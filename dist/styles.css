@@ -7,3 +7,5 @@
 html[lang="en"] .intro h1 { font-size: clamp(30px, 4vw, 60px); }
 html[dir="ltr"] .search input { text-align: left; }
 html[dir="ltr"] .intro-index { border-right: 0; border-left: 1px solid #5de0cb; padding-left: 24px; }
+
+.account-menu{display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:14px;margin-inline-start:auto}.account-menu a,.account-menu button{color:var(--accent)}.account-menu form{margin:0}.account-menu button{background:none;border:0;padding:0;font:inherit;cursor:pointer}.account-name{color:var(--ink)}

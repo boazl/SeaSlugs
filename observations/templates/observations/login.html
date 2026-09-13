@@ -1,0 +1,1 @@
+{% extends 'observations/base.html' %}{% block content %}<h1>כניסה / Login</h1><form method="post">{% csrf_token %}{{ form.as_p }}<button>כניסה</button></form><p><a href="{% url 'signup' %}">יצירת חשבון חדש</a></p>{% endblock %}

@@ -1,0 +1,38 @@
+{% extends 'observations/base.html' %}
+{% block content %}
+<h1>ניהול גרסאות וגיבויים</h1>
+<p class="notice">אתה עובד כעת על <strong>{% if local %}המק המקומי{% else %}האתר ב־Render{% endif %}</strong>. פרסום קוד והעברת נתונים הם שני שלבים נפרדים.</p>
+<p><a href="http://127.0.0.1:8000/admin/releases/">ניהול במק</a> · <a href="https://seaslugs.onrender.com/admin/releases/" target="_blank" rel="noopener">ניהול באתר</a> · <a href="https://dashboard.render.com/" target="_blank" rel="noopener">Render</a> · <a href="https://github.com/boazl/SeaSlugs" target="_blank" rel="noopener">GitHub</a></p>
+<h2>1. גיבוי לפני שינוי</h2>
+<p>צור גיבוי במק וגם באתר. הכפתור מגבה את הסביבה שמופיעה בראש העמוד ומוריד ZIP עם מסד SQLite והתמונות שהועלו. הגיבוי כולל משתמשים ומידע פרטי. להפסקה מתואמת של שינויים במסד ובתמונות, בקש מהמשתמשים להימנע מעריכה בזמן הגיבוי.</p>
+<form method="post">{% csrf_token %}<input type="hidden" name="action" value="backup"><button>גיבוי הסביבה הנוכחית והורדה למק</button></form>
+<p>חלופה במסוף: גיבוי מסד בלבד (בלי תמונות), נשמר בתיקיית backups בסביבה שבה הופעלה הפקודה:</p>
+<pre dir="ltr"><code>python manage.py backup_database</code></pre>
+<details><summary>בפרסום הראשון: הגיבוי בשרת הישן, לפני שהכלי זמין בו</summary>
+<p>ב־Render פתח SeaSlugs → Shell. הפקודה הבאה יוצרת גיבוי מסד בדיסק הקבוע, בלי לשנות את המקור. הורד אותו באמצעות scp לפי פרטי Connect → SSH ב־Render. הורד גם את תיקיית media אם קיימת.</p>
+<pre dir="ltr"><code>python -c "import sqlite3,datetime; p='/var/data/pre-release-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S')+'.sqlite3'; a=sqlite3.connect('/var/data/db.sqlite3'); b=sqlite3.connect(p); a.backup(b); b.close(); a.close(); print(p)"</code></pre>
+<p>לאחר עדכון הקוד יהיה אפשר להוריד גיבוי מהכפתור גם באתר.</p></details>
+<h2>2. בדיקת הגרסה המקומית</h2>
+<p>העתק למסוף במק. המשך רק אם הבדיקות הסתיימו בהצלחה.</p>
+<pre dir="ltr"><code>cd /Users/boazliebes/SeaSlugs
+.venv/bin/python manage.py check
+.venv/bin/python manage.py test observations
+.venv/bin/python manage.py makemigrations --check --dry-run</code></pre>
+<h2>3. הכנת הנתונים להעברה</h2>
+<p>פתח <a href="{% url 'table-transfer' %}">העברת טבלאות</a> בסביבת המקור, וייצא את הטבלאות הדרושות. אפשר להעביר מהמק לאתר או מהאתר למק. סדר הייבוא ביעד:</p>
+<ol>{% for key,label in tables %}<li>{{ label }} <code>{{ key }}</code></li>{% endfor %}</ol>
+<p>ב־Samples המשתמש משויך לפי שם משתמש. המשתמש חייב כבר להתקיים ביעד; סיסמאות ותפקידים אינם מועתקים. ההעברה אינה מוחקת רשומות שאינן בקובץ, ואינה מעבירה רשומות מסומנות כמחוקות. תמונות YouTube נתמכות; העברה עם קובצי תמונה מקומיים תיעצר ותדרוש טיפול במדיה.</p>
+<h2>4. פרסום הקוד</h2>
+<p>הפעל את הסקריפט במק. הוא מציג את השינויים ומבקש אישור לפני העלאה ל־GitHub.</p>
+<pre dir="ltr"><code>open "/Users/boazliebes/SeaSlugs/Publish SeaSlugs.command"</code></pre>
+<p>ב־Render בחר SeaSlugs → Manual Deploy → Deploy latest commit אם לא הופעלה פריסה אוטומטית. בפריסה שמשנה את מבנה הנתונים יש לתאם חלון תחזוקה; אחרי שהקוד הופך ל־Live ועד להשלמת הייבוא, ייתכן שהגלריה תהיה ריקה.</p>
+<h2>5. השוואה וייבוא ביעד</h2>
+<p>פתח את כלי העברת הטבלאות <strong>בסביבת היעד</strong>. העלה כל קובץ לפי הסדר, קרא את ההבדלים ואשר רק את העדכונים הרצויים. לפני כל ייבוא נוצר גיבוי אוטומטי. הרצה חוזרת עם אותם נתונים לא אמורה ליצור כפילויות.</p>
+<p><a href="http://127.0.0.1:8000/admin/table-transfer/">העברה במק</a> · <a href="https://seaslugs.onrender.com/admin/table-transfer/" target="_blank" rel="noopener">העברה באתר</a></p>
+<h2>6. בדיקה לאחר פרסום</h2>
+<p>בדוק את <a href="https://seaslugs.onrender.com/" target="_blank" rel="noopener">הגלריה באתר</a>, מספר הסרטונים, כניסה ויציאה, והתצפיות של משתמש רגיל ושל מנהל. שמור את מזהה הגרסה המוצג ב־Render ליד קובץ הגיבוי.</p>
+<h2>שחזור במקרה תקלה</h2>
+<p>אל תחליף קובץ SQLite בזמן שהאתר פועל. שחזור מלא דורש עצירת כל תהליכי האתר, בחירת קוד תואם לגיבוי והחזרת המסד והמדיה יחד. הכלי הזה אינו מבצע החלפה מלאה אוטומטית. תיקוני תוכן נקודתיים אפשר לבצע באמצעות ייצוא והשוואת טבלאות.</p>
+<script>document.querySelectorAll('pre').forEach(pre=>{const b=document.createElement('button');b.type='button';b.textContent='העתקת הפקודה';b.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(pre.textContent);b.textContent='הועתק'}catch(e){b.textContent='סמן והעתק את הפקודה ידנית'}});pre.after(b)})</script>
+<style>pre{white-space:pre-wrap;overflow-wrap:anywhere;padding:18px;background:#102630;border:1px solid #345;text-align:left;font-size:14px}h2{margin-top:40px}details{margin-top:20px}</style>
+{% endblock %}

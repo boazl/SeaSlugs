@@ -1,0 +1,11 @@
+{% extends 'observations/base.html' %}{% block content %}<h1>{{ title }}</h1>
+{% if observation_form %}<p>כל תצפית כוללת מין, מדינה, אזור, שנה וסרטון. ללא העלאת תמונה תוצג התמונה המקדימה של YouTube. מין חדש לאזור מתפרסם מיד אם כל הנתונים מזוהים; אחרת התצפית ממתינה לבדיקה.</p>{% endif %}
+<form method="post" enctype="multipart/form-data">{% csrf_token %}{{ form.as_p }}<button type="submit">שמירה / Save</button></form>
+{% if observation_form %}{{ locations|json_script:'locations' }}<script>
+const locations=JSON.parse(document.getElementById('locations').textContent);
+const fields=['species','country','region','site'];
+function updateOther(){for(const name of fields){const other=document.querySelector('[data-other-for="'+name+'"]');const enabled=document.getElementById('id_'+name).value==='other';other.closest('p').hidden=!enabled;other.disabled=!enabled;other.required=enabled;}}
+function filterOptions(child,parent,data,key,reset){const field=document.getElementById('id_'+child);const parentValue=document.getElementById('id_'+parent).value;for(const option of field.options){if(!option.value||option.value==='other')continue;const row=data.find(x=>String(x.id)===option.value);option.hidden=String(row[key])!==parentValue;option.disabled=option.hidden;}if(reset&&field.selectedOptions[0]?.disabled)field.value='';}
+function updateLocations(reset){filterOptions('region','country',locations.regions,'country_id',reset);filterOptions('site','region',locations.sites,'region_id',reset);updateOther();}
+for(const name of fields)document.getElementById('id_'+name).addEventListener('change',()=>updateLocations(true));updateLocations(false);
+</script>{% endif %}{% endblock %}

@@ -46,6 +46,7 @@ MEDIA_URL = "/media/"
 # Application definition
 
 INSTALLED_APPS = [
+    'observations',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -142,3 +143,7 @@ STORAGES = {
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+LOGIN_URL = "/observations/login/"
+LOGIN_REDIRECT_URL = "/observations/"
+LOGOUT_REDIRECT_URL = "/observations/"

@@ -2,7 +2,10 @@
 const videos=window.SEASLUGS.videos;
 const regions={...window.SEASLUGS.regions};
 let language="he";
-const englishRegions={romblon:"Romblon · Philippines",redsea:"Red Sea · Eilat",mediterranean:"Mediterranean · Akhziv"};
+const englishRegions={...window.SEASLUGS.regions_en};
+const filters=document.querySelector('.filters');
+filters.replaceChildren();
+for(const [key,label] of [['all','כל האזורים'],...Object.entries(regions)]){const b=document.createElement('button');b.type='button';b.className='filter';b.dataset.region=key;b.textContent=label;filters.append(b)}
 const grid=document.querySelector('#grid');
 const search=document.querySelector('#search');
 const dialog=document.querySelector('#player');

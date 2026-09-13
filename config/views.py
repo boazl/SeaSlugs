@@ -10,6 +10,29 @@ FILES = {
 }
 
 def gallery_file(request, filename='index.html'):
+    if filename == 'index.html':
+        from django.template import engines
+        from django.http import HttpResponse
+        template = engines['django'].from_string((settings.BASE_DIR / 'dist' / filename).read_text())
+        response = HttpResponse(template.render({}, request))
+        response['Cache-Control'] = 'private, no-store'
+        return response
+    if filename == 'catalog.js':
+        import json
+        from django.http import HttpResponse
+        from observations.models import Sample, youtube_id
+        rows = Sample.objects.filter(status='published', deleted_at__isnull=True, species__isnull=False, region__isnull=False, country__isnull=False, year__isnull=False).select_related('species', 'region', 'country').order_by('gallery_order', 'pk')
+        data = {'videos': [], 'regions': {}, 'regions_en': {}}
+        for item in rows:
+            if any(getattr(item, field + '_other') for field in ('species', 'country', 'region', 'site')):
+                continue
+            key = str(item.region_id)
+            data['regions'][key] = f'{item.region.name} · {item.country.name}'
+            data['regions_en'][key] = f'{item.region.name_en or item.region.name} · {item.country.name_en or item.country.name}'
+            data['videos'].append({'id': youtube_id(item.video_url), 'sample_id': item.pk, 'title': item.title or item.species.scientific_name, 'region': key, 'year': item.year, 'month': item.month, 'thumbnail': f'/observations/{item.pk}/photo/' if item.image else item.thumbnail})
+        response = HttpResponse('window.SEASLUGS = ' + json.dumps(data, ensure_ascii=False).replace('<', '\\u003c') + ';', content_type='text/javascript; charset=utf-8')
+        response['Cache-Control'] = 'no-store'
+        return response
     if filename not in FILES:
         raise Http404
     return FileResponse((settings.BASE_DIR / 'dist' / filename).open('rb'), content_type=FILES[filename])

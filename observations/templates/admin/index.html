@@ -1,0 +1,1 @@
+{% extends "admin/index.html" %}{% block content %}{% if user.is_superuser %}<a href="{% url 'releases' %}">ניהול גרסאות וגיבויים</a> <p><a href="{% url 'table-transfer' %}">העברת טבלאות — ייצוא, השוואה וייבוא</a></p>{% endif %}{{ block.super }}{% endblock %}
