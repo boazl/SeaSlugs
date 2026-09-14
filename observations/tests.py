@@ -26,7 +26,8 @@ class WorkflowTests(TestCase):
     def test_first_repeat_other_and_approval(self):
         self.assertEqual(self.record().status,'published')
         repeat=self.record();self.assertEqual(repeat.status,'pending')
-        repeat.save_reviewed(actor=self.user,approve=True);self.assertEqual(repeat.status,'published')
+        with self.assertRaises(ValidationError):repeat.save_reviewed(actor=self.user,approve=True)
+        repeat.refresh_from_db();self.assertEqual(repeat.status,'pending')
         unknown=self.record(species=None,species_other='Unknown');self.assertEqual(unknown.status,'pending')
         with self.assertRaises(ValidationError):unknown.save_reviewed(actor=self.user,approve=True)
     def test_form_other_and_invalid_hierarchy_date(self):
@@ -53,7 +54,38 @@ class WorkflowTests(TestCase):
         output=BytesIO();Image.new('RGB',(2000,1800),'blue').save(output,'PNG')
         form=SampleForm(self.data(),{'image':SimpleUploadedFile('test.png',output.getvalue(),content_type='image/png')},instance=Sample(owner=self.user))
         self.assertTrue(form.is_valid(),form.errors)
-        image=Image.open(form.cleaned_data['image']);self.assertLessEqual(max(image.size),1600);self.assertEqual(image.format,'JPEG')
+        image=Image.open(form.cleaned_data['image']);self.assertLessEqual(image.width,1920);self.assertLessEqual(image.height,1080);self.assertEqual(image.format,'JPEG')
+    def test_photo_only_gallery_and_permissions(self):
+        import json
+        with tempfile.TemporaryDirectory() as folder, override_settings(MEDIA_ROOT=folder):
+            output=BytesIO();Image.new('RGB',(3840,2160),'blue').save(output,'JPEG')
+            data=self.data();data['video_url']=''
+            form=SampleForm(data,{'image':SimpleUploadedFile('photo.jpg',output.getvalue(),content_type='image/jpeg')},instance=Sample(owner=self.user))
+            self.assertTrue(form.is_valid(),form.errors)
+            self.assertEqual(Image.open(form.cleaned_data['image']).size,(1920,1080))
+            item=form.save(commit=False);item.save_reviewed()
+            catalog=json.loads(self.client.get('/catalog.js').content.decode().removeprefix('window.SEASLUGS = ').removesuffix(';'))
+            entry=catalog['videos'][0]
+            self.assertIsNone(entry['id']);self.assertEqual(entry['thumbnail'],entry['image_url'])
+            url=f'/observations/{item.pk}/photo/'
+            response=self.client.get(url);self.assertEqual(response.status_code,200);response.close()
+            item.status='pending';item.save()
+            self.assertEqual(self.client.get(url).status_code,404)
+            self.client.force_login(self.user)
+            response=self.client.get(url);self.assertEqual(response.status_code,200);response.close()
+            cleared=dict(data,**{'image-clear':'on'})
+            self.assertFalse(SampleForm(cleared,instance=item).is_valid())
+            self.client.force_login(self.other);self.assertEqual(self.client.get(url).status_code,404)
+
+    def test_media_required_and_small_photo_not_enlarged(self):
+        data=self.data();data['video_url']=''
+        form=SampleForm(data,instance=Sample(owner=self.user))
+        self.assertFalse(form.is_valid());self.assertIn('video_url',form.errors)
+        output=BytesIO();Image.new('RGB',(400,600),'blue').save(output,'PNG')
+        form=SampleForm(data,{'image':SimpleUploadedFile('small.png',output.getvalue(),content_type='image/png')},instance=Sample(owner=self.user))
+        self.assertTrue(form.is_valid(),form.errors)
+        self.assertEqual(Image.open(form.cleaned_data['image']).size,(400,600))
+
     def test_routes_signup_no_privilege_escalation(self):
         for url in ['/observations/login/','/observations/signup/']:
             self.assertEqual(self.client.get(url).status_code,200)

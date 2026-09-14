@@ -9,14 +9,15 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
-from .models import Country, Sea, Region, Site, Species, Sample, youtube_id
+from .models import Country, Sea, Region, Site, Species, Sample, DiveTrip, youtube_id
 from django.contrib.auth import get_user_model
 from .account_transfer import ACCOUNT_TABLES, account_row, account_plan
 
-TABLES = {'species': (Species, ['scientific_name','name_he','name_en','source_id']),
+TABLES = {'species': (Species, ['scientific_name','name_he','name_en','source_id','genus','species','author','order','family','superfamily','accepted_genus','accepted_species','common_name','transliteration','language','formatted_author','distribution','phylogenetic_order','full_species_name_with_order','reference_author']),
           'countries': (Country,['name','name_en']), 'seas': (Sea,['name','name_en']),
           'regions': (Region,['name','name_en','country','sea']), 'sites': (Site,['name','name_en','region']),
-          'samples': (Sample, ['title','owner','species','country','region','site','species_other','country_other','region_other','site_other','year','month','day','depth','video_url','status','source_id','gallery_order','source_metadata'])}
+          'trips': (DiveTrip, ['code','title','source_sort','year','month','start_day','duration_days','country_name','region_name','reserve','sea_name','photographer','species_count','source_metadata']),
+          'samples': (Sample, ['title','kind','trip','owner','species','country','region','site','species_other','country_other','region_other','site_other','year','month','day','depth','video_url','status','source_id','gallery_order','source_metadata','transfer_id','image'])}
 TABLES.update(ACCOUNT_TABLES)
 
 
@@ -37,8 +38,6 @@ def row(obj, fields):
 def export_table(table):
     if table not in TABLES: raise ValidationError('טבלה לא נתמכת.')
     model,fields=TABLES[table]
-    if table == 'samples' and model.objects.filter(image__gt='').exists():
-        raise ValidationError('יש תמונות שהועלו לקבצים. העברת Samples זו תומכת בתמונות YouTube בלבד; יש להעביר את קובצי המדיה בנפרד לפני סנכרון רשומות אלו.')
     return {'format':'seaslugs-reference-v1','table':table,'exported_at':timezone.now().isoformat(),
             'rows':[row(obj,fields) for obj in (model.objects.filter(deleted_at__isnull=True) if table == 'samples' else model.objects.all()).order_by('pk')]}
 
@@ -77,11 +76,19 @@ def plan(document):
         return sample_plan(document, TABLES['samples'][1])
     model,fields=TABLES[document['table']]
     result=[]; seen=set(); targets=set()
+    if model is Species and document['rows'] and all(isinstance(r,dict) and {'scientific_name','name_he','name_en','source_id'}<=set(r)<=set(fields) and set(r)==set(document['rows'][0]) for r in document['rows']):
+        fields=[f for f in fields if f in document['rows'][0]]
     for number,incoming in enumerate(document['rows'],1):
         if not isinstance(incoming,dict) or set(incoming)!=set(fields): raise ValidationError(f'שדות לא תואמים בשורה {number}; יש לעדכן את הקוד בשתי הסביבות.')
         values={}
         for f,v in incoming.items():
             if f in ('country','sea','region'): values[f]=related(f,v)
+            elif model is DiveTrip and f in ('year','month','start_day','duration_days','species_count'):
+                if v is not None and type(v) is not int: raise ValidationError('נדרש מספר שלם: '+f)
+                values[f] = v
+            elif model is DiveTrip and f == 'source_metadata':
+                if not isinstance(v,dict): raise ValidationError('מידע מקור לא תקין.')
+                values[f] = v
             elif not isinstance(v,str): raise ValidationError(f'ערך לא תקין בשורה {number}.')
             else: values[f]=v.strip()
         if model is Species:
@@ -91,6 +98,9 @@ def plan(document):
             obj=source or named
             if obj and obj.source_id and values['source_id']!=obj.source_id: raise ValidationError('מזהי מקור שונים עבור אותו מין; נדרשת התאמה ידנית.')
             identity=values['source_id'] or values['scientific_name']
+        elif model is DiveTrip:
+            obj=unique(model,code=values['code'])
+            identity=values['code']
         else:
             lookup={'name':values['name']}
             if model is Region:lookup['country']=values['country']
@@ -102,6 +112,9 @@ def plan(document):
         if obj: targets.add(obj.pk)
         before=row(obj,fields) if obj else {}
         candidate=model(pk=obj.pk if obj else None,**values)
+        if model is Species and obj:
+            for field in TABLES['species'][1]:
+                if field not in values: setattr(candidate,field,getattr(obj,field))
         if obj: candidate._state.adding = False
         candidate.full_clean()
         after=row(candidate,fields)
@@ -119,13 +132,16 @@ def create_backup():
     return backup
 
 
-def apply(document, expected, actor=None):
+def apply(document, expected, actor=None, images=None):
     backup = create_backup()
     with transaction.atomic():
         # A write statement obtains SQLite's reservation before re-reading preview state.
         Species.objects.filter(pk=-1).update(scientific_name=F('scientific_name'))
         if fingerprint()!=expected:raise ValidationError('הנתונים השתנו מאז התצוגה המקדימה. יש ליצור תצוגה חדשה.')
         items=plan(document)
+        if images:
+            from .media_transfer import save_images
+            save_images(images)
         if document['table'] == 'users':
             for item in items:
                 user = item['object']

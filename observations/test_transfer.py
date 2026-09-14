@@ -50,3 +50,17 @@ class TransferTests(TestCase):
         root=User.objects.create_superuser('root','root@example.com','test-pass');self.client.force_login(root)
         self.assertEqual(self.client.get('/admin/table-transfer/').status_code,200)
         self.assertEqual(self.client.post('/admin/table-transfer/',{'action':'export','table':'species'}).json()['rows'][0]['scientific_name'],'Species a')
+    def test_scientific_species_fields_roundtrip_and_legacy_preservation(self):
+        self.species.genus='Species';self.species.species='a';self.species.author='Author, 2020';self.species.save()
+        doc=export_table('species');self.assertEqual(doc['rows'][0]['author'],'Author, 2020')
+        self.assertEqual(plan(doc)[0]['action'],'same')
+        legacy=dict(doc,rows=[{k:doc['rows'][0][k] for k in ['scientific_name','name_he','name_en','source_id']}])
+        legacy['rows'][0]['name_he']='updated'
+        with patch('observations.table_transfer.create_backup',return_value=Path('test.sqlite3')):apply(legacy,fingerprint())
+        self.species.refresh_from_db();self.assertEqual(self.species.author,'Author, 2020')
+    def test_species_admin_scientific_fields_and_hidden_import_id(self):
+        user=User.objects.create_superuser('scientific-admin',password='test-password')
+        self.client.force_login(user)
+        response=self.client.get(f'/admin/observations/species/{self.species.pk}/change/')
+        self.assertContains(response,'name="genus"');self.assertContains(response,'name="author"')
+        self.assertNotContains(response,'name="source_id"')

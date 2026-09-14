@@ -6,11 +6,19 @@ from django.db.models import Q
 from django.http import Http404, FileResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
-from .models import Sample, Profile, Region, Site
+from .models import Sample, Profile, Region, Site, DiveTrip
 from .forms import SignupForm, SampleForm, ProfileForm
 
 
 def is_manager(user): return user.is_authenticated and user.is_staff and user.has_perm('observations.change_sample')
+
+
+def trips(request):
+    from django.db.models import Prefetch
+    published = Sample.objects.filter(status='published', deleted_at__isnull=True, trip__isnull=False, country__isnull=False, region__isnull=False, year__isnull=False,
+        species_other='',country_other='',region_other='',site_other='').filter(Q(kind='collection', species__isnull=True) | Q(kind='species',species__isnull=False)).select_related('species')
+    rows = DiveTrip.objects.filter(samples__in=published).distinct().prefetch_related(Prefetch('samples',queryset=published,to_attr='public_samples'))
+    return render(request, 'observations/trips.html', {'trips':rows})
 
 @login_required
 def listing(request):
@@ -27,7 +35,7 @@ def signup(request):
     if request.method == 'POST' and form.is_valid():
         user=form.save()
         user.groups.add(Group.objects.get_or_create(name='New user')[0])
-        Profile.objects.create(user=user,display_name=user.username)
+        Profile.objects.create(user=user,display_name=user.get_full_name() or user.username)
         login(request,user)
         return redirect('profile')
     return render(request,'observations/form.html',{'form':form,'title':'הרשמה / Sign up'})

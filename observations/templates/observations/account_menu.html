@@ -1,6 +1,7 @@
 <nav class="account-menu" aria-label="חשבון / Account">
+<a href="{% url 'dive-trips' %}">מסעות צלילה / Dive trips</a>
 {% if user.is_authenticated %}
-    <span class="account-name">שלום, <bdi>{{ user.get_username }}</bdi></span>
+    <span class="account-name">שלום, <bdi>{{ user.first_name|default:"חבר/ת הקהילה" }}</bdi></span>
     <a class="community-link" href="{% url 'observations' %}">תצפיות / Observations</a>
     <a href="{% url 'profile' %}">הפרופיל שלי / Profile</a>
     <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit">יציאה / Logout</button></form>

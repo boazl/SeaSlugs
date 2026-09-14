@@ -1,5 +1,5 @@
 {% extends 'observations/base.html' %}{% block content %}<h1>{{ title }}</h1>
-{% if observation_form %}<p>כל תצפית כוללת מין, מדינה, אזור, שנה וסרטון. ללא העלאת תמונה תוצג התמונה המקדימה של YouTube. מין חדש לאזור מתפרסם מיד אם כל הנתונים מזוהים; אחרת התצפית ממתינה לבדיקה.</p>{% endif %}
+{% if observation_form %}<p>בחרו מין יחיד או אוסף מינים. דגימת מין מחייבת מין; אוסף מחייב מסע צלילה וכותרת, ללא בחירת מין. בשניהם נדרשים מדינה, אזור, שנה ותמונה או סרטון (אפשר גם שניהם). אוספים מתפרסמים במסעות הצלילה לאחר אישור מנהל. ללא העלאת תמונה תוצג התמונה המקדימה של YouTube. מין חדש לאזור מתפרסם מיד אם כל הנתונים מזוהים; אחרת התצפית ממתינה לבדיקה.</p>{% endif %}
 <form method="post" enctype="multipart/form-data">{% csrf_token %}{{ form.as_p }}<button type="submit">שמירה / Save</button></form>
 {% if observation_form %}{{ locations|json_script:'locations' }}<script>
 const locations=JSON.parse(document.getElementById('locations').textContent);

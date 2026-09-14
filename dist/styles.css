@@ -9,3 +9,10 @@ html[dir="ltr"] .search input { text-align: left; }
 html[dir="ltr"] .intro-index { border-right: 0; border-left: 1px solid #5de0cb; padding-left: 24px; }
 
 .account-menu{display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:14px;margin-inline-start:auto}.account-menu a,.account-menu button{color:var(--accent)}.account-menu form{margin:0}.account-menu button{background:none;border:0;padding:0;font:inherit;cursor:pointer}.account-name{color:var(--ink)}
+
+.gallery-group-title{grid-column:1 / -1;margin:18px 0 0;color:var(--accent)}
+html[dir="ltr"] .card h3.hebrew{direction:ltr;text-align:left}
+
+#frame.image-view{aspect-ratio:auto;display:flex;justify-content:center}#frame.image-view img{display:block;max-width:100%;height:auto;object-fit:contain}dialog:has(.image-view){width:min(1920px,96vw)}
+
+.photographer{display:block;font-size:14px;color:var(--muted);margin-top:5px}.collection-selection{display:flex;align-items:center;gap:20px;flex-wrap:wrap;margin-bottom:20px}.collection-selection button{background:var(--accent);color:var(--bg);padding:8px 16px;border:0;border-radius:6px}

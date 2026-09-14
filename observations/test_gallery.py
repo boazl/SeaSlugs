@@ -50,10 +50,10 @@ class GalleryTests(TestCase):
         self.assertNotContains(response, 'href="/observations/"')
         self.assertContains(response, 'href="/observations/login/"')
         self.assertEqual(self.client.get('/observations/').status_code, 302)
-        member = User.objects.create_user('ordinary-member', password='test-password')
+        member = User.objects.create_user('ordinary-member', first_name='Dana', password='test-password')
         self.client.force_login(member)
         response = self.client.get('/')
-        self.assertContains(response, 'ordinary-member')
+        self.assertContains(response, '<bdi>Dana</bdi>');self.assertNotContains(response, 'ordinary-member')
         self.assertContains(response, 'href="/observations/"')
         self.assertEqual(response['Cache-Control'], 'private, no-store')
         for suffix in ('', '?mine=0', '?owner=1'):

@@ -2,6 +2,7 @@ from django.urls import path
 from django.contrib.auth import views as auth
 from . import views
 urlpatterns=[
+ path('trips/',views.trips,name='dive-trips'),
  path('',views.listing,name='observations'),
  path('new/',views.edit,name='observation-new'),
  path('<int:pk>/edit/',views.edit,name='observation-edit'),

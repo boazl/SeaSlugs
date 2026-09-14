@@ -1,0 +1,16 @@
+{% extends 'observations/base.html' %}{% block content %}
+<h1>מסעות צלילה / Dive trips</h1>
+<p>סרטוני אוסף ממסעות צלילה, לצד הדגימות המשויכות לכל מסע.</p>
+{% for trip in trips %}
+<section style="margin:32px 0;border-top:1px solid #36515a;padding-top:20px">
+<h2>{{trip.title}}</h2>
+<p>{{trip.photographer}} · {{trip.country_name}} · {{trip.region_name}}{% if trip.reserve %} · {{trip.reserve}}{% endif %}{% if trip.year %} · {{trip.year}}{% if trip.month %}/{{trip.month}}{% endif %}{% endif %}</p>
+<p>{% if trip.species_count != None %}מספר מינים שנצפו במסע{% else %}מספר מינים משויכים למסע{% endif %}: <strong>{{trip.display_species_count}}</strong></p>
+<div class="cards">
+{% for item in trip.public_samples %}{% if item.kind == 'collection' %}
+<article><a href="{% if item.video_url %}{{item.video_url}}{% else %}{% url 'observation-photo' item.pk %}{% endif %}" target="_blank" rel="noopener">{% if item.image %}<img src="{% url 'observation-photo' item.pk %}" alt="" loading="lazy">{% else %}<img src="{{item.thumbnail}}" alt="" loading="lazy">{% endif %}<h3>{{item.title}}</h3><small>צילום: {{item.photographer_name}}</small><span>{% if item.video_url %}צפייה בסרטון המסע ב־YouTube ↗{% else %}צפייה בתמונה המלאה ↗{% endif %}</span></a></article>
+{% endif %}{% endfor %}</div>
+<details><summary>דגימות מינים מהמסע</summary><ul>{% for item in trip.public_samples %}{% if item.kind == 'species' %}<li><a href="{% if item.video_url %}{{item.video_url}}{% else %}{% url 'observation-photo' item.pk %}{% endif %}" target="_blank" rel="noopener">{{item.species}}</a> · צילום: {{item.photographer_name}}</li>{% endif %}{% endfor %}</ul></details>
+</section>
+{% empty %}<p>עדיין אין מסעות עם סרטונים מפורסמים.</p>{% endfor %}
+{% endblock %}

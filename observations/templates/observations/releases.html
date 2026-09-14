@@ -1,5 +1,5 @@
 {% extends 'observations/base.html' %}
-{% block content %}
+{% block content %}<a href="{% url 'image-manager' %}">ניהול והעברת תמונות</a>
 <h1>ניהול גרסאות וגיבויים</h1>
 <p class="notice">אתה עובד כעת על <strong>{% if local %}המק המקומי{% else %}האתר ב־Render{% endif %}</strong>. פרסום קוד והעברת נתונים הם שני שלבים נפרדים.</p>
 <p><a href="http://127.0.0.1:8000/admin/releases/">ניהול במק</a> · <a href="https://seaslugs.onrender.com/admin/releases/" target="_blank" rel="noopener">ניהול באתר</a> · <a href="https://dashboard.render.com/" target="_blank" rel="noopener">Render</a> · <a href="https://github.com/boazl/SeaSlugs" target="_blank" rel="noopener">GitHub</a></p>
