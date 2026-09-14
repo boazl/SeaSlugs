@@ -27,6 +27,6 @@ def releases(request):
         response = FileResponse(archive, as_attachment=True, filename='seaslugs-' + backup.stem + '.zip')
         response['Cache-Control'] = 'private, no-store'
         return response
-    response = render(request, 'observations/releases.html', {'local':not settings.PRODUCTION, 'tables':[(key,str(model._meta.verbose_name_plural)) for key,(model,fields) in TABLES.items()]})
+    response = render(request, 'observations/releases.html', {'local':not settings.PRODUCTION, 'tables':[(key,str(model._meta.verbose_name_plural)) for key in ('species','countries','seas','regions','sites','groups','users','profiles','samples') for model,fields in [TABLES[key]]]})
     response['Cache-Control'] = 'private, no-store'
     return response

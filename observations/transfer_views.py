@@ -40,7 +40,7 @@ def transfer(request):
                 data=signing.loads(request.POST.get('token',''),salt='table-transfer',max_age=1800)
                 if data['user']!=request.user.pk:raise PermissionDenied
                 if request.POST.get('confirm')!='yes':raise ValidationError('יש לאשר את העדכון.')
-                items,backup=apply(data['doc'],data['snapshot'])
+                items,backup=apply(data['doc'],data['snapshot'],actor=request.user)
                 messages.success(request,f"הועברו {sum(i['action']!='same' for i in items)} רשומות חדשות או מעודכנות. נוצר גיבוי: {backup}")
                 return redirect('table-transfer')
         except (ValidationError,ValueError,UnicodeError,signing.BadSignature) as exc:

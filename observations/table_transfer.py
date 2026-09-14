@@ -11,11 +11,13 @@ from django.db.models import F
 from django.utils import timezone
 from .models import Country, Sea, Region, Site, Species, Sample, youtube_id
 from django.contrib.auth import get_user_model
+from .account_transfer import ACCOUNT_TABLES, account_row, account_plan
 
 TABLES = {'species': (Species, ['scientific_name','name_he','name_en','source_id']),
           'countries': (Country,['name','name_en']), 'seas': (Sea,['name','name_en']),
           'regions': (Region,['name','name_en','country','sea']), 'sites': (Site,['name','name_en','region']),
           'samples': (Sample, ['title','owner','species','country','region','site','species_other','country_other','region_other','site_other','year','month','day','depth','video_url','status','source_id','gallery_order','source_metadata'])}
+TABLES.update(ACCOUNT_TABLES)
 
 
 def reference(obj):
@@ -24,6 +26,8 @@ def reference(obj):
 
 
 def row(obj, fields):
+    if any(isinstance(obj, model) for model, _ in ACCOUNT_TABLES.values()):
+        return account_row(obj, fields)
     if isinstance(obj, Sample):
         from .sample_transfer import sample_row
         return sample_row(obj, fields)
@@ -66,6 +70,8 @@ def related(field,value):
 def plan(document):
     if not isinstance(document,dict) or document.get('format')!='seaslugs-reference-v1' or document.get('table') not in TABLES or not isinstance(document.get('rows'),list): raise ValidationError('קובץ העברה לא תקין או גרסה לא נתמכת.')
     if len(document['rows'])>10000: raise ValidationError('עד 10,000 רשומות בהעברה.')
+    if document['table'] in ACCOUNT_TABLES:
+        return account_plan(document)
     if document['table'] == 'samples':
         from .sample_transfer import sample_plan
         return sample_plan(document, TABLES['samples'][1])
@@ -113,13 +119,21 @@ def create_backup():
     return backup
 
 
-def apply(document, expected):
+def apply(document, expected, actor=None):
     backup = create_backup()
     with transaction.atomic():
         # A write statement obtains SQLite's reservation before re-reading preview state.
         Species.objects.filter(pk=-1).update(scientific_name=F('scientific_name'))
         if fingerprint()!=expected:raise ValidationError('הנתונים השתנו מאז התצוגה המקדימה. יש ליצור תצוגה חדשה.')
         items=plan(document)
+        if document['table'] == 'users':
+            for item in items:
+                user = item['object']
+                if actor and user.pk == actor.pk and not (user.is_active and user.is_staff and user.is_superuser):
+                    raise ValidationError('לא ניתן להסיר את גישת המנהל שמבצע את ההעברה. יש לבצע שינוי זה דרך מנהל אחר.')
         for item in items:
-            if item['action']!='same':item['object'].save()
+            if item['action']!='same':
+                item['object'].save()
+                for field, values in item.get('many', {}).items():
+                    getattr(item['object'],field).set(values)
     return items,backup.name
