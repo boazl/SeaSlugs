@@ -77,3 +77,13 @@ class FolderImportTests(TestCase):
         self.assertEqual(species.genus,'Thecacera');self.assertEqual(species.species,'picta');self.assertEqual(species.phylogenetic_order,'205')
         self.assertEqual(Sample.objects.filter(species=species).count(),1)
         self.assertContains(response,'דולגו 1 תמונות כפולות')
+    def test_ignores_edit_and_year_suffixes(self):
+        from .folder_import import filename_species,filename_stem
+        item=Species.objects.create(scientific_name='Phyllodesmium magnum')
+        for suffix in [' 2023-Edit',' 2003','-Edit','-edit','-Edit 2023',' 2023-Edit-Edit']:
+            filename='727-Phyllodesmium magnum'+suffix+'.jpeg'
+            self.assertEqual(filename_stem(filename),'Phyllodesmium magnum')
+            self.assertEqual(filename_species(filename),'Phyllodesmium magnum')
+            self.assertEqual(match_species(filename,[item]),item.pk)
+        self.assertEqual(filename_species('C20-Thuridilla sp. 4 (2021)-Edit.jpg'),'Thuridilla sp. 4 (2021)')
+        self.assertEqual(filename_species('713-Tenellia sp. 18 2023-Edit.jpg'),'Tenellia sp. 18')

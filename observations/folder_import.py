@@ -25,8 +25,19 @@ def normalized(value):
     return ' '.join(unicodedata.normalize('NFC',value).split())
 
 
+def filename_stem(filename):
+    text=normalized(Path(filename).stem)
+    # Strip only trailing export labels and bare years, not numbered sp. IDs
+    # or parenthesized taxonomic qualifiers such as sp. 4 (2021).
+    while True:
+        cleaned=re.sub(r'(?:[ _-]+edit|[ _-]+(?:19|20)\d{2})$', '', text, flags=re.IGNORECASE).rstrip()
+        if cleaned==text:break
+        text=cleaned
+    return re.sub(r'^[A-Za-z]*\d+[ ._-]+','',text)
+
+
 def filename_species(filename):
-    text=re.sub(r'^[A-Za-z]*\d+[ ._-]+','',normalized(Path(filename).stem))
+    text=filename_stem(filename)
     match=re.match(r'^([A-Za-z]+\s+(?:cf\.\s+)?(?:spp?\.(?:\s+(?:\d{1,3}(?!\d)|[A-Z](?![A-Za-z])))?|[A-Za-z][a-z]+(?:-[a-z]+)*))',text)
     if not match:return ''
     name=match.group(1)
@@ -37,7 +48,7 @@ def filename_species(filename):
 
 
 def match_species(filename,species):
-    stem=re.sub(r'^[A-Za-z]*\d+[ ._-]+','',normalized(Path(filename).stem))
+    stem=filename_stem(filename)
     matches=[]
     for item in species:
         aliases={normalized(item.scientific_name),re.sub(r'\s+\([^)]*\)$','',normalized(item.scientific_name))}
@@ -85,6 +96,8 @@ def folder_import(request):
                 if not trip.year:raise ValidationError('במסע חסרה שנה.')
                 location(trip)
                 entries=[];localpath=request.POST.get('folder','').strip()
+                if localpath and request.FILES.getlist('images'):
+                    raise ValidationError('נבחרו גם נתיב תיקייה וגם קבצים. בחרו מקור אחד: נקו את הנתיב כדי להשתמש בקבצים שנבחרו.')
                 if localpath:
                     if settings.PRODUCTION:raise ValidationError('נתיב מקומי זמין רק במק. באתר השתמשו בבחירת תיקייה.')
                     directory=Path(localpath).expanduser()
