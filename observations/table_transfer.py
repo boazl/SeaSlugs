@@ -148,7 +148,7 @@ def apply(document, expected, actor=None, images=None):
                 if actor and user.pk == actor.pk and not (user.is_active and user.is_staff and user.is_superuser):
                     raise ValidationError('לא ניתן להסיר את גישת המנהל שמבצע את ההעברה. יש לבצע שינוי זה דרך מנהל אחר.')
         for item in items:
-            if item['action']!='same':
+            if item['action'] in ('new','update'):
                 item['object'].save()
                 for field, values in item.get('many', {}).items():
                     getattr(item['object'],field).set(values)

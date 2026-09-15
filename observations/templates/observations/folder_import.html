@@ -1,0 +1,15 @@
+{% extends 'observations/base.html' %}{% block content %}
+<h1>ייבוא תיקיית תמונות לתצפיות</h1>
+<p class="notice">סביבה: <strong>{% if local %}המק המקומי{% else %}השרת{% endif %}</strong>. הקבצים המקוריים לא משתנים.</p>
+<p>שם הקובץ משמש לזיהוי המין. השנה, החודש, המדינה והאזור נלקחים מהמסע שתבחרו; יום ועומק לא יומצאו. מין שכבר קיים במסע יקבל תמונה והתצפית והסרטון שלו יישמרו. עבור מין חסר תיווצר תצפית חדשה בבעלות המנהל שמבצע את הייבוא. מין שכבר מפורסם באזור במסע אחר ייחסם לבדיקה.</p>
+{% if error %}<p class="errorlist" role="alert">{{error}}</p>{% endif %}
+<form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="action" value="preview">
+<p><label>מסע צלילה<select name="trip" required><option value="">בחרו מסע</option>{% for trip in trips %}<option value="{{trip.pk}}">{{trip}}</option>{% endfor %}</select></label></p>
+{% if local %}<p><label>נתיב תיקייה במק (אפשר במקום בחירת תיקייה)<input type="text" name="folder" style="width:100%" dir="ltr" placeholder="/Users/boazliebes/Romblon Island/Species/Romblon 2026 with Species Names"></label></p>{% endif %}
+<p><label>בחירת תיקייה מהמחשב<input type="file" name="images" webkitdirectory multiple></label></p>
+<p>עד 500 תמונות, עד 10MB לתמונה. JPEG, PNG או WebP. התמונות יוקטנו עד 1920×1080 בלי חיתוך. הכנה זמנית מוגבלת ל־100MB ונמחקת אחרי ייבוא, או בניקוי הכנות שפג תוקפן.</p><button>בדיקת התאמות בלבד</button></form>
+{% if token %}<h2>{{chosen_trip}} — תצוגה מקדימה</h2><p>אם נבחרו כמה תמונות לאותו מין, הראשונה לפי סדר הרשימה תישמר והשאר ידולגו. אפשר לתקן התאמת מין ברשימה. החלפה מוחקת תמונה קודמת שאינה בשימוש, ללא גיבוי תמונה.</p>
+<form method="post">{% csrf_token %}<input type="hidden" name="action" value="apply"><input type="hidden" name="token" value="{{token}}">
+<table><thead><tr><th>בחירה</th><th>קובץ</th><th>מין</th><th>פעולה</th></tr></thead><tbody>{% for row in rows %}<tr><td><input type="checkbox" name="selected" value="{{row.index}}" {% if row.error %}disabled{% endif %} {% if row.checked %}checked{% endif %}></td><td dir="auto">{{row.filename}}</td><td><select name="species_{{row.index}}"><option value="">בחרו מין</option>{% if row.proposed %}<option value="new" {% if not row.species_id %}selected{% endif %}>יצירת מין חדש</option>{% endif %}{% for item in species %}<option value="{{item.pk}}" {% if item.pk == row.species_id %}selected{% endif %}>{{item}}</option>{% endfor %}</select>{% if row.proposed and not row.species_id %}<label>שם המין החדש<input name="new_name_{{row.index}}" value="{{row.proposed}}" dir="ltr"></label>{% endif %}</td><td>{% if row.error %}<span class="errorlist">{{row.error}}</span>{% else %}{{row.description}}{% endif %}</td></tr>{% endfor %}</tbody></table>
+<p><label><input type="checkbox" name="confirm" value="yes" required> בדקתי את המסע וההתאמות; אני מאשר הוספת המינים החדשים, יצירת תצפיות והחלפת התמונות המסומנות</label></p><button>ייבוא התמונות המסומנות</button></form>{% endif %}
+{% endblock %}

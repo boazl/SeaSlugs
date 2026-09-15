@@ -1,5 +1,5 @@
 {% extends 'observations/base.html' %}{% block content %}
-<h1>ניהול תמונות</h1><p class="notice">סביבה: <strong>{% if local %}המק המקומי{% else %}האתר ב־Render{% endif %}</strong> · {{images|length}} קבצים · {{total_bytes|filesizeformat}}</p>
+<h1>ניהול תמונות</h1><p><a href="{% url 'folder-import' %}">ייבוא תיקיית תמונות לפי מסע צלילה</a></p><p class="notice">סביבה: <strong>{% if local %}המק המקומי{% else %}האתר ב־Render{% endif %}</strong> · {{images|length}} קבצים · {{total_bytes|filesizeformat}}</p>
 <p><a href="http://127.0.0.1:8000/admin/images/">תמונות במק</a> · <a href="https://seaslugs.onrender.com/admin/images/" target="_blank" rel="noopener">תמונות באתר</a></p>
 <p>סמנו תמונות והורידו כקבצים רגילים. בסביבת היעד העלו את הקבצים ללא שינוי שמם. הדפדפן עשוי לבקש אישור להורדת כמה קבצים. הורדה מעתיקה את התמונה ואינה מוחקת את המקור. התמונות המשויכות נושאות את נתוני התצפית בקובץ. תצפית חסרה תתווסף ביעד; בתצפית קיימת תוחלף רק התמונה. יש להעביר תחילה משתמשים וטבלאות עזר. קובצי ההעברה כוללים פרטי תצפית ושם חשבון.</p>
 {% if error %}<p class="errorlist" role="alert">{{error}}</p>{% endif %}

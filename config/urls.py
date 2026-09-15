@@ -5,7 +5,10 @@ from observations.transfer_views import transfer
 from observations.release_views import releases
 from observations.image_manager import manager as image_manager, image_file
 
+from observations.folder_import import folder_import
+
 urlpatterns = [
+    path('admin/images/folder/',folder_import,name='folder-import'),
     path('admin/images/',image_manager,name='image-manager'),
     path('admin/images/file/',image_file,name='image-file'),
     path('admin/releases/', releases, name='releases'),

@@ -82,3 +82,28 @@ class MediaTransferTests(TestCase):
         self.assertEqual(self.client.get('/admin/images/').status_code,302)
         self.client.force_login(User.objects.create_user('staff',is_staff=True))
         self.assertEqual(self.client.get('/admin/images/').status_code,403)
+    def test_json_export_and_update_preserves_destination_image(self):
+        import json
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        self.client.force_login(self.sample.owner)
+        response=self.client.post('/admin/table-transfer/',{'action':'export','table':'samples'})
+        self.assertEqual(response['Content-Type'],'application/json; charset=utf-8')
+        doc=json.loads(response.content);doc['rows'][0]['title']='Table update'
+        doc['rows'][0]['image']='different/source/file.jpg'
+        original=self.sample.image.name
+        response=self.client.post('/admin/table-transfer/',{'action':'preview','file':SimpleUploadedFile('table.json',json.dumps(doc).encode())})
+        self.assertIn('token',response.context)
+        with patch('observations.table_transfer.create_backup',return_value=Path('backup.sqlite3')):
+            response=self.client.post('/admin/table-transfer/',{'action':'apply','confirm':'yes','token':response.context['token']})
+        self.assertEqual(response.status_code,302)
+        self.sample.refresh_from_db();self.assertEqual(self.sample.title,'Table update');self.assertEqual(self.sample.image.name,original)
+        self.assertTrue(Path(self.sample.image.path).exists())
+    def test_missing_photo_skips_only_that_row(self):
+        from .table_transfer import export_table
+        import uuid
+        doc=export_table('samples');doc['media_mode']='separate'
+        missing=dict(doc['rows'][0],transfer_id=str(uuid.uuid4()),title='Missing image')
+        doc['rows'][0]['title']='Changed';doc['rows'].append(missing)
+        items=plan(doc);self.assertEqual([i['action'] for i in items],['update','skipped'])
+        with patch('observations.table_transfer.create_backup',return_value=Path('backup.sqlite3')):apply(doc,fingerprint())
+        self.sample.refresh_from_db();self.assertEqual(self.sample.title,'Changed');self.assertEqual(Sample.objects.count(),1)

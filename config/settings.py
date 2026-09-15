@@ -147,3 +147,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = "/observations/login/"
 LOGIN_REDIRECT_URL = "/observations/"
 LOGOUT_REDIRECT_URL = "/observations/"
+
+# Folder import accepts up to 500 images and one species selector per image.
+DATA_UPLOAD_MAX_NUMBER_FILES = 500
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 2000

@@ -28,8 +28,7 @@ def transfer(request):
                 return response
             if action=='export':
                 doc=export_table(request.POST.get('table'))
-                if doc['table']=='samples' and any(row.get('image') for row in doc['rows']):
-                    raise ValidationError('התצפיות כוללות תמונות. השתמשו בכפתור הורדת תצפיות ותמונות (ZIP).')
+                if doc['table']=='samples': doc['media_mode']='separate'
                 response=HttpResponse(json.dumps(doc,ensure_ascii=False,indent=2),content_type='application/json; charset=utf-8')
                 response['Content-Disposition']=f'attachment; filename="seaslugs-{doc["table"]}.json"'
                 response['Cache-Control']='no-store'
@@ -47,10 +46,12 @@ def transfer(request):
                     else:
                         if len(raw)>5*1024*1024:raise ValidationError('קובץ JSON גדול מ־5MB.')
                         doc=json.loads(raw.decode('utf-8'))
-                        if isinstance(doc,dict): doc.pop('_media_names',None)
+                        if isinstance(doc,dict):
+                            doc.pop('_media_names',None)
+                            if doc.get('table')=='samples': doc['media_mode']='separate'
                     snapshot=fingerprint();items=plan(doc)
                     context.update(items=items,table_name=str(TABLES[doc['table']][0]._meta.verbose_name_plural),
-                                   changed=sum(i['action']!='same' for i in items),unchanged=sum(i['action']=='same' for i in items),
+                                   changed=sum(i['action'] in ('new','update') for i in items),unchanged=sum(i['action']=='same' for i in items),
                                    token=signing.dumps({'doc':None if bundle else doc,'bundle':bundle,'snapshot':snapshot,'user':request.user.pk},salt='table-transfer',compress=True))
             elif action=='apply':
                 data=signing.loads(request.POST.get('token',''),salt='table-transfer',max_age=1800)
@@ -62,7 +63,7 @@ def transfer(request):
                     path,doc,images=staged(*data['bundle'])
                 items,backup=apply(doc,data['snapshot'],actor=request.user,images=images)
                 if path: path.unlink(missing_ok=True)
-                messages.success(request,f"הועברו {sum(i['action']!='same' for i in items)} רשומות חדשות או מעודכנות. נוצר גיבוי: {backup}")
+                messages.success(request,f"הועברו {sum(i['action'] in ('new','update') for i in items)} רשומות חדשות או מעודכנות. נוצר גיבוי: {backup}")
                 return redirect('table-transfer')
         except (ValidationError,ValueError,UnicodeError,signing.BadSignature) as exc:
             context['error']='; '.join(exc.messages) if isinstance(exc,ValidationError) else 'קובץ או אישור לא תקין/פג תוקף. העלו את הקובץ מחדש.'
