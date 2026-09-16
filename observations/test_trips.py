@@ -10,14 +10,14 @@ from .table_transfer import export_table, plan
 class DiveTripTests(TestCase):
     def setUp(self):
         self.user=User.objects.create_user('owner')
-        self.trip=DiveTrip.objects.create(code='V',title='Romblon',species_count=153)
         self.country=Country.objects.create(name='Philippines')
         sea=Sea.objects.create(name='Indo Pacific')
         self.region=Region.objects.create(name='Romblon',country=self.country,sea=sea)
+        self.trip=DiveTrip.objects.create(code='V',title='Romblon',species_count=153,year=2026,country=self.country,region=self.region)
         self.species=Species.objects.create(scientific_name='Test species')
 
     def collection(self):
-        return Sample(owner=self.user,kind='collection',trip=self.trip,title='Trip collection',year=2026,country=self.country,region=self.region,video_url='https://youtu.be/abcdefghijk')
+        return Sample(owner=self.user,kind='collection',trip=self.trip,title='Trip collection',video_url='https://youtu.be/abcdefghijk')
 
     def test_collection_needs_trip_not_species_and_admin_approval(self):
         sample=self.collection();sample.trip=None
@@ -30,15 +30,20 @@ class DiveTripTests(TestCase):
         self.assertEqual(sample.status,'published')
 
     def test_public_separation_and_soft_delete(self):
+        # species_count (the field) is deliberately left at 153 (set in setUp) to prove the
+        # displayed/catalog count ignores it and reflects only real published species samples.
+        for name in ['Species A','Species B','Species C','Species D']:
+            species_sample=Sample(owner=self.user,kind='species',trip=self.trip,species=Species.objects.create(scientific_name=name),video_url='https://youtu.be/abcdefghijk')
+            species_sample.save_reviewed()
         sample=self.collection();sample.save_reviewed()
         self.assertNotContains(self.client.get('/observations/trips/'),'Trip collection')
         sample.save_reviewed(actor=self.user,approve=True)
         response=self.client.get('/observations/trips/')
-        self.assertContains(response,'Trip collection');self.assertContains(response,'153')
+        self.assertContains(response,'Trip collection');self.assertContains(response,'<strong>4</strong>')
         catalog=json.loads(self.client.get('/catalog.js').content.decode().split('=',1)[1].strip().removesuffix(';'))
-        self.assertEqual(catalog['videos'],[])
+        self.assertEqual(len(catalog['species']), 4)
         self.assertEqual(len(catalog['collections']), 1)
-        self.assertEqual(catalog['collections'][0]['species_count'], 153)
+        self.assertEqual(catalog['collections'][0]['species_count'], 4)
         self.assertEqual(catalog['collections'][0]['year'], 2026)
         sample.soft_delete(self.user)
         self.assertNotContains(self.client.get('/observations/trips/'),'Trip collection')
@@ -46,7 +51,7 @@ class DiveTripTests(TestCase):
         self.assertEqual(catalog['collections'], [])
 
     def test_collection_form_and_transfer(self):
-        data={'title':'Collection','kind':'collection','trip':self.trip.pk,'species':'','country':str(self.country.pk),'region':str(self.region.pk),'year':2026,'video_url':'https://youtu.be/abcdefghijk'}
+        data={'title':'Collection','kind':'collection','trip':self.trip.pk,'species':'','video_url':'https://youtu.be/abcdefghijk'}
         form=SampleForm(data,instance=Sample(owner=self.user))
         self.assertTrue(form.is_valid(),form.errors)
         sample=form.save(commit=False);sample.save_reviewed(actor=self.user,approve=True)
@@ -61,31 +66,40 @@ class DiveTripTests(TestCase):
         sample=self.collection();sample.kind='species'
         with self.assertRaises(ValidationError):sample.full_clean()
 
-    def test_missing_count_uses_distinct_linked_species(self):
+    def test_species_count_is_computed_from_published_species_only(self):
         self.trip.species_count=None;self.trip.save()
         self.assertEqual(self.trip.display_species_count,0)
-        for _ in range(2):
-            sample=self.collection();sample.kind='species';sample.species=self.species;sample.save()
+        # a pending (unreviewed) species sample must not count yet
+        pending=self.collection();pending.kind='species';pending.species=self.species;pending.save()
+        self.assertEqual(self.trip.display_species_count,0)
+        # publishing it (species samples auto-publish once complete) makes it count
+        pending.save_reviewed()
+        self.assertEqual(self.trip.display_species_count,1)
+        # a second published sample of the SAME species must not double-count
+        dup=self.collection();dup.kind='species';dup.species=self.species;dup.save_reviewed()
+        self.assertEqual(self.trip.display_species_count,1)
+        # a soft-deleted species sample must not count
         removed=self.collection();removed.kind='species'
         removed.species=Species.objects.create(scientific_name='Deleted species')
-        removed.save();removed.soft_delete(self.user)
-        collection=self.collection();collection.save_reviewed(actor=self.user,approve=True)
+        removed.save_reviewed();removed.soft_delete(self.user)
         self.assertEqual(self.trip.display_species_count,1)
+        collection=self.collection();collection.save_reviewed(actor=self.user,approve=True)
         catalog=json.loads(self.client.get('/catalog.js').content.decode().split('=',1)[1].strip().removesuffix(';'))
         self.assertEqual(catalog['collections'][0]['species_count'],1)
-        self.trip.species_count=0
-        self.assertEqual(self.trip.display_species_count,0)
-        self.trip.species_count=153
-        self.assertEqual(self.trip.display_species_count,153)
+        # the manually-reported species_count field must never affect the displayed/computed number
+        self.trip.species_count=999;self.trip.save()
+        self.assertEqual(self.trip.display_species_count,1)
+        self.trip.species_count=0;self.trip.save()
+        self.assertEqual(self.trip.display_species_count,1)
 
     def test_catalog_trip_membership_and_credit(self):
         self.trip.photographer='Trip photographer';self.trip.save()
         collection=self.collection();collection.save_reviewed(actor=self.user,approve=True)
-        sample=Sample(owner=self.user,species=self.species,trip=self.trip,year=2026,country=self.country,region=self.region,video_url='https://youtu.be/zyxwvutsrqp')
+        sample=Sample(owner=self.user,species=self.species,trip=self.trip,video_url='https://youtu.be/zyxwvutsrqp')
         sample.save_reviewed()
         data=json.loads(self.client.get('/catalog.js').content.decode().split('=',1)[1].strip().removesuffix(';'))
-        self.assertEqual(data['videos'][0]['trip_id'],data['collections'][0]['trip_id'])
-        self.assertEqual(data['videos'][0]['photographer'],'Trip photographer')
+        self.assertEqual(data['species'][0]['samples'][0]['trip_id'],data['collections'][0]['trip_id'])
+        self.assertEqual(data['species'][0]['samples'][0]['photographer'],'Trip photographer')
         sample.trip=None;self.user.first_name='Dana';self.user.save()
         self.assertEqual(sample.photographer_name,'Dana')
 

@@ -5,7 +5,9 @@ from django import forms
 from django.core.files.base import ContentFile
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
-from .models import Sample, Profile, Species, Country, Region, Site
+from django.urls import reverse
+from django.utils.html import format_html
+from .models import Sample, Profile, Species, Country, Region, Site, DiveTrip
 
 
 class SignupForm(UserCreationForm):
@@ -34,22 +36,76 @@ class ProfileForm(forms.ModelForm):
         widgets = {'countries':forms.CheckboxSelectMultiple, 'regions':forms.CheckboxSelectMultiple}
 
 
+class AutocompleteWidget(forms.Widget):
+    """A search-as-you-type text input backed by a JSON endpoint, standing in for a
+    <select> when the choice list (e.g. thousands of species) is too large to render
+    inline. The bound value stays a plain string — a pk, '', or the 'other' sentinel —
+    exactly like the plain ChoiceField it replaces, so form validation is unaffected."""
+    def __init__(self, search_url_name, label_for_value=None, other_value='other',
+                 other_label='אחר — פירוט', placeholder='הקלידו לחיפוש…', attrs=None):
+        super().__init__(attrs)
+        self.search_url_name = search_url_name
+        self.label_for_value = label_for_value or (lambda value: '')
+        self.other_value = other_value
+        self.other_label = other_label
+        self.placeholder = placeholder
+
+    def value_omitted_from_data(self, data, files, name):
+        return name not in data
+
+    def render(self, name, value, attrs=None, renderer=None):
+        attrs = attrs or {}
+        widget_id = attrs.get('id') or f'id_{name}'
+        value = '' if value in (None, 'None') else str(value)
+        if value == self.other_value:
+            display = self.other_label
+        elif value:
+            display = self.label_for_value(value)
+        else:
+            display = ''
+        search_id, results_id = f'{widget_id}_search', f'{widget_id}_results'
+        return format_html(
+            '<span class="autocomplete-wrap">'
+            '<input type="text" id="{search_id}" class="autocomplete-search" autocomplete="off" '
+            'placeholder="{placeholder}" value="{display}">'
+            '<div class="autocomplete-results" id="{results_id}" hidden></div>'
+            '</span>'
+            '<input type="hidden" name="{name}" id="{widget_id}" value="{value}">'
+            '<script>(window.__autocompleteQueue=window.__autocompleteQueue||[]).push([{widget_id_js}, {search_id_js}, {results_id_js}, {url_js}, {other_value_js}, {other_label_js}]);</script>',
+            search_id=search_id, results_id=results_id, placeholder=self.placeholder, display=display,
+            name=name, widget_id=widget_id, value=value,
+            widget_id_js=_js_str(widget_id), search_id_js=_js_str(search_id), results_id_js=_js_str(results_id),
+            url_js=_js_str(reverse(self.search_url_name)), other_value_js=_js_str(self.other_value),
+            other_label_js=_js_str(self.other_label))
+
+
+def _js_str(value):
+    import json
+    return json.dumps(value)
+
+
+class TripChoiceField(forms.ModelChoiceField):
+    def label_from_instance(self, obj):
+        where = ' · '.join(x for x in [str(obj.region) if obj.region_id else obj.region_name, str(obj.country) if obj.country_id else obj.country_name] if x)
+        when = f'{obj.month}/{obj.year}' if obj.month and obj.year else (str(obj.year) if obj.year else '')
+        bits = ' · '.join(x for x in [where, when] if x)
+        return f'{obj.title} ({bits})' if bits else obj.title
+
+
 class SampleForm(forms.ModelForm):
-    year = forms.IntegerField(label='שנה', min_value=1900)
-    species = forms.ChoiceField(label='מין', required=False)
-    country = forms.ChoiceField(label='מדינה')
-    region = forms.ChoiceField(label='אזור')
+    species = forms.CharField(label='מין', required=False, widget=AutocompleteWidget('species-search'))
     site = forms.ChoiceField(label='אתר צלילה',required=False)
+    trip = TripChoiceField(label='מסע צלילה', queryset=DiveTrip.objects.all(), help_text='לא מוצא/ת את המסע? אפשר להוסיף מסע חדש ולחזור לכאן.')
     class Meta:
         model = Sample
-        fields = ['title','kind','species','species_other','trip','country','country_other','region','region_other','site','site_other','year','month','day','depth','video_url','image']
+        fields = ['title','kind','species','species_other','trip','site','site_other','day','depth','video_url','image']
     def __init__(self,*args,**kwargs):
         super().__init__(*args,**kwargs)
         self.fields['kind'].required = False
         self.fields['video_url'].help_text = 'אפשר להשאיר ריק כאשר מעלים תמונה. ניתן להוסיף סרטון בהמשך.'
-        self.fields['trip'].help_text = 'אוסף מחייב מסע; דגימה של מין יחיד יכולה להשתייך לאותו מסע. מסע חדש מוסיפים בניהול מסעות הצלילה.'
-        for name, model in [('species',Species),('country',Country),('region',Region),('site',Site)]:
-            self.fields[name].choices = [('', 'בחרו…')] + [(str(x.pk), str(x)) for x in model.objects.all()] + [('other','אחר — פירוט')]
+        self.fields['species'].widget.label_for_value = lambda pk: str(Species.objects.filter(pk=pk).first() or '')
+        self.fields['site'].choices = [('', 'בחרו…')] + [(str(x.pk), str(x)) for x in Site.objects.all()] + [('other','אחר — פירוט')]
+        for name in ['species','site']:
             if self.instance.pk:
                 self.initial[name] = str(getattr(self.instance,name+'_id') or ('other' if getattr(self.instance,name+'_other') else ''))
             self.fields[name+'_other'].widget.attrs['data-other-for'] = name
@@ -57,14 +113,19 @@ class SampleForm(forms.ModelForm):
     def clean(self):
         data = super().clean()
         data['kind'] = data.get('kind') or Sample.Kind.SPECIES
-        for name, model in [('species',Species),('country',Country),('region',Region),('site',Site)]:
+        for name, model in [('species',Species),('site',Site)]:
             value = data.get(name)
             if value == 'other':
                 if not data.get(name+'_other','').strip(): self.add_error(name+'_other','יש לפרט את הערך האחר.')
                 data[name] = None
             elif value:
-                data[name] = model.objects.get(pk=value)
-                data[name+'_other'] = ''
+                try:
+                    data[name] = model.objects.get(pk=value)
+                except (model.DoesNotExist, ValueError, TypeError):
+                    self.add_error(name,'ערך לא תקין.')
+                    data[name] = None
+                else:
+                    data[name+'_other'] = ''
             else:
                 data[name] = None
                 data[name+'_other'] = ''
@@ -85,3 +146,32 @@ class SampleForm(forms.ModelForm):
             return ContentFile(output.getvalue(),name=f'{uuid4().hex}.jpg')
         except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError):
             raise forms.ValidationError('יש להעלות תמונת JPEG, PNG או WebP תקינה, עד 25 מיליון פיקסלים.')
+
+
+class DiveTripForm(forms.ModelForm):
+    country = forms.ChoiceField(label='מדינה')
+    region = forms.ChoiceField(label='אזור')
+    class Meta:
+        model = DiveTrip
+        fields = ['title','country','region','year','month','start_day','duration_days','photographer','reserve']
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['region'].help_text = 'רשימת האזורים מסוננת לפי המדינה שנבחרה.'
+        for name, model in [('country',Country),('region',Region)]:
+            self.fields[name].choices = [('', 'בחרו…')] + [(str(x.pk), str(x)) for x in model.objects.all()]
+            if self.instance.pk:
+                self.initial[name] = str(getattr(self.instance,name+'_id') or '')
+    def clean(self):
+        data = super().clean()
+        for name, model in [('country',Country),('region',Region)]:
+            value = data.get(name)
+            data[name] = model.objects.get(pk=value) if value else None
+        if data.get('region') and data.get('country') and data['region'].country_id != data['country'].id:
+            self.add_error('region', 'האזור אינו שייך למדינה שנבחרה.')
+        return data
+    def save(self, commit=True):
+        trip = super().save(commit=False)
+        if trip.country_id: trip.country_name = trip.country.name_en or trip.country.name
+        if trip.region_id: trip.region_name = trip.region.name_en or trip.region.name
+        if commit: trip.save()
+        return trip

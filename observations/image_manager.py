@@ -14,7 +14,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.http import FileResponse, Http404
 from django.shortcuts import render, redirect
-from .models import Sample
+from .models import Sample, SiteImage
 from .forms import SampleForm
 
 
@@ -128,6 +128,16 @@ def manager(request):
                         if not old_path.is_symlink() and old_path.resolve().is_relative_to(root): old_path.unlink(missing_ok=True)
                 messages.success(request,f'הועברו {len(items)} תמונות. גרסאות קודמות שאינן בשימוש נמחקו ללא גיבוי.')
                 return redirect('image-manager')
+            elif action=='site_image':
+                upload=request.FILES.get('site_image')
+                if not upload: raise ValidationError('יש לבחור תמונה.')
+                form=SampleForm();form.cleaned_data={'image':upload};content=form.clean_image()
+                obj,created=SiteImage.objects.get_or_create(key='intro_photo')
+                if not created and obj.image: obj.image.delete(save=False)
+                obj.image.save(content.name,content,save=True)
+                messages.success(request,'תמונת הבית עודכנה.')
+                return redirect('image-manager')
         except ValidationError as exc: context['error']='; '.join(exc.messages)
     context['images']=files();context['total_bytes']=sum(r['size'] for r in context['images'])
+    context['site_image']=SiteImage.objects.filter(key='intro_photo').exclude(image='').first()
     response=render(request,'observations/images.html',context);response['Cache-Control']='private, no-store';return response

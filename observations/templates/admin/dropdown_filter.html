@@ -1,0 +1,9 @@
+{% load i18n %}
+<div class="dropdown-filter">
+  <h3>{% blocktranslate with filter_title=title %} {{ filter_title }} {% endblocktranslate %}</h3>
+  <select onchange="if(this.value){window.location=this.value}">
+    {% for choice in choices %}
+      <option value="{{ choice.query_string|iriencode }}"{% if choice.selected %} selected{% endif %}>{{ choice.display }}</option>
+    {% endfor %}
+  </select>
+</div>

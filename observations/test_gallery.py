@@ -2,7 +2,7 @@ import json
 from django.test import TestCase
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
-from .models import Country, Sea, Region, Species, Sample
+from .models import Country, Sea, Region, Species, Sample, DiveTrip
 
 
 class GalleryTests(TestCase):
@@ -11,8 +11,9 @@ class GalleryTests(TestCase):
         country = Country.objects.create(name='ישראל', name_en='Israel')
         sea = Sea.objects.create(name='ים סוף')
         region = Region.objects.create(name='אילת', name_en='Eilat', country=country, sea=sea)
+        self.trip = DiveTrip.objects.create(title='Trip', year=2026, country=country, region=region)
         species = Species.objects.create(scientific_name='Test species')
-        self.item = Sample(owner=self.owner, country=country, region=region, species=species, year=2026, video_url='https://youtu.be/abcdefghijk')
+        self.item = Sample(owner=self.owner, trip=self.trip, species=species, video_url='https://youtu.be/abcdefghijk')
         self.item.save_reviewed()
 
     def catalog(self):
@@ -22,23 +23,24 @@ class GalleryTests(TestCase):
         return json.loads(response.content.decode().split('=', 1)[1].strip().removesuffix(';'))
 
     def test_database_updates_and_soft_delete_reach_gallery(self):
-        self.assertEqual(self.catalog()['videos'][0]['title'], 'Test species')
-        self.item.title = 'Updated title'
+        self.assertEqual(self.catalog()['species'][0]['title'], 'Test species')
+        self.item.video_url = 'https://youtu.be/zyxwvutsrqp'
         self.item.save()
-        self.assertEqual(self.catalog()['videos'][0]['title'], 'Updated title')
+        self.assertEqual(self.catalog()['species'][0]['video_id'], 'zyxwvutsrqp')
         self.item.soft_delete(self.owner)
-        self.assertEqual(self.catalog()['videos'], [])
+        self.assertEqual(self.catalog()['species'], [])
 
     def test_pending_and_incomplete_records_are_not_public(self):
         self.item.status = 'pending'
         self.item.save()
-        self.assertEqual(self.catalog()['videos'], [])
-        self.item.year = None
+        self.assertEqual(self.catalog()['species'], [])
+        self.trip.year = None
+        self.trip.save()
         with self.assertRaises(ValidationError):
             self.item.save_reviewed(actor=self.owner, approve=True)
         self.item.status = 'published'
         self.item.save()
-        self.assertEqual(self.catalog()['videos'], [])
+        self.assertEqual(self.catalog()['species'], [])
 
     def test_manager_links_and_admin_form(self):
         self.client.force_login(self.owner)

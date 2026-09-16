@@ -9,6 +9,11 @@
 {% for sample in image.refs %}<p><a href="{% url 'admin:observations_sample_change' sample.pk %}">{{sample}}</a>{% if sample.deleted_at %} · תצפית מחוקה{% endif %}</p>{% empty %}<p>לא משויכת לתצפית — אפשר למחוק לפינוי מקום</p>{% endfor %}
 {% if image.blocked %}<p class="errorlist">המדיה היחידה בתצפית פעילה — המחיקה חסומה</p>{% endif %}</article>{% empty %}<p>אין תמונות שהועלו בסביבה זו. תמונות YouTube אינן מאוחסנות כאן.</p>{% endfor %}</div>
 <p><label><input type="checkbox" name="confirm" value="yes"> אני מאשר מחיקה קבועה של התמונות המסומנות, ללא גיבוי תמונה</label></p><button>מחיקת התמונות המסומנות</button></form>
+<h2>תמונת הבית</h2>
+<p>התמונה המוצגת בעמוד הבית, ליד הכותרת. עדכון כאן משפיע רק על הסביבה הנוכחית (מקומי/Render) — יש להעלות בנפרד בכל סביבה.</p>
+<p class="helptext">JPEG, PNG או WebP, עד 10MB ועד 25 מיליון פיקסלים. התמונה לא נחתכת: היא מוצגת ברוחב קבוע וקטן (כ-200 פיקסלים) בגובה לפי היחס המקורי שלה, ולכן מומלץ תמונה רוחבית (יחס כמו 3:2, למשל כ-1200×800) — תמונה גבוהה, מרובעת מאוד או פנורמית עלולה להיראות לא טוב או לשבש את הפריסה. הקובץ יעבור אוטומטית תיקון סיבוב (לפי נתוני הצילום) ושינוי גודל עד 1920×1080 (ללא הגדלה של תמונה קטנה), ללא חיתוך.</p>
+{% if site_image %}<p><a href="{% url 'site-image' 'intro_photo' %}" target="_blank" rel="noopener"><img src="{% url 'site-image' 'intro_photo' %}" style="width:auto;max-width:320px;height:auto;object-fit:contain" alt="תמונת הבית הנוכחית"></a></p>{% else %}<p>לא הוגדרה תמונה בסביבה זו — מוצגת תמונת ברירת המחדל מהקוד.</p>{% endif %}
+<form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="action" value="site_image"><p><input type="file" name="site_image" accept="image/jpeg,image/png,image/webp" required></p><button>{% if site_image %}החלפת תמונת הבית{% else %}הגדרת תמונת הבית{% endif %}</button></form>
 <h2>העברת תמונות לסביבה זו</h2><form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="action" value="upload"><p><input type="file" name="images" accept="image/jpeg" multiple required></p><p><label><input type="checkbox" name="replace" value="yes"> לאשר החלפת תמונות קיימות ומחיקת הגרסאות הקודמות שאינן בשימוש, ללא גיבוי</label></p><button>העלאת התמונות המסומנות</button></form>
 <script>
 const checks=()=>[...document.querySelectorAll('[name=selected]')];

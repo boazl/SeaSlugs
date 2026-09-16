@@ -17,7 +17,7 @@ class FolderImportTests(TestCase):
         self.user=User.objects.create_superuser('importer',password='test')
         self.country=Country.objects.create(name='Philippines');sea=Sea.objects.create(name='Pacific')
         self.region=Region.objects.create(name='Romblon',country=self.country,sea=sea)
-        self.trip=DiveTrip.objects.create(title='Trip',year=2026,month=1,country_name='Philippines',region_name='Romblon')
+        self.trip=DiveTrip.objects.create(title='Trip',year=2026,month=1,country=self.country,region=self.region)
         self.species=Species.objects.create(scientific_name='Micromelo undatus')
     def photo(self):
         output=io.BytesIO();Image.new('RGB',(40,30),'blue').save(output,'JPEG')
@@ -34,12 +34,13 @@ class FolderImportTests(TestCase):
         with patch('observations.folder_import.create_backup',return_value=Path('backup.sqlite3')):
             response=self.client.post('/admin/images/folder/',{'action':'apply','token':response.context['token'],'selected':['0'],'species_0':self.species.pk,'confirm':'yes'})
         self.assertEqual(response.status_code,302)
-        item=Sample.objects.get();self.assertEqual(item.year,2026);self.assertEqual(item.month,1);self.assertIsNone(item.day);self.assertTrue(item.image);self.assertEqual(item.trip,self.trip)
-    def test_other_trip_conflict_and_same_trip_update(self):
-        item=Sample(owner=self.user,species=self.species,trip=self.trip,country=self.country,region=self.region,year=2026,video_url='https://youtu.be/abcdefghijk');item.save_reviewed()
+        item=Sample.objects.get();self.assertEqual(item.trip.year,2026);self.assertEqual(item.trip.month,1);self.assertIsNone(item.day);self.assertTrue(item.image);self.assertEqual(item.trip,self.trip)
+    def test_other_trip_creates_new_sample_and_same_trip_updates(self):
+        item=Sample(owner=self.user,species=self.species,trip=self.trip,video_url='https://youtu.be/abcdefghijk');item.save_reviewed()
         self.assertEqual(plan_row(self.trip,self.species.pk,self.user)[1],'update')
+        # a different trip for the same species is a brand-new sample, not a blocked duplicate
         other=DiveTrip.objects.create(title='Other',year=2026,country_name='Philippines',region_name='Romblon')
-        with self.assertRaises(ValidationError):plan_row(other,self.species.pk,self.user)
+        self.assertEqual(plan_row(other,self.species.pk,self.user)[1],'new')
     def test_duplicate_selection_keeps_first_and_skips_second(self):
         import hashlib
         from django.core import signing

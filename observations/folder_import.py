@@ -66,22 +66,19 @@ def match_species(filename,species):
 
 
 def location(trip):
-    pairs=set(trip.samples.filter(country__isnull=False,region__isnull=False,deleted_at__isnull=True).values_list('country_id','region_id'))
-    if len(pairs)==1:return next(iter(pairs))
+    if trip.country_id and trip.region_id:return trip.country_id,trip.region_id
     from django.db.models import Q
     candidates=list(Region.objects.filter(Q(name__iexact=trip.region_name)|Q(name_en__iexact=trip.region_name)).filter(Q(country__name__iexact=trip.country_name)|Q(country__name_en__iexact=trip.country_name)))
     if len(candidates)==1:return candidates[0].country_id,candidates[0].pk
-    raise ValidationError('לא ניתן לזהות מדינה ואזור יחידים למסע. יש להשלים את נתוני המסע או את שיוך התצפיות שלו.')
+    raise ValidationError('למסע אין מדינה ואזור מוגדרים. יש להשלים אותם בניהול מסעות הצלילה לפני יבוא.')
 
 
 def plan_row(trip,species_id,owner):
-    country,region=location(trip)
-    matches=list(Sample.objects.filter(kind='species',species_id=species_id,region_id=region,deleted_at__isnull=True))
-    same=[s for s in matches if s.trip_id==trip.pk]
-    if len(same)>1:raise ValidationError('כמה תצפיות לאותו מין במסע; יש לפתור בניהול.')
-    if same:return same[0],'update'
-    if any(s.status=='published' for s in matches):raise ValidationError('המין כבר מפורסם באזור במסע אחר. לא ניצור פרסום כפול ולא נשנה את שיוך המסע שלו.')
-    return Sample(owner=owner,species_id=species_id,trip=trip,country_id=country,region_id=region,year=trip.year,month=trip.month),'new'
+    location(trip)  # validates the trip has a resolvable country+region before importing into it
+    matches=list(Sample.objects.filter(kind='species',species_id=species_id,trip=trip,deleted_at__isnull=True))
+    if len(matches)>1:raise ValidationError('כמה תצפיות לאותו מין במסע; יש לפתור בניהול.')
+    if matches:return matches[0],'update'
+    return Sample(owner=owner,species_id=species_id,trip=trip),'new'
 
 
 @staff_member_required

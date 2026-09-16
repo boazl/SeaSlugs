@@ -6,6 +6,7 @@ from observations.release_views import releases
 from observations.image_manager import manager as image_manager, image_file
 
 from observations.folder_import import folder_import
+from observations.views import site_image
 
 urlpatterns = [
     path('admin/images/folder/',folder_import,name='folder-import'),
@@ -15,6 +16,7 @@ urlpatterns = [
     path('admin/table-transfer/', transfer, name='table-transfer'),
     path('observations/', include('observations.urls')),
     path('healthz', health, name='health'),
+    path('site-image/<slug:key>.jpg', site_image, name='site-image'),
     path('admin/', admin.site.urls),
     path('', gallery_file, name='gallery'),
     path('<str:filename>', gallery_file, name='gallery-file'),

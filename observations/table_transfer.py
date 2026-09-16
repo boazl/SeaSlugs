@@ -9,19 +9,25 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
-from .models import Country, Sea, Region, Site, Species, Sample, DiveTrip, youtube_id
+from .models import Country, Sea, Region, Site, Species, Sample, DiveTrip, SpeciesArea, youtube_id
 from django.contrib.auth import get_user_model
 from .account_transfer import ACCOUNT_TABLES, account_row, account_plan
 
-TABLES = {'species': (Species, ['scientific_name','name_he','name_en','source_id','genus','species','author','order','family','superfamily','accepted_genus','accepted_species','common_name','transliteration','language','formatted_author','distribution','phylogenetic_order','full_species_name_with_order','reference_author']),
+# Ordered to match the actual transfer dependency chain (see TABLE-TRANSFER.md): each table
+# only ever references ones earlier in this dict, so exporting/importing in this order (as
+# both the table-transfer page and the releases page now show it) never hits a missing
+# reference. Samples must always go last, since they depend on nearly everything else.
+TABLES = {'groups': ACCOUNT_TABLES['groups'], 'users': ACCOUNT_TABLES['users'],
           'countries': (Country,['name','name_en']), 'seas': (Sea,['name','name_en']),
           'regions': (Region,['name','name_en','country','sea']), 'sites': (Site,['name','name_en','region']),
-          'trips': (DiveTrip, ['code','title','source_sort','year','month','start_day','duration_days','country_name','region_name','reserve','sea_name','photographer','species_count','source_metadata']),
-          'samples': (Sample, ['title','kind','trip','owner','species','country','region','site','species_other','country_other','region_other','site_other','year','month','day','depth','video_url','status','source_id','gallery_order','source_metadata','transfer_id','image'])}
-TABLES.update(ACCOUNT_TABLES)
+          'profiles': ACCOUNT_TABLES['profiles'],
+          'species': (Species, ['scientific_name','name_he','name_en','source_id','genus','species','author','order','family','superfamily','accepted_genus','accepted_species','common_name','transliteration','language','formatted_author','distribution','phylogenetic_order','full_species_name_with_order','reference_author']),
+          'trips': (DiveTrip, ['code','title','source_sort','year','month','start_day','duration_days','country','region','country_name','region_name','reserve','sea_name','photographer','species_count','source_metadata']),
+          'samples': (Sample, ['title','kind','trip','owner','species','site','species_other','site_other','day','depth','video_url','status','source_id','gallery_order','source_metadata','transfer_id','image'])}
 
 
 def reference(obj):
+    if obj is None: return None
     if isinstance(obj, Region): return {'name':obj.name,'country':obj.country.name}
     return obj.name
 
@@ -55,7 +61,10 @@ def unique(model, **lookup):
     return items[0] if items else None
 
 
-def related(field,value):
+def related(field,value,required=True):
+    if value is None:
+        if required: raise ValidationError(f'חסר ערך מקושר ({field}).')
+        return None
     if field=='region':
         if not isinstance(value,dict) or set(value)!= {'name','country'} or not all(isinstance(v,str) for v in value.values()): raise ValidationError('מפתח אזור לא תקין.')
         obj=unique(Region,name=value['name'],country__name=value['country'])
@@ -82,7 +91,7 @@ def plan(document):
         if not isinstance(incoming,dict) or set(incoming)!=set(fields): raise ValidationError(f'שדות לא תואמים בשורה {number}; יש לעדכן את הקוד בשתי הסביבות.')
         values={}
         for f,v in incoming.items():
-            if f in ('country','sea','region'): values[f]=related(f,v)
+            if f in ('country','sea','region'): values[f]=related(f,v,required=not (model is DiveTrip))
             elif model is DiveTrip and f in ('year','month','start_day','duration_days','species_count'):
                 if v is not None and type(v) is not int: raise ValidationError('נדרש מספר שלם: '+f)
                 values[f] = v
@@ -152,4 +161,20 @@ def apply(document, expected, actor=None, images=None):
                 item['object'].save()
                 for field, values in item.get('many', {}).items():
                     getattr(item['object'],field).set(values)
+        if document['table'] == 'samples':
+            # Mirror Sample.save_reviewed()'s own side effect: a transferred sample that is
+            # already published must register itself in SpeciesArea exactly like one saved
+            # through the site normally would, otherwise imported species silently never
+            # appear in the public gallery even though the Sample row exists.
+            for item in items:
+                if item['action'] not in ('new', 'update'):
+                    continue
+                sample = item['object']
+                if (sample.status == Sample.Status.PUBLISHED and sample.kind == Sample.Kind.SPECIES
+                        and sample.species_id and sample.trip_id
+                        and sample.trip.country_id and sample.trip.region_id):
+                    SpeciesArea.objects.get_or_create(
+                        species_id=sample.species_id, country_id=sample.trip.country_id,
+                        sea_id=sample.trip.region.sea_id, defaults={'defining_sample': sample},
+                    )
     return items,backup.name

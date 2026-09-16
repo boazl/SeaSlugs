@@ -8,7 +8,7 @@ from django.test import TestCase,override_settings
 from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
 from django.core.exceptions import ValidationError
-from .models import Sample,Species,Country,Sea,Region
+from .models import Sample,Species,Country,Sea,Region,DiveTrip
 from .media_transfer import export_bundle,read_bundle
 from .table_transfer import plan,apply,fingerprint
 
@@ -20,8 +20,9 @@ class MediaTransferTests(TestCase):
         user=User.objects.create_superuser('admin',password='testing')
         country=Country.objects.create(name='Israel');sea=Sea.objects.create(name='Red Sea')
         region=Region.objects.create(name='Eilat',country=country,sea=sea)
+        trip=DiveTrip.objects.create(title='Eilat trip',year=2026,country=country,region=region)
         species=Species.objects.create(scientific_name='Test species')
-        self.sample=Sample(owner=user,species=species,country=country,region=region,year=2026)
+        self.sample=Sample(owner=user,species=species,trip=trip)
         output=io.BytesIO();Image.new('RGB',(100,80),'blue').save(output,'JPEG')
         self.sample.image.save('original.jpg',ContentFile(output.getvalue()),save=False)
         self.sample.save_reviewed()

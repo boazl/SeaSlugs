@@ -77,6 +77,15 @@ class Species(models.Model):
     def __str__(self): return self.scientific_name
 
 
+class SiteImage(models.Model):
+    key = models.SlugField('מזהה', max_length=50, unique=True)
+    image = models.ImageField('תמונה', upload_to='site/')
+    updated_at = models.DateTimeField('עודכן', auto_now=True)
+    class Meta:
+        verbose_name = 'תמונת אתר'; verbose_name_plural = 'תמונות אתר'
+    def __str__(self): return self.key
+
+
 class Profile(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     display_name = models.CharField('שם לתצוגה', max_length=100)
@@ -101,6 +110,8 @@ class DiveTrip(models.Model):
     region_name = models.CharField('אזור כפי שנרשם במקור', max_length=180, blank=True)
     reserve = models.CharField('שמורה / אתר', max_length=180, blank=True)
     sea_name = models.CharField('ים', max_length=180, blank=True)
+    country = models.ForeignKey(Country, null=True, blank=True, on_delete=models.PROTECT, verbose_name='מדינה', related_name='dive_trips')
+    region = models.ForeignKey(Region, null=True, blank=True, on_delete=models.PROTECT, verbose_name='אזור', related_name='dive_trips')
     photographer = models.CharField('צלם', max_length=180, blank=True)
     species_count = models.PositiveIntegerField('מספר מינים שנצפו במסע', null=True, blank=True, help_text='מספר מדווח לכל המסע; אינו מספר הסרטונים באתר. השאר ריק אם אינו ידוע.')
     source_metadata = models.JSONField(default=dict, blank=True)
@@ -115,12 +126,23 @@ class DiveTrip(models.Model):
 
     @property
     def display_species_count(self):
-        if self.species_count is not None:
-            return self.species_count
-        return self.samples.filter(kind='species', deleted_at__isnull=True, species__isnull=False).order_by().values('species_id').distinct().count()
+        """Number of distinct species actually visible on the public site when this trip's
+        collection is opened (published, non-deleted, real samples only). Always computed
+        live from the gallery data -- the self-reported species_count field above is kept
+        only as a reference value from the source spreadsheet and is never shown on the site."""
+        return self.samples.filter(
+            kind='species', status='published', deleted_at__isnull=True, species__isnull=False,
+            species_other='', site_other='',
+        ).order_by().values('species_id').distinct().count()
+
+    @property
+    def sea(self):
+        return self.region.sea if self.region_id else None
 
     def clean(self):
         super().clean()
+        if self.year and self.year > date.today().year:
+            raise ValidationError({'year': 'השנה אינה יכולה להיות בעתיד.'})
         if self.start_day:
             if not self.year or not self.month: raise ValidationError({'start_day':'יום התחלה מחייב שנה וחודש.'})
             try: date(self.year, self.month, self.start_day)
@@ -132,7 +154,7 @@ class Sample(models.Model):
         SPECIES = 'species', 'מין יחיד'
         COLLECTION = 'collection', 'אוסף מינים / מסע צלילה'
     kind = models.CharField('סוג הסרטון', max_length=20, choices=Kind.choices, default=Kind.SPECIES)
-    trip = models.ForeignKey(DiveTrip, verbose_name='מסע צלילה', null=True, blank=True, on_delete=models.PROTECT, related_name='samples')
+    trip = models.ForeignKey(DiveTrip, verbose_name='מסע צלילה', on_delete=models.PROTECT, related_name='samples')
     title = models.CharField('כותרת הגלריה', max_length=240, blank=True)
     gallery_order = models.PositiveIntegerField(default=0)
     source_metadata = models.JSONField(default=dict, blank=True)
@@ -142,15 +164,9 @@ class Sample(models.Model):
         PUBLISHED = 'published', 'מפורסמת'
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='observations', verbose_name='יוצר')
     species = models.ForeignKey(Species, null=True, blank=True, on_delete=models.PROTECT, verbose_name='מין')
-    country = models.ForeignKey(Country, null=True, blank=True, on_delete=models.PROTECT, verbose_name='מדינה')
-    region = models.ForeignKey(Region, null=True, blank=True, on_delete=models.PROTECT, verbose_name='אזור')
     site = models.ForeignKey(Site, null=True, blank=True, on_delete=models.PROTECT, verbose_name='אתר צלילה')
     species_other = models.CharField('מין אחר', max_length=200, blank=True)
-    country_other = models.CharField('מדינה אחרת', max_length=200, blank=True)
-    region_other = models.CharField('אזור אחר', max_length=200, blank=True)
     site_other = models.CharField('אתר צלילה אחר', max_length=200, blank=True)
-    year = models.PositiveSmallIntegerField('שנה', null=True, blank=True, validators=[MinValueValidator(1900)])
-    month = models.PositiveSmallIntegerField('חודש', null=True, blank=True, validators=[MinValueValidator(1),MaxValueValidator(12)])
     day = models.PositiveSmallIntegerField('יום', null=True, blank=True, validators=[MinValueValidator(1),MaxValueValidator(31)])
     depth = models.DecimalField('עומק במטרים', max_digits=6, decimal_places=1, null=True, blank=True, validators=[MinValueValidator(0)])
     transfer_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
@@ -167,9 +183,8 @@ class Sample(models.Model):
     class Meta:
         ordering = ['-created_at']
         db_table = 'samples'
-        constraints = [models.UniqueConstraint(fields=['species','region'], condition=models.Q(kind='species',status='published',deleted_at__isnull=True), name='unique_published_species_region')]
         verbose_name = 'דגימה / תצפית'; verbose_name_plural = 'Samples — דגימות ותצפיות'
-    def __str__(self): return f'{self.title if self.kind == self.Kind.COLLECTION else self.species or self.species_other} · {self.year or ""}'
+    def __str__(self): return f'{self.title if self.kind == self.Kind.COLLECTION else self.species or self.species_other} · {self.trip.year if self.trip_id and self.trip.year else ""}'
     @property
     def photographer_name(self):
         if self.trip_id and self.trip.photographer.strip():
@@ -179,20 +194,13 @@ class Sample(models.Model):
     @property
     def thumbnail(self):
         return self.image.url if self.image else (f'https://i.ytimg.com/vi/{youtube_id(self.video_url)}/hqdefault.jpg' if self.video_url else '')
-    def publication_duplicate(self):
-        if self.kind != self.Kind.SPECIES or not self.species_id or not self.region_id:
-            return None
-        return Sample.objects.filter(kind='species',species_id=self.species_id,region_id=self.region_id,status='published',deleted_at__isnull=True).exclude(pk=self.pk).first()
-
     def publication_reasons(self):
         reasons = []
-        duplicate = self.publication_duplicate()
-        if duplicate: reasons.append(f'המין כבר מפורסם באזור זה בתצפית מספר {duplicate.pk}. לא ניתן לאשר פרסום כפול.')
         if self.deleted_at: reasons.append('התצפית מסומנת כמחוקה.')
         try: self.full_clean(validate_constraints=False)
         except ValidationError as exc: reasons.extend(exc.messages)
-        if any(getattr(self,n+'_other') for n in ('species','country','region','site')):
-            reasons.append('יש להחליף ערכי ״אחר״ בערכים מטבלאות העזר לפני פרסום.')
+        if self.species_other: reasons.append('יש להחליף את ערך המין ״אחר״ בערך מטבלת המינים לפני פרסום (או להוסיף מין חדש דרך הפעולה הייעודית).')
+        if self.site_other: reasons.append('יש להחליף את ערך אתר הצלילה ״אחר״ בערך מטבלת אתרי הצלילה לפני פרסום.')
         if not reasons and self.status == self.Status.PENDING: reasons.append('הנתונים הושלמו; נדרש אישור מנהל.')
         return reasons
     def clean(self):
@@ -202,20 +210,19 @@ class Sample(models.Model):
             errors['video_url'] = 'יש לספק קישור YouTube או להעלות תמונה, או את שניהם.'
         if self.kind == self.Kind.COLLECTION:
             if self.species_id or self.species_other: errors['species'] = 'סרטון אוסף אינו משויך למין יחיד. נקה את בחירת המין.'
-            if not self.trip_id: errors['trip'] = 'יש לבחור מסע צלילה לסרטון אוסף.'
             if not self.title.strip(): errors['title'] = 'יש להזין כותרת לסרטון האוסף.'
-        if not self.year: errors['year'] = 'יש להשלים שנה לפני פרסום.'
-        for name in ('species','country','region','site'):
-            other = getattr(self, name+'_other').strip()
-            setattr(self, name+'_other', other)
-            if getattr(self, name+'_id') and other: errors[name+'_other'] = 'יש לבחור ערך מהרשימה או אחר, לא את שניהם.'
-            if name != 'site' and not (name == 'species' and self.kind == self.Kind.COLLECTION) and not getattr(self,name+'_id') and not other: errors[name] = 'יש לבחור ערך או לפרט אחר.'
-        if self.region_id and self.country_id != self.region.country_id: errors['region'] = 'האזור אינו שייך למדינה שנבחרה.'
-        if self.site_id and self.region_id != self.site.region_id: errors['site'] = 'האתר אינו שייך לאזור שנבחר.'
-        if self.year and self.year > date.today().year: errors['year'] = 'השנה אינה יכולה להיות בעתיד.'
-        if self.day and not self.month: errors['day'] = 'יום מחייב בחירת חודש.'
-        if self.year and self.month and self.day:
-            try: date(self.year,self.month,self.day)
+        if not self.trip_id: errors['trip'] = 'יש לבחור מסע צלילה.'
+        elif not self.trip.year: errors['trip'] = 'למסע הנבחר אין שנה מוגדרת. יש להשלים שנה במסע הצלילה לפני פרסום.'
+        self.species_other = self.species_other.strip()
+        self.site_other = self.site_other.strip()
+        if self.species_id and self.species_other: errors['species_other'] = 'יש לבחור מין מהרשימה או לפרט אחר, לא את שניהם.'
+        if self.kind != self.Kind.COLLECTION and not self.species_id and not self.species_other: errors['species'] = 'יש לבחור מין או לפרט אחר.'
+        if self.site_id and self.site_other: errors['site_other'] = 'יש לבחור אתר צלילה מהרשימה או לפרט אחר, לא את שניהם.'
+        if self.site_id and self.trip_id and self.trip.region_id and self.site.region_id != self.trip.region_id:
+            errors['site'] = 'אתר הצלילה אינו שייך לאזור המסע שנבחר.'
+        if self.day and not (self.trip_id and self.trip.month): errors['day'] = 'יום מחייב שהוגדר חודש במסע הצלילה.'
+        if self.day and self.trip_id and self.trip.year and self.trip.month:
+            try: date(self.trip.year, self.trip.month, self.day)
             except ValueError: errors['day'] = 'תאריך לא תקין.'
         if errors: raise ValidationError(errors)
     def save_reviewed(self, actor=None, approve=False):
@@ -224,17 +231,48 @@ class Sample(models.Model):
             # Acquire SQLite's write lock before checking first occurrence.
             if self.species_id:
                 Species.objects.filter(pk=self.species_id).update(scientific_name=models.F('scientific_name'))
-            other = any(getattr(self,n+'_other') for n in ('species','country','region','site'))
-            complete = (self.trip_id if self.kind == self.Kind.COLLECTION else self.species_id) and self.country_id and self.region_id and not other
-            if approve and not complete: raise ValidationError('לפני אישור יש להחליף את ערכי האחר בערכים מטבלאות העזר.')
-            duplicate = self.publication_duplicate()
-            if approve and duplicate:
-                raise ValidationError(f'המין כבר מפורסם באזור זה בתצפית מספר {duplicate.pk}. לא ניתן לאשר פרסום כפול.')
-            existing = duplicate is not None
-            self.status = 'published' if complete and (approve or (self.kind == self.Kind.SPECIES and not existing)) else 'pending'
+            other = bool(self.species_other) or bool(self.site_other)
+            complete = bool(self.trip_id and self.trip.year and (self.species_id if self.kind == self.Kind.SPECIES else True) and not other)
+            if approve and not complete:
+                raise ValidationError('לפני אישור יש להשלים את שנת המסע ולהחליף ערכי ״אחר״ בערכים מטבלאות העזר.')
+            self.status = 'published' if complete and (approve or self.kind == self.Kind.SPECIES) else 'pending'
             self.approved_by = actor if approve else None
             self.approved_at = timezone.now() if approve else None
             self.save()
+            if self.status == self.Status.PUBLISHED and self.kind == self.Kind.SPECIES and self.species_id and self.trip.country_id and self.trip.region_id:
+                SpeciesArea.objects.get_or_create(
+                    species_id=self.species_id, country_id=self.trip.country_id, sea_id=self.trip.region.sea_id,
+                    defaults={'defining_sample': self},
+                )
     def soft_delete(self, actor):
         self.deleted_at = timezone.now(); self.deleted_by = actor
         self.save(update_fields=['deleted_at','deleted_by','updated_at'])
+
+
+class SpeciesArea(models.Model):
+    """Links a Species to a country+sea it has been observed in, together with the
+    sample that defines how it is presented in the gallery (photo/thumbnail)."""
+    species = models.ForeignKey(Species, on_delete=models.CASCADE, related_name='areas', verbose_name='מין')
+    country = models.ForeignKey(Country, on_delete=models.PROTECT, verbose_name='מדינה')
+    sea = models.ForeignKey(Sea, on_delete=models.PROTECT, verbose_name='ים')
+    defining_sample = models.ForeignKey(Sample, null=True, blank=True, on_delete=models.SET_NULL, related_name='+', verbose_name='דגימה מגדירה',
+        help_text='הדגימה שתמונתה או שרטון היוטיוב שלה יוצגו בכרטיס המין בגלריה. ניתן לבחור דגימה אחרת מבין דגימות המין באזור זה.')
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['species','country','sea'], name='unique_species_area')]
+        verbose_name = 'מין באזור'; verbose_name_plural = 'מינים באזורים'
+    def __str__(self):
+        return f'{self.species} · {self.country} · {self.sea}'
+
+    @staticmethod
+    def pick_defining_sample(species_id, country_id, sea_id):
+        """Best sample to represent this species in this country+sea: prefer one with an
+        uploaded image over a video-only one, only among published/non-deleted samples,
+        tie-broken by whichever was created first."""
+        candidates = list(Sample.objects.filter(
+            kind=Sample.Kind.SPECIES, species_id=species_id, status=Sample.Status.PUBLISHED,
+            deleted_at__isnull=True, trip__country_id=country_id, trip__region__sea_id=sea_id,
+        ).order_by('created_at', 'pk'))
+        if not candidates:
+            return None
+        with_image = [c for c in candidates if c.image]
+        return (with_image or candidates)[0]

@@ -23,11 +23,11 @@
         <section class="intro">
             <div>
                 <p class="eyebrow">מבעד לעדשה, מתחת לפני הים</p>
-                <h1>מדע ואומנות.<br><span>מגוון ודינמיקה של הגירה מפתח למעקב אחר שינוים בסביבה הימית.</span></h1>
-                <p class="intro-copy">מפגשים עם חינניות ים, מצלילה לצלילה.<br>אוסף סרטונים מרומבלון, ים סוף והים התיכון.
+                <h1>הבית של חובבי חינניות הים</h1>
+                <p class="intro-copy">כאן תוכלו לחפש, לצפות ולפרסם מינים חדשים, וגם למצוא שותפים לצלילות מקרו.
                 </p>
             </div>
-            <div class="intro-index" aria-hidden="true"><span>SEA SLUGS</span><span>FIELD COLLECTION</span><i>2026</i></div>
+            <div class="intro-index"><img src="{% if has_site_image %}/site-image/intro_photo.jpg{% else %}/intro-photo.jpg{% endif %}" alt="חינניית ים, צילום: בועז ליבס" width="520" height="346"></div>
         </section>
         <section class="collection" aria-labelledby="collectionTitle">
             <div class="collection-head">
@@ -35,19 +35,46 @@
                     class="search"><span>חיפוש</span><input type="search" id="search" placeholder="שם המין או הסרטון…"
                         autocomplete="off" aria-label="חיפוש לפי שם המין או הסרטון"></label>
             </div>
-            <div class="filter-row">
-                <div class="filters" role="group" aria-label="סינון לפי אזור"><button type="button"
-                        class="filter active" data-region="all" aria-pressed="true">כל האזורים</button><button
-                        type="button" class="filter" data-region="romblon" aria-pressed="false">רומבלון ·
-                        פיליפינים</button><button type="button" class="filter" data-region="redsea"
-                        aria-pressed="false">ים סוף · אילת</button><button type="button" class="filter"
-                        data-region="mediterranean" aria-pressed="false">הים התיכון · אכזיב</button></div>
-                <p id="resultCount" role="status" aria-live="polite"></p>
-            </div>
-            <div id="grid" class="grid"></div>
-            <div id="empty" class="empty" hidden>
-                <h3>לא נמצאו פריטים</h3>
-                <p>נסו שם אחר או בחרו אזור אחר.</p><button type="button" id="reset">ניקוי החיפוש והסינון</button>
+            <div class="gallery-layout">
+                <aside class="filter-sidebar" id="filterSidebar" aria-label="סינון">
+                    <h3 id="filterSidebarTitle">סינון</h3>
+                    <div class="filter-group">
+                        <h4 id="areaGroupTitle">אזור</h4>
+                        <div class="filters" id="areaFilters" role="group" aria-label="סינון לפי אזור"></div>
+                    </div>
+                    <div class="filter-group">
+                        <h4 id="regionGroupTitle">אזור צלילה</h4>
+                        <div class="filter-checks" id="regionOptions"></div>
+                    </div>
+                    <div class="filter-group">
+                        <h4 id="siteGroupTitle">אתר צלילה</h4>
+                        <div class="filter-checks" id="siteOptions"></div>
+                    </div>
+                    <div class="filter-group">
+                        <h4 id="photographerGroupTitle">צלם</h4>
+                        <div class="filter-checks" id="photographerOptions"></div>
+                    </div>
+                    <div class="filter-group">
+                        <h4 id="orderGroupTitle">סדרה</h4>
+                        <select id="orderSelect"></select>
+                    </div>
+                    <div class="filter-group">
+                        <h4 id="familyGroupTitle">משפחה</h4>
+                        <select id="familySelect"></select>
+                    </div>
+                    <div class="filter-group">
+                        <h4 id="genusGroupTitle">סוג</h4>
+                        <select id="genusSelect"></select>
+                    </div>
+                </aside>
+                <div class="gallery-main">
+                    <p id="resultCount" role="status" aria-live="polite"></p>
+                    <div id="grid" class="grid"></div>
+                    <div id="empty" class="empty" hidden>
+                        <h3>לא נמצאו פריטים</h3>
+                        <p>נסו שם אחר או בחרו אזור אחר.</p><button type="button" id="reset">ניקוי החיפוש והסינון</button>
+                    </div>
+                </div>
             </div>
             <noscript>
                 <p>להצגת האוסף ולחיפוש יש להפעיל JavaScript בדפדפן.</p>
@@ -65,6 +92,7 @@
             </div><button type="button" class="close" id="close" aria-label="סגירת התצוגה">✕</button>
         </div>
         <div id="frame"></div>
+        <ul id="pickerList" class="picker-list" hidden></ul>
         <div class="player-bottom"><span>אם הסרטון אינו נטען, אפשר לצפות בו ב־YouTube.</span><a id="youtubeLink"
                 target="_blank" rel="noopener noreferrer">צפייה ב־YouTube ↗</a></div>
     </dialog>

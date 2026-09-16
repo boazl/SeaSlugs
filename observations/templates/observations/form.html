@@ -1,11 +1,88 @@
 {% extends 'observations/base.html' %}{% block content %}<h1>{{ title }}</h1>
-{% if observation_form %}<p>בחרו מין יחיד או אוסף מינים. דגימת מין מחייבת מין; אוסף מחייב מסע צלילה וכותרת, ללא בחירת מין. בשניהם נדרשים מדינה, אזור, שנה ותמונה או סרטון (אפשר גם שניהם). אוספים מתפרסמים במסעות הצלילה לאחר אישור מנהל. ללא העלאת תמונה תוצג התמונה המקדימה של YouTube. מין חדש לאזור מתפרסם מיד אם כל הנתונים מזוהים; אחרת התצפית ממתינה לבדיקה.</p>{% endif %}
-<form method="post" enctype="multipart/form-data">{% csrf_token %}{{ form.as_p }}<button type="submit">שמירה / Save</button></form>
+{% if observation_form %}<p>בחרו מין יחיד או אוסף מינים. דגימת מין מחייבת מין; אוסף מחייב כותרת, ללא בחירת מין. בשניהם נדרש מסע צלילה (הכולל מדינה, אזור ושנה) ותמונה או סרטון (אפשר גם שניהם). אוספים מתפרסמים במסעות הצלילה לאחר אישור מנהל. ללא העלאת תמונה תוצג התמונה המקדימה של YouTube. מין חדש לאזור מתפרסם מיד אם כל הנתונים מזוהים; אחרת התצפית ממתינה לבדיקה.</p>{% endif %}
+{% if trip_form %}<p>מסע צלילה מייצג ביקור אחד באתר בתאריך מסוים. לאחר השמירה תחזרו לטופס התצפית עם המסע החדש נבחר.</p>{% endif %}
+<form method="post" enctype="multipart/form-data">{% csrf_token %}{% if trip_form %}<input type="hidden" name="next" value="{{ next }}">{% endif %}{{ form.as_p }}<button type="submit">שמירה / Save</button></form>
+{% if observation_form and trip_new_url %}<p><a href="{{ trip_new_url }}?next={{ request.path|urlencode }}">מסע הצלילה לא ברשימה? הוספת מסע חדש</a></p>{% endif %}
 {% if observation_form %}{{ locations|json_script:'locations' }}<script>
+const Autocomplete={
+  init(hiddenId,searchId,resultsId,url,otherValue,otherLabel){
+    const hidden=document.getElementById(hiddenId);const input=document.getElementById(searchId);const results=document.getElementById(resultsId);
+    if(!hidden||!input||!results)return;
+    let items=[];let activeIndex=-1;let debounceTimer=null;
+    function allRows(){return [...items,{id:otherValue,label:otherLabel}];}
+    function renderResults(){
+      results.replaceChildren();
+      const rows=allRows();
+      rows.forEach((item,i)=>{
+        const row=document.createElement('div');
+        row.className='autocomplete-row'+(i===activeIndex?' active':'');
+        row.textContent=item.label;
+        row.addEventListener('mousedown',e=>{e.preventDefault();select(item);});
+        results.appendChild(row);
+      });
+      results.hidden=input.value.trim()==='';
+    }
+    function select(item){
+      hidden.value=item.id;input.value=item.label;results.hidden=true;
+      hidden.dispatchEvent(new Event('change',{bubbles:true}));
+    }
+    function search(q){
+      if(!q){items=[];renderResults();return;}
+      fetch(url+'?q='+encodeURIComponent(q)).then(r=>r.ok?r.json():{results:[]}).then(data=>{items=data.results||[];activeIndex=-1;renderResults();}).catch(()=>{});
+    }
+    input.addEventListener('input',()=>{
+      hidden.value='';clearTimeout(debounceTimer);
+      const q=input.value.trim();debounceTimer=setTimeout(()=>search(q),200);
+    });
+    input.addEventListener('focus',()=>{if(input.value.trim())search(input.value.trim());});
+    input.addEventListener('keydown',e=>{
+      const rows=allRows();
+      if(e.key==='ArrowDown'){e.preventDefault();activeIndex=Math.min(activeIndex+1,rows.length-1);renderResults();}
+      else if(e.key==='ArrowUp'){e.preventDefault();activeIndex=Math.max(activeIndex-1,0);renderResults();}
+      else if(e.key==='Enter'){if(activeIndex>=0){e.preventDefault();select(rows[activeIndex]);}}
+      else if(e.key==='Escape'){results.hidden=true;}
+    });
+    document.addEventListener('click',e=>{if(e.target!==input)results.hidden=true;});
+  }
+};
+(window.__autocompleteQueue||[]).forEach(args=>Autocomplete.init(...args));
 const locations=JSON.parse(document.getElementById('locations').textContent);
-const fields=['species','country','region','site'];
-function updateOther(){for(const name of fields){const other=document.querySelector('[data-other-for="'+name+'"]');const enabled=document.getElementById('id_'+name).value==='other';other.closest('p').hidden=!enabled;other.disabled=!enabled;other.required=enabled;}}
-function filterOptions(child,parent,data,key,reset){const field=document.getElementById('id_'+child);const parentValue=document.getElementById('id_'+parent).value;for(const option of field.options){if(!option.value||option.value==='other')continue;const row=data.find(x=>String(x.id)===option.value);option.hidden=String(row[key])!==parentValue;option.disabled=option.hidden;}if(reset&&field.selectedOptions[0]?.disabled)field.value='';}
-function updateLocations(reset){filterOptions('region','country',locations.regions,'country_id',reset);filterOptions('site','region',locations.sites,'region_id',reset);updateOther();}
-for(const name of fields)document.getElementById('id_'+name).addEventListener('change',()=>updateLocations(true));updateLocations(false);
-</script>{% endif %}{% endblock %}
+const otherFields=['species','site'];
+function updateOther(){for(const name of otherFields){const other=document.querySelector('[data-other-for="'+name+'"]');if(!other)continue;const el=document.getElementById('id_'+name);const enabled=el.value==='other';other.closest('p').hidden=!enabled;other.disabled=!enabled;other.required=enabled;}}
+function updateSites(reset){
+  const tripField=document.getElementById('id_trip');const siteField=document.getElementById('id_site');
+  if(!tripField||!siteField)return;
+  const trip=locations.trips.find(t=>String(t.id)===tripField.value);
+  const regionId=trip?trip.region_id:null;
+  for(const option of siteField.options){
+    if(!option.value||option.value==='other')continue;
+    const row=locations.sites.find(x=>String(x.id)===option.value);
+    const hidden=regionId!=null&&row&&String(row.region_id)!==String(regionId);
+    option.hidden=!!hidden;option.disabled=!!hidden;
+  }
+  if(reset&&siteField.selectedOptions[0]?.disabled)siteField.value='';
+}
+const tripEl=document.getElementById('id_trip');
+if(tripEl)tripEl.addEventListener('change',()=>updateSites(true));
+for(const name of otherFields){const el=document.getElementById('id_'+name);if(el)el.addEventListener('change',updateOther);}
+updateSites(false);updateOther();
+</script>{% endif %}
+{% if trip_form %}{{ locations|json_script:'divetrip-locations' }}<script>
+const tripLocations=JSON.parse(document.getElementById('divetrip-locations').textContent);
+function updateRegions(reset){
+  const countryField=document.getElementById('id_country');const regionField=document.getElementById('id_region');
+  if(!countryField||!regionField)return;
+  const countryValue=countryField.value;
+  for(const option of regionField.options){
+    if(!option.value)continue;
+    const row=tripLocations.regions.find(x=>String(x.id)===option.value);
+    const hidden=row&&String(row.country_id)!==countryValue;
+    option.hidden=!!hidden;option.disabled=!!hidden;
+  }
+  if(reset&&regionField.selectedOptions[0]?.disabled)regionField.value='';
+}
+const countryEl=document.getElementById('id_country');
+if(countryEl)countryEl.addEventListener('change',()=>updateRegions(true));
+updateRegions(false);
+</script>{% endif %}
+{% endblock %}

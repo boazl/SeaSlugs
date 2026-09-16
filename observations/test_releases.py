@@ -6,7 +6,7 @@ from unittest.mock import patch
 from django.test import TestCase, override_settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
-from .models import Sample, Species, Country, Sea, Region
+from .models import Sample, Species, Country, Sea, Region, DiveTrip
 from .table_transfer import export_table, plan, apply, fingerprint
 
 
@@ -16,8 +16,9 @@ class ReleaseTests(TestCase):
         country = Country.objects.create(name='Israel')
         sea = Sea.objects.create(name='Red Sea')
         region = Region.objects.create(name='Eilat', country=country, sea=sea)
+        trip = DiveTrip.objects.create(title='Eilat trip', year=2026, country=country, region=region)
         species = Species.objects.create(scientific_name='Test species')
-        self.sample = Sample(owner=self.user, species=species, country=country, region=region, year=2026, video_url='https://youtu.be/abcdefghijk')
+        self.sample = Sample(owner=self.user, species=species, trip=trip, video_url='https://youtu.be/abcdefghijk')
         self.sample.save_reviewed()
 
     def test_transfer_idempotency_preview_and_update(self):
@@ -43,7 +44,7 @@ class ReleaseTests(TestCase):
 
     def test_incomplete_draft_can_transfer_but_not_publish(self):
         doc = export_table('samples')
-        doc['rows'][0].update(year=None, species=None, status='pending')
+        doc['rows'][0].update(trip=None, species=None, status='pending')
         self.assertEqual(plan(doc)[0]['action'], 'update')
         doc['rows'][0]['status'] = 'published'
         with self.assertRaises(ValidationError): plan(doc)
