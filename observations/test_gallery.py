@@ -1,4 +1,5 @@
 import json
+from datetime import timedelta
 from django.test import TestCase
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
@@ -93,3 +94,68 @@ class GalleryTests(TestCase):
         self.assertContains(self.client.get('/observations/'), 'Test species')
         self.client.logout()
         self.assertNotContains(self.client.get('/'), 'ordinary-member')
+
+
+class ObservationsFilterTests(TestCase):
+    """Covers the /observations/ list page's filter/sort GET params added alongside
+    the gallery sort feature: narrowing filters, manager-only scope of the owner
+    filter, sort ordering, and the filter-dropdown option lists themselves."""
+
+    def setUp(self):
+        self.owner = User.objects.create_superuser('manager', password='test-password')
+        country = Country.objects.create(name='ישראל', name_en='Israel')
+        sea = Sea.objects.create(name='ים סוף')
+        region = Region.objects.create(name='אילת', name_en='Eilat', country=country, sea=sea)
+        self.trip = DiveTrip.objects.create(title='Trip', year=2026, country=country, region=region)
+        self.client.force_login(self.owner)
+
+    def make(self, species, owner=None):
+        sample = Sample(owner=owner or self.owner, trip=self.trip, species=species,
+                         video_url='https://youtu.be/abcdefghijk')
+        sample.save_reviewed(actor=self.owner, approve=True)
+        return sample
+
+    def test_kind_filter_narrows_observations_list(self):
+        self.make(Species.objects.create(scientific_name='Aeolid species'))
+        collection = Sample(owner=self.owner, kind='collection', trip=self.trip, title='Trip collection',
+                             video_url='https://youtu.be/abcdefghijk')
+        collection.save_reviewed(actor=self.owner, approve=True)
+        response = self.client.get('/observations/?kind=collection')
+        self.assertContains(response, 'Trip collection')
+        self.assertNotContains(response, 'Aeolid species')
+        response = self.client.get('/observations/?kind=species')
+        self.assertContains(response, 'Aeolid species')
+        self.assertNotContains(response, 'Trip collection')
+
+    def test_owner_filter_is_manager_only(self):
+        self.make(Species.objects.create(scientific_name='Manager species'))
+        member = User.objects.create_user('member', password='test-password')
+        self.make(Species.objects.create(scientific_name='Member species'), owner=member)
+        response = self.client.get(f'/observations/?owner={member.username}')
+        self.assertContains(response, 'Member species')
+        self.assertNotContains(response, 'Manager species')
+        self.client.force_login(member)
+        response = self.client.get(f'/observations/?owner={self.owner.username}')
+        # Non-managers can't use the owner param to see someone else's records --
+        # they only ever see their own, whatever the query string says.
+        self.assertNotContains(response, 'Manager species')
+        self.assertContains(response, 'Member species')
+
+    def test_sort_by_species_name(self):
+        self.make(Species.objects.create(scientific_name='Zzz species'))
+        self.make(Species.objects.create(scientific_name='Aaa species'))
+        content = self.client.get('/observations/?sort=species').content.decode()
+        self.assertLess(content.index('Aaa species'), content.index('Zzz species'))
+
+    def test_filter_dropdown_options_have_no_duplicates(self):
+        # Regression: Sample's default Meta.ordering (-created_at) must not leak into the
+        # values_list().distinct() calls that build the filter dropdowns, or the same
+        # option value appears twice whenever two matching samples have different
+        # created_at timestamps -- the same class of bug once fixed in SpeciesArea.rebuild().
+        species = Species.objects.create(scientific_name='Duplicate species', order='Nudibranchia')
+        first = self.make(species)
+        second = self.make(species)
+        Sample.objects.filter(pk=second.pk).update(created_at=first.created_at - timedelta(days=1))
+        response = self.client.get('/observations/')
+        self.assertEqual(response.context['orders'], ['Nudibranchia'])
+        self.assertEqual(response.content.decode().count('>Nudibranchia<'), 1)

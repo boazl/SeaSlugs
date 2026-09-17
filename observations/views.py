@@ -7,7 +7,7 @@ from django.http import Http404, FileResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
 from django.urls import reverse
-from .models import Sample, Profile, Region, Site, DiveTrip, SiteImage, Species
+from .models import Sample, Profile, Region, Site, DiveTrip, SiteImage, Species, Country
 from .forms import SignupForm, SampleForm, ProfileForm, DiveTripForm
 
 
@@ -22,14 +22,80 @@ def trips(request):
     rows = DiveTrip.objects.filter(samples__in=published).distinct().prefetch_related(Prefetch('samples',queryset=published,to_attr='public_samples'))
     return render(request, 'observations/trips.html', {'trips':rows})
 
+SORT_OPTIONS = {
+    'newest': ('-created_at',),
+    'oldest': ('created_at',),
+    'trip_desc': ('-trip__year', '-trip__month', '-created_at'),
+    'trip_asc': ('trip__year', 'trip__month', 'created_at'),
+    'species': ('species__scientific_name', '-created_at'),
+}
+
+
 @login_required
 def listing(request):
-    rows = Sample.objects.select_related('species','trip','trip__country','trip__region','site','owner')
-    if is_manager(request.user): pass
-    else:
-        rows = rows.filter(deleted_at__isnull=True, owner=request.user)
-    if request.GET.get('mine') and request.user.is_authenticated: rows=rows.filter(owner=request.user)
-    return render(request,'observations/list.html',{'observations':rows,'manager':is_manager(request.user)})
+    from django.contrib.auth import get_user_model
+
+    def as_int(value):
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    manager = is_manager(request.user)
+    visible = Sample.objects.all() if manager else Sample.objects.filter(deleted_at__isnull=True, owner=request.user)
+    rows = visible.select_related('species', 'trip', 'trip__country', 'trip__region', 'site', 'owner')
+    if request.GET.get('mine') and request.user.is_authenticated:
+        rows = rows.filter(owner=request.user)
+    get = request.GET
+    if get.get('kind') in ('species', 'collection'):
+        rows = rows.filter(kind=get['kind'])
+    if get.get('status') in ('pending', 'published'):
+        rows = rows.filter(status=get['status'])
+    country_id = as_int(get.get('country'))
+    if country_id is not None:
+        rows = rows.filter(trip__country_id=country_id)
+    region_id = as_int(get.get('region'))
+    if region_id is not None:
+        rows = rows.filter(trip__region_id=region_id)
+    year = as_int(get.get('year'))
+    if year is not None:
+        rows = rows.filter(trip__year=year)
+    if get.get('order'):
+        rows = rows.filter(species__order=get['order'])
+    if get.get('family'):
+        rows = rows.filter(species__family=get['family'])
+    if get.get('genus'):
+        rows = rows.filter(species__genus=get['genus'])
+    if get.get('photographer'):
+        rows = rows.filter(trip__photographer=get['photographer'])
+    if manager and get.get('owner'):
+        rows = rows.filter(owner__username=get['owner'])
+    sort = get.get('sort') if get.get('sort') in SORT_OPTIONS else 'newest'
+    rows = rows.order_by(*SORT_OPTIONS[sort])
+
+    def options(field, **extra):
+        # .order_by() clears Sample's default Meta.ordering (-created_at) before the
+        # values_list/distinct -- otherwise Django silently adds created_at to the
+        # SELECT DISTINCT columns (needed to support the implicit ORDER BY), which
+        # defeats distinct() and produces duplicate option values in the dropdowns.
+        return sorted(v for v in visible.filter(**extra).exclude(**{field: ''}).order_by().values_list(field, flat=True).distinct() if v)
+
+    context = {
+        'observations': rows,
+        'manager': manager,
+        'sort': sort,
+        'filters': get,
+        'countries': Country.objects.filter(dive_trips__samples__in=visible).distinct().order_by('name'),
+        'regions': Region.objects.filter(dive_trips__samples__in=visible).distinct().order_by('name'),
+        'years': sorted((v for v in visible.exclude(trip__year__isnull=True).order_by().values_list('trip__year', flat=True).distinct() if v), reverse=True),
+        'orders': options('species__order'),
+        'families': options('species__family'),
+        'genera': options('species__genus'),
+        'photographers': options('trip__photographer'),
+    }
+    if manager:
+        context['owners'] = get_user_model().objects.filter(observations__in=visible).distinct().order_by('username')
+    return render(request, 'observations/list.html', context)
 
 
 def signup(request):
