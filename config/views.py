@@ -67,7 +67,7 @@ def gallery_file(request, filename='index.html'):
             species_out.append({
                 'area_id': area.pk, 'species_id': area.species_id, 'area': area_key,
                 'title': area.species.scientific_name, 'name_he': area.species.name_he, 'name_en': area.species.name_en,
-                'genus': area.species.genus, 'family': area.species.family, 'order': area.species.order,
+                'genus': area.species.genus, 'epithet': area.species.species, 'family': area.species.family, 'order': area.species.order,
                 'thumbnail': primary['thumbnail'], 'image_url': primary['image_url'], 'video_id': primary['video_id'],
                 'samples': samples,
             })

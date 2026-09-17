@@ -30,6 +30,16 @@ class GalleryTests(TestCase):
         self.item.soft_delete(self.owner)
         self.assertEqual(self.catalog()['species'], [])
 
+    def test_catalog_exposes_genus_and_epithet_for_alphabetical_sorting(self):
+        # The gallery's alphabetical sort (genus, then specific epithet) is done client
+        # side in app.js, so both fields must actually reach catalog.js.
+        self.item.species.genus = 'Testus'
+        self.item.species.species = 'exemplaris'
+        self.item.species.save()
+        entry = self.catalog()['species'][0]
+        self.assertEqual(entry['genus'], 'Testus')
+        self.assertEqual(entry['epithet'], 'exemplaris')
+
     def test_species_hidden_when_area_has_no_defining_sample(self):
         from .models import SpeciesArea
         area = SpeciesArea.objects.get(species=self.item.species)

@@ -21,6 +21,7 @@ const state = {
     family: 'all',
     genus: 'all',
     collection: null,
+    sort: 'taxonomic',
 };
 
 let opener = null;
@@ -445,11 +446,22 @@ function buildSpeciesCard(sp, index) {
     article.append(button);
     return article;
 }
+function speciesSortKey(sp) {
+    return normalize(sp.genus || sp.title || '');
+}
+function speciesSortCompare(a, b) {
+    const ga = speciesSortKey(a), gb = speciesSortKey(b);
+    if (ga !== gb) return ga.localeCompare(gb, 'he');
+    const ea = normalize(a.epithet || ''), eb = normalize(b.epithet || '');
+    if (ea !== eb) return ea.localeCompare(eb, 'he');
+    return normalize(a.title || '').localeCompare(normalize(b.title || ''), 'he');
+}
 function render() {
     updateCollectionStatus();
     const q = normalize(search.value);
     const filteredCollections = collectionsList.filter(c => collectionMatches(c, q));
-    const filteredSpecies = speciesList.filter(sp => speciesMatches(sp, q));
+    let filteredSpecies = speciesList.filter(sp => speciesMatches(sp, q));
+    if (state.sort === 'alpha') filteredSpecies = [...filteredSpecies].sort(speciesSortCompare);
     grid.replaceChildren();
     const frag = document.createDocumentFragment();
     if (filteredCollections.length) {
@@ -478,11 +490,13 @@ document.querySelector('#reset').addEventListener('click', () => {
     search.value = '';
     state.area = 'all'; state.regions.clear(); state.sites.clear(); state.photographers.clear();
     state.order = 'all'; state.family = 'all'; state.genus = 'all'; state.collection = null;
+    state.sort = 'taxonomic'; document.querySelector('#sortSelect').value = 'taxonomic';
     renderSidebar(); render(); search.focus();
 });
 document.querySelector('#orderSelect').addEventListener('change', e => { state.order = e.target.value; state.family = 'all'; state.genus = 'all'; renderTaxonomySelects(); render(); });
 document.querySelector('#familySelect').addEventListener('change', e => { state.family = e.target.value; state.genus = 'all'; renderTaxonomySelects(); render(); });
 document.querySelector('#genusSelect').addEventListener('change', e => { state.genus = e.target.value; render(); });
+document.querySelector('#sortSelect').addEventListener('change', e => { state.sort = e.target.value; render(); });
 document.querySelector('#close').addEventListener('click', () => dialog.close());
 dialog.addEventListener('click', e => {
     if (e.target === dialog) {

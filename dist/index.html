@@ -33,7 +33,11 @@
             <div class="collection-head">
                 <h2 id="collectionTitle">אוסף הסרטונים <span id="total"></span></h2><label
                     class="search"><span>חיפוש</span><input type="search" id="search" placeholder="שם המין או הסרטון…"
-                        autocomplete="off" aria-label="חיפוש לפי שם המין או הסרטון"></label>
+                        autocomplete="off" aria-label="חיפוש לפי שם המין או הסרטון"></label><label
+                    class="sort-order"><span>מיון</span><select id="sortSelect" aria-label="מיון המינים">
+                        <option value="taxonomic">סדר טקסונומי</option>
+                        <option value="alpha">אלפביתי (סוג ואז מין)</option>
+                    </select></label>
             </div>
             <div class="gallery-layout">
                 <aside class="filter-sidebar" id="filterSidebar" aria-label="סינון">
