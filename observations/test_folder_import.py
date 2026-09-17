@@ -78,6 +78,24 @@ class FolderImportTests(TestCase):
         self.assertEqual(species.genus,'Thecacera');self.assertEqual(species.species,'picta');self.assertEqual(species.phylogenetic_order,'205')
         self.assertEqual(Sample.objects.filter(species=species).count(),1)
         self.assertContains(response,'דולגו 1 תמונות כפולות')
+    def test_completing_an_existing_pending_sample_publishes_and_registers_species_area(self):
+        # An existing sample for this species+trip with no image yet (e.g. created
+        # manually, or by an earlier partial import) is an 'update' match, not
+        # 'new' -- but adding its image here is exactly what makes it complete,
+        # so it must still get published and registered in SpeciesArea, just
+        # like a brand-new sample created by this same tool would.
+        from .models import SpeciesArea
+        existing=Sample.objects.create(owner=self.user,species=self.species,trip=self.trip,status='pending')
+        self.assertEqual(plan_row(self.trip,self.species.pk,self.user)[1],'update')
+        self.assertFalse(SpeciesArea.objects.filter(species=self.species).exists())
+        self.client.force_login(self.user)
+        response=self.client.post('/admin/images/folder/',{'action':'preview','trip':self.trip.pk,'images':self.photo()})
+        with patch('observations.folder_import.create_backup',return_value=Path('backup.sqlite3')):
+            response=self.client.post('/admin/images/folder/',{'action':'apply','token':response.context['token'],'selected':['0'],'species_0':self.species.pk,'confirm':'yes'})
+        self.assertEqual(response.status_code,302)
+        existing.refresh_from_db()
+        self.assertEqual(existing.status,'published')
+        self.assertTrue(SpeciesArea.objects.filter(species=self.species,country=self.country,defining_sample=existing).exists())
     def test_ignores_edit_and_year_suffixes(self):
         from .folder_import import filename_species,filename_stem
         item=Species.objects.create(scientific_name='Phyllodesmium magnum')

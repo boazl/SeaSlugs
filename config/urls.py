@@ -7,6 +7,7 @@ from observations.image_manager import manager as image_manager, image_file
 
 from observations.folder_import import folder_import
 from observations.views import site_image
+from observations.db_replace import db_replace, db_replace_download
 
 urlpatterns = [
     path('admin/images/folder/',folder_import,name='folder-import'),
@@ -14,6 +15,8 @@ urlpatterns = [
     path('admin/images/file/',image_file,name='image-file'),
     path('admin/releases/', releases, name='releases'),
     path('admin/table-transfer/', transfer, name='table-transfer'),
+    path('admin/db-replace/', db_replace, name='db-replace'),
+    path('admin/db-replace/download/', db_replace_download, name='db-replace-download'),
     path('observations/', include('observations.urls')),
     path('healthz', health, name='health'),
     path('site-image/<slug:key>.jpg', site_image, name='site-image'),

@@ -88,6 +88,14 @@ def edit(request,pk=None):
     form=SampleForm(request.POST or None,request.FILES or None,instance=item,initial=initial)
     if request.method=='POST' and form.is_valid():
         item=form.save(commit=False)
+        if 'image' in form.changed_data and item.image:
+            # Store by content hash, exactly like the bulk folder importer and the
+            # image manager, so the same photo always resolves to the same image
+            # reference whether it was uploaded here or arrived through a transfer.
+            import hashlib
+            from .media_transfer import save_images
+            raw=item.image.read();name='observations/transfer/'+hashlib.sha256(raw).hexdigest()+'.jpg'
+            save_images({name:raw});item.image=name
         item.save_reviewed()
         messages.success(request,'התצפית פורסמה.' if item.status=='published' else 'התצפית נשמרה וממתינה להשלמת נתונים ולאישור מנהל.')
         return redirect('observations')

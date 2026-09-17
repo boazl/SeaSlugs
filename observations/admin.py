@@ -33,14 +33,23 @@ class SpeciesAreaAdmin(admin.ModelAdmin):
     list_filter = ['country','sea']
     search_fields = ['species__scientific_name']
     autocomplete_fields = []
+    actions = ['rebuild_all']
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == 'defining_sample' and getattr(self, '_obj', None):
-            kwargs['queryset'] = Sample.objects.filter(kind='species', species_id=self._obj.species_id,
+            # Only samples that would actually qualify to show the species in the gallery --
+            # published, not deleted, matching this row's species+country+sea.
+            kwargs['queryset'] = Sample.objects.filter(kind='species', species_id=self._obj.species_id, status='published',
                 trip__country_id=self._obj.country_id, trip__region__sea_id=self._obj.sea_id, deleted_at__isnull=True)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
     def get_form(self, request, obj=None, **kwargs):
         self._obj = obj
         return super().get_form(request, obj, **kwargs)
+    @admin.action(description='בנייה מחדש של כל הטבלה מהדגימות המפורסמות הקיימות (מתעלם מהבחירה; מוחק ובונה מחדש את כל הרשומות)')
+    def rebuild_all(self, request, queryset):
+        from .table_transfer import create_backup
+        backup = create_backup()
+        count = SpeciesArea.rebuild()
+        messages.success(request, f'הטבלה נבנתה מחדש: {count} רשומות. נוצר גיבוי: {backup.name}')
 
 
 def reason_number_map():

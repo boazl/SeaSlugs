@@ -1,5 +1,5 @@
 {% extends 'observations/base.html' %}
-{% block content %}<a href="{% url 'image-manager' %}">ניהול והעברת תמונות</a>
+{% block content %}<a href="{% url 'image-manager' %}">ניהול והעברת תמונות</a> · <a href="{% url 'db-replace' %}">החלפה מלאה של מסד הנתונים</a>
 <h1>ניהול גרסאות וגיבויים</h1>
 <p class="notice">אתה עובד כעת על <strong>{% if local %}המק המקומי{% else %}האתר ב־Render{% endif %}</strong>. פרסום קוד והעברת נתונים הם שני שלבים נפרדים.</p>
 <p><a href="http://127.0.0.1:8000/admin/releases/">ניהול במק</a> · <a href="https://seaslugs.onrender.com/admin/releases/" target="_blank" rel="noopener">ניהול באתר</a> · <a href="https://dashboard.render.com/" target="_blank" rel="noopener">Render</a> · <a href="https://github.com/boazl/SeaSlugs" target="_blank" rel="noopener">GitHub</a></p>
@@ -31,8 +31,10 @@
 <p><a href="http://127.0.0.1:8000/admin/table-transfer/">העברה במק</a> · <a href="https://seaslugs.onrender.com/admin/table-transfer/" target="_blank" rel="noopener">העברה באתר</a></p>
 <h2>6. בדיקה לאחר פרסום</h2>
 <p>בדוק את <a href="https://seaslugs.onrender.com/" target="_blank" rel="noopener">הגלריה באתר</a>, מספר הסרטונים, כניסה ויציאה, והתצפיות של משתמש רגיל ושל מנהל. שמור את מזהה הגרסה המוצג ב־Render ליד קובץ הגיבוי.</p>
+<h2>7. החלפה מלאה של מסד הנתונים (במקום שלבים 3–5)</h2>
+<p>כשמדובר בהחלפה מלאה של המסד ולא בעדכון נקודתי, <a href="{% url 'db-replace' %}">כלי ההחלפה המלאה</a> עושה את הכול מכאן: נועל את האתר ומגבה, מוריד את המסד הנוכחי, בודק את הקובץ שמעלים (תקינות וגרסת מיגרציות תואמת), משווה את התמונות הדרושות מול מה שכבר קיים כאן ומבקש רק את החסרות, ולבסוף מחליף ומשחרר — הכול בלי מסוף או גישה ל-Render. הכלי מבצע את ההחלפה עצמה בהחלפת קובץ אטומית (rename), כך שבקשה שכבר באמצע טיפול ממשיכה מול הנתונים הישנים עד שהיא מסתיימת, ובקשה חדשה נפתחת כבר מול הקובץ החדש.</p>
 <h2>שחזור במקרה תקלה</h2>
-<p>אל תחליף קובץ SQLite בזמן שהאתר פועל. שחזור מלא דורש עצירת כל תהליכי האתר, בחירת קוד תואם לגיבוי והחזרת המסד והמדיה יחד. הכלי הזה אינו מבצע החלפה מלאה אוטומטית. תיקוני תוכן נקודתיים אפשר לבצע באמצעות ייצוא והשוואת טבלאות.</p>
+<p>שחזור מלא דורש קוד תואם לגיבוי והחזרת המסד והמדיה יחד. אם כלי ההחלפה המלאה אינו זמין (למשל בפרסום הראשון לפני שהוא קיים בסביבה), אל תחליפו קובץ SQLite ידנית בזמן שהאתר פועל — יש לעצור את כל תהליכי האתר קודם. תיקוני תוכן נקודתיים אפשר לבצע באמצעות ייצוא והשוואת טבלאות.</p>
 <script>document.querySelectorAll('pre').forEach(pre=>{const b=document.createElement('button');b.type='button';b.textContent='העתקת הפקודה';b.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(pre.textContent);b.textContent='הועתק'}catch(e){b.textContent='סמן והעתק את הפקודה ידנית'}});pre.after(b)})</script>
 <style>pre{white-space:pre-wrap;overflow-wrap:anywhere;padding:18px;background:#102630;border:1px solid #345;text-align:left;font-size:14px}h2{margin-top:40px}details{margin-top:20px}</style>
 {% endblock %}

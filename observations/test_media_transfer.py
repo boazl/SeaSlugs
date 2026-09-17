@@ -1,16 +1,14 @@
 import io
 import tempfile
-import zipfile
 from pathlib import Path
 from unittest.mock import patch
 from PIL import Image
 from django.test import TestCase,override_settings
 from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
-from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from .models import Sample,Species,Country,Sea,Region,DiveTrip
-from .media_transfer import export_bundle,read_bundle
-from .table_transfer import plan,apply,fingerprint
+from .table_transfer import plan,apply,fingerprint,export_table
 
 class MediaTransferTests(TestCase):
     def setUp(self):
@@ -26,41 +24,7 @@ class MediaTransferTests(TestCase):
         output=io.BytesIO();Image.new('RGB',(100,80),'blue').save(output,'JPEG')
         self.sample.image.save('original.jpg',ContentFile(output.getvalue()),save=False)
         self.sample.save_reviewed()
-    def test_photo_only_update_repeat_and_old_file_retained(self):
-        old=self.sample.image.path
-        doc,images=read_bundle(export_bundle());doc['rows'][0]['title']='Updated photo'
-        self.assertEqual(plan(doc)[0]['action'],'update')
-        with patch('observations.table_transfer.create_backup',return_value=Path('backup.sqlite3')):
-            apply(doc,fingerprint(),images=images)
-        self.sample.refresh_from_db();self.assertEqual(self.sample.title,'Updated photo')
-        self.assertTrue(Path(old).exists());self.assertTrue(Path(self.sample.image.path).exists())
-        self.assertEqual(plan(doc)[0]['action'],'same');self.assertEqual(Sample.objects.count(),1)
-    def test_new_target_and_missing_media(self):
-        doc,images=read_bundle(export_bundle());self.sample.delete()
-        self.assertEqual(plan(doc)[0]['action'],'new')
-        with patch('observations.table_transfer.create_backup',return_value=Path('backup.sqlite3')):
-            apply(doc,fingerprint(),images=images)
-        self.assertEqual(Sample.objects.count(),1)
-    def test_unsafe_zip_and_stale_preview(self):
-        output=io.BytesIO()
-        with zipfile.ZipFile(output,'w') as archive:
-            archive.writestr('table.json','{"table":"samples","rows":[]}')
-            archive.writestr('../escape.jpg',b'bad')
-        with self.assertRaises(ValidationError):read_bundle(output.getvalue())
-        doc,images=read_bundle(export_bundle());before=fingerprint()
-        self.sample.title='Changed';self.sample.save()
-        with patch('observations.table_transfer.create_backup',return_value=Path('backup.sqlite3')):
-            with self.assertRaises(ValidationError):apply(doc,before,images=images)
-    def test_view_preview_and_confirm(self):
-        from django.core.files.uploadedfile import SimpleUploadedFile
-        self.client.force_login(self.sample.owner)
-        response=self.client.post('/admin/table-transfer/',{'action':'preview','file':SimpleUploadedFile('samples.zip',export_bundle())})
-        self.assertEqual(response.status_code,200);self.assertIn('token',response.context)
-        with patch('observations.table_transfer.create_backup',return_value=Path('backup.sqlite3')):
-            response=self.client.post('/admin/table-transfer/',{'action':'apply','confirm':'yes','token':response.context['token']})
-        self.assertEqual(response.status_code,302)
     def test_image_manager_download_upload_and_cleanup(self):
-        from django.core.files.uploadedfile import SimpleUploadedFile
         from .image_manager import files
         self.client.force_login(self.sample.owner)
         old=Path(self.sample.image.path);row=files()[0]
@@ -85,7 +49,6 @@ class MediaTransferTests(TestCase):
         self.assertEqual(self.client.get('/admin/images/').status_code,403)
     def test_json_export_and_update_preserves_destination_image(self):
         import json
-        from django.core.files.uploadedfile import SimpleUploadedFile
         self.client.force_login(self.sample.owner)
         response=self.client.post('/admin/table-transfer/',{'action':'export','table':'samples'})
         self.assertEqual(response['Content-Type'],'application/json; charset=utf-8')
@@ -100,7 +63,6 @@ class MediaTransferTests(TestCase):
         self.sample.refresh_from_db();self.assertEqual(self.sample.title,'Table update');self.assertEqual(self.sample.image.name,original)
         self.assertTrue(Path(self.sample.image.path).exists())
     def test_missing_photo_skips_only_that_row(self):
-        from .table_transfer import export_table
         import uuid
         doc=export_table('samples');doc['media_mode']='separate'
         missing=dict(doc['rows'][0],transfer_id=str(uuid.uuid4()),title='Missing image')
@@ -108,3 +70,25 @@ class MediaTransferTests(TestCase):
         items=plan(doc);self.assertEqual([i['action'] for i in items],['update','skipped'])
         with patch('observations.table_transfer.create_backup',return_value=Path('backup.sqlite3')):apply(doc,fingerprint())
         self.sample.refresh_from_db();self.assertEqual(self.sample.title,'Changed');self.assertEqual(Sample.objects.count(),1)
+    def test_edit_view_stores_uploaded_image_by_content_hash(self):
+        # The live per-observation upload must name files exactly like the bulk
+        # folder importer and the image manager do (SHA256 of the content), so
+        # the same photo resolves to the same reference regardless of which of
+        # the two upload mechanisms created it, or in which environment.
+        output=io.BytesIO();Image.new('RGB',(80,60),'green').save(output,'JPEG');raw=output.getvalue()
+        species2=Species.objects.create(scientific_name='Second species')
+        species3=Species.objects.create(scientific_name='Third species')
+        self.client.force_login(self.sample.owner)
+        base={'kind':'species','species_other':'','site':'','site_other':'','day':'','depth':'','video_url':'','title':''}
+        response=self.client.post('/observations/new/',dict(base,species=species2.pk,trip=self.sample.trip.pk,
+            image=SimpleUploadedFile('photo.jpg',raw,content_type='image/jpeg')))
+        self.assertEqual(response.status_code,302)
+        created=Sample.objects.get(species=species2)
+        self.assertRegex(created.image.name,r'^observations/transfer/[0-9a-f]{64}\.jpg$')
+        # Uploading the exact same bytes again, for a different sample, must reuse
+        # the same stored file rather than create a second copy.
+        response=self.client.post('/observations/new/',dict(base,species=species3.pk,trip=self.sample.trip.pk,
+            image=SimpleUploadedFile('photo-again.jpg',raw,content_type='image/jpeg')))
+        self.assertEqual(response.status_code,302)
+        other=Sample.objects.get(species=species3)
+        self.assertEqual(other.image.name,created.image.name)

@@ -180,12 +180,16 @@ def folder_import(request):
                     for species_id,proposal,image in prepared:
                         if species_id is None:
                             species=Species(**proposal);species.full_clean();species.save();species_id=species.pk;created_species+=1
-                        item,action=plan_row(trip,species_id,request.user);old_names.append(item.image.name)
+                        item,_=plan_row(trip,species_id,request.user);old_names.append(item.image.name)
                         name='observations/transfer/'+hashlib.sha256(image).hexdigest()+'.jpg'
                         item.image=name;item.full_clean(validate_constraints=False)
                         save_images({name:image})
-                        if action=='new':item.save_reviewed(actor=request.user)
-                        else:item.save(update_fields=['image','updated_at'])
+                        # Always re-run save_reviewed, not just for brand-new samples: adding
+                        # an image can be exactly what completes a previously-pending sample
+                        # (created via an earlier import or manually), and only save_reviewed
+                        # publishes it and registers the SpeciesArea entry that makes the
+                        # species show up in the gallery.
+                        item.save_reviewed(actor=request.user)
                 media=Path(settings.MEDIA_ROOT).resolve()
                 for name in set(old_names):
                     if name and not Sample.objects.filter(image=name).exists():

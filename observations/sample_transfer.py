@@ -55,19 +55,23 @@ def sample_plan(document, fields):
         if obj and obj.deleted_at: raise ValidationError('תצפית היעד מחוקה; יש לבדוק אותה בניהול לפני העברה.')
         if obj: values['transfer_id'] = str(obj.transfer_id)
         if document.get('media_mode')=='separate':
-            # Table-only imports never copy, remove, or replace target image references.
+            # Plain table transfers never copy, remove, or replace target image references --
+            # actual image files travel separately, through image management.
             values['image'] = obj.image.name if obj and obj.image else ''
             if not values['video_url'] and not values['image']:
                 result.append({'object':None,'label':values['title'] or incoming.get('species') or identity,
                                'action':'skipped','changes':[],
                                'reason':'התצפית לא הועברה: חסרה תמונה ביעד ואין סרטון. העבירו את התמונה דרך ניהול התמונות ואז ייבאו שוב.'})
                 continue
-        if values['image'] and document.get('media_mode')!='separate':
+        elif values['image']:
+            # The image manager's own transfer flow (not plain table transfer): the doc's
+            # rows carry a freshly content-hashed image name that will be written by this
+            # same request, listed in _media_names.
             from .media_transfer import validate_image_name
             validate_image_name(values['image'])
             if values['image'] not in document.get('_media_names', []):
                 from django.core.files.storage import default_storage
-                if not default_storage.exists(values['image']): raise ValidationError('קובץ תמונה חסר; יש להעביר חבילת תצפיות ותמונות.')
+                if not default_storage.exists(values['image']): raise ValidationError('קובץ תמונה חסר; יש להעביר דרך ניהול התמונות.')
         values['owner'] = unique(get_user_model(), username=values['owner'])
         if values['owner'] is None: raise ValidationError('משתמש חסר ביעד: ' + incoming['owner'] + '. יש ליצור אותו או להתאים שם משתמש לפני ההעברה.')
         for field in ('species','site'):

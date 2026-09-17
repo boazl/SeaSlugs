@@ -37,10 +37,13 @@ def gallery_file(request, filename='index.html'):
                 'thumbnail': f'/observations/{s.pk}/photo/' if s.image else s.thumbnail,
             }
 
-        areas = SpeciesArea.objects.select_related('species', 'country', 'sea').order_by(
+        areas = SpeciesArea.objects.select_related('species', 'country', 'sea', 'defining_sample').order_by(
             NullIf('species__phylogenetic_order', Value('')).asc(nulls_last=True), 'species__scientific_name')
         species_out, area_labels, region_out, site_out = [], {}, {}, {}
         for area in areas:
+            defining = area.defining_sample
+            if not defining or defining.status != 'published' or defining.deleted_at or not (defining.image or defining.video_url):
+                continue  # a species shows in the gallery only through a valid defining sample
             area_key = f'{area.country_id}-{area.sea_id}'
             area_labels[area_key] = {
                 'label': f'{area.country.name} \u00b7 {area.sea.name}',

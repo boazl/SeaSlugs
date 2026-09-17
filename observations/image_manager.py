@@ -24,13 +24,14 @@ def files():
     linked={}
     for item in Sample.objects.exclude(image='').select_related('species'):
         linked.setdefault(item.image.name,[]).append(item)
+    site_images=set(SiteImage.objects.exclude(image='').values_list('image',flat=True))
     rows=[]
     for path in sorted(root.rglob('*')):
         if not path.is_file() or path.is_symlink() or not path.resolve().is_relative_to(root): continue
         if path.suffix.lower() not in ('.jpg','.jpeg','.png','.webp'): continue
         name=path.relative_to(root).as_posix();refs=linked.get(name,[])
         rows.append({'name':name,'size':path.stat().st_size,'refs':refs,'token':signing.dumps(name,salt='image-file'),
-                     'blocked':any(not r.video_url and not r.deleted_at for r in refs)})
+                     'blocked':any(not r.video_url and not r.deleted_at for r in refs) or name in site_images})
     return rows
 
 
@@ -82,6 +83,8 @@ def manager(request):
                     for name,path in selected:
                         if Sample.objects.filter(image=name,video_url='',deleted_at__isnull=True).exists():
                             raise ValidationError('לא ניתן למחוק תמונה שהיא המדיה היחידה בתצפית פעילה. הוסיפו סרטון או הסירו את התצפית תחילה.')
+                        if SiteImage.objects.filter(image=name).exists():
+                            raise ValidationError('לא ניתן למחוק את תמונת הבית מכאן. יש להחליף או להסיר אותה דרך "תמונת הבית" למטה.')
                     # No archive or retained copy: remove files only after checking all selections.
                     for name,path in selected:
                         path.unlink()

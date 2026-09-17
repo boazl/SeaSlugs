@@ -1,0 +1,31 @@
+{% extends 'observations/base.html' %}{% block content %}<a href="{% url 'releases' %}">ניהול גרסאות וגיבויים</a> · <a href="{% url 'table-transfer' %}">העברת טבלאות</a> · <a href="{% url 'image-manager' %}">ניהול תמונות</a>
+<h1>החלפה מלאה של מסד הנתונים</h1>
+<p class="notice">סביבה: <strong>{% if local %}המחשב המקומי{% else %}האתר ב־Render{% endif %}</strong> · מצב: <strong>{% if locked %}נעול לתחזוקה{% else %}פעיל{% endif %}</strong></p>
+<p>מיועד להחלפה מלאה של קובץ מסד הנתונים (למשל אחרי עבודה מקומית מקיפה), לא לעדכון נקודתי — לזה יש את העברת הטבלאות. התהליך: נעילת האתר ויצירת גיבוי, הורדת מסד הנתונים הנוכחי, העלאת הקובץ המעודכן ובדיקתו, השלמת תמונות חסרות, ולבסוף ביצוע ההחלפה ושחרור האתר — כל זה מכאן, בלי צורך במסוף או ב-Render.</p>
+{% if error %}<p class="errorlist" role="alert">{{error}}</p>{% endif %}
+{% if not locked %}
+<form method="post">{% csrf_token %}<input type="hidden" name="action" value="lock">
+<p><label><input type="checkbox" name="confirm" value="yes" required> אני מאשר/ת נעילת האתר ליצירת גיבוי והתחלת תהליך החלפה</label></p>
+<button>נעילת האתר והתחלת התהליך</button></form>
+{% else %}
+<form method="post"><input type="hidden" name="action" value="unlock">
+<button type="submit" formnovalidate>ביטול הנעילה — לא להחליף כלום, לשחרר את האתר</button></form>
+<h2>1. הורדת מסד הנתונים הנוכחי</h2>
+<p><a href="{% url 'db-replace-download' %}">הורדת עותק נוכחי של מסד הנתונים</a> — בצעו עליו את השינויים במחשב המקומי.</p>
+<h2>2. העלאת הקובץ המעודכן</h2>
+<form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="action" value="preview">
+<p><input type="file" name="database" accept=".sqlite3" required></p><button>בדיקת הקובץ</button></form>
+{% if pending %}
+<h2>3. תמונות</h2>
+<p>מסד הנתונים שהועלה מפנה ל-{{needed_count}} תמונות. {% if missing_count %}חסרות ביעד <strong>{{missing_count}}</strong> מהן — יש להעלות אותן לפני ההחלפה.{% else %}כל התמונות הנדרשות כבר קיימות כאן.{% endif %}</p>
+{% if missing_count %}<form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="action" value="upload_images">
+<p><input type="file" name="images" accept="image/jpeg" multiple required></p><button>העלאת תמונות</button></form>{% endif %}
+<h2>4. ביצוע ההחלפה</h2>
+{% if missing_count %}<p>אי אפשר לבצע את ההחלפה כל עוד חסרות תמונות ביעד.</p>{% else %}
+<form method="post">{% csrf_token %}<input type="hidden" name="action" value="commit">
+<p><label><input type="checkbox" name="cleanup" value="yes"> למחוק גם תמונות שכבר לא בשימוש אחרי ההחלפה</label></p>
+<p><label><input type="checkbox" name="confirm" value="yes" required> אני מאשר/ת את ההחלפה — הפעולה בלתי הפיכה (נוצר גיבוי לפני כן)</label></p>
+<button>ביצוע ההחלפה ושחרור האתר</button></form>
+{% endif %}{% endif %}
+{% endif %}
+{% endblock %}

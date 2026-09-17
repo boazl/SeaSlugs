@@ -30,6 +30,21 @@ class GalleryTests(TestCase):
         self.item.soft_delete(self.owner)
         self.assertEqual(self.catalog()['species'], [])
 
+    def test_species_hidden_when_area_has_no_defining_sample(self):
+        from .models import SpeciesArea
+        area = SpeciesArea.objects.get(species=self.item.species)
+        area.defining_sample = None
+        area.save(update_fields=['defining_sample'])
+        self.assertEqual(self.catalog()['species'], [])
+
+    def test_soft_deleting_the_defining_sample_falls_back_to_another_published_one(self):
+        second = Sample(owner=self.owner, trip=self.trip, species=self.item.species, video_url='https://youtu.be/12345678901')
+        second.save_reviewed()
+        self.item.soft_delete(self.owner)
+        catalog = self.catalog()
+        self.assertEqual(len(catalog['species']), 1)
+        self.assertEqual(catalog['species'][0]['video_id'], '12345678901')
+
     def test_pending_and_incomplete_records_are_not_public(self):
         self.item.status = 'pending'
         self.item.save()

@@ -56,6 +56,59 @@ class SpeciesAreaTests(TestCase):
         self.assertEqual(response.status_code,302)
         area.refresh_from_db();self.assertEqual(area.defining_sample_id,second.pk)
 
+    def test_soft_delete_repoints_defining_sample_to_another_valid_sample(self):
+        second=self.record(self.other)
+        self.first.soft_delete(self.user)
+        area=SpeciesArea.objects.get(species=self.species,country=self.country,sea=self.sea)
+        self.assertEqual(area.defining_sample_id,second.pk)
+
+    def test_soft_delete_clears_defining_sample_when_no_replacement_exists(self):
+        self.first.soft_delete(self.user)
+        area=SpeciesArea.objects.get(species=self.species,country=self.country,sea=self.sea)
+        self.assertIsNone(area.defining_sample_id)
+
+    def test_publishing_again_after_deletion_self_heals_a_cleared_area(self):
+        self.first.soft_delete(self.user)
+        area=SpeciesArea.objects.get(species=self.species,country=self.country,sea=self.sea)
+        self.assertIsNone(area.defining_sample_id)
+        third=self.record(self.other)
+        area.refresh_from_db();self.assertEqual(area.defining_sample_id,third.pk)
+
+    def test_rebuild_recreates_areas_from_published_samples_and_drops_stale_rows(self):
+        stale=Species.objects.create(scientific_name='No longer published')
+        SpeciesArea.objects.create(species=stale,country=self.country,sea=self.sea)
+        count=SpeciesArea.rebuild()
+        self.assertEqual(count,1)
+        self.assertFalse(SpeciesArea.objects.filter(species=stale).exists())
+        area=SpeciesArea.objects.get(species=self.species,country=self.country,sea=self.sea)
+        self.assertEqual(area.defining_sample_id,self.first.pk)
+
+    def test_rebuild_is_not_confused_by_samples_with_different_created_at(self):
+        # Regression: Sample's default ordering (Meta.ordering=['-created_at']) used to leak
+        # into rebuild()'s DISTINCT query, so two samples sharing one species+country+sea but
+        # recorded at different times produced two "distinct" keys and crashed on the
+        # SpeciesArea unique constraint. Force distinct timestamps so this reproduces even
+        # when both samples are created in the same test tick.
+        second=self.record(self.other)
+        from django.utils import timezone
+        import datetime
+        Sample.objects.filter(pk=self.first.pk).update(created_at=timezone.now()-datetime.timedelta(days=1))
+        Sample.objects.filter(pk=second.pk).update(created_at=timezone.now())
+        count=SpeciesArea.rebuild()
+        self.assertEqual(count,1)
+        self.assertEqual(SpeciesArea.objects.filter(species=self.species,country=self.country,sea=self.sea).count(),1)
+
+    def test_rebuild_admin_action_rebuilds_regardless_of_selection(self):
+        self.client.force_login(self.user)
+        area=SpeciesArea.objects.get(species=self.species,country=self.country,sea=self.sea)
+        # corrupt it first, to prove the action truly rebuilds rather than trusting existing rows
+        area.defining_sample=None;area.save(update_fields=['defining_sample'])
+        with patch('observations.table_transfer.create_backup',return_value=Path('test.sqlite3')):
+            response=self.client.post('/admin/observations/speciesarea/',{'action':'rebuild_all','_selected_action':[str(area.pk)]})
+        self.assertEqual(response.status_code,302)
+        area=SpeciesArea.objects.get(species=self.species,country=self.country,sea=self.sea)
+        self.assertEqual(area.defining_sample_id,self.first.pk)
+
     def test_import_allows_republishing_same_species_elsewhere(self):
         self.record(self.other)
         doc=export_table('samples')
@@ -67,7 +120,7 @@ class SpeciesAreaTests(TestCase):
         self.assertEqual(result[0]['action'],'new')
 
     def test_applying_a_samples_transfer_creates_species_area_like_save_reviewed_would(self):
-        # A table/bundle transfer applies with a plain .save(), never save_reviewed(), so it
+        # A table transfer applies with a plain .save(), never save_reviewed(), so it
         # must independently register the same SpeciesArea side effect -- otherwise a species
         # imported this way would silently never show up in the public gallery.
         imported_species=Species.objects.create(scientific_name='Imported species')

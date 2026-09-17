@@ -141,16 +141,13 @@ def create_backup():
     return backup
 
 
-def apply(document, expected, actor=None, images=None):
+def apply(document, expected, actor=None):
     backup = create_backup()
     with transaction.atomic():
         # A write statement obtains SQLite's reservation before re-reading preview state.
         Species.objects.filter(pk=-1).update(scientific_name=F('scientific_name'))
         if fingerprint()!=expected:raise ValidationError('הנתונים השתנו מאז התצוגה המקדימה. יש ליצור תצוגה חדשה.')
         items=plan(document)
-        if images:
-            from .media_transfer import save_images
-            save_images(images)
         if document['table'] == 'users':
             for item in items:
                 user = item['object']
@@ -165,7 +162,10 @@ def apply(document, expected, actor=None, images=None):
             # Mirror Sample.save_reviewed()'s own side effect: a transferred sample that is
             # already published must register itself in SpeciesArea exactly like one saved
             # through the site normally would, otherwise imported species silently never
-            # appear in the public gallery even though the Sample row exists.
+            # appear in the public gallery even though the Sample row exists. Recomputing via
+            # pick_defining_sample (not just filling in a missing row) also self-heals an area
+            # left without a defining sample, e.g. after the sample that used to define it was
+            # deleted in an environment this transfer hasn't reached yet.
             for item in items:
                 if item['action'] not in ('new', 'update'):
                     continue
@@ -173,8 +173,9 @@ def apply(document, expected, actor=None, images=None):
                 if (sample.status == Sample.Status.PUBLISHED and sample.kind == Sample.Kind.SPECIES
                         and sample.species_id and sample.trip_id
                         and sample.trip.country_id and sample.trip.region_id):
-                    SpeciesArea.objects.get_or_create(
-                        species_id=sample.species_id, country_id=sample.trip.country_id,
-                        sea_id=sample.trip.region.sea_id, defaults={'defining_sample': sample},
+                    SpeciesArea.objects.update_or_create(
+                        species_id=sample.species_id, country_id=sample.trip.country_id, sea_id=sample.trip.region.sea_id,
+                        defaults={'defining_sample': SpeciesArea.pick_defining_sample(
+                            sample.species_id, sample.trip.country_id, sample.trip.region.sea_id)},
                     )
     return items,backup.name

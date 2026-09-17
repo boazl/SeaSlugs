@@ -240,13 +240,27 @@ class Sample(models.Model):
             self.approved_at = timezone.now() if approve else None
             self.save()
             if self.status == self.Status.PUBLISHED and self.kind == self.Kind.SPECIES and self.species_id and self.trip.country_id and self.trip.region_id:
-                SpeciesArea.objects.get_or_create(
+                # update_or_create (not get_or_create) so an area that already exists but has
+                # no defining sample yet -- e.g. after the previous one was deleted and no
+                # replacement existed at that moment -- self-heals as soon as a valid sample
+                # for it is published again.
+                SpeciesArea.objects.update_or_create(
                     species_id=self.species_id, country_id=self.trip.country_id, sea_id=self.trip.region.sea_id,
-                    defaults={'defining_sample': self},
+                    defaults={'defining_sample': SpeciesArea.pick_defining_sample(
+                        self.species_id, self.trip.country_id, self.trip.region.sea_id)},
                 )
     def soft_delete(self, actor):
         self.deleted_at = timezone.now(); self.deleted_by = actor
         self.save(update_fields=['deleted_at','deleted_by','updated_at'])
+        if self.kind == self.Kind.SPECIES and self.species_id and self.trip_id and self.trip.country_id and self.trip.region_id:
+            # If this sample was defining its species in the gallery, replace it with another
+            # published sample of the same species+area if one exists, else clear the field --
+            # pick_defining_sample already excludes this sample now that it is marked deleted.
+            SpeciesArea.objects.filter(
+                species_id=self.species_id, country_id=self.trip.country_id, sea_id=self.trip.region.sea_id,
+                defining_sample_id=self.pk,
+            ).update(defining_sample=SpeciesArea.pick_defining_sample(
+                self.species_id, self.trip.country_id, self.trip.region.sea_id))
 
 
 class SpeciesArea(models.Model):
@@ -276,3 +290,29 @@ class SpeciesArea(models.Model):
             return None
         with_image = [c for c in candidates if c.image]
         return (with_image or candidates)[0]
+
+    @staticmethod
+    def rebuild():
+        """Delete every SpeciesArea row and regenerate it from scratch from the samples
+        that currently exist: one row per species+country+sea with at least one published
+        sample, each pointing at pick_defining_sample's choice. Safe to re-run at any time
+        -- only this table is touched, Sample data is never changed."""
+        with transaction.atomic():
+            SpeciesArea.objects.all().delete()
+            keys = Sample.objects.filter(
+                kind=Sample.Kind.SPECIES, status=Sample.Status.PUBLISHED, deleted_at__isnull=True,
+                species__isnull=False, species_other='', site_other='',
+                trip__country__isnull=False, trip__region__isnull=False,
+            ).order_by().values_list('species_id', 'trip__country_id', 'trip__region__sea_id').distinct()
+            # .order_by() clears Sample's default ordering (Meta.ordering = ['-created_at']);
+            # without it Django silently adds created_at to the SELECT DISTINCT columns to
+            # support that ordering, which defeats the intended (species,country,sea) dedup
+            # and can raise a UNIQUE-constraint IntegrityError below when two samples for the
+            # same species+area have different created_at timestamps.
+            count = 0
+            for species_id, country_id, sea_id in keys:
+                defining = SpeciesArea.pick_defining_sample(species_id, country_id, sea_id)
+                if defining:
+                    SpeciesArea.objects.create(species_id=species_id, country_id=country_id, sea_id=sea_id, defining_sample=defining)
+                    count += 1
+        return count
