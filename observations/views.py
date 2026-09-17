@@ -7,7 +7,7 @@ from django.http import Http404, FileResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
 from django.urls import reverse
-from .models import Sample, Profile, Region, Site, DiveTrip, SiteImage, Species, Country
+from .models import Sample, Profile, Region, Site, DiveTrip, SiteImage, Species, Country, SpeciesArea
 from .forms import SignupForm, SampleForm, ProfileForm, DiveTripForm
 
 
@@ -158,6 +158,26 @@ def species_search(request):
     rows = rows.order_by('scientific_name')[:40]
     results = [{'id': str(item.pk), 'label': item.scientific_name + (f' — {item.name_he}' if item.name_he else '')} for item in rows]
     return JsonResponse({'results': results})
+
+
+@login_required
+def species_area_status(request):
+    """Whether the sample currently being edited is (or would be) the defining sample
+    for the given species in the given trip's country+sea, and whether that species
+    already appears in the gallery there through some other sample. Called live from the
+    observation form whenever the species or trip field changes, since both together
+    determine which SpeciesArea is relevant."""
+    from django.http import JsonResponse
+    species_text = (request.GET.get('species') or '').strip()
+    species = Species.objects.filter(scientific_name__iexact=species_text).first() if species_text else None
+    trip = DiveTrip.objects.filter(pk=request.GET.get('trip')).select_related('country','region__sea').first()
+    if not species or not trip or not trip.country_id or not trip.sea:
+        return JsonResponse({'matched': False})
+    area = SpeciesArea.objects.filter(species=species, country_id=trip.country_id, sea=trip.sea).first()
+    sample_id = request.GET.get('sample') or None
+    is_defining = bool(area and sample_id and str(area.defining_sample_id) == str(sample_id))
+    appears = bool(area and area.defining_sample_id)
+    return JsonResponse({'matched': True, 'is_defining': is_defining, 'appears': appears})
 
 
 @login_required

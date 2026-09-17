@@ -138,6 +138,30 @@ class WorkflowTests(TestCase):
         results = self.client.get('/observations/species-search/?q=Test').json()['results']
         self.assertEqual([row['label'] for row in results], ['Test species'])
 
+    def test_species_area_status_endpoint(self):
+        # Drives the live "does this observation define the species / does the species
+        # appear in the gallery" message on the edit form, which re-checks whenever the
+        # species or trip field changes (a SpeciesArea is keyed by species+country+sea).
+        self.client.force_login(self.user)
+        resp = self.client.get('/observations/species-area-status/', {'species': 'Nope', 'trip': '999'}).json()
+        self.assertEqual(resp, {'matched': False})
+
+        first = self.record()  # the first published sample of a species+area becomes defining
+        resp = self.client.get('/observations/species-area-status/',
+            {'species': self.species.scientific_name, 'trip': self.trip.pk, 'sample': first.pk}).json()
+        self.assertEqual(resp, {'matched': True, 'is_defining': True, 'appears': True})
+
+        second = self.record()  # a second published sample of the same species+area is not
+        resp = self.client.get('/observations/species-area-status/',
+            {'species': self.species.scientific_name, 'trip': self.trip.pk, 'sample': second.pk}).json()
+        self.assertEqual(resp, {'matched': True, 'is_defining': False, 'appears': True})
+
+        # a species with no published sample anywhere in this trip's area yet
+        Species.objects.create(scientific_name='Not yet published')
+        resp = self.client.get('/observations/species-area-status/',
+            {'species': 'Not yet published', 'trip': self.trip.pk}).json()
+        self.assertEqual(resp, {'matched': True, 'is_defining': False, 'appears': False})
+
     def test_species_field_matches_case_insensitively_and_edit_prefills_scientific_name(self):
         d=self.data();d.update(species=self.species.scientific_name.upper())
         form=SampleForm(d,instance=Sample(owner=self.user));self.assertTrue(form.is_valid(),form.errors)
@@ -168,13 +192,12 @@ class WorkflowTests(TestCase):
         self.assertIsNone(form.cleaned_data['species'])
         self.assertEqual(form.cleaned_data['species_other'],'Nonexistent name')
 
-    def test_image_help_text_flags_the_defining_sample_only(self):
-        first=self.record()  # the first published sample of a species+area becomes defining
-        area=SpeciesArea.objects.get(species=self.species,country=self.country,sea=self.sea)
-        self.assertEqual(area.defining_sample_id,first.pk)
-        self.assertIn('תצפית זו מגדירה את המין',SampleForm(instance=first).fields['image'].help_text)
-        second=self.record()  # a second published sample of the same species+area is not
-        self.assertNotEqual(area.defining_sample_id,second.pk)
-        self.assertNotIn('תצפית זו מגדירה',SampleForm(instance=second).fields['image'].help_text)
-        # a brand-new, unsaved sample obviously can't be defining anything yet
-        self.assertNotIn('תצפית זו מגדירה',SampleForm(instance=Sample(owner=self.user)).fields['image'].help_text)
+    def test_observation_form_wires_up_the_live_defining_status_check(self):
+        self.client.force_login(self.user)
+        content=self.client.get('/observations/new/').content.decode()
+        self.assertIn('id="defining-status"',content)
+        self.assertIn('/observations/species-area-status/',content)
+        self.assertIn('const sampleId=null;',content)  # new/unsaved sample
+        item=self.record()
+        content=self.client.get(f'/observations/{item.pk}/edit/').content.decode()
+        self.assertIn(f'const sampleId={item.pk};',content)

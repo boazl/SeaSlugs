@@ -1,7 +1,7 @@
 {% extends 'observations/base.html' %}{% block content %}<h1>{{ title }}</h1>
 {% if observation_form %}<p>בחרו מין יחיד או אוסף מינים. דגימת מין מחייבת מין; אוסף מחייב כותרת, ללא בחירת מין. בשניהם נדרש מסע צלילה (הכולל מדינה, אזור ושנה) ותמונה או סרטון (אפשר גם שניהם). אוספים מתפרסמים במסעות הצלילה לאחר אישור מנהל. ללא העלאת תמונה תוצג התמונה המקדימה של YouTube. מין חדש לאזור מתפרסם מיד אם כל הנתונים מזוהים; אחרת התצפית ממתינה לבדיקה.</p>{% endif %}
 {% if trip_form %}<p>מסע צלילה מייצג ביקור אחד באתר בתאריך מסוים. לאחר השמירה תחזרו לטופס התצפית עם המסע החדש נבחר.</p>{% endif %}
-<form method="post" enctype="multipart/form-data">{% csrf_token %}{% if trip_form %}<input type="hidden" name="next" value="{{ next }}">{% endif %}{{ form.as_p }}<button type="submit">שמירה / Save</button></form>
+<form method="post" enctype="multipart/form-data">{% csrf_token %}{% if trip_form %}<input type="hidden" name="next" value="{{ next }}">{% endif %}{{ form.as_p }}{% if observation_form %}<p id="defining-status" class="notice" hidden></p>{% endif %}<button type="submit">שמירה / Save</button></form>
 {% if observation_form and trip_new_url %}<p><a href="{{ trip_new_url }}?next={{ request.path|urlencode }}">מסע הצלילה לא ברשימה? הוספת מסע חדש</a></p>{% endif %}
 {% if observation_form %}<datalist id="species-options">{% for s in species_options %}<option value="{{ s }}">{% endfor %}</datalist>{{ locations|json_script:'locations' }}<script>
 const locations=JSON.parse(document.getElementById('locations').textContent);
@@ -24,6 +24,31 @@ const tripEl=document.getElementById('id_trip');
 if(tripEl)tripEl.addEventListener('change',()=>updateSites(true));
 for(const name of otherFields){const el=document.getElementById('id_'+name);if(el)el.addEventListener('change',updateOther);}
 updateSites(false);updateOther();
+
+// Whether this sample is (or would be) the species' defining/gallery sample depends on
+// both the species and the trip fields together (a SpeciesArea is species+country+sea),
+// so re-check with the server whenever either one changes, rather than only on load.
+const sampleId={{ form.instance.pk|default_if_none:"null" }};
+const speciesEl=document.getElementById('id_species');
+const statusEl=document.getElementById('defining-status');
+function updateDefiningStatus(){
+  if(!speciesEl||!tripEl||!statusEl)return;
+  const species=speciesEl.value.trim();const trip=tripEl.value;
+  if(!species||!trip){statusEl.hidden=true;return;}
+  const params=new URLSearchParams({species,trip});
+  if(sampleId!==null)params.set('sample',sampleId);
+  fetch('{% url "species-area-status" %}?'+params).then(r=>r.ok?r.json():{matched:false}).then(data=>{
+    if(!data.matched){statusEl.hidden=true;return;}
+    statusEl.hidden=false;
+    statusEl.textContent=data.is_defining?'תצפית זו מגדירה את המין.'
+      :(data.appears?'המין שנבחר מופיע בגלריה.':'המין שנבחר אינו מופיע בגלריה.');
+  }).catch(()=>{statusEl.hidden=true;});
+}
+let definingDebounce=null;
+if(speciesEl)speciesEl.addEventListener('input',()=>{clearTimeout(definingDebounce);definingDebounce=setTimeout(updateDefiningStatus,300);});
+if(speciesEl)speciesEl.addEventListener('change',updateDefiningStatus);
+if(tripEl)tripEl.addEventListener('change',updateDefiningStatus);
+updateDefiningStatus();
 </script>{% endif %}
 {% if trip_form %}{{ locations|json_script:'divetrip-locations' }}<script>
 const tripLocations=JSON.parse(document.getElementById('divetrip-locations').textContent);

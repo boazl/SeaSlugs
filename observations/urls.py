@@ -6,6 +6,7 @@ urlpatterns=[
  path('',views.listing,name='observations'),
  path('new/',views.edit,name='observation-new'),
  path('species-search/',views.species_search,name='species-search'),
+ path('species-area-status/',views.species_area_status,name='species-area-status'),
  path('trips/new/',views.trip_new,name='trip-new'),
  path('<int:pk>/edit/',views.edit,name='observation-edit'),
  path('<int:pk>/remove/',views.remove,name='observation-remove'),
