@@ -76,6 +76,23 @@ class DbReplaceTests(TestCase):
         self.assertFalse(maintenance.is_locked())
         self.assertFalse(pending_path().exists())
 
+    def test_unlock_button_appears_on_admin_index_and_admin_tool_pages_only_when_locked(self):
+        # / is served from a standalone dist/index.html, not base.html, so this checks
+        # the admin index and an ordinary base.html-based admin tool page instead.
+        self.client.force_login(self.user)
+        response = self.client.get('/admin/')
+        self.assertNotContains(response, 'ביטול נעילה')
+        response = self.client.get('/admin/releases/')
+        self.assertNotContains(response, 'ביטול נעילה')
+        maintenance.lock()
+        response = self.client.get('/admin/')
+        self.assertContains(response, 'ביטול נעילה')
+        response = self.client.get('/admin/releases/')
+        self.assertContains(response, 'ביטול נעילה')
+        response = self.client.post('/admin/db-replace/', {'action': 'unlock'})
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(maintenance.is_locked())
+
     def test_preview_rejected_when_not_locked(self):
         self.client.force_login(self.user)
         response = self.client.post('/admin/db-replace/', {'action': 'preview', 'database': SimpleUploadedFile('db.sqlite3', b'x')})
