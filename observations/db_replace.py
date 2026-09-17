@@ -12,6 +12,7 @@ admin navigates away mid-review.
 import hashlib
 import io
 import os
+import re
 import sqlite3
 from pathlib import Path
 
@@ -193,6 +194,16 @@ def db_replace(request):
                 if not uploads:
                     raise ValidationError('יש לבחור תמונות.')
                 needed = needed_images(pending_path())
+                # Content-hash names (observations/transfer/<sha256>.jpg) are verified by
+                # recomputing the hash. Older samples -- uploaded before images were stored
+                # by content hash -- keep whatever name they already had (e.g.
+                # observations/<uuid>.jpg); there's nothing in that name to verify against,
+                # so those are matched by the uploaded file's own filename instead.
+                legacy_by_basename = {
+                    name.rsplit('/', 1)[-1]: name
+                    for name in needed
+                    if not re.fullmatch(r'observations/transfer/[0-9a-f]{64}\.jpg', name)
+                }
                 from .media_transfer import save_images
                 accepted = 0
                 for upload in uploads:
@@ -204,11 +215,15 @@ def db_replace(request):
                             image.verify()
                     except (UnidentifiedImageError, OSError):
                         continue
-                    name = 'observations/transfer/' + hashlib.sha256(raw).hexdigest() + '.jpg'
-                    if name not in needed:
+                    hash_name = 'observations/transfer/' + hashlib.sha256(raw).hexdigest() + '.jpg'
+                    if hash_name in needed:
+                        save_images({hash_name: raw})
+                        accepted += 1
                         continue
-                    save_images({name: raw})
-                    accepted += 1
+                    legacy_name = legacy_by_basename.get(upload.name)
+                    if legacy_name:
+                        save_images({legacy_name: raw})
+                        accepted += 1
                 messages.success(request, f'הועלו {accepted} תמונות מתוך {len(uploads)} שנבחרו.')
                 return redirect('db-replace')
             if action == 'commit':

@@ -140,6 +140,25 @@ class DbReplaceTests(TestCase):
         response = self.client.get('/admin/db-replace/')
         self.assertEqual(response.context['missing_count'], 1)
 
+    def test_upload_images_matches_legacy_non_hash_names_by_filename(self):
+        # Samples whose image predates content-hash naming keep names like
+        # observations/<uuid>.jpg -- there's no hash in that name to verify a re-upload
+        # against, so it must be matched by the uploaded file's own filename instead.
+        maintenance.lock(); self.client.force_login(self.user)
+        output = io.BytesIO(); Image.new('RGB', (10, 8), 'green').save(output, 'JPEG'); raw = output.getvalue()
+        legacy_name = 'observations/6c239d15efe44d16a6a9cbe889123a53.jpg'
+        path = Path(self.temp.name) / 'good.sqlite3'
+        build_fixture(path, images=[legacy_name])
+        self.client.post('/admin/db-replace/', {'action': 'preview', 'database': SimpleUploadedFile('db.sqlite3', path.read_bytes())})
+        response = self.client.post('/admin/db-replace/', {
+            'action': 'upload_images',
+            'images': SimpleUploadedFile('6c239d15efe44d16a6a9cbe889123a53.jpg', raw, content_type='image/jpeg'),
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(default_storage.exists(legacy_name))
+        response = self.client.get('/admin/db-replace/')
+        self.assertEqual(response.context['missing_count'], 0)
+
     def test_commit_blocked_while_images_missing(self):
         maintenance.lock(); self.client.force_login(self.user)
         path = Path(self.temp.name) / 'good.sqlite3'
