@@ -80,14 +80,14 @@ class MediaTransferTests(TestCase):
         species3=Species.objects.create(scientific_name='Third species')
         self.client.force_login(self.sample.owner)
         base={'kind':'species','species_other':'','site':'','site_other':'','day':'','depth':'','video_url':'','title':''}
-        response=self.client.post('/observations/new/',dict(base,species=species2.pk,trip=self.sample.trip.pk,
+        response=self.client.post('/observations/new/',dict(base,species=species2.scientific_name,trip=self.sample.trip.pk,
             image=SimpleUploadedFile('photo.jpg',raw,content_type='image/jpeg')))
         self.assertEqual(response.status_code,302)
         created=Sample.objects.get(species=species2)
         self.assertRegex(created.image.name,r'^observations/transfer/[0-9a-f]{64}\.jpg$')
         # Uploading the exact same bytes again, for a different sample, must reuse
         # the same stored file rather than create a second copy.
-        response=self.client.post('/observations/new/',dict(base,species=species3.pk,trip=self.sample.trip.pk,
+        response=self.client.post('/observations/new/',dict(base,species=species3.scientific_name,trip=self.sample.trip.pk,
             image=SimpleUploadedFile('photo-again.jpg',raw,content_type='image/jpeg')))
         self.assertEqual(response.status_code,302)
         other=Sample.objects.get(species=species3)

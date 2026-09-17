@@ -5,8 +5,6 @@ from django import forms
 from django.core.files.base import ContentFile
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
-from django.urls import reverse
-from django.utils.html import format_html
 from .models import Sample, Profile, Species, Country, Region, Site, DiveTrip
 
 
@@ -36,54 +34,6 @@ class ProfileForm(forms.ModelForm):
         widgets = {'countries':forms.CheckboxSelectMultiple, 'regions':forms.CheckboxSelectMultiple}
 
 
-class AutocompleteWidget(forms.Widget):
-    """A search-as-you-type text input backed by a JSON endpoint, standing in for a
-    <select> when the choice list (e.g. thousands of species) is too large to render
-    inline. The bound value stays a plain string — a pk, '', or the 'other' sentinel —
-    exactly like the plain ChoiceField it replaces, so form validation is unaffected."""
-    def __init__(self, search_url_name, label_for_value=None, other_value='other',
-                 other_label='אחר — פירוט', placeholder='הקלידו לחיפוש…', attrs=None):
-        super().__init__(attrs)
-        self.search_url_name = search_url_name
-        self.label_for_value = label_for_value or (lambda value: '')
-        self.other_value = other_value
-        self.other_label = other_label
-        self.placeholder = placeholder
-
-    def value_omitted_from_data(self, data, files, name):
-        return name not in data
-
-    def render(self, name, value, attrs=None, renderer=None):
-        attrs = attrs or {}
-        widget_id = attrs.get('id') or f'id_{name}'
-        value = '' if value in (None, 'None') else str(value)
-        if value == self.other_value:
-            display = self.other_label
-        elif value:
-            display = self.label_for_value(value)
-        else:
-            display = ''
-        search_id, results_id = f'{widget_id}_search', f'{widget_id}_results'
-        return format_html(
-            '<span class="autocomplete-wrap">'
-            '<input type="text" id="{search_id}" class="autocomplete-search" autocomplete="off" '
-            'placeholder="{placeholder}" value="{display}">'
-            '<div class="autocomplete-results" id="{results_id}" hidden></div>'
-            '</span>'
-            '<input type="hidden" name="{name}" id="{widget_id}" value="{value}">'
-            '<script>(window.__autocompleteQueue=window.__autocompleteQueue||[]).push([{widget_id_js}, {search_id_js}, {results_id_js}, {url_js}, {other_value_js}, {other_label_js}]);</script>',
-            search_id=search_id, results_id=results_id, placeholder=self.placeholder, display=display,
-            name=name, widget_id=widget_id, value=value,
-            widget_id_js=_js_str(widget_id), search_id_js=_js_str(search_id), results_id_js=_js_str(results_id),
-            url_js=_js_str(reverse(self.search_url_name)), other_value_js=_js_str(self.other_value),
-            other_label_js=_js_str(self.other_label))
-
-
-def _js_str(value):
-    import json
-    return json.dumps(value)
-
-
 class TripChoiceField(forms.ModelChoiceField):
     def label_from_instance(self, obj):
         where = ' · '.join(x for x in [str(obj.region) if obj.region_id else obj.region_name, str(obj.country) if obj.country_id else obj.country_name] if x)
@@ -93,7 +43,13 @@ class TripChoiceField(forms.ModelChoiceField):
 
 
 class SampleForm(forms.ModelForm):
-    species = forms.CharField(label='מין', required=False, widget=AutocompleteWidget('species-search'))
+    # A native text input backed by a <datalist> (rendered in form.html from
+    # species_options) rather than a <select> -- there can be hundreds of species, and
+    # this is the same open-dropdown-with-autocomplete pattern used for the genus filter
+    # on the observations list page. The submitted value is the scientific name itself
+    # (matched case-insensitively in clean() below), not a pk.
+    species = forms.CharField(label='מין', required=False, widget=forms.TextInput(attrs={
+        'list': 'species-options', 'autocomplete': 'off', 'placeholder': 'הקלידו לחיפוש…'}))
     site = forms.ChoiceField(label='אתר צלילה',required=False)
     trip = TripChoiceField(label='מסע צלילה', queryset=DiveTrip.objects.all(), help_text='לא מוצא/ת את המסע? אפשר להוסיף מסע חדש ולחזור לכאן.')
     class Meta:
@@ -103,32 +59,52 @@ class SampleForm(forms.ModelForm):
         super().__init__(*args,**kwargs)
         self.fields['kind'].required = False
         self.fields['video_url'].help_text = 'אפשר להשאיר ריק כאשר מעלים תמונה. ניתן להוסיף סרטון בהמשך.'
-        self.fields['species'].widget.label_for_value = lambda pk: str(Species.objects.filter(pk=pk).first() or '')
+        if self.instance.pk:
+            self.initial['species'] = self.instance.species.scientific_name if self.instance.species_id else (self.instance.species_other or '')
+        # species_other is now derived automatically in clean() from whatever was typed
+        # into "species" -- it no longer needs its own visible input (that used to only
+        # appear once "other" was explicitly picked from the old species dropdown).
+        self.fields['species_other'].widget = forms.HiddenInput()
         self.fields['site'].choices = [('', 'בחרו…')] + [(str(x.pk), str(x)) for x in Site.objects.all()] + [('other','אחר — פירוט')]
-        for name in ['species','site']:
-            if self.instance.pk:
-                self.initial[name] = str(getattr(self.instance,name+'_id') or ('other' if getattr(self.instance,name+'_other') else ''))
-            self.fields[name+'_other'].widget.attrs['data-other-for'] = name
+        if self.instance.pk:
+            self.initial['site'] = str(self.instance.site_id or ('other' if self.instance.site_other else ''))
+        self.fields['site_other'].widget.attrs['data-other-for'] = 'site'
         self.fields['image'].help_text = 'JPEG, PNG או WebP, עד 10MB ועד 25 מיליון פיקסלים. מומלץ צילום רוחבי 1920×1080 ומעלה. נשמור JPEG עד 1920×1080, ללא חיתוך או הגדלת תמונה קטנה. תמונה שהועלתה תשמש כתצוגה מקדימה לסרטון; ללא סרטון תיפתח התמונה המלאה. ללא תמונה נשתמש בתצוגה המקדימה של YouTube. העלו רק תמונות שיש לכם הרשאה לפרסם.'
     def clean(self):
         data = super().clean()
         data['kind'] = data.get('kind') or Sample.Kind.SPECIES
-        for name, model in [('species',Species),('site',Site)]:
-            value = data.get(name)
-            if value == 'other':
-                if not data.get(name+'_other','').strip(): self.add_error(name+'_other','יש לפרט את הערך האחר.')
-                data[name] = None
-            elif value:
-                try:
-                    data[name] = model.objects.get(pk=value)
-                except (model.DoesNotExist, ValueError, TypeError):
-                    self.add_error(name,'ערך לא תקין.')
-                    data[name] = None
-                else:
-                    data[name+'_other'] = ''
+
+        # A value that matches an existing species (case-insensitively) is used as-is;
+        # anything else -- a typo, or a species not yet catalogued -- is kept as free text
+        # in species_other, exactly like explicitly picking "other" used to work.
+        species_text = (data.get('species') or '').strip()
+        if species_text:
+            match = Species.objects.filter(scientific_name__iexact=species_text).first()
+            if match:
+                data['species'] = match
+                data['species_other'] = ''
             else:
-                data[name] = None
-                data[name+'_other'] = ''
+                data['species'] = None
+                data['species_other'] = species_text
+        else:
+            data['species'] = None
+            data['species_other'] = ''
+
+        value = data.get('site')
+        if value == 'other':
+            if not data.get('site_other','').strip(): self.add_error('site_other','יש לפרט את הערך האחר.')
+            data['site'] = None
+        elif value:
+            try:
+                data['site'] = Site.objects.get(pk=value)
+            except (Site.DoesNotExist, ValueError, TypeError):
+                self.add_error('site','ערך לא תקין.')
+                data['site'] = None
+            else:
+                data['site_other'] = ''
+        else:
+            data['site'] = None
+            data['site_other'] = ''
         return data
     def clean_image(self):
         file = self.cleaned_data.get('image')

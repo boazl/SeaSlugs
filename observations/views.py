@@ -182,6 +182,7 @@ def edit(request,pk=None):
         return redirect('observations')
     return render(request,'observations/form.html',{'form':form,'title':'תצפית / Sample','observation_form':True,
         'trip_new_url':reverse('trip-new'),
+        'species_options':Species.objects.order_by('scientific_name').values_list('scientific_name',flat=True),
         'locations':{'trips':list(DiveTrip.objects.values('id','region_id')),'sites':list(Site.objects.values('id','region_id'))}})
 
 

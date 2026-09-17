@@ -23,7 +23,7 @@ class WorkflowTests(TestCase):
         data.update(kwargs)
         item=Sample(**data);item.save_reviewed();return item
     def data(self):
-        return dict(species=str(self.species.pk),trip=str(self.trip.pk),site='',video_url='https://youtu.be/abcdefghijk')
+        return dict(species=self.species.scientific_name,trip=str(self.trip.pk),site='',video_url='https://youtu.be/abcdefghijk')
     def test_first_repeat_other_and_approval(self):
         first=self.record();self.assertEqual(first.status,'published')
         area=SpeciesArea.objects.get(species=self.species,country=self.country,sea=self.sea)
@@ -35,9 +35,10 @@ class WorkflowTests(TestCase):
         unknown=self.record(species=None,species_other='Unknown');self.assertEqual(unknown.status,'pending')
         with self.assertRaises(ValidationError):unknown.save_reviewed(actor=self.user,approve=True)
     def test_form_other_and_invalid_date(self):
-        d=self.data();d.update(species='other',species_other='New species')
+        d=self.data();d.update(species='New species')  # not an existing scientific name -> species_other
         form=SampleForm(d,instance=Sample(owner=self.user));self.assertTrue(form.is_valid(),form.errors)
-        form.save(commit=False).save_reviewed()
+        saved=form.save(commit=False);self.assertIsNone(saved.species_id);self.assertEqual(saved.species_other,'New species')
+        saved.save_reviewed()
         d=self.data();d.update(day=30)  # self.trip is in February; the 30th does not exist
         self.assertFalse(SampleForm(d,instance=Sample(owner=self.user)).is_valid())
     def test_trip_form_rejects_mismatched_region(self):
@@ -114,7 +115,7 @@ class WorkflowTests(TestCase):
         self.client.force_login(self.user)
         self.assertEqual(self.client.post('/observations/new/',self.data()).status_code,302)
         item=Sample.objects.get();self.assertEqual(item.status,'published')
-        d=self.data();d.update(species='other',species_other='Needs identification')
+        d=self.data();d.update(species='Needs identification')  # not an existing scientific name -> species_other
         self.assertEqual(self.client.post(f'/observations/{item.pk}/edit/',d).status_code,302)
         item.refresh_from_db();self.assertEqual(item.status,'pending')
         self.client.logout();self.assertEqual(self.client.get('/observations/').status_code,302)
@@ -136,3 +137,22 @@ class WorkflowTests(TestCase):
         Species.objects.create(scientific_name='Aaa species')
         results = self.client.get('/observations/species-search/?q=Test').json()['results']
         self.assertEqual([row['label'] for row in results], ['Test species'])
+
+    def test_species_field_matches_case_insensitively_and_edit_prefills_scientific_name(self):
+        d=self.data();d.update(species=self.species.scientific_name.upper())
+        form=SampleForm(d,instance=Sample(owner=self.user));self.assertTrue(form.is_valid(),form.errors)
+        self.assertEqual(form.cleaned_data['species'],self.species)
+        item=form.save(commit=False);item.save_reviewed()
+        # editing an existing item must show its scientific name in the field, not its pk
+        self.assertEqual(SampleForm(instance=item).initial['species'],self.species.scientific_name)
+
+    def test_species_options_datalist_and_hidden_species_other(self):
+        self.client.force_login(self.user)
+        content=self.client.get('/observations/new/').content.decode()
+        self.assertIn('<datalist id="species-options">',content)
+        self.assertIn(f'<option value="{self.species.scientific_name}">',content)
+        self.assertIn('list="species-options"',content)
+        # species_other is filled in automatically from the species field now, so it must
+        # no longer render as its own visible text input.
+        self.assertNotIn('type="text" name="species_other"',content)
+        self.assertIn('type="hidden" name="species_other"',content)
