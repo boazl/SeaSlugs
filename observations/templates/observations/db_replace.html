@@ -18,9 +18,9 @@
 {% if pending %}
 <h2>3. תמונות</h2>
 <p>מסד הנתונים שהועלה מפנה ל-{{needed_count}} תמונות. {% if missing_count %}חסרות ביעד <strong>{{missing_count}}</strong> מהן — יש להעלות אותן לפני ההחלפה.{% else %}כל התמונות הנדרשות כבר קיימות כאן.{% endif %}</p>
-{% if missing_list %}<ul>{% for item in missing_list %}<li>{% for label in item.labels %}{{label}}{% if not forloop.last %}, {% endif %}{% empty %}(לא נמצאה דגימה מתאימה בקובץ){% endfor %} <small>{{item.name}}</small></li>{% endfor %}</ul>{% if missing_list_truncated %}<p class="helptext">ועוד {{missing_count|add:'-200'}} תמונות חסרות נוספות שלא מוצגות כאן.</p>{% endif %}{% endif %}
+{% if missing_list %}<p class="helptext">תמונות בשם חדש (גיבוב תוכן) אפשר להעלות בבת אחת למטה — הן מזוהות אוטומטית. תמונות ישנות (עם כפתור ליד השורה) צריך להעלות אחת-אחת, כי אין דרך לזהות אותן לפי התוכן.</p><ul>{% for item in missing_list %}<li>{% for label in item.labels %}{{label}}{% if not forloop.last %}, {% endif %}{% empty %}(לא נמצאה דגימה מתאימה בקובץ){% endfor %} <small>{{item.name}}</small>{% if item.legacy %}<form method="post" enctype="multipart/form-data" style="display:inline">{% csrf_token %}<input type="hidden" name="action" value="upload_images"><input type="hidden" name="target" value="{{item.name}}"><input type="file" name="image" accept="image/jpeg" required><button>העלאת התמונה הזו</button></form>{% endif %}</li>{% endfor %}</ul>{% if missing_list_truncated %}<p class="helptext">ועוד {{missing_count|add:'-200'}} תמונות חסרות נוספות שלא מוצגות כאן.</p>{% endif %}{% endif %}
 {% if missing_count %}<form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="action" value="upload_images">
-<p><input type="file" name="images" accept="image/jpeg" multiple required></p><button>העלאת תמונות</button></form>{% endif %}
+<p><input type="file" name="images" accept="image/jpeg" multiple required></p><button>העלאת תמונות (לפי תוכן — לשמות חדשים בלבד)</button></form>{% endif %}
 <h2>4. ביצוע ההחלפה</h2>
 {% if missing_count %}<p>אי אפשר לבצע את ההחלפה כל עוד חסרות תמונות ביעד.</p>{% else %}
 <form method="post">{% csrf_token %}<input type="hidden" name="action" value="commit">

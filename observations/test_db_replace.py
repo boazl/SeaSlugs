@@ -140,24 +140,56 @@ class DbReplaceTests(TestCase):
         response = self.client.get('/admin/db-replace/')
         self.assertEqual(response.context['missing_count'], 1)
 
-    def test_upload_images_matches_legacy_non_hash_names_by_filename(self):
+    def test_upload_images_with_target_saves_legacy_non_hash_names(self):
         # Samples whose image predates content-hash naming keep names like
         # observations/<uuid>.jpg -- there's no hash in that name to verify a re-upload
-        # against, so it must be matched by the uploaded file's own filename instead.
+        # against automatically, so those are uploaded one at a time through their own
+        # dedicated button, which declares exactly which missing name it's filling.
         maintenance.lock(); self.client.force_login(self.user)
         output = io.BytesIO(); Image.new('RGB', (10, 8), 'green').save(output, 'JPEG'); raw = output.getvalue()
         legacy_name = 'observations/6c239d15efe44d16a6a9cbe889123a53.jpg'
         path = Path(self.temp.name) / 'good.sqlite3'
         build_fixture(path, images=[legacy_name])
         self.client.post('/admin/db-replace/', {'action': 'preview', 'database': SimpleUploadedFile('db.sqlite3', path.read_bytes())})
+        response = self.client.get('/admin/db-replace/')
+        self.assertTrue(response.context['missing_list'][0]['legacy'])
         response = self.client.post('/admin/db-replace/', {
-            'action': 'upload_images',
-            'images': SimpleUploadedFile('6c239d15efe44d16a6a9cbe889123a53.jpg', raw, content_type='image/jpeg'),
+            'action': 'upload_images', 'target': legacy_name,
+            'image': SimpleUploadedFile('whatever-name.jpg', raw, content_type='image/jpeg'),
         })
         self.assertEqual(response.status_code, 302)
         self.assertTrue(default_storage.exists(legacy_name))
         response = self.client.get('/admin/db-replace/')
         self.assertEqual(response.context['missing_count'], 0)
+
+    def test_upload_images_with_target_rejects_content_mismatch_for_hash_names(self):
+        # A hash-style target still gets its integrity guarantee: uploading the wrong
+        # file through the per-image button must not be accepted just because the admin
+        # declared that target explicitly.
+        maintenance.lock(); self.client.force_login(self.user)
+        output = io.BytesIO(); Image.new('RGB', (10, 8), 'blue').save(output, 'JPEG'); wrong_raw = output.getvalue()
+        hash_name = 'observations/transfer/' + 'c' * 64 + '.jpg'
+        path = Path(self.temp.name) / 'good.sqlite3'
+        build_fixture(path, images=[hash_name])
+        self.client.post('/admin/db-replace/', {'action': 'preview', 'database': SimpleUploadedFile('db.sqlite3', path.read_bytes())})
+        response = self.client.post('/admin/db-replace/', {
+            'action': 'upload_images', 'target': hash_name,
+            'image': SimpleUploadedFile('x.jpg', wrong_raw, content_type='image/jpeg'),
+        })
+        self.assertContains(response, 'אינו תואם')
+        self.assertFalse(default_storage.exists(hash_name))
+
+    def test_upload_images_with_target_rejects_a_no_longer_needed_name(self):
+        maintenance.lock(); self.client.force_login(self.user)
+        output = io.BytesIO(); Image.new('RGB', (10, 8), 'green').save(output, 'JPEG'); raw = output.getvalue()
+        path = Path(self.temp.name) / 'good.sqlite3'
+        build_fixture(path, images=[])
+        self.client.post('/admin/db-replace/', {'action': 'preview', 'database': SimpleUploadedFile('db.sqlite3', path.read_bytes())})
+        response = self.client.post('/admin/db-replace/', {
+            'action': 'upload_images', 'target': 'observations/nonexistent.jpg',
+            'image': SimpleUploadedFile('x.jpg', raw, content_type='image/jpeg'),
+        })
+        self.assertContains(response, 'כבר אינה נדרשת')
 
     def test_commit_blocked_while_images_missing(self):
         maintenance.lock(); self.client.force_login(self.user)
