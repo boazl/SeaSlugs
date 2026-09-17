@@ -23,7 +23,9 @@ def build_fixture(path, images=()):
     try:
         conn.execute('CREATE TABLE django_migrations (id INTEGER PRIMARY KEY, app TEXT, name TEXT)')
         conn.executemany('INSERT INTO django_migrations (app,name) VALUES (?,?)', migrations)
-        conn.execute('CREATE TABLE samples (id INTEGER PRIMARY KEY, image TEXT, deleted_at TEXT)')
+        conn.execute('CREATE TABLE observations_species (id INTEGER PRIMARY KEY, scientific_name TEXT)')
+        conn.execute('CREATE TABLE dive_trips (id INTEGER PRIMARY KEY, title TEXT, year INTEGER)')
+        conn.execute('CREATE TABLE samples (id INTEGER PRIMARY KEY, image TEXT, deleted_at TEXT, species_id INTEGER, species_other TEXT, trip_id INTEGER)')
         for i, name in enumerate(images):
             conn.execute('INSERT INTO samples (id,image,deleted_at) VALUES (?,?,NULL)', (i, name))
         conn.commit()
@@ -97,6 +99,25 @@ class DbReplaceTests(TestCase):
         response = self.client.get('/admin/db-replace/')
         self.assertEqual(response.context['needed_count'], 1)
         self.assertEqual(response.context['missing_count'], 1)
+
+    def test_preview_missing_images_are_labeled_by_species_and_trip(self):
+        # A missing image is just a content hash -- meaningless to a human -- so the
+        # page must show which sample it belongs to instead of only a bare count.
+        maintenance.lock(); self.client.force_login(self.user)
+        path = Path(self.temp.name) / 'good.sqlite3'
+        build_fixture(path, images=[])
+        conn = sqlite3.connect(str(path))
+        conn.execute("INSERT INTO observations_species (id, scientific_name) VALUES (1, 'Chromodoris annulata')")
+        conn.execute("INSERT INTO dive_trips (id, title, year) VALUES (1, 'Anilao', 2025)")
+        conn.execute(
+            "INSERT INTO samples (id, image, deleted_at, species_id, trip_id) VALUES (1, ?, NULL, 1, 1)",
+            ('observations/transfer/' + 'b' * 64 + '.jpg',),
+        )
+        conn.commit(); conn.close()
+        self.client.post('/admin/db-replace/', {'action': 'preview', 'database': SimpleUploadedFile('db.sqlite3', path.read_bytes())})
+        response = self.client.get('/admin/db-replace/')
+        self.assertContains(response, 'Chromodoris annulata')
+        self.assertContains(response, 'Anilao')
 
     def test_upload_images_accepts_only_needed_hash_named_jpegs(self):
         maintenance.lock(); self.client.force_login(self.user)

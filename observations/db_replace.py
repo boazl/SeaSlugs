@@ -84,6 +84,37 @@ def missing_images(needed):
     return sorted(name for name in needed if not default_storage.exists(name))
 
 
+MAX_MISSING_LISTED = 200
+
+
+def missing_image_details(path, missing):
+    # Content-hash filenames (observations/transfer/<sha256>.jpg) mean nothing to a
+    # human, so for each missing image look up which sample(s) in the uploaded file
+    # point at it and show the species/trip instead -- that's what the admin actually
+    # needs to go find and re-upload. Capped so a huge first-time sync doesn't render
+    # an enormous page.
+    if not missing:
+        return []
+    shown = missing[:MAX_MISSING_LISTED]
+    conn = sqlite3.connect(f'file:{path}?mode=ro', uri=True)
+    try:
+        placeholders = ','.join('?' for _ in shown)
+        query = ('SELECT s.image, sp.scientific_name, s.species_other, t.title, t.year '
+                 'FROM samples s '
+                 'LEFT JOIN observations_species sp ON s.species_id = sp.id '
+                 'LEFT JOIN dive_trips t ON s.trip_id = t.id '
+                 'WHERE s.image IN (' + placeholders + ') AND s.deleted_at IS NULL')
+        rows = conn.execute(query, shown).fetchall()
+    finally:
+        conn.close()
+    by_image = {}
+    for image, scientific_name, species_other, title, year in rows:
+        species = scientific_name or species_other or 'ללא מין מזוהה'
+        trip = ' · '.join(x for x in (title, str(year) if year else '') if x)
+        by_image.setdefault(image, []).append(f'{species} ({trip})' if trip else species)
+    return [{'name': name, 'labels': by_image.get(name, [])} for name in shown]
+
+
 def replace_live_database(staged_path):
     # Same-filesystem atomic rename: a request already reading the old file
     # keeps its own handle on the old inode until it finishes; the next
@@ -205,9 +236,12 @@ def db_replace(request):
     context['locked'] = maintenance.is_locked()
     if context['locked'] and pending_path().exists():
         needed = needed_images(pending_path())
+        missing = missing_images(needed)
         context['pending'] = True
         context['needed_count'] = len(needed)
-        context['missing_count'] = len(missing_images(needed))
+        context['missing_count'] = len(missing)
+        context['missing_list'] = missing_image_details(pending_path(), missing)
+        context['missing_list_truncated'] = len(missing) > MAX_MISSING_LISTED
     response = render(request, 'observations/db_replace.html', context)
     response['Cache-Control'] = 'no-store'
     return response

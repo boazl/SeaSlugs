@@ -18,6 +18,7 @@
 {% if pending %}
 <h2>3. תמונות</h2>
 <p>מסד הנתונים שהועלה מפנה ל-{{needed_count}} תמונות. {% if missing_count %}חסרות ביעד <strong>{{missing_count}}</strong> מהן — יש להעלות אותן לפני ההחלפה.{% else %}כל התמונות הנדרשות כבר קיימות כאן.{% endif %}</p>
+{% if missing_list %}<ul>{% for item in missing_list %}<li>{% for label in item.labels %}{{label}}{% if not forloop.last %}, {% endif %}{% empty %}(לא נמצאה דגימה מתאימה בקובץ){% endfor %} <small>{{item.name}}</small></li>{% endfor %}</ul>{% if missing_list_truncated %}<p class="helptext">ועוד {{missing_count|add:'-200'}} תמונות חסרות נוספות שלא מוצגות כאן.</p>{% endif %}{% endif %}
 {% if missing_count %}<form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="action" value="upload_images">
 <p><input type="file" name="images" accept="image/jpeg" multiple required></p><button>העלאת תמונות</button></form>{% endif %}
 <h2>4. ביצוע ההחלפה</h2>
