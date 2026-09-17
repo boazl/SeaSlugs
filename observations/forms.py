@@ -5,7 +5,7 @@ from django import forms
 from django.core.files.base import ContentFile
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
-from .models import Sample, Profile, Species, Country, Region, Site, DiveTrip
+from .models import Sample, Profile, Species, Country, Region, Site, DiveTrip, SpeciesArea
 
 
 class SignupForm(UserCreationForm):
@@ -69,7 +69,13 @@ class SampleForm(forms.ModelForm):
         if self.instance.pk:
             self.initial['site'] = str(self.instance.site_id or ('other' if self.instance.site_other else ''))
         self.fields['site_other'].widget.attrs['data-other-for'] = 'site'
-        self.fields['image'].help_text = 'JPEG, PNG או WebP, עד 10MB ועד 25 מיליון פיקסלים. מומלץ צילום רוחבי 1920×1080 ומעלה. נשמור JPEG עד 1920×1080, ללא חיתוך או הגדלת תמונה קטנה. תמונה שהועלתה תשמש כתצוגה מקדימה לסרטון; ללא סרטון תיפתח התמונה המלאה. ללא תמונה נשתמש בתצוגה המקדימה של YouTube. העלו רק תמונות שיש לכם הרשאה לפרסם.'
+        image_help = 'JPEG, PNG או WebP, עד 10MB ועד 25 מיליון פיקסלים. מומלץ צילום רוחבי 1920×1080 ומעלה. נשמור JPEG עד 1920×1080, ללא חיתוך או הגדלת תמונה קטנה. תמונה שהועלתה תשמש כתצוגה מקדימה לסרטון; ללא סרטון תיפתח התמונה המלאה. ללא תמונה נשתמש בתצוגה המקדימה של YouTube. העלו רק תמונות שיש לכם הרשאה לפרסם.'
+        if self.instance.pk and SpeciesArea.objects.filter(defining_sample_id=self.instance.pk).exists():
+            # The defining sample is whichever published sample represents its species in
+            # the public gallery for its region -- worth flagging here since replacing or
+            # removing this observation's image changes what visitors see for that species.
+            image_help = '<strong>תצפית זו מגדירה את המין.</strong> ' + image_help
+        self.fields['image'].help_text = image_help
     def clean(self):
         data = super().clean()
         data['kind'] = data.get('kind') or Sample.Kind.SPECIES

@@ -167,3 +167,14 @@ class WorkflowTests(TestCase):
         self.assertTrue(form.is_valid(),form.errors)
         self.assertIsNone(form.cleaned_data['species'])
         self.assertEqual(form.cleaned_data['species_other'],'Nonexistent name')
+
+    def test_image_help_text_flags_the_defining_sample_only(self):
+        first=self.record()  # the first published sample of a species+area becomes defining
+        area=SpeciesArea.objects.get(species=self.species,country=self.country,sea=self.sea)
+        self.assertEqual(area.defining_sample_id,first.pk)
+        self.assertIn('תצפית זו מגדירה את המין',SampleForm(instance=first).fields['image'].help_text)
+        second=self.record()  # a second published sample of the same species+area is not
+        self.assertNotEqual(area.defining_sample_id,second.pk)
+        self.assertNotIn('תצפית זו מגדירה',SampleForm(instance=second).fields['image'].help_text)
+        # a brand-new, unsaved sample obviously can't be defining anything yet
+        self.assertNotIn('תצפית זו מגדירה',SampleForm(instance=Sample(owner=self.user)).fields['image'].help_text)
