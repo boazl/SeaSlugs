@@ -194,58 +194,30 @@ def db_replace(request):
                     raise ValidationError('אין מסד נתונים ממתין; יש להעלות אותו קודם.')
                 needed = needed_images(pending_path())
                 from .media_transfer import save_images
+                # One upload mechanism, always tied to one specific missing image: the
+                # admin picks the file next to that image's own label (species + trip), so
+                # the association is explicit rather than guessed from a filename or a bulk
+                # match. When the target name itself encodes a content hash, that hash is
+                # also verified, so a wrong file still can't be accepted for it by mistake.
                 target = request.POST.get('target')
-                if target:
-                    # A single missing image uploaded through its own dedicated button (used
-                    # for legacy, pre-content-hash names): the admin has already confirmed
-                    # which sample this photo belongs to, so there's no filename or content
-                    # guessing -- just basic validation, and a hash check when the target
-                    # name itself encodes one.
-                    if target not in needed:
-                        raise ValidationError('התמונה הזו כבר אינה נדרשת; רעננו את הדף.')
-                    upload = request.FILES.get('image')
-                    if not upload:
-                        raise ValidationError('יש לבחור קובץ.')
-                    raw = upload.read()
-                    try:
-                        with Image.open(io.BytesIO(raw)) as image:
-                            if image.format != 'JPEG':
-                                raise ValidationError('הקובץ אינו JPEG.')
-                            image.verify()
-                    except (UnidentifiedImageError, OSError):
-                        raise ValidationError('הקובץ אינו תמונה תקינה.')
-                    hash_match = re.fullmatch(r'observations/transfer/([0-9a-f]{64})\.jpg', target)
-                    if hash_match and hashlib.sha256(raw).hexdigest() != hash_match.group(1):
-                        raise ValidationError('תוכן הקובץ אינו תואם לתמונה הנדרשת — ודאו שזה הקובץ הנכון.')
-                    save_images({target: raw})
-                    messages.success(request, 'התמונה הועלתה.')
-                    return redirect('db-replace')
-                uploads = request.FILES.getlist('images')
-                if not uploads:
-                    raise ValidationError('יש לבחור תמונות.')
-                accepted = 0
-                rejected = []
-                for upload in uploads:
-                    raw = upload.read()
-                    try:
-                        with Image.open(io.BytesIO(raw)) as image:
-                            if image.format != 'JPEG':
-                                rejected.append(f'{upload.name}: לא קובץ JPEG')
-                                continue
-                            image.verify()
-                    except (UnidentifiedImageError, OSError):
-                        rejected.append(f'{upload.name}: קובץ תמונה לא תקין')
-                        continue
-                    hash_name = 'observations/transfer/' + hashlib.sha256(raw).hexdigest() + '.jpg'
-                    if hash_name in needed:
-                        save_images({hash_name: raw})
-                        accepted += 1
-                    else:
-                        rejected.append(f'{upload.name}: לא נמצאה עבורו תמונה חסרה בעלת תוכן זהה — לתמונות ישנות יש להשתמש בכפתור ליד התמונה הספציפית ברשימה')
-                msg = f'הועלו {accepted} תמונות מתוך {len(uploads)} שנבחרו.'
-                if rejected:
-                    msg += ' | ' + ' | '.join(rejected)
-                messages.success(request, msg)
+                if not target or target not in needed:
+                    raise ValidationError('התמונה הזו כבר אינה נדרשת; רעננו את הדף.')
+                upload = request.FILES.get('image')
+                if not upload:
+                    raise ValidationError('יש לבחור קובץ.')
+                raw = upload.read()
+                try:
+                    with Image.open(io.BytesIO(raw)) as image:
+                        if image.format != 'JPEG':
+                            raise ValidationError('הקובץ אינו JPEG.')
+                        image.verify()
+                except (UnidentifiedImageError, OSError):
+                    raise ValidationError('הקובץ אינו תמונה תקינה.')
+                hash_match = re.fullmatch(r'observations/transfer/([0-9a-f]{64})\.jpg', target)
+                if hash_match and hashlib.sha256(raw).hexdigest() != hash_match.group(1):
+                    raise ValidationError('תוכן הקובץ אינו תואם לתמונה הנדרשת — ודאו שזה הקובץ הנכון.')
+                save_images({target: raw})
+                messages.success(request, 'התמונה הועלתה.')
                 return redirect('db-replace')
             if action == 'commit':
                 path = pending_path()

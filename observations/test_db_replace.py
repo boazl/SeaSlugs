@@ -127,14 +127,17 @@ class DbReplaceTests(TestCase):
         self.assertContains(response, 'Chromodoris annulata')
         self.assertContains(response, 'Anilao')
 
-    def test_upload_images_accepts_only_needed_hash_named_jpegs(self):
+    def test_upload_images_accepts_a_hash_named_target_with_matching_content(self):
         maintenance.lock(); self.client.force_login(self.user)
         output = io.BytesIO(); Image.new('RGB', (10, 8), 'red').save(output, 'JPEG'); raw = output.getvalue()
         name = 'observations/transfer/' + hashlib.sha256(raw).hexdigest() + '.jpg'
         path = Path(self.temp.name) / 'good.sqlite3'
         build_fixture(path, images=[name, 'observations/transfer/' + 'b' * 64 + '.jpg'])
         self.client.post('/admin/db-replace/', {'action': 'preview', 'database': SimpleUploadedFile('db.sqlite3', path.read_bytes())})
-        response = self.client.post('/admin/db-replace/', {'action': 'upload_images', 'images': SimpleUploadedFile('x.jpg', raw, content_type='image/jpeg')})
+        response = self.client.post('/admin/db-replace/', {
+            'action': 'upload_images', 'target': name,
+            'image': SimpleUploadedFile('x.jpg', raw, content_type='image/jpeg'),
+        })
         self.assertEqual(response.status_code, 302)
         self.assertTrue(default_storage.exists(name))
         response = self.client.get('/admin/db-replace/')
