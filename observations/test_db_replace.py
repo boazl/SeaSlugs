@@ -49,6 +49,14 @@ class DbReplaceTests(TestCase):
         self.client.force_login(self.user)
         self.assertEqual(self.client.get('/').status_code, 200)
 
+    def test_healthz_is_never_blocked_by_maintenance_mode(self):
+        # Render's health check hits /healthz with no auth; if that 503s while the
+        # site is locked, Render concludes the instance itself crashed and restarts
+        # it -- a real incident this caused once already. Must stay 200 regardless.
+        self.assertEqual(self.client.get('/healthz').status_code, 200)
+        maintenance.lock()
+        self.assertEqual(self.client.get('/healthz').status_code, 200)
+
     def test_lock_requires_confirm_and_creates_backup(self):
         self.client.force_login(self.user)
         with patch('observations.db_replace.create_backup') as backup:
