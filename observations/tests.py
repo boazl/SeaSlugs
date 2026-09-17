@@ -118,3 +118,21 @@ class WorkflowTests(TestCase):
         self.assertEqual(self.client.post(f'/observations/{item.pk}/edit/',d).status_code,302)
         item.refresh_from_db();self.assertEqual(item.status,'pending')
         self.client.logout();self.assertEqual(self.client.get('/observations/').status_code,302)
+
+    def test_species_search_browses_all_when_query_is_empty(self):
+        # The species picker on the observation form opens as a browsable dropdown on
+        # focus/click, before anything is typed -- so the endpoint it calls must return
+        # results for an empty query too, not just for an actual search term.
+        self.client.force_login(self.user)
+        Species.objects.create(scientific_name='Aaa species')
+        labels = self.client.get('/observations/species-search/').json()['results']
+        labels = [row['label'] for row in labels]
+        self.assertIn('Test species', labels)
+        self.assertIn('Aaa species', labels)
+        self.assertLess(labels.index('Aaa species'), labels.index('Test species'))
+
+    def test_species_search_still_filters_by_query(self):
+        self.client.force_login(self.user)
+        Species.objects.create(scientific_name='Aaa species')
+        results = self.client.get('/observations/species-search/?q=Test').json()['results']
+        self.assertEqual([row['label'] for row in results], ['Test species'])

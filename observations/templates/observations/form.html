@@ -20,21 +20,24 @@ const Autocomplete={
         row.addEventListener('mousedown',e=>{e.preventDefault();select(item);});
         results.appendChild(row);
       });
-      results.hidden=input.value.trim()==='';
     }
     function select(item){
       hidden.value=item.id;input.value=item.label;results.hidden=true;
       hidden.dispatchEvent(new Event('change',{bubbles:true}));
     }
     function search(q){
-      if(!q){items=[];renderResults();return;}
-      fetch(url+'?q='+encodeURIComponent(q)).then(r=>r.ok?r.json():{results:[]}).then(data=>{items=data.results||[];activeIndex=-1;renderResults();}).catch(()=>{});
+      // Fetching even for an empty q (rather than bailing out) is what lets clicking into
+      // an empty field open a browsable list, like a real dropdown, instead of showing
+      // nothing until the user starts typing.
+      fetch(url+'?q='+encodeURIComponent(q)).then(r=>r.ok?r.json():{results:[]}).then(data=>{
+        items=data.results||[];activeIndex=-1;renderResults();results.hidden=false;
+      }).catch(()=>{});
     }
     input.addEventListener('input',()=>{
       hidden.value='';clearTimeout(debounceTimer);
       const q=input.value.trim();debounceTimer=setTimeout(()=>search(q),200);
     });
-    input.addEventListener('focus',()=>{if(input.value.trim())search(input.value.trim());});
+    input.addEventListener('focus',()=>{search(input.value.trim());});
     input.addEventListener('keydown',e=>{
       const rows=allRows();
       if(e.key==='ArrowDown'){e.preventDefault();activeIndex=Math.min(activeIndex+1,rows.length-1);renderResults();}

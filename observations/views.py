@@ -147,11 +147,15 @@ def partners(request):
 def species_search(request):
     from django.http import JsonResponse
     q = (request.GET.get('q') or '').strip()
-    if not q:
-        return JsonResponse({'results': []})
-    rows = Species.objects.filter(
-        Q(scientific_name__icontains=q) | Q(name_he__icontains=q) | Q(name_en__icontains=q) | Q(genus__icontains=q)
-    ).order_by('scientific_name')[:30]
+    rows = Species.objects.all()
+    if q:
+        rows = rows.filter(
+            Q(scientific_name__icontains=q) | Q(name_he__icontains=q) | Q(name_en__icontains=q) | Q(genus__icontains=q)
+        )
+    # An empty q still returns a page of species (rather than nothing) so the species
+    # picker on the observation form behaves like an open dropdown you can browse by
+    # clicking, not only a search box that stays empty until you type something.
+    rows = rows.order_by('scientific_name')[:40]
     results = [{'id': str(item.pk), 'label': item.scientific_name + (f' — {item.name_he}' if item.name_he else '')} for item in rows]
     return JsonResponse({'results': results})
 
