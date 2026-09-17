@@ -152,10 +152,38 @@ class ObservationsFilterTests(TestCase):
         # values_list().distinct() calls that build the filter dropdowns, or the same
         # option value appears twice whenever two matching samples have different
         # created_at timestamps -- the same class of bug once fixed in SpeciesArea.rebuild().
+        # A second, differently-ordered species is included so the "order" filter has more
+        # than one value and is actually rendered (see test_single_value_filters_are_hidden).
         species = Species.objects.create(scientific_name='Duplicate species', order='Nudibranchia')
+        other = Species.objects.create(scientific_name='Other species', order='Sacoglossa')
         first = self.make(species)
         second = self.make(species)
+        self.make(other)
         Sample.objects.filter(pk=second.pk).update(created_at=first.created_at - timedelta(days=1))
         response = self.client.get('/observations/')
-        self.assertEqual(response.context['orders'], ['Nudibranchia'])
-        self.assertEqual(response.content.decode().count('>Nudibranchia<'), 1)
+        self.assertEqual(response.context['orders'], ['Nudibranchia', 'Sacoglossa'])
+        self.assertEqual(response.content.decode().count('value="Nudibranchia"'), 1)
+
+    def test_single_value_filters_are_hidden_from_the_form(self):
+        # A filter whose only visible data holds one distinct value (or none) can never
+        # narrow the result set, so it shouldn't clutter the form -- kind, status, country,
+        # order etc. are all published with the exact same values in setUp/make().
+        self.make(Species.objects.create(scientific_name='Only species', order='Nudibranchia'))
+        content = self.client.get('/observations/').content.decode()
+        for hidden_field in ('name="kind"', 'name="status"', 'name="country"', 'name="region"',
+                              'name="order"', 'name="genus"', 'name="photographer"'):
+            self.assertNotIn(hidden_field, content)
+
+    def test_genus_filter_is_a_searchable_autocomplete_field(self):
+        berghia = Species.objects.create(scientific_name='Berghia coerulescens', genus='Berghia')
+        hypselodoris = Species.objects.create(scientific_name='Hypselodoris picta', genus='Hypselodoris')
+        self.make(berghia)
+        self.make(hypselodoris)
+        response = self.client.get('/observations/')
+        self.assertContains(response, 'name="genus" list="genus-options"')
+        self.assertContains(response, '<option value="Berghia">')
+        self.assertContains(response, '<option value="Hypselodoris">')
+        # A partial, not-quite-exact typed value still narrows the results (icontains).
+        response = self.client.get('/observations/?genus=Berg')
+        self.assertContains(response, 'Berghia coerulescens')
+        self.assertNotContains(response, 'Hypselodoris picta')

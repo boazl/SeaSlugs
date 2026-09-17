@@ -60,16 +60,19 @@ def listing(request):
     year = as_int(get.get('year'))
     if year is not None:
         rows = rows.filter(trip__year=year)
+    # order/family/genus/photographer/owner are typed into free-text autocomplete fields
+    # (some have hundreds of possible values, so a <select> isn't practical) -- icontains
+    # keeps a partial or not-quite-exact typed value still useful as a search.
     if get.get('order'):
-        rows = rows.filter(species__order=get['order'])
+        rows = rows.filter(species__order__icontains=get['order'])
     if get.get('family'):
-        rows = rows.filter(species__family=get['family'])
+        rows = rows.filter(species__family__icontains=get['family'])
     if get.get('genus'):
-        rows = rows.filter(species__genus=get['genus'])
+        rows = rows.filter(species__genus__icontains=get['genus'])
     if get.get('photographer'):
-        rows = rows.filter(trip__photographer=get['photographer'])
+        rows = rows.filter(trip__photographer__icontains=get['photographer'])
     if manager and get.get('owner'):
-        rows = rows.filter(owner__username=get['owner'])
+        rows = rows.filter(owner__username__icontains=get['owner'])
     sort = get.get('sort') if get.get('sort') in SORT_OPTIONS else 'newest'
     rows = rows.order_by(*SORT_OPTIONS[sort])
 
@@ -80,11 +83,19 @@ def listing(request):
         # defeats distinct() and produces duplicate option values in the dropdowns.
         return sorted(v for v in visible.filter(**extra).exclude(**{field: ''}).order_by().values_list(field, flat=True).distinct() if v)
 
+    present_kinds = set(visible.order_by().values_list('kind', flat=True).distinct())
+    present_statuses = set(visible.order_by().values_list('status', flat=True).distinct())
+
     context = {
         'observations': rows,
         'manager': manager,
         'sort': sort,
         'filters': get,
+        # A filter whose data holds only zero or one distinct value is never useful --
+        # narrowing it can't change the result set -- so each list below is only rendered
+        # by the template when it has more than one option (see list.html's length checks).
+        'kind_choices': [(v, label) for v, label in Sample.Kind.choices if v in present_kinds],
+        'status_choices': [(v, label) for v, label in Sample.Status.choices if v in present_statuses],
         'countries': Country.objects.filter(dive_trips__samples__in=visible).distinct().order_by('name'),
         'regions': Region.objects.filter(dive_trips__samples__in=visible).distinct().order_by('name'),
         'years': sorted((v for v in visible.exclude(trip__year__isnull=True).order_by().values_list('trip__year', flat=True).distinct() if v), reverse=True),
@@ -94,7 +105,7 @@ def listing(request):
         'photographers': options('trip__photographer'),
     }
     if manager:
-        context['owners'] = get_user_model().objects.filter(observations__in=visible).distinct().order_by('username')
+        context['owners'] = list(get_user_model().objects.filter(observations__in=visible).distinct().order_by('username').values_list('username', flat=True))
     return render(request, 'observations/list.html', context)
 
 
