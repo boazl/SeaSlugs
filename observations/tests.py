@@ -35,7 +35,7 @@ class WorkflowTests(TestCase):
         unknown=self.record(species=None,species_other='Unknown');self.assertEqual(unknown.status,'pending')
         with self.assertRaises(ValidationError):unknown.save_reviewed(actor=self.user,approve=True)
     def test_form_other_and_invalid_date(self):
-        d=self.data();d.update(species='New species')  # not an existing scientific name -> species_other
+        d=self.data();d.update(species='',species_other='New species')
         form=SampleForm(d,instance=Sample(owner=self.user));self.assertTrue(form.is_valid(),form.errors)
         saved=form.save(commit=False);self.assertIsNone(saved.species_id);self.assertEqual(saved.species_other,'New species')
         saved.save_reviewed()
@@ -115,7 +115,7 @@ class WorkflowTests(TestCase):
         self.client.force_login(self.user)
         self.assertEqual(self.client.post('/observations/new/',self.data()).status_code,302)
         item=Sample.objects.get();self.assertEqual(item.status,'published')
-        d=self.data();d.update(species='Needs identification')  # not an existing scientific name -> species_other
+        d=self.data();d.update(species='',species_other='Needs identification')
         self.assertEqual(self.client.post(f'/observations/{item.pk}/edit/',d).status_code,302)
         item.refresh_from_db();self.assertEqual(item.status,'pending')
         self.client.logout();self.assertEqual(self.client.get('/observations/').status_code,302)
@@ -146,13 +146,24 @@ class WorkflowTests(TestCase):
         # editing an existing item must show its scientific name in the field, not its pk
         self.assertEqual(SampleForm(instance=item).initial['species'],self.species.scientific_name)
 
-    def test_species_options_datalist_and_hidden_species_other(self):
+    def test_species_options_datalist_and_visible_species_other(self):
         self.client.force_login(self.user)
         content=self.client.get('/observations/new/').content.decode()
         self.assertIn('<datalist id="species-options">',content)
         self.assertIn(f'<option value="{self.species.scientific_name}">',content)
         self.assertIn('list="species-options"',content)
-        # species_other is filled in automatically from the species field now, so it must
-        # no longer render as its own visible text input.
-        self.assertNotIn('type="text" name="species_other"',content)
-        self.assertIn('type="hidden" name="species_other"',content)
+        # species_other is a distinct, always-visible field -- the deliberate manual
+        # override for a species that isn't in the table -- not something derived
+        # silently from the species search box.
+        self.assertIn('type="text" name="species_other"',content)
+
+    def test_species_must_match_the_catalog_unless_other_is_specified(self):
+        d=self.data();d.update(species='Nonexistent name')
+        form=SampleForm(d,instance=Sample(owner=self.user))
+        self.assertFalse(form.is_valid())
+        self.assertIn('species',form.errors)
+        d=self.data();d.update(species='Nonexistent name',species_other='Nonexistent name')
+        form=SampleForm(d,instance=Sample(owner=self.user))
+        self.assertTrue(form.is_valid(),form.errors)
+        self.assertIsNone(form.cleaned_data['species'])
+        self.assertEqual(form.cleaned_data['species_other'],'Nonexistent name')

@@ -47,7 +47,10 @@ class SampleForm(forms.ModelForm):
     # species_options) rather than a <select> -- there can be hundreds of species, and
     # this is the same open-dropdown-with-autocomplete pattern used for the genus filter
     # on the observations list page. The submitted value is the scientific name itself
-    # (matched case-insensitively in clean() below), not a pk.
+    # (matched case-insensitively in clean() below), not a pk. It must match an existing
+    # species exactly -- species_other (below) is the deliberate, separate escape hatch
+    # for a species that isn't catalogued yet, so a typo here can't silently turn into an
+    # "unidentified species" record.
     species = forms.CharField(label='מין', required=False, widget=forms.TextInput(attrs={
         'list': 'species-options', 'autocomplete': 'off', 'placeholder': 'הקלידו לחיפוש…'}))
     site = forms.ChoiceField(label='אתר צלילה',required=False)
@@ -60,11 +63,8 @@ class SampleForm(forms.ModelForm):
         self.fields['kind'].required = False
         self.fields['video_url'].help_text = 'אפשר להשאיר ריק כאשר מעלים תמונה. ניתן להוסיף סרטון בהמשך.'
         if self.instance.pk:
-            self.initial['species'] = self.instance.species.scientific_name if self.instance.species_id else (self.instance.species_other or '')
-        # species_other is now derived automatically in clean() from whatever was typed
-        # into "species" -- it no longer needs its own visible input (that used to only
-        # appear once "other" was explicitly picked from the old species dropdown).
-        self.fields['species_other'].widget = forms.HiddenInput()
+            self.initial['species'] = self.instance.species.scientific_name if self.instance.species_id else ''
+        self.fields['species_other'].help_text = 'אם המין לא נמצא ברשימה שלמעלה, אפשר לפרט כאן במקום לבחור מהרשימה.'
         self.fields['site'].choices = [('', 'בחרו…')] + [(str(x.pk), str(x)) for x in Site.objects.all()] + [('other','אחר — פירוט')]
         if self.instance.pk:
             self.initial['site'] = str(self.instance.site_id or ('other' if self.instance.site_other else ''))
@@ -74,18 +74,24 @@ class SampleForm(forms.ModelForm):
         data = super().clean()
         data['kind'] = data.get('kind') or Sample.Kind.SPECIES
 
-        # A value that matches an existing species (case-insensitively) is used as-is;
-        # anything else -- a typo, or a species not yet catalogued -- is kept as free text
-        # in species_other, exactly like explicitly picking "other" used to work.
+        # species_other, if filled in, always wins -- it's a deliberate manual override.
+        # Otherwise, whatever was typed into species must match an existing species
+        # exactly (case-insensitively); if it doesn't, that's a validation error rather
+        # than a silent fallback, since a typo or a near-miss must not quietly become an
+        # "unidentified species" record.
         species_text = (data.get('species') or '').strip()
-        if species_text:
+        other_text = (data.get('species_other') or '').strip()
+        if other_text:
+            data['species'] = None
+            data['species_other'] = other_text
+        elif species_text:
             match = Species.objects.filter(scientific_name__iexact=species_text).first()
             if match:
                 data['species'] = match
                 data['species_other'] = ''
             else:
+                self.add_error('species', 'לא נמצא מין תואם ברשימה. יש לבחור מין קיים, או למלא "מין אחר".')
                 data['species'] = None
-                data['species_other'] = species_text
         else:
             data['species'] = None
             data['species_other'] = ''
