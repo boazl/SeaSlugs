@@ -3,6 +3,8 @@ from io import BytesIO
 from django.test import TestCase, override_settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from PIL import Image
 from .models import Country, Sea, Region, Site, Species, Sample, DiveTrip, SpeciesArea
@@ -149,18 +151,38 @@ class WorkflowTests(TestCase):
         first = self.record()  # the first published sample of a species+area becomes defining
         resp = self.client.get('/observations/species-area-status/',
             {'species': self.species.scientific_name, 'trip': self.trip.pk, 'sample': first.pk}).json()
-        self.assertEqual(resp, {'matched': True, 'is_defining': True, 'appears': True})
+        # no other sample of the species exists yet, so releasing it would leave the area empty
+        self.assertEqual(resp, {'matched': True, 'is_defining': True, 'appears': True, 'next': {'kind': 'single'}})
 
         second = self.record()  # a second published sample of the same species+area is not
         resp = self.client.get('/observations/species-area-status/',
             {'species': self.species.scientific_name, 'trip': self.trip.pk, 'sample': second.pk}).json()
-        self.assertEqual(resp, {'matched': True, 'is_defining': False, 'appears': True})
+        self.assertEqual(resp, {'matched': True, 'is_defining': False, 'appears': True, 'next': None})
 
         # a species with no published sample anywhere in this trip's area yet
         Species.objects.create(scientific_name='Not yet published')
         resp = self.client.get('/observations/species-area-status/',
             {'species': 'Not yet published', 'trip': self.trip.pk}).json()
-        self.assertEqual(resp, {'matched': True, 'is_defining': False, 'appears': False})
+        self.assertEqual(resp, {'matched': True, 'is_defining': False, 'appears': False, 'next': None})
+
+    def test_next_candidate_prefers_most_recent_with_media_then_falls_back(self):
+        first = self.record()
+        self.assertEqual(SpeciesArea.next_candidate(self.species.pk, self.country.pk, self.sea, first.pk), {'kind': 'single'})
+
+        # a media-less sample can exist (bulk-imported data bypasses Sample.clean, which a
+        # plain .save()/.create() does not run) -- next_candidate should notice it exists
+        # without treating it as a usable replacement
+        medialess = Sample.objects.create(owner=self.user, species=self.species, trip=self.trip,
+            kind=Sample.Kind.SPECIES, status=Sample.Status.PUBLISHED, video_url='', image='')
+        self.assertEqual(SpeciesArea.next_candidate(self.species.pk, self.country.pk, self.sea, first.pk), {'kind': 'without_media'})
+
+        third = self.record()
+        result = SpeciesArea.next_candidate(self.species.pk, self.country.pk, self.sea, first.pk)
+        self.assertEqual(result, {'kind': 'with_media', 'sample': third})
+
+        fourth = self.record()  # more recently created than third -- should now be preferred
+        result = SpeciesArea.next_candidate(self.species.pk, self.country.pk, self.sea, first.pk)
+        self.assertEqual(result, {'kind': 'with_media', 'sample': fourth})
 
     def test_species_field_matches_case_insensitively_and_edit_prefills_scientific_name(self):
         d=self.data();d.update(species=self.species.scientific_name.upper())
@@ -198,6 +220,98 @@ class WorkflowTests(TestCase):
         self.assertIn('id="defining-status"',content)
         self.assertIn('/observations/species-area-status/',content)
         self.assertIn('const sampleId=null;',content)  # new/unsaved sample
+        # the release/delete-image/delete-video actions only make sense for a saved sample
+        self.assertNotIn('id="release-species-form"',content)
+        self.assertNotIn('id="delete-image-btn"',content)
         item=self.record()
         content=self.client.get(f'/observations/{item.pk}/edit/').content.decode()
         self.assertIn(f'const sampleId={item.pk};',content)
+        self.assertIn(f'/observations/{item.pk}/action/',content)
+        self.assertIn('id="release-species-form" hidden',content)  # hidden until the live check confirms it
+        self.assertIn('id="delete-image-btn" data-has-image="" disabled',content)  # self.record() has no image
+        self.assertIn('id="delete-video-btn" data-has-video="1" >',content)  # self.record() has a video_url, so not disabled
+
+    def test_observation_action_requires_ownership_and_post(self):
+        item = self.record()
+        self.client.force_login(self.other)
+        self.assertEqual(self.client.post(f'/observations/{item.pk}/action/', {'action': 'release_species'}).status_code, 404)
+        self.client.force_login(self.user)
+        self.assertEqual(self.client.get(f'/observations/{item.pk}/action/').status_code, 405)
+        response = self.client.post(f'/observations/{item.pk}/action/', {'action': 'nonsense'}, follow=True)
+        self.assertContains(response, 'פעולה לא מוכרת.')
+
+    def test_observation_action_release_species_hands_off_to_next_candidate(self):
+        self.client.force_login(self.user)
+        first = self.record()
+        second = self.record()
+        area = SpeciesArea.objects.get(species=self.species, country=self.country, sea=self.sea)
+        self.assertEqual(area.defining_sample_id, first.pk)
+
+        # releasing a sample that isn't currently defining the species is a no-op with an error
+        response = self.client.post(f'/observations/{second.pk}/action/', {'action': 'release_species'}, follow=True)
+        self.assertContains(response, 'התצפית אינה מגדירה את המין כרגע.')
+        area.refresh_from_db();self.assertEqual(area.defining_sample_id, first.pk)
+
+        response = self.client.post(f'/observations/{first.pk}/action/', {'action': 'release_species'})
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, f'/observations/{first.pk}/edit/')
+        # first is released; second is still published, so it takes over as defining
+        area.refresh_from_db();self.assertEqual(area.defining_sample_id, second.pk)
+
+        # once second is the only published sample left (first has been withdrawn entirely,
+        # not merely released), releasing it clears the area rather than handing off to first
+        first.soft_delete(self.user)
+        response = self.client.post(f'/observations/{second.pk}/action/', {'action': 'release_species'}, follow=True)
+        self.assertContains(response, 'המין שנבחר אינו מופיע בגלריה.')
+        area.refresh_from_db();self.assertIsNone(area.defining_sample_id)
+
+    def test_observation_action_delete_image_and_video_blocked_while_defining(self):
+        with tempfile.TemporaryDirectory() as folder, override_settings(MEDIA_ROOT=folder):
+            self.client.force_login(self.user)
+            output = BytesIO();Image.new('RGB', (400, 600), 'blue').save(output, 'PNG')
+            data = dict(self.data(), image=SimpleUploadedFile('a.png', output.getvalue(), content_type='image/png'))
+            self.assertEqual(self.client.post('/observations/new/', data).status_code, 302)
+            item = Sample.objects.get()
+            self.assertTrue(item.image);image_name = item.image.name
+            self.assertTrue(default_storage.exists(image_name))
+            area = SpeciesArea.objects.get(species=self.species, country=self.country, sea=self.sea)
+            self.assertEqual(area.defining_sample_id, item.pk)  # the only sample -- currently defining
+
+            for action, message in [('delete_image', 'לא ניתן למחוק את התמונה כאשר התצפית מגדירה את המין. יש להסיר קודם את התצפית מהמין.'),
+                                     ('delete_video', 'לא ניתן למחוק את קישור הסרטון כאשר התצפית מגדירה את המין. יש להסיר קודם את התצפית מהמין.')]:
+                response = self.client.post(f'/observations/{item.pk}/action/', {'action': action}, follow=True)
+                self.assertContains(response, message)
+            item.refresh_from_db()
+            self.assertTrue(item.image);self.assertTrue(item.video_url);self.assertTrue(default_storage.exists(image_name))
+
+            self.client.post(f'/observations/{item.pk}/action/', {'action': 'release_species'})
+            area.refresh_from_db();self.assertIsNone(area.defining_sample_id)
+
+            # no longer defining -- the file is genuinely deleted since nothing else uses it
+            response = self.client.post(f'/observations/{item.pk}/action/', {'action': 'delete_image'}, follow=True)
+            self.assertContains(response, 'התמונה נמחקה.')
+            item.refresh_from_db();self.assertFalse(item.image);self.assertFalse(default_storage.exists(image_name))
+
+            response = self.client.post(f'/observations/{item.pk}/action/', {'action': 'delete_video'}, follow=True)
+            self.assertContains(response, 'קישור הסרטון נמחק.')
+            item.refresh_from_db();self.assertEqual(item.video_url, '')
+
+            # deleting again reports there is nothing left to delete rather than erroring
+            response = self.client.post(f'/observations/{item.pk}/action/', {'action': 'delete_image'}, follow=True)
+            self.assertContains(response, 'לתצפית זו אין תמונה.')
+
+    def test_observation_action_delete_image_keeps_file_when_another_sample_shares_it(self):
+        with tempfile.TemporaryDirectory() as folder, override_settings(MEDIA_ROOT=folder):
+            name = default_storage.save('observations/transfer/shared.jpg', ContentFile(b'fake-bytes'))
+            a = Sample.objects.create(owner=self.user, species=self.species, trip=self.trip, image=name,
+                video_url='', kind=Sample.Kind.SPECIES, status=Sample.Status.PUBLISHED)
+            b = Sample.objects.create(owner=self.user, species=self.species, trip=self.trip, image=name,
+                video_url='https://youtu.be/abcdefghijk', kind=Sample.Kind.SPECIES, status=Sample.Status.PUBLISHED)
+            # created directly (not through save_reviewed), so no SpeciesArea claims either one yet
+            self.assertFalse(SpeciesArea.objects.filter(species=self.species).exists())
+            self.client.force_login(self.user)
+            response = self.client.post(f'/observations/{a.pk}/action/', {'action': 'delete_image'}, follow=True)
+            self.assertContains(response, 'התמונה נמחקה.')
+            a.refresh_from_db();self.assertFalse(a.image)
+            b.refresh_from_db();self.assertEqual(b.image, name)
+            self.assertTrue(default_storage.exists(name))  # b still references it

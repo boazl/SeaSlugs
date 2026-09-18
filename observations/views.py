@@ -177,7 +177,11 @@ def species_area_status(request):
     sample_id = request.GET.get('sample') or None
     is_defining = bool(area and sample_id and str(area.defining_sample_id) == str(sample_id))
     appears = bool(area and area.defining_sample_id)
-    return JsonResponse({'matched': True, 'is_defining': is_defining, 'appears': appears})
+    next_info = None
+    if is_defining:
+        candidate = SpeciesArea.next_candidate(species.pk, trip.country_id, trip.sea, sample_id)
+        next_info = {'kind': 'with_media', 'id': candidate['sample'].pk} if candidate['kind'] == 'with_media' else {'kind': candidate['kind']}
+    return JsonResponse({'matched': True, 'is_defining': is_defining, 'appears': appears, 'next': next_info})
 
 
 @login_required
@@ -226,6 +230,57 @@ def remove(request,pk):
     item.soft_delete(request.user)
     messages.success(request,'התצפית הוסרה מהאתר. מנהל יכול לשחזר אותה.')
     return redirect('observations')
+
+
+@login_required
+@require_POST
+def observation_action(request, pk):
+    """Three destructive-ish actions available from the observation edit form, all scoped
+    to the owner's own non-deleted sample: releasing it from the species it currently
+    defines in the gallery (with the vacated spot handed to next_candidate's pick, exactly
+    like the live preview on the form promised), and deleting its image or video link --
+    which is only ever blocked while this sample is the one defining its species, since
+    that would silently drop the species from the gallery instead of going through the
+    explicit release action above."""
+    item = get_object_or_404(Sample, pk=pk, owner=request.user, deleted_at__isnull=True)
+    action = request.POST.get('action')
+    area = None
+    if item.kind == Sample.Kind.SPECIES and item.species_id and item.trip_id and item.trip.country_id and item.trip.region_id:
+        area = SpeciesArea.objects.filter(species_id=item.species_id, country_id=item.trip.country_id, sea=item.trip.region.sea).first()
+    is_defining = bool(area and area.defining_sample_id == item.pk)
+
+    if action == 'release_species':
+        if not is_defining:
+            messages.error(request, 'התצפית אינה מגדירה את המין כרגע.')
+        else:
+            candidate = SpeciesArea.next_candidate(item.species_id, item.trip.country_id, item.trip.region.sea, item.pk)
+            area.defining_sample = candidate['sample'] if candidate['kind'] == 'with_media' else None
+            area.save(update_fields=['defining_sample'])
+            messages.success(request, 'המין שנבחר מופיע בגלריה.' if area.defining_sample_id else 'המין שנבחר אינו מופיע בגלריה.')
+    elif action == 'delete_image':
+        if is_defining:
+            messages.error(request, 'לא ניתן למחוק את התמונה כאשר התצפית מגדירה את המין. יש להסיר קודם את התצפית מהמין.')
+        elif not item.image:
+            messages.error(request, 'לתצפית זו אין תמונה.')
+        else:
+            from .media_transfer import delete_image_if_unused
+            old_name = item.image.name
+            item.image = ''
+            item.save(update_fields=['image', 'updated_at'])
+            delete_image_if_unused(old_name)
+            messages.success(request, 'התמונה נמחקה.')
+    elif action == 'delete_video':
+        if is_defining:
+            messages.error(request, 'לא ניתן למחוק את קישור הסרטון כאשר התצפית מגדירה את המין. יש להסיר קודם את התצפית מהמין.')
+        elif not item.video_url:
+            messages.error(request, 'לתצפית זו אין קישור סרטון.')
+        else:
+            item.video_url = ''
+            item.save(update_fields=['video_url', 'updated_at'])
+            messages.success(request, 'קישור הסרטון נמחק.')
+    else:
+        messages.error(request, 'פעולה לא מוכרת.')
+    return redirect('observation-edit', pk=item.pk)
 
 
 def site_image(request,key):

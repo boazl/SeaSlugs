@@ -15,6 +15,20 @@ def validate_image_name(name):
         raise ValidationError('שם קובץ תמונה לא תקין.')
 
 
+def delete_image_if_unused(name):
+    """Delete the stored file at `name` only if no Sample or SiteImage still references it --
+    images are content-addressed and can be shared across records (the same photo can back
+    several samples, or a sample and a SiteImage), so removing one record's reference must
+    not break another's. Returns True if the underlying file was actually deleted."""
+    from .models import Sample, SiteImage
+    if not name:
+        return False
+    if Sample.objects.filter(image=name).exists() or SiteImage.objects.filter(image=name).exists():
+        return False
+    default_storage.delete(name)
+    return True
+
+
 def save_images(images):
     # Content-addressed files preserve old images for database-backup recovery.
     for name, data in images.items():

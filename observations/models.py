@@ -292,6 +292,27 @@ class SpeciesArea(models.Model):
         return (with_image or candidates)[0]
 
     @staticmethod
+    def next_candidate(species_id, country_id, sea, exclude_pk):
+        """Describes what would take over as the defining sample for this species+area if
+        the sample identified by exclude_pk stopped being it: the most recently created
+        OTHER published, non-deleted sample of the species there that has media (an image
+        or a video), if one exists; otherwise whether some other (media-less) sample of
+        the species exists there at all, or none at all. Used both to preview the outcome
+        on the observation form (species_area_status) and to actually carry it out when
+        releasing a sample from its species (views.observation_action) -- the two must
+        agree, so both go through this one method."""
+        others = Sample.objects.filter(
+            kind=Sample.Kind.SPECIES, species_id=species_id, status=Sample.Status.PUBLISHED,
+            deleted_at__isnull=True, trip__country_id=country_id, trip__region__sea=sea,
+        ).exclude(pk=exclude_pk)
+        with_media = others.exclude(image='', video_url='').order_by('-created_at', '-pk').first()
+        if with_media:
+            return {'kind': 'with_media', 'sample': with_media}
+        if others.exists():
+            return {'kind': 'without_media'}
+        return {'kind': 'single'}
+
+    @staticmethod
     def rebuild():
         """Delete every SpeciesArea row and regenerate it from scratch from the samples
         that currently exist: one row per species+country+sea with at least one published
