@@ -1,3 +1,5 @@
+from django.conf import settings
+from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path, include
 from .views import gallery_file, health
@@ -24,3 +26,11 @@ urlpatterns = [
     path('', gallery_file, name='gallery'),
     path('<str:filename>', gallery_file, name='gallery-file'),
 ]
+
+if settings.DEBUG:
+    # Local dev only -- production never serves MEDIA_ROOT directly (Sample.image and
+    # SiteImage.image are only ever meant to be reached through the access-controlled
+    # observation-photo/site-image views), but Django's own admin and form widgets (e.g.
+    # ClearableFileInput's "Currently: <a>" link on the image field) link straight to
+    # image.url, which is MEDIA_URL + name -- so without this, following that link 404s.
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
