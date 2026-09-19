@@ -43,6 +43,43 @@ class MediaTransferTests(TestCase):
         response=self.client.post('/admin/images/',{'action':'delete','confirm':'yes','selected':[row['token']]})
         self.assertEqual(response.status_code,302);self.sample.refresh_from_db();self.assertFalse(self.sample.image)
         self.assertEqual(files(),[])
+    def test_image_manager_sort_alpha_and_taxonomy(self):
+        # self.sample's species ("Test species") has no genus or phylogenetic_order set,
+        # so it should sort after any species that does specify them.
+        from .image_manager import files
+        zebra=Species.objects.create(scientific_name='Zzz species',genus='Zebra',species='stripey',phylogenetic_order='50')
+        aardvark=Species.objects.create(scientific_name='Aaa species',genus='Aardvark',species='snouty',phylogenetic_order='10')
+        def add_sample(species,filename):
+            output=io.BytesIO();Image.new('RGB',(60,40),'red').save(output,'JPEG')
+            sample=Sample(owner=self.sample.owner,species=species,trip=self.sample.trip)
+            sample.image.save(filename,ContentFile(output.getvalue()),save=False)
+            sample.save_reviewed();return sample
+        add_sample(zebra,'z.jpg');add_sample(aardvark,'a.jpg')
+
+        def names(sort):
+            return [row['refs'][0].species.scientific_name for row in files(sort)]
+
+        self.assertEqual(names('alpha'),['Aaa species','Test species','Zzz species'])
+        self.assertEqual(names('taxonomy'),['Aaa species','Zzz species','Test species'])
+        # file order (the default) is unaffected -- unrelated to species entirely
+        self.assertEqual(set(names('file')),{'Aaa species','Test species','Zzz species'})
+
+    def test_image_manager_sort_view_and_redirect(self):
+        self.client.force_login(self.sample.owner)
+        content=self.client.get('/admin/images/',{'sort':'alpha'}).content.decode()
+        self.assertIn('<strong>לפי סדר אלפביתי (סוג ומין)</strong>',content)
+        self.assertIn('href="?sort=taxonomy"',content)
+        # an invalid value falls back to the default rather than erroring
+        content=self.client.get('/admin/images/',{'sort':'bogus'}).content.decode()
+        self.assertIn('<strong>לפי שם קובץ</strong>',content)
+        # the chosen sort survives an action's redirect back to the page
+        from .image_manager import files
+        row=files()[0]
+        self.sample.video_url='https://youtu.be/abcdefghijk';self.sample.save()
+        response=self.client.post('/admin/images/?sort=alpha',{'action':'delete','confirm':'yes','selected':[row['token']]})
+        self.assertEqual(response.status_code,302)
+        self.assertEqual(response.url,'/admin/images/?sort=alpha')
+
     def test_image_manager_authorization(self):
         self.assertEqual(self.client.get('/admin/images/').status_code,302)
         self.client.force_login(User.objects.create_user('staff',is_staff=True))

@@ -14,11 +14,37 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.http import FileResponse, Http404
 from django.shortcuts import render, redirect
+from django.urls import reverse
 from .models import Sample, SiteImage
 from .forms import SampleForm
 
 
-def files():
+SORT_OPTIONS={'file':'לפי שם קובץ','alpha':'לפי סדר אלפביתי (סוג ומין)','taxonomy':'לפי סדר טקסונומי'}
+
+
+def _row_species(row):
+    """The species this image is filed under, for sorting -- the first linked sample that
+    has one (almost always all of a content-addressed image's samples agree on species;
+    picking the first is enough to place the row sensibly). None for an orphaned image or
+    one only linked to collection/"other" samples, which sort after every named species."""
+    for sample in row['refs']:
+        if sample.species_id: return sample.species
+    return None
+
+
+def _alpha_key(species):
+    # Mirrors the public gallery's alphabetical sort (dist/app.js's speciesSortCompare):
+    # genus, then specific epithet, then the full scientific name as a final tie-break.
+    return ((species.genus or species.scientific_name).lower(), (species.species or '').lower(), species.scientific_name.lower())
+
+
+def _taxonomy_key(species):
+    # Mirrors the public gallery's default (taxonomic) order (config/views.py's catalog
+    # queryset, and Species.Meta.ordering): phylogenetic_order first, blank ones last.
+    return (0, species.phylogenetic_order, species.scientific_name.lower()) if species.phylogenetic_order else (1, '', species.scientific_name.lower())
+
+
+def files(sort='file'):
     root=Path(settings.MEDIA_ROOT).resolve()
     if not root.exists(): return []
     linked={}
@@ -32,6 +58,9 @@ def files():
         name=path.relative_to(root).as_posix();refs=linked.get(name,[])
         rows.append({'name':name,'size':path.stat().st_size,'refs':refs,'token':signing.dumps(name,salt='image-file'),
                      'blocked':any(not r.video_url and not r.deleted_at for r in refs) or name in site_images})
+    if sort in ('alpha','taxonomy'):
+        key_fn=_alpha_key if sort=='alpha' else _taxonomy_key
+        rows.sort(key=lambda row:(1,row['name']) if not (species:=_row_species(row)) else (0,key_fn(species)))
     return rows
 
 
@@ -70,7 +99,10 @@ def image_file(request):
 @staff_member_required
 def manager(request):
     if not request.user.is_superuser: raise PermissionDenied
-    context={'local':not settings.PRODUCTION}
+    sort=request.GET.get('sort') or 'file'
+    if sort not in SORT_OPTIONS: sort='file'
+    redirect_target='image-manager' if sort=='file' else f"{reverse('image-manager')}?sort={sort}"
+    context={'local':not settings.PRODUCTION,'sort':sort,'sort_options':SORT_OPTIONS}
     if request.method=='POST':
         try:
             action=request.POST.get('action')
@@ -90,7 +122,7 @@ def manager(request):
                         path.unlink()
                         Sample.objects.filter(image=name).update(image='')
                 messages.success(request,f'נמחקו {len(selected)} תמונות ללא גיבוי.')
-                return redirect('image-manager')
+                return redirect(redirect_target)
             elif action=='upload':
                 uploads=request.FILES.getlist('images')
                 if not uploads or len(uploads)>50: raise ValidationError('בחרו בין תמונה אחת ל־50 תמונות.')
@@ -130,7 +162,7 @@ def manager(request):
                         root=Path(settings.MEDIA_ROOT).resolve();old_path=root/old
                         if not old_path.is_symlink() and old_path.resolve().is_relative_to(root): old_path.unlink(missing_ok=True)
                 messages.success(request,f'הועברו {len(items)} תמונות. גרסאות קודמות שאינן בשימוש נמחקו ללא גיבוי.')
-                return redirect('image-manager')
+                return redirect(redirect_target)
             elif action=='site_image':
                 upload=request.FILES.get('site_image')
                 if not upload: raise ValidationError('יש לבחור תמונה.')
@@ -139,8 +171,8 @@ def manager(request):
                 if not created and obj.image: obj.image.delete(save=False)
                 obj.image.save(content.name,content,save=True)
                 messages.success(request,'תמונת הבית עודכנה.')
-                return redirect('image-manager')
+                return redirect(redirect_target)
         except ValidationError as exc: context['error']='; '.join(exc.messages)
-    context['images']=files();context['total_bytes']=sum(r['size'] for r in context['images'])
+    context['images']=files(sort);context['total_bytes']=sum(r['size'] for r in context['images'])
     context['site_image']=SiteImage.objects.filter(key='intro_photo').exclude(image='').first()
     response=render(request,'observations/images.html',context);response['Cache-Control']='private, no-store';return response
