@@ -80,6 +80,24 @@ class MediaTransferTests(TestCase):
         self.assertEqual(response.status_code,302)
         self.assertEqual(response.url,'/admin/images/?sort=alpha')
 
+    def test_image_manager_lists_using_observations_with_region_and_status(self):
+        # Each image card must show which observation(s) actually use it -- with enough
+        # detail (region, and a status flag when it isn't a normal published sample) to
+        # tell otherwise-identical entries apart.
+        self.client.force_login(self.sample.owner)
+        content=self.client.get('/admin/images/').content.decode()
+        self.assertIn('<ul>',content);self.assertIn(f'/admin/observations/sample/{self.sample.pk}/change/',content)
+        self.assertIn('Eilat',content)  # the region name, from self.sample.trip
+        self.assertNotIn('ממתינה לאישור',content)  # self.sample is published -- no status suffix
+
+        self.sample.status='pending';self.sample.save()
+        content=self.client.get('/admin/images/').content.decode()
+        self.assertIn('ממתינה לאישור',content)
+
+        self.sample.soft_delete(self.sample.owner)
+        content=self.client.get('/admin/images/').content.decode()
+        self.assertIn('תצפית מחוקה',content);self.assertNotIn('ממתינה לאישור',content)  # deleted wins over status
+
     def test_image_manager_authorization(self):
         self.assertEqual(self.client.get('/admin/images/').status_code,302)
         self.client.force_login(User.objects.create_user('staff',is_staff=True))

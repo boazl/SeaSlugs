@@ -48,7 +48,7 @@ def files(sort='file'):
     root=Path(settings.MEDIA_ROOT).resolve()
     if not root.exists(): return []
     linked={}
-    for item in Sample.objects.exclude(image='').select_related('species'):
+    for item in Sample.objects.exclude(image='').select_related('species','trip__region'):
         linked.setdefault(item.image.name,[]).append(item)
     site_images=set(SiteImage.objects.exclude(image='').values_list('image',flat=True))
     rows=[]

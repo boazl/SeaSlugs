@@ -7,7 +7,7 @@
 <form method="post" id="image-selection">{% csrf_token %}<input type="hidden" name="action" value="delete">
 <p><button type="button" id="select-all">בחירת הכול / ביטול</button> <button type="button" id="download-images">הורדת התמונות המסומנות למק</button></p>
 <div class="cards">{% for image in images %}<article><label><input type="checkbox" name="selected" value="{{image.token}}" data-download="{% url 'image-file' %}?download=1&amp;file={{image.token|urlencode}}"> {{image.size|filesizeformat}}</label><a href="{% url 'image-file' %}?file={{image.token|urlencode}}" target="_blank" rel="noopener"><img src="{% url 'image-file' %}?file={{image.token|urlencode}}" loading="lazy" alt="תמונה מנוהלת"></a>
-{% for sample in image.refs %}<p><a href="{% url 'admin:observations_sample_change' sample.pk %}">{{sample}}</a>{% if sample.deleted_at %} · תצפית מחוקה{% endif %}</p>{% empty %}<p>לא משויכת לתצפית — אפשר למחוק לפינוי מקום</p>{% endfor %}
+<p>תצפיות שמשתמשות בתמונה זו:</p><ul>{% for sample in image.refs %}<li><a href="{% url 'admin:observations_sample_change' sample.pk %}">{{sample}}</a>{% if sample.trip.region %} · {{sample.trip.region.name}}{% endif %}{% if sample.deleted_at %} · תצפית מחוקה{% elif sample.status != 'published' %} · {{sample.get_status_display}}{% endif %}</li>{% empty %}<li>לא משויכת לתצפית — אפשר למחוק לפינוי מקום</li>{% endfor %}</ul>
 {% if image.blocked %}<p class="errorlist">המדיה היחידה בתצפית פעילה — המחיקה חסומה</p>{% endif %}</article>{% empty %}<p>אין תמונות שהועלו בסביבה זו. תמונות YouTube אינן מאוחסנות כאן.</p>{% endfor %}</div>
 <p><label><input type="checkbox" name="confirm" value="yes"> אני מאשר מחיקה קבועה של התמונות המסומנות, ללא גיבוי תמונה</label></p><button>מחיקת התמונות המסומנות</button></form>
 <h2>תמונת הבית</h2>
