@@ -108,9 +108,17 @@ class SampleAdmin(admin.ModelAdmin):
     def save_model(self,request,obj,form,change): obj.save_reviewed()
     @admin.action(description='אישור פרסום לאחר השלמת הנתונים',permissions=['change'])
     def approve(self,request,queryset):
+        # A soft-deleted sample keeps whatever status it had when it was deleted (deletion
+        # never touches that field), so it can still show "מפורסמת" here even though it's
+        # excluded from the site -- easy to mistake for "already fine". Approving it is a
+        # no-op on purpose (it should come back through "שחזור לבדיקה מחדש" first, which
+        # re-validates it), but doing that silently just looks like the button didn't work.
+        skipped = queryset.filter(deleted_at__isnull=False).count()
         for item in queryset.filter(deleted_at__isnull=True):
             try: item.save_reviewed(actor=request.user,approve=True)
             except ValidationError as exc: self.message_user(request,f'{item}: {exc}',messages.ERROR)
+        if skipped:
+            self.message_user(request,f'{skipped} תצפיות מחוקות דולגו ונשארו מחוקות — יש לשחזר אותן קודם ("שחזור לבדיקה מחדש").',messages.WARNING)
     @admin.action(description='סימון כמחוקה',permissions=['change'])
     def soft_remove(self,request,queryset):
         for item in queryset: item.soft_delete(request.user)

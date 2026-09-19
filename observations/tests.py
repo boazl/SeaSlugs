@@ -69,6 +69,22 @@ class WorkflowTests(TestCase):
         manager=User.objects.create_superuser('admin','admin@example.com','valid-password-912')
         self.client.force_login(manager);self.assertContains(self.client.get('/observations/'),'מחוקה')
 
+    def test_admin_approve_skips_deleted_samples_with_a_warning(self):
+        # A soft-deleted sample still shows its last status (e.g. "מפורסמת") in the admin
+        # list -- easy to mistake for "already fine" -- but approving it is a deliberate
+        # no-op; it must say so instead of leaving the deletion unexplained.
+        manager=User.objects.create_superuser('admin','admin@example.com','valid-password-912')
+        item=self.record();item.soft_delete(self.user)
+        self.client.force_login(manager)
+        response=self.client.post('/admin/observations/sample/',
+            {'action':'approve','_selected_action':[str(item.pk)],'index':'0'},follow=True)
+        item.refresh_from_db();self.assertIsNotNone(item.deleted_at)
+        self.assertContains(response,'שחזור לבדיקה מחדש')
+
+        response=self.client.post('/admin/observations/sample/',
+            {'action':'restore','_selected_action':[str(item.pk)],'index':'0'},follow=True)
+        item.refresh_from_db();self.assertIsNone(item.deleted_at);self.assertEqual(item.status,'published')
+
     def test_manager_can_edit_any_or_deleted_sample_but_others_cannot(self):
         # The image manager (and the observations list) point a manager straight at the
         # app's own edit form for any sample, including someone else's or an already
