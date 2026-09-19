@@ -486,6 +486,65 @@ function render() {
     const total = filteredSpecies.length + filteredCollections.length;
     document.querySelector('#resultCount').textContent = language === 'he' ? `${total} פריטים` : `${total} ${total === 1 ? 'item' : 'items'}`;
     document.querySelector('#empty').hidden = total > 0;
+    updateFilterToggleCount();
+}
+
+// ---- mobile filter drawer ----
+
+const filterToggle = document.querySelector('#filterToggle');
+const filterSidebar = document.querySelector('#filterSidebar');
+const filterClose = document.querySelector('#filterClose');
+const filterToggleCount = document.querySelector('#filterToggleCount');
+function closeFilterDrawer() {
+    filterSidebar.classList.remove('open');
+    filterToggle?.setAttribute('aria-expanded', 'false');
+    document.body.style.overflow = '';
+}
+function openFilterDrawer() {
+    filterSidebar.classList.add('open');
+    filterToggle?.setAttribute('aria-expanded', 'true');
+    document.body.style.overflow = 'hidden';
+}
+function updateFilterToggleCount() {
+    if (!filterToggleCount) return;
+    let n = state.regions.size + state.sites.size + state.photographers.size;
+    if (state.area !== 'all') n++;
+    if (state.order !== 'all') n++;
+    if (state.family !== 'all') n++;
+    if (state.genus !== 'all') n++;
+    filterToggleCount.textContent = String(n);
+    filterToggleCount.hidden = n === 0;
+}
+filterToggle?.addEventListener('click', () => {
+    if (filterSidebar.classList.contains('open')) closeFilterDrawer(); else openFilterDrawer();
+});
+filterClose?.addEventListener('click', closeFilterDrawer);
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && filterSidebar.classList.contains('open')) { closeFilterDrawer(); filterToggle?.focus(); }
+});
+
+// ---- mobile account menu ----
+
+const accountMenuToggle = document.querySelector('.account-menu-toggle');
+const accountMenuList = document.querySelector('.account-menu-list');
+if (accountMenuToggle && accountMenuList) {
+    accountMenuToggle.addEventListener('click', () => {
+        const open = accountMenuList.classList.toggle('open');
+        accountMenuToggle.setAttribute('aria-expanded', String(open));
+    });
+    document.addEventListener('click', e => {
+        if (!accountMenuList.classList.contains('open')) return;
+        if (accountMenuList.contains(e.target) || accountMenuToggle.contains(e.target)) return;
+        accountMenuList.classList.remove('open');
+        accountMenuToggle.setAttribute('aria-expanded', 'false');
+    });
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && accountMenuList.classList.contains('open')) {
+            accountMenuList.classList.remove('open');
+            accountMenuToggle.setAttribute('aria-expanded', 'false');
+            accountMenuToggle.focus();
+        }
+    });
 }
 
 document.querySelector('#total').textContent = `(${speciesList.length})`;
@@ -534,6 +593,7 @@ const translations = [
     ['.player-bottom > span', 'If the video does not load, watch it on YouTube.'],
     ['#youtubeLink', 'Watch on YouTube ↗'],
     ['#filterSidebarTitle', 'Filters'],
+    ['#filterToggleLabel', 'Filters'],
     ['#areaGroupTitle', 'Area'],
     ['#regionGroupTitle', 'Dive region'],
     ['#siteGroupTitle', 'Dive site'],
@@ -579,6 +639,7 @@ function setLanguage(value) {
     document.querySelector('#filterSidebar').setAttribute('aria-label', en ? 'Filters' : 'סינון');
     document.querySelector('.brand').setAttribute('aria-label', en ? 'SeaSlugs — Home' : 'SeaSlugs — דף הבית');
     document.querySelector('#close').setAttribute('aria-label', en ? 'Close video' : 'סגירת התצוגה');
+    document.querySelector('#filterClose').setAttribute('aria-label', en ? 'Close filters' : 'סגירת הסינון');
     languageButton.textContent = en ? 'עברית' : 'English';
     languageButton.lang = en ? 'he' : 'en';
     languageButton.setAttribute('aria-label', en ? 'Switch to Hebrew' : 'מעבר לאנגלית');

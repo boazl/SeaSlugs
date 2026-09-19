@@ -39,9 +39,13 @@
                         <option value="alpha">אלפביתי (סוג ואז מין)</option>
                     </select></label>
             </div>
+            <button type="button" id="filterToggle" class="filter-toggle" aria-haspopup="true" aria-controls="filterSidebar" aria-expanded="false"><span id="filterToggleLabel">סינון</span><span id="filterToggleCount" class="filter-toggle-count" hidden>0</span></button>
             <div class="gallery-layout">
                 <aside class="filter-sidebar" id="filterSidebar" aria-label="סינון">
-                    <h3 id="filterSidebarTitle">סינון</h3>
+                    <div class="filter-sidebar-head">
+                        <h3 id="filterSidebarTitle">סינון</h3>
+                        <button type="button" id="filterClose" class="filter-close" aria-label="סגירת הסינון">✕</button>
+                    </div>
                     <div class="filter-group">
                         <h4 id="areaGroupTitle">אזור</h4>
                         <div class="filters" id="areaFilters" role="group" aria-label="סינון לפי אזור"></div>
