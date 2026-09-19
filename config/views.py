@@ -69,6 +69,11 @@ def gallery_file(request, filename='index.html'):
                 'title': area.species.scientific_name, 'name_he': area.species.name_he, 'name_en': area.species.name_en,
                 'genus': area.species.genus, 'epithet': area.species.species, 'family': area.species.family, 'order': area.species.order,
                 'thumbnail': primary['thumbnail'], 'image_url': primary['image_url'], 'video_id': primary['video_id'],
+                # Where/when the card's own photo was taken (the defining sample's, not
+                # necessarily the whole species-in-area's) -- shown on the card instead of
+                # the coarser country+sea area label, e.g. "Anilao, 2017" rather than
+                # "Philippines · Indo Pacific".
+                'region': primary['region'], 'year': primary['year'],
                 'samples': samples,
             })
 

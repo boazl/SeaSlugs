@@ -41,6 +41,15 @@ class GalleryTests(TestCase):
         self.assertEqual(entry['genus'], 'Testus')
         self.assertEqual(entry['epithet'], 'exemplaris')
 
+    def test_catalog_exposes_defining_samples_region_and_year_for_the_card_caption(self):
+        # The species card shows "<region>, <year>" (e.g. "Eilat, 2026") for the defining
+        # sample's own trip, rather than the coarser country+sea area label -- both fields
+        # must reach catalog.js for app.js to render that.
+        entry = self.catalog()['species'][0]
+        self.assertEqual(entry['region'], str(self.trip.region_id))
+        self.assertEqual(entry['year'], 2026)
+        self.assertEqual(self.catalog()['regions'][str(self.trip.region_id)]['label'], 'אילת')
+
     def test_species_hidden_when_area_has_no_defining_sample(self):
         from .models import SpeciesArea
         area = SpeciesArea.objects.get(species=self.item.species)

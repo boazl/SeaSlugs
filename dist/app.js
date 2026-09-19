@@ -432,7 +432,11 @@ function buildSpeciesCard(sp, index) {
     const meta = document.createElement('span');
     meta.className = 'card-meta';
     const area = document.createElement('span');
-    area.textContent = areaLabelFor(sp.area);
+    // Where/when the card's own photo (the species' defining sample) was taken, e.g.
+    // "Anilao, 2017" -- more useful here than the country+sea area label, which is
+    // already shown by the area filter above the grid and can span many regions/years.
+    const regionLabel = labelFor(sp.region, regionLabelsData);
+    area.textContent = regionLabel && sp.year ? `${regionLabel}, ${sp.year}` : areaLabelFor(sp.area);
     const label = document.createElement('span');
     label.textContent = sp.samples.length > 1
         ? (language === 'he' ? `${sp.samples.length} תצפיות` : `${sp.samples.length} observations`)
