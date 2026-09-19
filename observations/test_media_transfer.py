@@ -86,7 +86,7 @@ class MediaTransferTests(TestCase):
         # tell otherwise-identical entries apart.
         self.client.force_login(self.sample.owner)
         content=self.client.get('/admin/images/').content.decode()
-        self.assertIn('<ul>',content);self.assertIn(f'/admin/observations/sample/{self.sample.pk}/change/',content)
+        self.assertIn('<ul>',content);self.assertIn(f'/observations/{self.sample.pk}/edit/',content)
         self.assertIn('Eilat',content)  # the region name, from self.sample.trip
         self.assertNotIn('ממתינה לאישור',content)  # self.sample is published -- no status suffix
 

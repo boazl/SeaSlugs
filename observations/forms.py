@@ -42,6 +42,16 @@ class TripChoiceField(forms.ModelChoiceField):
         return f'{obj.title} ({bits})' if bits else obj.title
 
 
+class SampleImageInput(forms.ClearableFileInput):
+    """Adds a visual thumbnail next to the already-uploaded image on the observation form --
+    Django's default widget only shows a text link to the file, no picture. The link and
+    the thumbnail both go through the observation-photo view rather than the raw storage
+    URL (widget.value.url), since production never serves MEDIA_ROOT directly and only that
+    access-controlled view is guaranteed to actually show the image."""
+    template_name = 'observations/widgets/sample_image_input.html'
+
+
+
 class SampleForm(forms.ModelForm):
     # A native text input backed by a <datalist> (rendered in form.html from
     # species_options) rather than a <select> -- there can be hundreds of species, and
@@ -58,6 +68,7 @@ class SampleForm(forms.ModelForm):
     class Meta:
         model = Sample
         fields = ['title','kind','species','species_other','trip','site','site_other','day','depth','video_url','image']
+        widgets = {'image': SampleImageInput}
     def __init__(self,*args,**kwargs):
         super().__init__(*args,**kwargs)
         self.fields['kind'].required = False

@@ -186,7 +186,14 @@ def species_area_status(request):
 
 @login_required
 def edit(request,pk=None):
-    item=get_object_or_404(Sample,pk=pk,owner=request.user,deleted_at__isnull=True) if pk else Sample(owner=request.user)
+    if pk:
+        item=get_object_or_404(Sample,pk=pk)
+        # A manager (e.g. from the image manager's "which observations use this file" list,
+        # which can point at a soft-deleted sample too) can open and edit any observation --
+        # everyone else is limited to their own, not-deleted samples, exactly like remove().
+        if not is_manager(request.user) and (item.owner_id!=request.user.id or item.deleted_at): raise Http404
+    else:
+        item=Sample(owner=request.user)
     initial={}
     trip_param=request.GET.get('trip')
     if trip_param and request.method!='POST': initial['trip']=trip_param

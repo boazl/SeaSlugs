@@ -68,6 +68,21 @@ class WorkflowTests(TestCase):
         self.client.logout();self.assertEqual(self.client.get('/observations/').status_code,302)
         manager=User.objects.create_superuser('admin','admin@example.com','valid-password-912')
         self.client.force_login(manager);self.assertContains(self.client.get('/observations/'),'מחוקה')
+
+    def test_manager_can_edit_any_or_deleted_sample_but_others_cannot(self):
+        # The image manager (and the observations list) point a manager straight at the
+        # app's own edit form for any sample, including someone else's or an already
+        # soft-deleted one -- everyone else stays limited to their own, active samples.
+        item=self.record()
+        manager=User.objects.create_superuser('admin','admin@example.com','valid-password-912')
+        self.client.force_login(self.other)
+        self.assertEqual(self.client.get(f'/observations/{item.pk}/edit/').status_code,404)
+        self.client.force_login(manager)
+        self.assertEqual(self.client.get(f'/observations/{item.pk}/edit/').status_code,200)
+        item.soft_delete(self.user)
+        self.assertEqual(self.client.get(f'/observations/{item.pk}/edit/').status_code,200)
+        self.client.force_login(self.user)
+        self.assertEqual(self.client.get(f'/observations/{item.pk}/edit/').status_code,404)  # owner, but now deleted
     def test_form_upload_compressed(self):
         output=BytesIO();Image.new('RGB',(2000,1800),'blue').save(output,'PNG')
         form=SampleForm(self.data(),{'image':SimpleUploadedFile('test.png',output.getvalue(),content_type='image/png')},instance=Sample(owner=self.user))
@@ -213,6 +228,19 @@ class WorkflowTests(TestCase):
         self.assertTrue(form.is_valid(),form.errors)
         self.assertIsNone(form.cleaned_data['species'])
         self.assertEqual(form.cleaned_data['species_other'],'Nonexistent name')
+
+    def test_observation_form_shows_image_thumbnail_preview(self):
+        with tempfile.TemporaryDirectory() as folder, override_settings(MEDIA_ROOT=folder):
+            self.client.force_login(self.user)
+            output=BytesIO();Image.new('RGB',(400,600),'blue').save(output,'PNG')
+            data=dict(self.data(),image=SimpleUploadedFile('a.png',output.getvalue(),content_type='image/png'))
+            self.assertEqual(self.client.post('/observations/new/',data).status_code,302)
+            item=Sample.objects.get()
+            content=self.client.get(f'/observations/{item.pk}/edit/').content.decode()
+            self.assertIn(f'<img src="/observations/{item.pk}/photo/"',content)
+            # a fresh, unsaved form has no existing image yet -- nothing to preview
+            content=self.client.get('/observations/new/').content.decode()
+            self.assertNotIn('<img src="/observations/',content)
 
     def test_observation_form_wires_up_the_live_defining_status_check(self):
         self.client.force_login(self.user)
