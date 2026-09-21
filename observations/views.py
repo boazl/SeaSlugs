@@ -7,6 +7,7 @@ from django.http import Http404, FileResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
 from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from .models import Sample, Profile, Region, Site, DiveTrip, SiteImage, Species, Country, SpeciesArea
 from .forms import SignupForm, SampleForm, ProfileForm, DiveTripForm
 
@@ -73,7 +74,7 @@ def listing(request):
         rows = rows.filter(trip__photographer__icontains=get['photographer'])
     if manager and get.get('owner'):
         rows = rows.filter(owner__username__icontains=get['owner'])
-    sort = get.get('sort') if get.get('sort') in SORT_OPTIONS else 'newest'
+    sort = get.get('sort') if get.get('sort') in SORT_OPTIONS else 'species'
     rows = rows.order_by(*SORT_OPTIONS[sort])
 
     def options(field, **extra):
@@ -197,6 +198,15 @@ def edit(request,pk=None):
     initial={}
     trip_param=request.GET.get('trip')
     if trip_param and request.method!='POST': initial['trip']=trip_param
+    # Where to return to after saving -- normally the observations list URL the user
+    # followed the "עריכה" link from, filters/sort/page and all, carried through the
+    # POST as a hidden field (see form.html) since it isn't otherwise part of this URL.
+    # Validated against open-redirect abuse since it's attacker-influenceable input.
+    requested_next=request.POST.get('next') or request.GET.get('next')
+    if requested_next and url_has_allowed_host_and_scheme(requested_next,allowed_hosts={request.get_host()},require_https=request.is_secure()):
+        next_url=requested_next
+    else:
+        next_url=reverse('observations')
     form=SampleForm(request.POST or None,request.FILES or None,instance=item,initial=initial)
     if request.method=='POST' and form.is_valid():
         item=form.save(commit=False)
@@ -210,9 +220,9 @@ def edit(request,pk=None):
             save_images({name:raw});item.image=name
         item.save_reviewed()
         messages.success(request,'התצפית פורסמה.' if item.status=='published' else 'התצפית נשמרה וממתינה להשלמת נתונים ולאישור מנהל.')
-        return redirect('observations')
+        return redirect(f'{next_url}#obs-{item.pk}')
     return render(request,'observations/form.html',{'form':form,'title':'תצפית / Sample','observation_form':True,
-        'trip_new_url':reverse('trip-new'),
+        'trip_new_url':reverse('trip-new'),'next':next_url,
         'species_options':Species.objects.order_by('scientific_name').values_list('scientific_name',flat=True),
         'locations':{'trips':list(DiveTrip.objects.values('id','region_id')),'sites':list(Site.objects.values('id','region_id'))}})
 

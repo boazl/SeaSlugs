@@ -359,3 +359,43 @@ class WorkflowTests(TestCase):
             a.refresh_from_db();self.assertFalse(a.image)
             b.refresh_from_db();self.assertEqual(b.image, name)
             self.assertTrue(default_storage.exists(name))  # b still references it
+
+    def test_listing_defaults_to_alphabetical_species_order(self):
+        # The list is mainly used to find one specific observation to edit, which is much
+        # easier scanning alphabetically than scanning by creation date.
+        self.client.force_login(self.user)
+        z_species = Species.objects.create(scientific_name='Zzz species')
+        self.record()  # self.species is "Test species"
+        self.record(species=z_species, species_other='')
+        response = self.client.get('/observations/')
+        self.assertEqual(response.context['sort'], 'species')
+        names = [item.species.scientific_name for item in response.context['observations']]
+        self.assertEqual(names, sorted(names))
+
+    def test_edit_redirects_back_to_the_list_url_it_came_from(self):
+        # Without an explicit ?next=, fall back to the plain list -- scrolled to the
+        # saved observation rather than dropped at the top with no idea where it is.
+        self.client.force_login(self.user)
+        item = self.record()
+        response = self.client.post(f'/observations/{item.pk}/edit/', self.data())
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, f'/observations/#obs-{item.pk}')
+
+        # With ?next= pointing at the exact filtered/sorted list URL the "עריכה" link on
+        # that page carries (and the hidden `next` field resubmitting it), land back on
+        # that same URL, still anchored to this observation.
+        list_url = '/observations/?sort=oldest&mine=1'
+        data = self.data(); data['next'] = list_url
+        response = self.client.post(f'/observations/{item.pk}/edit/?next={list_url}', data)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, f'{list_url}#obs-{item.pk}')
+
+    def test_edit_rejects_an_unsafe_next_url(self):
+        # `next` is attacker-influenceable (it round-trips through the URL and a hidden
+        # form field), so an off-site target must never be honored.
+        self.client.force_login(self.user)
+        item = self.record()
+        data = self.data(); data['next'] = 'https://evil.example/phish'
+        response = self.client.post(f'/observations/{item.pk}/edit/?next=https://evil.example/phish', data)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, f'/observations/#obs-{item.pk}')
