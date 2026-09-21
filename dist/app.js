@@ -307,17 +307,21 @@ function playSampleOf(species, sample, button) {
 }
 function openSpeciesDialog(species, button) {
     opener = button;
-    if (species.samples.length <= 1) {
-        playSampleOf(species, species.samples[0], button);
+    // Inside a selected dive-trip collection, offer only that trip's own sample(s)
+    // for this species -- the species' full sample list can span other trips too.
+    const inTrip = state.collection ? species.samples.filter(sm => String(sm.trip_id) === state.collection) : null;
+    const samples = inTrip && inTrip.length ? inTrip : species.samples;
+    if (samples.length <= 1) {
+        playSampleOf(species, samples[0], button);
         return;
     }
     document.querySelector('#playerTitle').textContent = species.title;
-    document.querySelector('#playerRegion').textContent = language === 'he' ? `${species.samples.length} תצפיות — לבחירה מהרשימה` : `${species.samples.length} observations — choose from the list`;
+    document.querySelector('#playerRegion').textContent = language === 'he' ? `${samples.length} תצפיות — לבחירה מהרשימה` : `${samples.length} observations — choose from the list`;
     document.querySelector('#frame').hidden = true;
     document.querySelector('.player-bottom').hidden = true;
     const list = document.querySelector('#pickerList');
     list.replaceChildren();
-    for (const sm of species.samples) {
+    for (const sm of samples) {
         const li = document.createElement('li');
         const btn = document.createElement('button');
         btn.type = 'button';
@@ -397,23 +401,29 @@ function buildSpeciesCard(sp, index) {
     button.className = 'video-button';
     const common = language === 'he' ? (sp.name_he || sp.name_en) : (sp.name_en || sp.name_he);
     button.setAttribute('aria-label', `${language === 'he' ? 'צפייה' : 'Watch'}: ${sp.title}${common ? ' — ' + common : ''}`);
+    // Inside a selected dive-trip collection, show that trip's own sample here too --
+    // whatever the species' overall defining sample is, it may belong to another trip.
+    const tripSamples = state.collection ? sp.samples.filter(sm => String(sm.trip_id) === state.collection) : null;
+    const pickSamples = tripSamples && tripSamples.length ? tripSamples : null;
+    const cardSample = pickSamples && pickSamples.length === 1 ? pickSamples[0] : null;
     const wrap = document.createElement('span');
     wrap.className = 'image-wrap';
     const img = document.createElement('img');
-    img.src = sp.thumbnail;
+    img.src = (pickSamples ? pickSamples[0] : sp).thumbnail;
     img.alt = '';
     img.width = 640; img.height = 360;
     img.loading = index < 6 ? 'eager' : 'lazy';
     img.decoding = 'async';
     const icon = document.createElement('span');
     icon.className = 'play';
-    icon.textContent = sp.video_id ? '▶' : '⤢';
+    icon.textContent = (pickSamples ? pickSamples[0] : sp).video_id ? '▶' : '⤢';
     icon.setAttribute('aria-hidden', 'true');
     wrap.append(img, icon);
-    if (sp.samples.length > 1) {
+    const displayCount = pickSamples ? pickSamples.length : sp.samples.length;
+    if (displayCount > 1) {
         const badge = document.createElement('span');
         badge.className = 'count-badge';
-        badge.textContent = sp.samples.length;
+        badge.textContent = displayCount;
         badge.setAttribute('aria-hidden', 'true');
         wrap.append(badge);
     }
@@ -426,20 +436,23 @@ function buildSpeciesCard(sp, index) {
     if (common) sub.textContent = common;
     const credit = document.createElement('span');
     credit.className = 'photographer';
-    if (sp.samples.length === 1 && sp.samples[0].photographer) {
-        credit.textContent = (language === 'he' ? 'צילום: ' : 'Photography: ') + sp.samples[0].photographer;
+    const creditSample = cardSample || (sp.samples.length === 1 ? sp.samples[0] : null);
+    if (creditSample && creditSample.photographer) {
+        credit.textContent = (language === 'he' ? 'צילום: ' : 'Photography: ') + creditSample.photographer;
     }
     const meta = document.createElement('span');
     meta.className = 'card-meta';
     const area = document.createElement('span');
-    // Where/when the card's own photo (the species' defining sample) was taken, e.g.
-    // "Anilao, 2017" -- more useful here than the country+sea area label, which is
-    // already shown by the area filter above the grid and can span many regions/years.
-    const regionLabel = labelFor(sp.region, regionLabelsData);
-    area.textContent = regionLabel && sp.year ? `${regionLabel}, ${sp.year}` : areaLabelFor(sp.area);
+    // Where/when the card's own photo was taken, e.g. "Anilao, 2017" -- more useful
+    // here than the country+sea area label, which is already shown by the area filter
+    // above the grid and can span many regions/years. Uses the selected collection's
+    // own sample when browsing inside one, otherwise the species' defining sample.
+    const regionSrc = pickSamples ? pickSamples[0] : sp;
+    const regionLabel = labelFor(regionSrc.region, regionLabelsData);
+    area.textContent = regionLabel && regionSrc.year ? `${regionLabel}, ${regionSrc.year}` : areaLabelFor(sp.area);
     const label = document.createElement('span');
-    label.textContent = sp.samples.length > 1
-        ? (language === 'he' ? `${sp.samples.length} תצפיות` : `${sp.samples.length} observations`)
+    label.textContent = displayCount > 1 && !cardSample
+        ? (language === 'he' ? `${displayCount} תצפיות` : `${displayCount} observations`)
         : (language === 'he' ? 'לצפייה' : 'Watch');
     meta.append(area, label);
     info.append(h3);
