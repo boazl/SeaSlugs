@@ -212,6 +212,26 @@ function sampleMatchesGeo(sm) {
     if (state.photographers.size && !state.photographers.has(sm.photographer)) return false;
     return true;
 }
+// When a dive-trip collection and/or dive region/site/photographer filters are active,
+// narrow a species' samples to the one(s) relevant to the current view -- e.g. a species
+// observed on several trips or by several photographers should show/play the sample that
+// actually matches what's selected, not just its overall defining sample. Each step only
+// narrows if that wouldn't empty the pool (a species can qualify for the view through two
+// different samples, one per criterion). Returns null when no such filter is active at all,
+// so callers fall back to the species' own defining sample as before.
+function scopedSamples(sp) {
+    if (!(state.collection || state.regions.size || state.sites.size || state.photographers.size)) return null;
+    let pool = sp.samples;
+    if (state.collection) {
+        const byTrip = pool.filter(sm => String(sm.trip_id) === state.collection);
+        if (byTrip.length) pool = byTrip;
+    }
+    if (state.regions.size || state.sites.size || state.photographers.size) {
+        const byGeo = pool.filter(sampleMatchesGeo);
+        if (byGeo.length) pool = byGeo;
+    }
+    return pool;
+}
 function speciesSearchText(sp) {
     const parts = [sp.title, sp.name_he, sp.name_en, sp.genus, sp.family, sp.order, areaLabelsData[sp.area]?.label, areaLabelsData[sp.area]?.label_en];
     for (const sm of sp.samples) {
@@ -307,10 +327,8 @@ function playSampleOf(species, sample, button) {
 }
 function openSpeciesDialog(species, button) {
     opener = button;
-    // Inside a selected dive-trip collection, offer only that trip's own sample(s)
-    // for this species -- the species' full sample list can span other trips too.
-    const inTrip = state.collection ? species.samples.filter(sm => String(sm.trip_id) === state.collection) : null;
-    const samples = inTrip && inTrip.length ? inTrip : species.samples;
+    const pool = scopedSamples(species);
+    const samples = pool && pool.length ? pool : species.samples;
     if (samples.length <= 1) {
         playSampleOf(species, samples[0], button);
         return;
@@ -401,10 +419,10 @@ function buildSpeciesCard(sp, index) {
     button.className = 'video-button';
     const common = language === 'he' ? (sp.name_he || sp.name_en) : (sp.name_en || sp.name_he);
     button.setAttribute('aria-label', `${language === 'he' ? 'צפייה' : 'Watch'}: ${sp.title}${common ? ' — ' + common : ''}`);
-    // Inside a selected dive-trip collection, show that trip's own sample here too --
-    // whatever the species' overall defining sample is, it may belong to another trip.
-    const tripSamples = state.collection ? sp.samples.filter(sm => String(sm.trip_id) === state.collection) : null;
-    const pickSamples = tripSamples && tripSamples.length ? tripSamples : null;
+    // When a collection and/or region/site/photographer filter is active, show the
+    // sample that actually matches the current view here too -- the species' overall
+    // defining sample may belong to a different trip, region, site or photographer.
+    const pickSamples = scopedSamples(sp);
     const cardSample = pickSamples && pickSamples.length === 1 ? pickSamples[0] : null;
     const wrap = document.createElement('span');
     wrap.className = 'image-wrap';
@@ -445,8 +463,8 @@ function buildSpeciesCard(sp, index) {
     const area = document.createElement('span');
     // Where/when the card's own photo was taken, e.g. "Anilao, 2017" -- more useful
     // here than the country+sea area label, which is already shown by the area filter
-    // above the grid and can span many regions/years. Uses the selected collection's
-    // own sample when browsing inside one, otherwise the species' defining sample.
+    // above the grid and can span many regions/years. Uses the current view's own
+    // sample when one is scoped in, otherwise the species' defining sample.
     const regionSrc = pickSamples ? pickSamples[0] : sp;
     const regionLabel = labelFor(regionSrc.region, regionLabelsData);
     area.textContent = regionLabel && regionSrc.year ? `${regionLabel}, ${regionSrc.year}` : areaLabelFor(sp.area);
