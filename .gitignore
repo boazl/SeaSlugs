@@ -11,3 +11,13 @@ media/
 
 backups/
 maintenance.flag
+
+# Personal project-documentation exports (Word/PDF/HTML) -- these don't belong in the code
+# repo: they're edited locally, periodically create Word's transient "~$..." lock file in
+# git status, and a saved Google Docs HTML export embeds Google's own internal API keys,
+# which triggered a GitHub secret-scanning alert once one such file got committed.
+*.docx
+*.doc
+* - Google Docs.html
+* - Google Docs.pdf
+Claude outputs/
