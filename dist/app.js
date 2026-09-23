@@ -20,6 +20,7 @@ const state = {
     photographers: new Set(),
     order: 'all',
     subOrder: 'all',
+    superfamily: 'all',
     family: 'all',
     genus: 'all',
     collection: null,
@@ -89,19 +90,21 @@ function photographerCount(area, name) {
     for (const c of collectionsList) { if (area !== 'all' && c.area !== area) continue; if (c.photographer === name) n++; }
     return n;
 }
-function taxonomyOptions(area, order, subOrder, family) {
-    const orders = new Set(), subOrders = new Set(), families = new Set(), genera = new Set();
+function taxonomyOptions(area, order, subOrder, superfamily, family) {
+    const orders = new Set(), subOrders = new Set(), superfamilies = new Set(), families = new Set(), genera = new Set();
     for (const sp of speciesList) {
         if (area !== 'all' && sp.area !== area) continue;
         if (sp.order) orders.add(sp.order);
         if (order !== 'all' && sp.order !== order) continue;
         if (sp.sub_order) subOrders.add(sp.sub_order);
         if (subOrder !== 'all' && sp.sub_order !== subOrder) continue;
+        if (sp.superfamily) superfamilies.add(sp.superfamily);
+        if (superfamily !== 'all' && sp.superfamily !== superfamily) continue;
         if (sp.family) families.add(sp.family);
         if (family !== 'all' && sp.family !== family) continue;
         if (sp.genus) genera.add(sp.genus);
     }
-    return { orders, subOrders, families, genera };
+    return { orders, subOrders, superfamilies, families, genera };
 }
 
 // ---- sidebar rendering ----
@@ -129,7 +132,7 @@ function renderAreaFilters() {
             if (state.area === key) return;
             state.area = key;
             state.regions.clear(); state.sites.clear(); state.photographers.clear();
-            state.order = 'all'; state.subOrder = 'all'; state.family = 'all'; state.genus = 'all';
+            state.order = 'all'; state.subOrder = 'all'; state.superfamily = 'all'; state.family = 'all'; state.genus = 'all';
             renderSidebar(); render();
         });
         container.append(b);
@@ -176,12 +179,12 @@ function fillSelect(select, values, current, allLabel) {
 }
 function renderTaxonomySelects() {
     const area = state.area;
-    const t1 = taxonomyOptions(area, 'all', 'all', 'all');
+    const t1 = taxonomyOptions(area, 'all', 'all', 'all', 'all');
     const orderSelect = document.querySelector('#orderSelect');
     fillSelect(orderSelect, t1.orders, state.order, language === 'he' ? 'כל הסדרות' : 'All orders');
     if (orderSelect.value !== state.order) state.order = 'all';
 
-    const t2 = taxonomyOptions(area, state.order, 'all', 'all');
+    const t2 = taxonomyOptions(area, state.order, 'all', 'all', 'all');
     const subOrderGroup = document.querySelector('#subOrderGroup');
     const subOrderSelect = document.querySelector('#subOrderSelect');
     if (t2.subOrders.size) {
@@ -193,11 +196,23 @@ function renderTaxonomySelects() {
         state.subOrder = 'all';
     }
 
-    const t3 = taxonomyOptions(area, state.order, state.subOrder, 'all');
+    const t2b = taxonomyOptions(area, state.order, state.subOrder, 'all', 'all');
+    const superfamilyGroup = document.querySelector('#superfamilyGroup');
+    const superfamilySelect = document.querySelector('#superfamilySelect');
+    if (t2b.superfamilies.size) {
+        superfamilyGroup.hidden = false;
+        fillSelect(superfamilySelect, t2b.superfamilies, state.superfamily, language === 'he' ? 'כל העל-משפחות' : 'All superfamilies');
+        if (superfamilySelect.value !== state.superfamily) state.superfamily = 'all';
+    } else {
+        superfamilyGroup.hidden = true;
+        state.superfamily = 'all';
+    }
+
+    const t3 = taxonomyOptions(area, state.order, state.subOrder, state.superfamily, 'all');
     const familySelect = document.querySelector('#familySelect');
     fillSelect(familySelect, t3.families, state.family, language === 'he' ? 'כל המשפחות' : 'All families');
     if (familySelect.value !== state.family) state.family = 'all';
-    const t4 = taxonomyOptions(area, state.order, state.subOrder, state.family);
+    const t4 = taxonomyOptions(area, state.order, state.subOrder, state.superfamily, state.family);
     const genusSelect = document.querySelector('#genusSelect');
     fillSelect(genusSelect, t4.genera, state.genus, language === 'he' ? 'כל הסוגים' : 'All genera');
     if (genusSelect.value !== state.genus) state.genus = 'all';
@@ -250,7 +265,7 @@ function scopedSamples(sp) {
     return pool;
 }
 function speciesSearchText(sp) {
-    const parts = [sp.title, sp.name_he, sp.name_en, sp.genus, sp.family, sp.order, areaLabelsData[sp.area]?.label, areaLabelsData[sp.area]?.label_en];
+    const parts = [sp.title, sp.name_he, sp.name_en, sp.genus, sp.family, sp.superfamily, sp.order, areaLabelsData[sp.area]?.label, areaLabelsData[sp.area]?.label_en];
     for (const sm of sp.samples) {
         const r = regionLabelsData[sm.region];
         if (r) parts.push(r.label, r.label_en);
@@ -265,6 +280,7 @@ function speciesMatches(sp, q) {
     if (state.area !== 'all' && sp.area !== state.area) return false;
     if (state.order !== 'all' && sp.order !== state.order) return false;
     if (state.subOrder !== 'all' && sp.sub_order !== state.subOrder) return false;
+    if (state.superfamily !== 'all' && sp.superfamily !== state.superfamily) return false;
     if (state.family !== 'all' && sp.family !== state.family) return false;
     if (state.genus !== 'all' && sp.genus !== state.genus) return false;
     if ((state.regions.size || state.sites.size || state.photographers.size) && !sp.samples.some(sampleMatchesGeo)) return false;
@@ -277,7 +293,7 @@ function collectionMatches(c, q) {
     if (state.regions.size && !state.regions.has(c.region)) return false;
     if (state.sites.size) return false;
     if (state.photographers.size && !state.photographers.has(c.photographer)) return false;
-    if (state.order !== 'all' || state.subOrder !== 'all' || state.family !== 'all' || state.genus !== 'all') return false;
+    if (state.order !== 'all' || state.subOrder !== 'all' || state.superfamily !== 'all' || state.family !== 'all' || state.genus !== 'all') return false;
     if (q) {
         const r = regionLabelsData[c.region];
         const a = areaLabelsData[c.area];
@@ -596,6 +612,7 @@ function updateFilterToggleCount() {
     if (state.area !== 'all') n++;
     if (state.order !== 'all') n++;
     if (state.subOrder !== 'all') n++;
+    if (state.superfamily !== 'all') n++;
     if (state.family !== 'all') n++;
     if (state.genus !== 'all') n++;
     filterToggleCount.textContent = String(n);
@@ -638,12 +655,13 @@ search.addEventListener('input', render);
 document.querySelector('#reset').addEventListener('click', () => {
     search.value = '';
     state.area = 'all'; state.regions.clear(); state.sites.clear(); state.photographers.clear();
-    state.order = 'all'; state.subOrder = 'all'; state.family = 'all'; state.genus = 'all'; state.collection = null;
+    state.order = 'all'; state.subOrder = 'all'; state.superfamily = 'all'; state.family = 'all'; state.genus = 'all'; state.collection = null;
     state.sort = 'taxonomic'; document.querySelector('#sortSelect').value = 'taxonomic';
     renderSidebar(); render(); search.focus();
 });
-document.querySelector('#orderSelect').addEventListener('change', e => { state.order = e.target.value; state.subOrder = 'all'; state.family = 'all'; state.genus = 'all'; renderTaxonomySelects(); render(); });
-document.querySelector('#subOrderSelect').addEventListener('change', e => { state.subOrder = e.target.value; state.family = 'all'; state.genus = 'all'; renderTaxonomySelects(); render(); });
+document.querySelector('#orderSelect').addEventListener('change', e => { state.order = e.target.value; state.subOrder = 'all'; state.superfamily = 'all'; state.family = 'all'; state.genus = 'all'; renderTaxonomySelects(); render(); });
+document.querySelector('#subOrderSelect').addEventListener('change', e => { state.subOrder = e.target.value; state.superfamily = 'all'; state.family = 'all'; state.genus = 'all'; renderTaxonomySelects(); render(); });
+document.querySelector('#superfamilySelect').addEventListener('change', e => { state.superfamily = e.target.value; state.family = 'all'; state.genus = 'all'; renderTaxonomySelects(); render(); });
 document.querySelector('#familySelect').addEventListener('change', e => { state.family = e.target.value; state.genus = 'all'; renderTaxonomySelects(); render(); });
 document.querySelector('#genusSelect').addEventListener('change', e => { state.genus = e.target.value; render(); });
 document.querySelector('#sortSelect').addEventListener('change', e => { state.sort = e.target.value; render(); });
@@ -687,6 +705,7 @@ const translations = [
     ['#photographerGroupTitle', 'Photographer'],
     ['#orderGroupTitle', 'Order'],
     ['#subOrderGroupTitle', 'Suborder'],
+    ['#superfamilyGroupTitle', 'Superfamily'],
     ['#familyGroupTitle', 'Family'],
     ['#genusGroupTitle', 'Genus'],
 ].map(([selector, en]) => {

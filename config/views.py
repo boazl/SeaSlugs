@@ -136,7 +136,19 @@ def gallery_file(request, filename='index.html'):
             entry = {
                 'area_id': area.pk, 'species_id': area.species_id, 'area': area_key,
                 'title': area.species.scientific_name, 'name_he': area.species.name_he, 'name_en': area.species.name_en,
-                'genus': area.species.genus, 'epithet': area.species.species, 'family': area.species.family, 'order': area.species.order,
+                'genus': area.species.genus, 'epithet': area.species.species, 'family': area.species.family,
+                # The order filter/search value is the CURATED order name (via order_obj,
+                # already resolved above), not the species' raw order text -- Species.order
+                # sometimes still carries a legacy synonym (e.g. "Doridida" for Nudibranchia) or
+                # a "Not assigned" placeholder, which used to leak into the gallery's order
+                # filter as bogus, disconnected options. Falls back to the raw text only when it
+                # isn't one of those placeholder values and nothing resolved it, so a species
+                # without a matching TaxonOrder row yet doesn't just disappear from the filter.
+                'order': order_obj.name if order_obj else (area.species.order if area.species.order not in ('', 'Not assigned') else ''),
+                # The family's curated superfamily (blank when not yet classified), for the
+                # superfamily filter -- sits between suborder and family in the taxonomic
+                # hierarchy the gallery filters by.
+                'superfamily': family_obj.superfamily if family_obj else '',
                 # Resolved via the TaxonGenus -> TaxonFamily -> TaxonOrder chain above: the
                 # suborder this species' order was curated into (blank when none), and the
                 # ids used both to filter by suborder and to detect group transitions for the

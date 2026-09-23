@@ -282,6 +282,34 @@ class TaxonomicSortAndPanelTests(TestCase):
         self.assertIsNone(entry['taxon_order_id'])
         self.assertEqual(entry['sub_order'], '')
 
+    def test_catalog_order_field_uses_the_curated_name_not_a_stale_raw_synonym(self):
+        from .models import TaxonOrder, TaxonFamily
+        # A species whose Species.order text is a legacy synonym ("Doridida") still shows up
+        # under the real, curated order name in the gallery's order filter/search field --
+        # not as its own disconnected "Doridida" option (the bug the user caught: this used to
+        # leak straight from Species.order into the catalog's "order" field unchanged).
+        order = TaxonOrder.objects.create(name='Nudibranchia', sub_order='Doridina', taxonomic_order='4')
+        family = TaxonFamily.objects.create(name='Hexabranchidae', order=order, superfamily='Chromodoridoidea')
+        species = Species.objects.create(scientific_name='Hexabranchus test', order='Doridida', family='Hexabranchidae')
+        self.publish(species)
+        entry = self.catalog()['species'][0]
+        self.assertEqual(entry['order'], 'Nudibranchia')
+        self.assertEqual(entry['superfamily'], 'Chromodoridoidea')
+
+    def test_catalog_order_field_falls_back_to_raw_text_when_unresolved_and_not_a_placeholder(self):
+        # A species with no matching TaxonOrder row at all still exposes whatever real order
+        # text it has (so it isn't just dropped from the filter) -- but a blank/"Not assigned"
+        # placeholder value is never shown as if it were a real order.
+        species = Species.objects.create(scientific_name='Unresolved species', order='SomeUnknownOrder')
+        self.publish(species)
+        entry = self.catalog()['species'][0]
+        self.assertEqual(entry['order'], 'SomeUnknownOrder')
+
+        species2 = Species.objects.create(scientific_name='Placeholder order species', order='Not assigned')
+        self.publish(species2)
+        entries = {e['title']: e for e in self.catalog()['species']}
+        self.assertEqual(entries['Placeholder order species']['order'], '')
+
     def test_species_with_blank_genus_resolves_via_scientific_name_leading_word(self):
         from .models import TaxonFamily, TaxonGenus
         # A handful of real species have a blank genus column even though their scientific
