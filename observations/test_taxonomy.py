@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 from unittest.mock import patch
+from django.apps import apps as django_apps
 from django.core.management import call_command
 from django.db import IntegrityError, transaction
 from django.test import TestCase
@@ -282,6 +283,24 @@ class TaxonomyTablesTests(TestCase):
         call_command('build_taxonomy_tables', '--apply')
         family.refresh_from_db()
         self.assertEqual(family.superfamily, 'שם שהמשתמש קבע ידנית')
+
+    def test_migration_0018_realigns_pre_existing_base_order_rows_to_the_reference(self):
+        # Simulates a real upgrade: a "base" order row already exists from the OLD scheme (its
+        # taxonomic_order came from Species.phylogenetic_order, e.g. "313"), and the migration
+        # data step must realign it in place to the curated reference value -- otherwise
+        # build_taxonomy_tables's next run would try to create a SECOND row for the same
+        # (name, sub_order='') pair (see the bug this data migration exists to prevent).
+        import importlib
+        migration_module = importlib.import_module(
+            'observations.migrations.0018_remove_taxonorder_unique_taxonorder_name_sub_order_and_more'
+        )
+        pre_existing = TaxonOrder.objects.create(name='Nudibranchia', sub_order='', taxonomic_order='313')
+        migration_module.migrate_taxon_order_rows(django_apps, None)
+        pre_existing.refresh_from_db()
+        self.assertEqual(pre_existing.taxonomic_order, '3')
+        self.assertEqual(pre_existing.name_he, 'גלויי זים')
+        # And the row's pk is unchanged -- any pre-existing family FK pointing at it survives.
+        self.assertEqual(TaxonOrder.objects.filter(name='Nudibranchia', sub_order='').count(), 1)
 
     def test_placeholder_genus_family_inferred_for_haminoeid_and_discodorid(self):
         # A couple of species use an informal placeholder genus (not a real Latin name) with no
