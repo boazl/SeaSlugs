@@ -4,9 +4,9 @@ from django.core.exceptions import ValidationError
 from django.utils.html import format_html
 from django.urls import reverse
 from .forms import SampleForm
-from .models import Country, Sea, Region, Site, Species, Profile, Sample, DiveTrip, SiteImage, SpeciesArea
+from .models import Country, Sea, Region, Site, Species, Profile, Sample, DiveTrip, SiteImage, SpeciesArea, TaxonOrder, TaxonFamily, TaxonGenus, SampleKind
 
-for model in [Country,Sea,Region,Site,Profile,SiteImage]: admin.site.register(model)
+for model in [Country,Sea,Region,Site,Profile,SiteImage,SampleKind]: admin.site.register(model)
 
 @admin.register(Species)
 class SpeciesAdmin(admin.ModelAdmin):
@@ -18,6 +18,28 @@ class SpeciesAdmin(admin.ModelAdmin):
         ('סיווג טקסונומי', {'fields':['order','superfamily','family','accepted_genus','accepted_species']}),
         ('שמות ותפוצה', {'fields':['name_he','name_en','common_name','transliteration','language','distribution']}),
     ]
+
+@admin.register(TaxonOrder)
+class TaxonOrderAdmin(admin.ModelAdmin):
+    list_display = ['taxonomic_order', 'name', 'name_he', 'sub_order', 'defining_sample']
+    search_fields = ['name', 'name_he', 'sub_order']
+
+
+@admin.register(TaxonFamily)
+class TaxonFamilyAdmin(admin.ModelAdmin):
+    list_display = ['taxonomic_order', 'name', 'name_he', 'sub_family', 'order', 'defining_sample']
+    list_filter = ['order']
+    search_fields = ['name', 'name_he', 'sub_family']
+    autocomplete_fields = ['order']
+
+
+@admin.register(TaxonGenus)
+class TaxonGenusAdmin(admin.ModelAdmin):
+    list_display = ['taxonomic_order', 'name', 'name_he', 'family', 'defining_sample']
+    list_filter = ['family__order']
+    search_fields = ['name', 'name_he']
+    autocomplete_fields = ['family']
+
 
 @admin.register(DiveTrip)
 class DiveTripAdmin(admin.ModelAdmin):

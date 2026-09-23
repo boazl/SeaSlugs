@@ -77,6 +77,49 @@ class Species(models.Model):
     def __str__(self): return self.scientific_name
 
 
+class TaxonOrder(models.Model):
+    name = models.CharField('סדרה', max_length=150, unique=True)
+    name_he = models.CharField('שם בעברית', max_length=150, blank=True)
+    sub_order = models.CharField('תת-סדרה', max_length=150, blank=True)
+    taxonomic_order = models.CharField('סדר טקסונומי', max_length=40, blank=True)
+    defining_sample = models.ForeignKey('Sample', null=True, blank=True, on_delete=models.SET_NULL, related_name='+', verbose_name='דגימה מגדירה',
+        help_text='הדגימה שתמונתה או סרטון היוטיוב שלה יוצגו בכותרת הסדרה בגלריה.')
+    class Meta:
+        ordering = [models.functions.NullIf('taxonomic_order', models.Value('')).asc(nulls_last=True), 'name']
+        verbose_name = 'סדרה (טקסונומיה)'
+        verbose_name_plural = 'סדרות (טקסונומיה)'
+    def __str__(self): return self.name
+
+
+class TaxonFamily(models.Model):
+    order = models.ForeignKey(TaxonOrder, on_delete=models.PROTECT, null=True, blank=True, related_name='families', verbose_name='סדרה')
+    name = models.CharField('משפחה', max_length=150, unique=True)
+    name_he = models.CharField('שם בעברית', max_length=150, blank=True)
+    sub_family = models.CharField('תת-משפחה', max_length=150, blank=True)
+    taxonomic_order = models.CharField('סדר טקסונומי', max_length=40, blank=True)
+    defining_sample = models.ForeignKey('Sample', null=True, blank=True, on_delete=models.SET_NULL, related_name='+', verbose_name='דגימה מגדירה',
+        help_text='הדגימה שתמונתה או סרטון היוטיוב שלה יוצגו בכותרת המשפחה בגלריה.')
+    class Meta:
+        ordering = [models.functions.NullIf('taxonomic_order', models.Value('')).asc(nulls_last=True), 'name']
+        verbose_name = 'משפחה (טקסונומיה)'
+        verbose_name_plural = 'משפחות (טקסונומיה)'
+    def __str__(self): return self.name
+
+
+class TaxonGenus(models.Model):
+    family = models.ForeignKey(TaxonFamily, on_delete=models.PROTECT, null=True, blank=True, related_name='genera', verbose_name='משפחה')
+    name = models.CharField('סוג', max_length=150, unique=True)
+    name_he = models.CharField('שם בעברית', max_length=150, blank=True)
+    taxonomic_order = models.CharField('סדר טקסונומי', max_length=40, blank=True)
+    defining_sample = models.ForeignKey('Sample', null=True, blank=True, on_delete=models.SET_NULL, related_name='+', verbose_name='דגימה מגדירה',
+        help_text='הדגימה שתמונתה או סרטון היוטיוב שלה יוצגו בכותרת הסוג ובאוסף המינים שלו בגלריה.')
+    class Meta:
+        ordering = [models.functions.NullIf('taxonomic_order', models.Value('')).asc(nulls_last=True), 'name']
+        verbose_name = 'סוג (טקסונומיה)'
+        verbose_name_plural = 'סוגים (טקסונומיה)'
+    def __str__(self): return self.name
+
+
 class SiteImage(models.Model):
     key = models.SlugField('מזהה', max_length=50, unique=True)
     image = models.ImageField('תמונה', upload_to='site/')
@@ -149,10 +192,25 @@ class DiveTrip(models.Model):
             except ValueError: raise ValidationError({'start_day':'תאריך התחלה לא תקין.'})
 
 
+class SampleKind(Named):
+    """Bilingual reference table describing the values Sample.kind can hold. Sample.kind stays
+    a plain CharField (not a real FK here) on purpose: it is compared to plain strings and the
+    Kind.* constants in ~25 places across views/forms/admin/management commands/tests and the
+    public gallery API, so converting it to a ForeignKey would touch all of those. This table
+    exists to give each kind an admin-editable, bilingual label."""
+    code = models.SlugField('קוד', max_length=20, unique=True)
+    class Meta(Named.Meta):
+        verbose_name = 'סוג דגימה'
+        verbose_name_plural = 'סוגי דגימה'
+
+
 class Sample(models.Model):
     class Kind(models.TextChoices):
         SPECIES = 'species', 'מין יחיד'
         COLLECTION = 'collection', 'אוסף מינים / מסע צלילה'
+        GENUS = 'genus', 'סוג'
+        FAMILY = 'family', 'משפחה'
+        ORDER = 'order', 'סדרה'
     kind = models.CharField('סוג הסרטון', max_length=20, choices=Kind.choices, default=Kind.SPECIES)
     trip = models.ForeignKey(DiveTrip, verbose_name='מסע צלילה', on_delete=models.PROTECT, related_name='samples')
     title = models.CharField('כותרת הגלריה', max_length=240, blank=True)
