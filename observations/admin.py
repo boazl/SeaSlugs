@@ -27,9 +27,9 @@ class TaxonOrderAdmin(admin.ModelAdmin):
 
 @admin.register(TaxonFamily)
 class TaxonFamilyAdmin(admin.ModelAdmin):
-    list_display = ['taxonomic_order', 'name', 'name_he', 'name_en', 'sub_family', 'order', 'defining_sample']
+    list_display = ['taxonomic_order', 'name', 'name_he', 'name_en', 'sub_family', 'superfamily', 'order', 'defining_sample']
     list_filter = ['order']
-    search_fields = ['name', 'name_he', 'name_en', 'sub_family']
+    search_fields = ['name', 'name_he', 'name_en', 'sub_family', 'superfamily']
     autocomplete_fields = ['order']
 
 

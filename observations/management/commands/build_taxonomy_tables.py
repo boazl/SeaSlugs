@@ -1,15 +1,32 @@
 """Build/refresh the taxonomy lookup tables (order, family, genus) from the Species table.
 
-The Species table already carries free-text order/family/genus/phylogenetic_order columns
-per species; this command derives the normalized TaxonOrder -> TaxonFamily -> TaxonGenus
-hierarchy from that data (majority vote per family/genus when a couple of species disagree,
-e.g. legacy "Doridida" vs current "Nudibranchia" labelling), and fills in Hebrew genus names
-from a small extracted supplement (data/taxonomy_excel_supplement.json) for genera the personal
-reference spreadsheet already has a Hebrew name for.
+The Species table already carries free-text order/family/genus/superfamily/phylogenetic_order
+columns per species; this command derives the normalized TaxonOrder -> TaxonFamily -> TaxonGenus
+hierarchy from that data, and fills in Hebrew/English names from a curated supplement file
+(data/taxonomy_excel_supplement.json):
 
-Safe to re-run: existing rows are matched by name and only their BLANK fields are filled in --
-any value the user has since edited by hand (name_he, taxonomic_order, sub_order/sub_family,
-or a reassigned FK) is left untouched.
+- genus_hebrew_names: Hebrew names for genera, from the personal reference spreadsheet.
+- taxon_order_reference: the curated, authoritative list of order/suborder groups (Hebrew name,
+  English name, taxonomic display order, and the superfamilies each group covers). Every one of
+  these rows is seeded as its own TaxonOrder row, matched by the (name, sub_order, taxonomic_order)
+  triple -- note the SAME (name, sub_order) pair can legitimately repeat across several rows
+  (e.g. Nudibranchia/Doridina covers both a "cryptobranch dorids" and a "radula-less dorids"
+  group), which taxonomic_order alone disambiguates.
+- family_to_superfamily: an externally-sourced family->superfamily crosswalk (from the user's
+  reference spreadsheet's taxonomic database export), used as a fallback wherever the Species
+  table's own (mostly blank) superfamily column doesn't cover a family.
+
+Family -> order linking prefers superfamily: a family's superfamily (majority-voted from
+Species.superfamily, falling back to the family_to_superfamily crosswalk) is looked up against
+the superfamilies each taxon_order_reference group covers, and the family is linked to that
+specific order row. This resolves cases plain order-text majority voting cannot (most
+Sacoglossa/Acteonoidea species have blank order text) and picks the correct specific row among
+several sharing the same order name/sub_order. Families whose superfamily can't be resolved fall
+back to the old order-text majority vote, linked to that order's blank-sub_order "base" row.
+
+Safe to re-run: existing rows are matched by their identifying key and only their BLANK fields
+are filled in -- any value the user has since edited by hand (name_he, taxonomic_order,
+sub_order/sub_family/superfamily, or a reassigned FK) is left untouched.
 """
 import json
 from collections import Counter, defaultdict
@@ -23,9 +40,14 @@ from observations.table_transfer import create_backup
 
 IGNORED_ORDER_VALUES = {'', 'Not assigned'}
 
-# The 4 classic Nudibranchia suborders, seeded as their own TaxonOrder rows when Nudibranchia
-# itself is present in the data -- see run()/sub_order_hebrew_names below.
-NUDIBRANCHIA_SUB_ORDERS = ['Doridacea', 'Dendronotacea', 'Arminacea', 'Aeolidacea']
+# A couple of species use an informal placeholder genus name (not a real Latin genus) that the
+# spreadsheet never gave a family for via genus->family text voting. Their real family is
+# unambiguous from the placeholder name itself -- flagged here as an explicit inference, not
+# something derived from the data, for the user to double-check in admin.
+PLACEHOLDER_GENUS_FAMILY = {
+    'Haminoeid': 'Haminoeidae',
+    'Discodorid': 'Discodorididae',
+}
 
 
 def _min_phylo(values):
@@ -70,21 +92,30 @@ class Command(BaseCommand):
         supplement_path = Path(__file__).resolve().parent / 'data' / 'taxonomy_excel_supplement.json'
         supplement = json.loads(supplement_path.read_text(encoding='utf-8')) if supplement_path.exists() else {}
         genus_hebrew_names = supplement.get('genus_hebrew_names', {})
-        order_hebrew_names = supplement.get('order_hebrew_names', {})
-        sub_order_hebrew_names = supplement.get('nudibranchia_sub_order_hebrew_names', {})
+        taxon_order_reference = supplement.get('taxon_order_reference', [])
+        family_to_superfamily_supplement = supplement.get('family_to_superfamily', {})
 
-        rows = list(Species.objects.order_by().values_list('order', 'family', 'genus', 'phylogenetic_order'))
+        # superfamily name -> (order_name, sub_order, taxonomic_order) identifying the specific
+        # taxon_order_reference row that covers it.
+        superfamily_to_order_key = {}
+        for entry in taxon_order_reference:
+            key = (entry['order_name'], entry.get('sub_order', ''), entry.get('taxonomic_order', ''))
+            for sf in entry.get('superfamilies', []):
+                superfamily_to_order_key[sf] = key
+
+        rows = list(Species.objects.order_by().values_list('order', 'family', 'genus', 'superfamily', 'phylogenetic_order'))
 
         order_phylo = defaultdict(list)
         family_phylo = defaultdict(list)
         genus_phylo = defaultdict(list)
         family_order_votes = defaultdict(Counter)
+        family_superfamily_votes = defaultdict(Counter)
         genus_family_votes = defaultdict(Counter)
         order_names = set()
         family_names = set()
         genus_names = set()
 
-        for order, family, genus, phylo in rows:
+        for order, family, genus, superfamily, phylo in rows:
             if order and order not in IGNORED_ORDER_VALUES:
                 order_names.add(order)
                 order_phylo[order].append(phylo)
@@ -93,6 +124,8 @@ class Command(BaseCommand):
                 family_phylo[family].append(phylo)
                 if order and order not in IGNORED_ORDER_VALUES:
                     family_order_votes[family][order] += 1
+                if superfamily:
+                    family_superfamily_votes[family][superfamily] += 1
             if genus:
                 genus_names.add(genus)
                 genus_phylo[genus].append(phylo)
@@ -101,7 +134,6 @@ class Command(BaseCommand):
 
         created = {'order': 0, 'family': 0, 'genus': 0}
         updated = {'order': 0, 'family': 0, 'genus': 0}
-        name_he_filled = 0
 
         def sync(model, name, defaults, level, sub_field=None):
             # A name can have several rows distinguished by sub_field (sub_order/sub_family),
@@ -176,58 +208,88 @@ class Command(BaseCommand):
                 obj.save(update_fields=['defining_sample'])
                 defining_counts[level] += 1
 
-        sub_order_counts = [0, 0]
+        order_reference_counts = [0, 0]
+        family_order_link_counts = {'superfamily': 0, 'order_text': 0, 'unresolved': 0}
+
+        def seed_order_reference():
+            """Seed every row from the curated taxon_order_reference list, matched by the full
+            (name, sub_order, taxonomic_order) triple -- several rows can share the same
+            (name, sub_order) pair, disambiguated only by taxonomic_order. Returns a dict keyed
+            by that same triple, for family->order linking below."""
+            order_by_key = {}
+            for entry in taxon_order_reference:
+                name = entry['order_name']
+                sub_order = entry.get('sub_order', '')
+                taxonomic_order = entry.get('taxonomic_order', '')
+                key = (name, sub_order, taxonomic_order)
+                lookup = {'name': name, 'sub_order': sub_order, 'taxonomic_order': taxonomic_order}
+                defaults = {'name_he': entry.get('order_name_he', ''), 'name_en': entry.get('order_name_en', '')}
+                if not apply:
+                    exists = TaxonOrder.objects.filter(**lookup).exists()
+                    order_reference_counts[1 if exists else 0] += 1
+                    continue
+                obj, was_created = TaxonOrder.objects.get_or_create(defaults=defaults, **lookup)
+                order_by_key[key] = obj
+                if was_created:
+                    order_reference_counts[0] += 1
+                    continue
+                order_reference_counts[1] += 1
+                changed = []
+                for field, value in defaults.items():
+                    if value and not getattr(obj, field):
+                        setattr(obj, field, value)
+                        changed.append(field)
+                if changed:
+                    obj.save(update_fields=changed)
+            return order_by_key
 
         def run():
+            # Seed the curated order/suborder reference rows FIRST, so their authoritative
+            # taxonomic_order (e.g. Nudibranchia's base row is "3") is what the plain order-text
+            # sync below matches against and fills in around -- doing it the other way round
+            # would let the species-derived base row grab a different taxonomic_order (from
+            # Species.phylogenetic_order) and then seed_order_reference would fail to match it
+            # (lookup includes taxonomic_order) and create a duplicate row instead.
+            order_by_key = seed_order_reference()
+
             order_objs = {}
             for name in sorted(order_names):
                 defaults = {'taxonomic_order': _min_phylo(order_phylo[name])}
-                he = order_hebrew_names.get(name)
-                if he:
-                    defaults['name_he'] = he
                 obj = sync(TaxonOrder, name, defaults, 'order', sub_field='sub_order')
                 order_objs[name] = obj
                 if obj:
                     fill_defining_sample(obj, 'order', species__order=name)
 
-            if 'Nudibranchia' in order_names:
-                # The 4 classic Nudibranchia suborders -- rows the auto-build never derives
-                # from Species text alone (Species has no suborder field), but are common
-                # enough to seed here. Matched by (name, sub_order), so this never touches
-                # or duplicates a row the user has since curated by hand in admin.
-                for sub in NUDIBRANCHIA_SUB_ORDERS:
-                    he = sub_order_hebrew_names.get(sub, '')
-                    if not apply:
-                        if TaxonOrder.objects.filter(name='Nudibranchia', sub_order=sub).exists():
-                            sub_order_counts[1] += 1
-                        else:
-                            sub_order_counts[0] += 1
-                        continue
-                    obj, was_created = TaxonOrder.objects.get_or_create(name='Nudibranchia', sub_order=sub, defaults={'name_he': he})
-                    if was_created:
-                        sub_order_counts[0] += 1
-                    else:
-                        sub_order_counts[1] += 1
-                        if he and not obj.name_he:
-                            obj.name_he = he
-                            obj.save(update_fields=['name_he'])
-
             family_objs = {}
             for name in sorted(family_names):
-                order_name = _majority(family_order_votes[name])
+                superfamily = _majority(family_superfamily_votes[name]) or family_to_superfamily_supplement.get(name, '')
                 defaults = {'taxonomic_order': _min_phylo(family_phylo[name])}
+                if superfamily:
+                    defaults['superfamily'] = superfamily
                 obj = sync(TaxonFamily, name, defaults, 'family', sub_field='sub_family')
                 family_objs[name] = obj
-                if apply and order_name and obj.order_id is None:
-                    order_obj = TaxonOrder.objects.filter(name=order_name, sub_order='').first()
+                if apply and obj.order_id is None:
+                    order_obj = None
+                    if superfamily and superfamily in superfamily_to_order_key:
+                        order_obj = order_by_key.get(superfamily_to_order_key[superfamily])
+                        if order_obj:
+                            family_order_link_counts['superfamily'] += 1
+                    if order_obj is None:
+                        order_name = _majority(family_order_votes[name])
+                        if order_name:
+                            order_obj = TaxonOrder.objects.filter(name=order_name, sub_order='').first()
+                            if order_obj:
+                                family_order_link_counts['order_text'] += 1
                     if order_obj:
                         obj.order = order_obj
                         obj.save(update_fields=['order'])
+                    else:
+                        family_order_link_counts['unresolved'] += 1
                 if obj:
                     fill_defining_sample(obj, 'family', species__family=name)
 
             for name in sorted(genus_names):
-                family_name = _majority(genus_family_votes[name])
+                family_name = _majority(genus_family_votes[name]) or PLACEHOLDER_GENUS_FAMILY.get(name)
                 defaults = {'taxonomic_order': _min_phylo(genus_phylo[name])}
                 he = genus_hebrew_names.get(name)
                 if he:
@@ -259,11 +321,20 @@ class Command(BaseCommand):
             f"orders: {created['order']} to create, {updated['order']} existing "
             f"(of {len(order_names)} distinct)"
         )
-        self.stdout.write(f"nudibranchia sub-orders: {sub_order_counts[0]} to create, {sub_order_counts[1]} existing (of {len(NUDIBRANCHIA_SUB_ORDERS)} defined)")
+        self.stdout.write(
+            f"taxon_order_reference rows: {order_reference_counts[0]} to create, "
+            f"{order_reference_counts[1]} existing (of {len(taxon_order_reference)} defined)"
+        )
         self.stdout.write(
             f"families: {created['family']} to create, {updated['family']} existing "
             f"(of {len(family_names)} distinct)"
         )
+        if apply:
+            self.stdout.write(
+                f"family->order links: {family_order_link_counts['superfamily']} via superfamily, "
+                f"{family_order_link_counts['order_text']} via order-text fallback, "
+                f"{family_order_link_counts['unresolved']} unresolved"
+            )
         self.stdout.write(
             f"genera: {created['genus']} to create, {updated['genus']} existing "
             f"(of {len(genus_names)} distinct; {len(genus_hebrew_names)} have a Hebrew name in the supplement file)"

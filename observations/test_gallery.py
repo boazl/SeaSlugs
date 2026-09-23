@@ -281,3 +281,16 @@ class TaxonomicSortAndPanelTests(TestCase):
         entry = self.catalog()['species'][0]
         self.assertIsNone(entry['taxon_order_id'])
         self.assertEqual(entry['sub_order'], '')
+
+    def test_species_with_blank_genus_resolves_via_scientific_name_leading_word(self):
+        from .models import TaxonFamily, TaxonGenus
+        # A handful of real species have a blank genus column even though their scientific
+        # name clearly starts with one -- resolve_taxon_chain falls back to that leading word
+        # for resolution only (Species.genus itself is never touched).
+        family = TaxonFamily.objects.create(name='Facelinidae')
+        genus = TaxonGenus.objects.create(name='Coryphellina', family=family)
+        species = Species.objects.create(scientific_name='Coryphellina iurmanovi', genus='', family='Facelinidae')
+        self.publish(species)
+        entry = self.catalog()['species'][0]
+        self.assertEqual(entry['taxon_genus_id'], str(genus.pk))
+        self.assertEqual(entry['taxon_family_id'], str(family.pk))

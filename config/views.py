@@ -47,7 +47,11 @@ def gallery_file(request, filename='index.html'):
         taxon_order_by_name = {o.name: o for o in TaxonOrder.objects.filter(sub_order='').select_related('defining_sample')}
 
         def resolve_taxon_chain(species):
-            genus_obj = taxon_genus_by_name.get(species.genus) if species.genus else None
+            # A handful of species have a blank genus column even though their scientific name
+            # clearly starts with one (e.g. "Coryphellina iurmanovi" with genus=''). Fall back to
+            # that leading word for RESOLUTION only -- it's never written back to Species.genus.
+            genus_text = species.genus or (species.scientific_name.split()[0] if species.scientific_name else '')
+            genus_obj = taxon_genus_by_name.get(genus_text) if genus_text else None
             family_obj = genus_obj.family if (genus_obj and genus_obj.family_id) else (
                 taxon_family_by_name.get(species.family) if species.family else None)
             order_obj = family_obj.order if (family_obj and family_obj.order_id) else (
