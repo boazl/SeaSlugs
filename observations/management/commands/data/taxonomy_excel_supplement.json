@@ -93,5 +93,16 @@
   "Tylodina": "בליטן מערבולת",
   "Unidentia": "חד-שני",
   "Verconia": "ורקוניה"
+ },
+ "order_hebrew_names": {
+  "Aplysiida": "ארנבים",
+  "Cephalaspidea": "מגן ראש",
+  "Pleurobranchida": "ימני זים",
+  "Umbraculida": "מטריה"
+ },
+ "nudibranchia_sub_order_hebrew_names": {
+  "Arminacea": "מגן",
+  "Dendronotacea": "אילן",
+  "Aeolidacea": "אונות"
  }
 }

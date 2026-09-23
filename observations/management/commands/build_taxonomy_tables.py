@@ -23,6 +23,10 @@ from observations.table_transfer import create_backup
 
 IGNORED_ORDER_VALUES = {'', 'Not assigned'}
 
+# The 4 classic Nudibranchia suborders, seeded as their own TaxonOrder rows when Nudibranchia
+# itself is present in the data -- see run()/sub_order_hebrew_names below.
+NUDIBRANCHIA_SUB_ORDERS = ['Doridacea', 'Dendronotacea', 'Arminacea', 'Aeolidacea']
+
 
 def _min_phylo(values):
     values = [v for v in values if v]
@@ -66,6 +70,8 @@ class Command(BaseCommand):
         supplement_path = Path(__file__).resolve().parent / 'data' / 'taxonomy_excel_supplement.json'
         supplement = json.loads(supplement_path.read_text(encoding='utf-8')) if supplement_path.exists() else {}
         genus_hebrew_names = supplement.get('genus_hebrew_names', {})
+        order_hebrew_names = supplement.get('order_hebrew_names', {})
+        sub_order_hebrew_names = supplement.get('nudibranchia_sub_order_hebrew_names', {})
 
         rows = list(Species.objects.order_by().values_list('order', 'family', 'genus', 'phylogenetic_order'))
 
@@ -170,13 +176,41 @@ class Command(BaseCommand):
                 obj.save(update_fields=['defining_sample'])
                 defining_counts[level] += 1
 
+        sub_order_counts = [0, 0]
+
         def run():
             order_objs = {}
             for name in sorted(order_names):
-                obj = sync(TaxonOrder, name, {'taxonomic_order': _min_phylo(order_phylo[name])}, 'order', sub_field='sub_order')
+                defaults = {'taxonomic_order': _min_phylo(order_phylo[name])}
+                he = order_hebrew_names.get(name)
+                if he:
+                    defaults['name_he'] = he
+                obj = sync(TaxonOrder, name, defaults, 'order', sub_field='sub_order')
                 order_objs[name] = obj
                 if obj:
                     fill_defining_sample(obj, 'order', species__order=name)
+
+            if 'Nudibranchia' in order_names:
+                # The 4 classic Nudibranchia suborders -- rows the auto-build never derives
+                # from Species text alone (Species has no suborder field), but are common
+                # enough to seed here. Matched by (name, sub_order), so this never touches
+                # or duplicates a row the user has since curated by hand in admin.
+                for sub in NUDIBRANCHIA_SUB_ORDERS:
+                    he = sub_order_hebrew_names.get(sub, '')
+                    if not apply:
+                        if TaxonOrder.objects.filter(name='Nudibranchia', sub_order=sub).exists():
+                            sub_order_counts[1] += 1
+                        else:
+                            sub_order_counts[0] += 1
+                        continue
+                    obj, was_created = TaxonOrder.objects.get_or_create(name='Nudibranchia', sub_order=sub, defaults={'name_he': he})
+                    if was_created:
+                        sub_order_counts[0] += 1
+                    else:
+                        sub_order_counts[1] += 1
+                        if he and not obj.name_he:
+                            obj.name_he = he
+                            obj.save(update_fields=['name_he'])
 
             family_objs = {}
             for name in sorted(family_names):
@@ -225,6 +259,7 @@ class Command(BaseCommand):
             f"orders: {created['order']} to create, {updated['order']} existing "
             f"(of {len(order_names)} distinct)"
         )
+        self.stdout.write(f"nudibranchia sub-orders: {sub_order_counts[0]} to create, {sub_order_counts[1]} existing (of {len(NUDIBRANCHIA_SUB_ORDERS)} defined)")
         self.stdout.write(
             f"families: {created['family']} to create, {updated['family']} existing "
             f"(of {len(family_names)} distinct)"

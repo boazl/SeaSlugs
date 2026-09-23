@@ -258,7 +258,9 @@ class TaxonomicSortAndPanelTests(TestCase):
         order.save(update_fields=['defining_sample'])
         taxa = self.catalog()['taxa']
         order_entry = taxa['orders'][str(order.pk)]
-        self.assertEqual(order_entry['label'], 'עירומי זימים (Cladobranchia)')
+        # The scientific (Latin) name leads; the Hebrew name (when set) follows in parens.
+        self.assertEqual(order_entry['label'], 'Nudibranchia (Cladobranchia) (עירומי זימים)')
+        self.assertEqual(order_entry['label_en'], 'Nudibranchia (Cladobranchia)')
         self.assertTrue(order_entry['thumbnail'])
         self.assertIn(str(genus.pk), taxa['genera'])
 

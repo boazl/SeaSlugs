@@ -35,7 +35,7 @@ class TaxonomyTablesTests(TestCase):
         self.build(scientific_name='B', order='Nudibranchia', family='Chromodorididae', genus='Chromodoris', phylogenetic_order='320')
         call_command('build_taxonomy_tables', '--apply')
 
-        order = TaxonOrder.objects.get(name='Nudibranchia')
+        order = TaxonOrder.objects.get(name='Nudibranchia', sub_order='')
         family = TaxonFamily.objects.get(name='Chromodorididae')
         genus = TaxonGenus.objects.get(name='Chromodoris')
         self.assertEqual(family.order, order)
@@ -81,7 +81,7 @@ class TaxonomyTablesTests(TestCase):
         genus.name_he = 'שם שהמשתמש קבע ידנית'
         genus.taxonomic_order = '999'
         genus.save()
-        order = TaxonOrder.objects.get(name='Nudibranchia')
+        order = TaxonOrder.objects.get(name='Nudibranchia', sub_order='')
         other_family = TaxonFamily.objects.create(name='Other family')
         genus.family = other_family
         genus.save()
@@ -99,14 +99,16 @@ class TaxonomyTablesTests(TestCase):
         self.build(scientific_name='A', order='Nudibranchia', family='Chromodorididae', genus='Chromodoris', phylogenetic_order='313')
         call_command('build_taxonomy_tables', '--apply')
         call_command('build_taxonomy_tables', '--apply')
-        self.assertEqual(TaxonOrder.objects.count(), 1)
+        # 1 base Nudibranchia row + its 4 auto-seeded classic suborders (see
+        # test_nudibranchia_suborders_are_seeded_automatically_with_hebrew_names_where_known).
+        self.assertEqual(TaxonOrder.objects.count(), 5)
         self.assertEqual(TaxonFamily.objects.count(), 1)
         self.assertEqual(TaxonGenus.objects.count(), 1)
 
     def test_defining_sample_field_exists_and_defaults_to_blank(self):
         self.build(scientific_name='A', order='Nudibranchia', family='Chromodorididae', genus='Chromodoris')
         call_command('build_taxonomy_tables', '--apply')
-        order = TaxonOrder.objects.get(name='Nudibranchia')
+        order = TaxonOrder.objects.get(name='Nudibranchia', sub_order='')
         family = TaxonFamily.objects.get(name='Chromodorididae')
         genus = TaxonGenus.objects.get(name='Chromodoris')
         self.assertIsNone(order.defining_sample_id)
@@ -143,22 +145,50 @@ class TaxonomyTablesTests(TestCase):
         self.assertEqual(SampleKind.objects.filter(code='species').count(), 1)
 
     def test_order_can_have_several_rows_for_different_sub_orders(self):
-        # e.g. Nudibranchia is manually curated into several suborder rows in admin --
-        # (name, sub_order) is the unique pair, not name alone.
-        self.build(scientific_name='A', order='Nudibranchia', family='Chromodorididae', genus='Chromodoris')
+        # A general check on any order (not Nudibranchia, which gets its own dedicated
+        # suborder-seeding tests below): can be manually curated into several suborder rows
+        # in admin -- (name, sub_order) is the unique pair, not name alone.
+        self.build(scientific_name='A', order='Testorderia', family='Chromodorididae', genus='Chromodoris')
         call_command('build_taxonomy_tables', '--apply')
-        base = TaxonOrder.objects.get(name='Nudibranchia', sub_order='')
+        base = TaxonOrder.objects.get(name='Testorderia', sub_order='')
 
-        TaxonOrder.objects.create(name='Nudibranchia', sub_order='Cladobranchia')
-        TaxonOrder.objects.create(name='Nudibranchia', sub_order='Doridina')
-        TaxonOrder.objects.create(name='Nudibranchia', sub_order='Euctenidiacea')
-        self.assertEqual(TaxonOrder.objects.filter(name='Nudibranchia').count(), 4)
+        TaxonOrder.objects.create(name='Testorderia', sub_order='Subgroup A')
+        TaxonOrder.objects.create(name='Testorderia', sub_order='Subgroup B')
+        self.assertEqual(TaxonOrder.objects.filter(name='Testorderia').count(), 3)
 
         # a rerun must not touch the hand-added suborder rows or duplicate the base row
         call_command('build_taxonomy_tables', '--apply')
-        self.assertEqual(TaxonOrder.objects.filter(name='Nudibranchia').count(), 4)
+        self.assertEqual(TaxonOrder.objects.filter(name='Testorderia').count(), 3)
         base.refresh_from_db()
         self.assertEqual(base.sub_order, '')
+
+    def test_nudibranchia_suborders_are_seeded_automatically_with_hebrew_names_where_known(self):
+        # The 4 classic Nudibranchia suborders aren't derivable from Species data (Species
+        # has no suborder field), so the command seeds them itself whenever a Nudibranchia
+        # order row exists, using Hebrew names from the supplement file where it has one.
+        self.build(scientific_name='A', order='Nudibranchia', family='Chromodorididae', genus='Chromodoris')
+        call_command('build_taxonomy_tables', '--apply')
+        sub_orders = set(TaxonOrder.objects.filter(name='Nudibranchia').exclude(sub_order='').values_list('sub_order', flat=True))
+        self.assertEqual(sub_orders, {'Doridacea', 'Dendronotacea', 'Arminacea', 'Aeolidacea'})
+        self.assertEqual(TaxonOrder.objects.get(name='Nudibranchia', sub_order='Arminacea').name_he, 'מגן')
+        # Doridacea has no single Hebrew word in the source workbook -- left blank, not guessed.
+        self.assertEqual(TaxonOrder.objects.get(name='Nudibranchia', sub_order='Doridacea').name_he, '')
+
+    def test_nudibranchia_suborders_not_seeded_without_a_nudibranchia_order_row(self):
+        self.build(scientific_name='A', order='Sacoglossa', family='Some family', genus='Some genus')
+        call_command('build_taxonomy_tables', '--apply')
+        self.assertFalse(TaxonOrder.objects.filter(sub_order__in=['Doridacea', 'Dendronotacea', 'Arminacea', 'Aeolidacea']).exists())
+
+    def test_rerun_does_not_duplicate_or_overwrite_nudibranchia_suborder_rows(self):
+        self.build(scientific_name='A', order='Nudibranchia', family='Chromodorididae', genus='Chromodoris')
+        call_command('build_taxonomy_tables', '--apply')
+        arminacea = TaxonOrder.objects.get(name='Nudibranchia', sub_order='Arminacea')
+        arminacea.name_he = 'שם שהמשתמש קבע ידנית'
+        arminacea.save()
+        call_command('build_taxonomy_tables', '--apply')
+        self.assertEqual(TaxonOrder.objects.filter(name='Nudibranchia', sub_order='Arminacea').count(), 1)
+        arminacea.refresh_from_db()
+        self.assertEqual(arminacea.name_he, 'שם שהמשתמש קבע ידנית')
 
     def test_family_can_have_several_rows_for_different_sub_families(self):
         self.build(scientific_name='A', order='Nudibranchia', family='Facelinidae', genus='Facelina')

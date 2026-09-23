@@ -82,8 +82,14 @@ def gallery_file(request, filename='index.html'):
             return thumbnail, image_url, video_id
 
         def taxon_label_pair(obj, sub_value):
+            # The scientific (Latin) name is always the primary/leading part of the label --
+            # the Hebrew or English common name (when set) is added afterwards in parens, the
+            # same way species cards show the scientific name first and the common name below.
             suffix = f' ({sub_value})' if sub_value else ''
-            return (obj.name_he or obj.name) + suffix, (obj.name_en or obj.name) + suffix
+            latin = obj.name + suffix
+            label = latin + (f' ({obj.name_he})' if obj.name_he else '')
+            label_en = latin + (f' ({obj.name_en})' if obj.name_en else '')
+            return label, label_en
 
         def register_taxon(dest, obj, sub_value):
             key = str(obj.pk)
