@@ -322,3 +322,38 @@ class TaxonomicSortAndPanelTests(TestCase):
         entry = self.catalog()['species'][0]
         self.assertEqual(entry['taxon_genus_id'], str(genus.pk))
         self.assertEqual(entry['taxon_family_id'], str(family.pk))
+
+    def test_catalog_family_field_uses_the_curated_name_not_blank_raw_text(self):
+        from .models import TaxonFamily, TaxonGenus
+        # A species resolved to a family only through its genus (Species.family itself left
+        # blank -- true for most of the real Phyllodesmium/Myrrhinidae observations) still
+        # exposes the curated family name in the catalog, not an empty string. Before this
+        # fix the family filter/search field leaked Species.family unchanged, so a blank raw
+        # value meant the real family (e.g. Myrrhinidae) never appeared as a filter option --
+        # and picking it manually would have hidden these species outright.
+        family = TaxonFamily.objects.create(name='Myrrhinidae', superfamily='Aeolidioidea')
+        TaxonGenus.objects.create(name='Phyllodesmium', family=family)
+        species = Species.objects.create(scientific_name='Phyllodesmium magnum', genus='Phyllodesmium', family='')
+        self.publish(species)
+        entry = self.catalog()['species'][0]
+        self.assertEqual(entry['family'], 'Myrrhinidae')
+
+    def test_catalog_family_field_falls_back_to_raw_text_when_unresolved(self):
+        # A species with no matching TaxonFamily row at all still exposes whatever real family
+        # text it has, so it isn't just dropped from the filter.
+        species = Species.objects.create(scientific_name='Unresolved family species', family='SomeUnknownFamily')
+        self.publish(species)
+        entry = self.catalog()['species'][0]
+        self.assertEqual(entry['family'], 'SomeUnknownFamily')
+
+    def test_catalog_genus_field_resolves_via_scientific_name_leading_word(self):
+        from .models import TaxonFamily, TaxonGenus
+        # Mirrors the family case above: a species with a blank Species.genus column that
+        # still resolves (via the scientific-name fallback in resolve_taxon_chain) exposes the
+        # curated genus name in the catalog, not the blank raw text.
+        family = TaxonFamily.objects.create(name='Facelinidae')
+        TaxonGenus.objects.create(name='Coryphellina', family=family)
+        species = Species.objects.create(scientific_name='Coryphellina bilas', genus='', family='Facelinidae')
+        self.publish(species)
+        entry = self.catalog()['species'][0]
+        self.assertEqual(entry['genus'], 'Coryphellina')

@@ -136,7 +136,17 @@ def gallery_file(request, filename='index.html'):
             entry = {
                 'area_id': area.pk, 'species_id': area.species_id, 'area': area_key,
                 'title': area.species.scientific_name, 'name_he': area.species.name_he, 'name_en': area.species.name_en,
-                'genus': area.species.genus, 'epithet': area.species.species, 'family': area.species.family,
+                'epithet': area.species.species,
+                # The genus/family filter+search values are the CURATED names (via genus_obj/
+                # family_obj, already resolved above), not the species' raw genus/family text --
+                # both fields are blank on many species whose genus is still resolvable (via
+                # TaxonGenus, or via the scientific-name fallback in resolve_taxon_chain), which
+                # used to make the family filter miss real families entirely (e.g. Myrrhinidae for
+                # every observed Phyllodesmium species with family='') and would have hidden those
+                # species outright had the family filter been used to select them. Falls back to
+                # the raw text only when nothing resolved it, same as the order field above.
+                'genus': genus_obj.name if genus_obj else area.species.genus,
+                'family': family_obj.name if family_obj else area.species.family,
                 # The order filter/search value is the CURATED order name (via order_obj,
                 # already resolved above), not the species' raw order text -- Species.order
                 # sometimes still carries a legacy synonym (e.g. "Doridida" for Nudibranchia) or
