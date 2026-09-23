@@ -35,6 +35,17 @@ def _majority(counter):
     return counter.most_common(1)[0][0]
 
 
+def _pick_defining_sample(queryset):
+    """Same spirit as SpeciesArea.pick_defining_sample: among published, non-deleted
+    species-kind samples for this taxon that actually have media, prefer one with an
+    uploaded image over a video-only one, tie-broken by whichever was created first."""
+    candidates = [s for s in queryset.order_by('created_at', 'pk') if s.image or s.video_url]
+    if not candidates:
+        return None
+    with_image = [c for c in candidates if c.image]
+    return (with_image or candidates)[0]
+
+
 
 KIND_EN_NAMES = {
     'species': 'Species',
@@ -86,8 +97,18 @@ class Command(BaseCommand):
         updated = {'order': 0, 'family': 0, 'genus': 0}
         name_he_filled = 0
 
-        def sync(model, name, defaults, level):
-            obj, was_created = model.objects.get_or_create(name=name, defaults=defaults) if apply else (None, name not in existing_names[level])
+        def sync(model, name, defaults, level, sub_field=None):
+            # A name can have several rows distinguished by sub_field (sub_order/sub_family),
+            # hand-curated in admin -- this command only ever creates/updates the "base" row
+            # with a blank sub_field, matched by (name, sub_field='').  Suborder/subfamily-
+            # specific rows the user added by hand are left completely untouched.
+            lookup = {'name': name}
+            if sub_field:
+                lookup[sub_field] = ''
+            if apply:
+                obj, was_created = model.objects.get_or_create(defaults=defaults, **lookup)
+            else:
+                obj, was_created = None, name not in existing_names[level]
             if was_created:
                 created[level] += 1
                 return obj
@@ -103,8 +124,8 @@ class Command(BaseCommand):
             return obj
 
         existing_names = {
-            'order': set(TaxonOrder.objects.values_list('name', flat=True)),
-            'family': set(TaxonFamily.objects.values_list('name', flat=True)),
+            'order': set(TaxonOrder.objects.filter(sub_order='').values_list('name', flat=True)),
+            'family': set(TaxonFamily.objects.filter(sub_family='').values_list('name', flat=True)),
             'genus': set(TaxonGenus.objects.values_list('name', flat=True)),
         }
 
@@ -134,22 +155,42 @@ class Command(BaseCommand):
                     obj.save(update_fields=changed)
             return kind_created, kind_updated
 
+        defining_counts = {'order': 0, 'family': 0, 'genus': 0}
+
+        def base_species_samples(**filters):
+            return Sample.objects.filter(
+                kind='species', status='published', deleted_at__isnull=True, species_other='', **filters)
+
+        def fill_defining_sample(obj, level, **filters):
+            if not apply or obj.defining_sample_id is not None:
+                return
+            picked = _pick_defining_sample(base_species_samples(**filters))
+            if picked:
+                obj.defining_sample = picked
+                obj.save(update_fields=['defining_sample'])
+                defining_counts[level] += 1
+
         def run():
             order_objs = {}
             for name in sorted(order_names):
-                order_objs[name] = sync(TaxonOrder, name, {'taxonomic_order': _min_phylo(order_phylo[name])}, 'order')
+                obj = sync(TaxonOrder, name, {'taxonomic_order': _min_phylo(order_phylo[name])}, 'order', sub_field='sub_order')
+                order_objs[name] = obj
+                if obj:
+                    fill_defining_sample(obj, 'order', species__order=name)
 
             family_objs = {}
             for name in sorted(family_names):
                 order_name = _majority(family_order_votes[name])
                 defaults = {'taxonomic_order': _min_phylo(family_phylo[name])}
-                obj = sync(TaxonFamily, name, defaults, 'family')
+                obj = sync(TaxonFamily, name, defaults, 'family', sub_field='sub_family')
                 family_objs[name] = obj
                 if apply and order_name and obj.order_id is None:
-                    order_obj = TaxonOrder.objects.filter(name=order_name).first()
+                    order_obj = TaxonOrder.objects.filter(name=order_name, sub_order='').first()
                     if order_obj:
                         obj.order = order_obj
                         obj.save(update_fields=['order'])
+                if obj:
+                    fill_defining_sample(obj, 'family', species__family=name)
 
             for name in sorted(genus_names):
                 family_name = _majority(genus_family_votes[name])
@@ -159,10 +200,12 @@ class Command(BaseCommand):
                     defaults['name_he'] = he
                 obj = sync(TaxonGenus, name, defaults, 'genus')
                 if apply and family_name and obj.family_id is None:
-                    family_obj = TaxonFamily.objects.filter(name=family_name).first()
+                    family_obj = TaxonFamily.objects.filter(name=family_name, sub_family='').first()
                     if family_obj:
                         obj.family = family_obj
                         obj.save(update_fields=['family'])
+                if obj:
+                    fill_defining_sample(obj, 'genus', species__genus=name)
 
         kind_counts = [0, 0]
 
@@ -191,5 +234,10 @@ class Command(BaseCommand):
             f"(of {len(genus_names)} distinct; {len(genus_hebrew_names)} have a Hebrew name in the supplement file)"
         )
         self.stdout.write(f'sample kinds: {kind_counts[0]} to create, {kind_counts[1]} existing (of {len(Sample.Kind.choices)} defined)')
+        if apply:
+            self.stdout.write(
+                f"defining samples newly picked: {defining_counts['order']} orders, "
+                f"{defining_counts['family']} families, {defining_counts['genus']} genera"
+            )
         if not apply:
             self.stdout.write('Dry run only -- pass --apply to write to the database.')

@@ -21,23 +21,23 @@ class SpeciesAdmin(admin.ModelAdmin):
 
 @admin.register(TaxonOrder)
 class TaxonOrderAdmin(admin.ModelAdmin):
-    list_display = ['taxonomic_order', 'name', 'name_he', 'sub_order', 'defining_sample']
-    search_fields = ['name', 'name_he', 'sub_order']
+    list_display = ['taxonomic_order', 'name', 'name_he', 'name_en', 'sub_order', 'defining_sample']
+    search_fields = ['name', 'name_he', 'name_en', 'sub_order']
 
 
 @admin.register(TaxonFamily)
 class TaxonFamilyAdmin(admin.ModelAdmin):
-    list_display = ['taxonomic_order', 'name', 'name_he', 'sub_family', 'order', 'defining_sample']
+    list_display = ['taxonomic_order', 'name', 'name_he', 'name_en', 'sub_family', 'order', 'defining_sample']
     list_filter = ['order']
-    search_fields = ['name', 'name_he', 'sub_family']
+    search_fields = ['name', 'name_he', 'name_en', 'sub_family']
     autocomplete_fields = ['order']
 
 
 @admin.register(TaxonGenus)
 class TaxonGenusAdmin(admin.ModelAdmin):
-    list_display = ['taxonomic_order', 'name', 'name_he', 'family', 'defining_sample']
+    list_display = ['taxonomic_order', 'name', 'name_he', 'name_en', 'family', 'defining_sample']
     list_filter = ['family__order']
-    search_fields = ['name', 'name_he']
+    search_fields = ['name', 'name_he', 'name_en']
     autocomplete_fields = ['family']
 
 

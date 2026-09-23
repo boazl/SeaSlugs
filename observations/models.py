@@ -78,38 +78,49 @@ class Species(models.Model):
 
 
 class TaxonOrder(models.Model):
-    name = models.CharField('סדרה', max_length=150, unique=True)
+    # name is NOT unique on its own: a single order (e.g. "Nudibranchia") can have several rows,
+    # one per sub_order, so it can be curated at the suborder level. The (name, sub_order) pair is
+    # what's unique -- build_taxonomy_tables only ever touches the blank-sub_order "base" row it
+    # created from Species data; extra suborder-specific rows are added and maintained by hand.
+    name = models.CharField('סדרה', max_length=150)
     name_he = models.CharField('שם בעברית', max_length=150, blank=True)
+    name_en = models.CharField('שם באנגלית', max_length=150, blank=True)
     sub_order = models.CharField('תת-סדרה', max_length=150, blank=True)
     taxonomic_order = models.CharField('סדר טקסונומי', max_length=40, blank=True)
     defining_sample = models.ForeignKey('Sample', null=True, blank=True, on_delete=models.SET_NULL, related_name='+', verbose_name='דגימה מגדירה',
         help_text='הדגימה שתמונתה או סרטון היוטיוב שלה יוצגו בכותרת הסדרה בגלריה.')
     class Meta:
-        ordering = [models.functions.NullIf('taxonomic_order', models.Value('')).asc(nulls_last=True), 'name']
+        ordering = [models.functions.NullIf('taxonomic_order', models.Value('')).asc(nulls_last=True), 'name', 'sub_order']
         verbose_name = 'סדרה (טקסונומיה)'
         verbose_name_plural = 'סדרות (טקסונומיה)'
-    def __str__(self): return self.name
+        constraints = [models.UniqueConstraint(fields=['name', 'sub_order'], name='unique_taxonorder_name_sub_order')]
+    def __str__(self): return f'{self.name} ({self.sub_order})' if self.sub_order else self.name
 
 
 class TaxonFamily(models.Model):
+    # Same pattern as TaxonOrder.name: name is not unique alone, so a family can have several
+    # rows, one per sub_family. (name, sub_family) is the unique pair.
     order = models.ForeignKey(TaxonOrder, on_delete=models.PROTECT, null=True, blank=True, related_name='families', verbose_name='סדרה')
-    name = models.CharField('משפחה', max_length=150, unique=True)
+    name = models.CharField('משפחה', max_length=150)
     name_he = models.CharField('שם בעברית', max_length=150, blank=True)
+    name_en = models.CharField('שם באנגלית', max_length=150, blank=True)
     sub_family = models.CharField('תת-משפחה', max_length=150, blank=True)
     taxonomic_order = models.CharField('סדר טקסונומי', max_length=40, blank=True)
     defining_sample = models.ForeignKey('Sample', null=True, blank=True, on_delete=models.SET_NULL, related_name='+', verbose_name='דגימה מגדירה',
         help_text='הדגימה שתמונתה או סרטון היוטיוב שלה יוצגו בכותרת המשפחה בגלריה.')
     class Meta:
-        ordering = [models.functions.NullIf('taxonomic_order', models.Value('')).asc(nulls_last=True), 'name']
+        ordering = [models.functions.NullIf('taxonomic_order', models.Value('')).asc(nulls_last=True), 'name', 'sub_family']
         verbose_name = 'משפחה (טקסונומיה)'
         verbose_name_plural = 'משפחות (טקסונומיה)'
-    def __str__(self): return self.name
+        constraints = [models.UniqueConstraint(fields=['name', 'sub_family'], name='unique_taxonfamily_name_sub_family')]
+    def __str__(self): return f'{self.name} ({self.sub_family})' if self.sub_family else self.name
 
 
 class TaxonGenus(models.Model):
     family = models.ForeignKey(TaxonFamily, on_delete=models.PROTECT, null=True, blank=True, related_name='genera', verbose_name='משפחה')
     name = models.CharField('סוג', max_length=150, unique=True)
     name_he = models.CharField('שם בעברית', max_length=150, blank=True)
+    name_en = models.CharField('שם באנגלית', max_length=150, blank=True)
     taxonomic_order = models.CharField('סדר טקסונומי', max_length=40, blank=True)
     defining_sample = models.ForeignKey('Sample', null=True, blank=True, on_delete=models.SET_NULL, related_name='+', verbose_name='דגימה מגדירה',
         help_text='הדגימה שתמונתה או סרטון היוטיוב שלה יוצגו בכותרת הסוג ובאוסף המינים שלו בגלריה.')

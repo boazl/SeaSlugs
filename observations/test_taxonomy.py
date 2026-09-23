@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 from django.core.management import call_command
+from django.db import IntegrityError, transaction
 from django.test import TestCase
 from .models import Species, TaxonOrder, TaxonFamily, TaxonGenus, Sample, SampleKind
 
@@ -140,4 +141,42 @@ class TaxonomyTablesTests(TestCase):
         kind.refresh_from_db()
         self.assertEqual(kind.name_en, 'A custom label the user typed')
         self.assertEqual(SampleKind.objects.filter(code='species').count(), 1)
+
+    def test_order_can_have_several_rows_for_different_sub_orders(self):
+        # e.g. Nudibranchia is manually curated into several suborder rows in admin --
+        # (name, sub_order) is the unique pair, not name alone.
+        self.build(scientific_name='A', order='Nudibranchia', family='Chromodorididae', genus='Chromodoris')
+        call_command('build_taxonomy_tables', '--apply')
+        base = TaxonOrder.objects.get(name='Nudibranchia', sub_order='')
+
+        TaxonOrder.objects.create(name='Nudibranchia', sub_order='Cladobranchia')
+        TaxonOrder.objects.create(name='Nudibranchia', sub_order='Doridina')
+        TaxonOrder.objects.create(name='Nudibranchia', sub_order='Euctenidiacea')
+        self.assertEqual(TaxonOrder.objects.filter(name='Nudibranchia').count(), 4)
+
+        # a rerun must not touch the hand-added suborder rows or duplicate the base row
+        call_command('build_taxonomy_tables', '--apply')
+        self.assertEqual(TaxonOrder.objects.filter(name='Nudibranchia').count(), 4)
+        base.refresh_from_db()
+        self.assertEqual(base.sub_order, '')
+
+    def test_family_can_have_several_rows_for_different_sub_families(self):
+        self.build(scientific_name='A', order='Nudibranchia', family='Facelinidae', genus='Facelina')
+        call_command('build_taxonomy_tables', '--apply')
+        base = TaxonFamily.objects.get(name='Facelinidae', sub_family='')
+
+        TaxonFamily.objects.create(name='Facelinidae', sub_family='Facelinoidea')
+        TaxonFamily.objects.create(name='Facelinidae', sub_family='Favorininae')
+        self.assertEqual(TaxonFamily.objects.filter(name='Facelinidae').count(), 3)
+
+        call_command('build_taxonomy_tables', '--apply')
+        self.assertEqual(TaxonFamily.objects.filter(name='Facelinidae').count(), 3)
+        base.refresh_from_db()
+        self.assertEqual(base.sub_family, '')
+
+    def test_taxonorder_name_and_sub_order_pair_must_be_unique(self):
+        TaxonOrder.objects.create(name='Nudibranchia', sub_order='Cladobranchia')
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                TaxonOrder.objects.create(name='Nudibranchia', sub_order='Cladobranchia')
 
