@@ -284,6 +284,86 @@ class TaxonomyTablesTests(TestCase):
         family.refresh_from_db()
         self.assertEqual(family.superfamily, 'שם שהמשתמש קבע ידנית')
 
+    def test_migration_0019_upgrades_families_from_generic_base_row_to_specific_suborder_row(self):
+        # Real-data bug the user caught: many families ended up linked (by the OLD code, before
+        # taxon_order_reference existed) to the generic Nudibranchia base row, even though their
+        # superfamily identifies a much more specific suborder row (e.g. Hexabranchidae/
+        # Chromodoridoidea belongs with the Doridina/"cryptobranch dorids" group, not the bare
+        # Nudibranchia row) -- build_taxonomy_tables's normal "never overwrite a set FK" rule
+        # protects manual edits, but that also silently protected this stale coarse assignment.
+        # Migration 0019 refines it in place.
+        self.build(scientific_name='A', order='Nudibranchia', family='Hexabranchidae', genus='Hexabranchus')
+        call_command('build_taxonomy_tables', '--apply')
+        nudibranchia_base = TaxonOrder.objects.get(name='Nudibranchia', sub_order='')
+        family = TaxonFamily.objects.get(name='Hexabranchidae')
+        family.superfamily = 'Chromodoridoidea'
+        family.order = nudibranchia_base  # simulate the stale, overly-generic old assignment
+        family.save()
+
+        import importlib
+        migration_module = importlib.import_module(
+            'observations.migrations.0019_fix_family_order_links_to_specific_suborder_rows'
+        )
+        migration_module.upgrade_family_order_links_to_specific_suborder_rows(django_apps, None)
+
+        family.refresh_from_db()
+        self.assertEqual(family.order.sub_order, 'Doridina')
+        self.assertEqual(family.order.taxonomic_order, '4')
+
+    def test_migration_0019_never_moves_a_family_to_a_genuinely_different_order(self):
+        # A family whose CURRENT order is a different order name entirely (a real, deliberate
+        # reclassification, not a stale generic assignment) must be left alone -- the migration
+        # only ever refines within the same order name.
+        self.build(scientific_name='A', order='Nudibranchia', family='Hexabranchidae', genus='Hexabranchus')
+        call_command('build_taxonomy_tables', '--apply')
+        other_order = TaxonOrder.objects.get(name='Sacoglossa', sub_order='')  # seeded unconditionally by taxon_order_reference
+        family = TaxonFamily.objects.get(name='Hexabranchidae')
+        family.superfamily = 'Chromodoridoidea'
+        family.order = other_order
+        family.save()
+
+        import importlib
+        migration_module = importlib.import_module(
+            'observations.migrations.0019_fix_family_order_links_to_specific_suborder_rows'
+        )
+        migration_module.upgrade_family_order_links_to_specific_suborder_rows(django_apps, None)
+
+        family.refresh_from_db()
+        self.assertEqual(family.order_id, other_order.pk)
+
+    def test_migration_0019_deletes_the_legacy_doridida_row_after_moving_its_families_off_it(self):
+        self.build(scientific_name='A', order='Nudibranchia', family='Hexabranchidae', genus='Hexabranchus')
+        self.build(scientific_name='B', order='Doridida', family='Some unrelated family', genus='Some genus')
+        call_command('build_taxonomy_tables', '--apply')
+        doridida = TaxonOrder.objects.filter(name='Doridida').first()
+        # ORDER_NAME_ALIASES already folds "Doridida" species text into Nudibranchia during the
+        # normal build, so no standalone Doridida row should even exist after a fresh build --
+        # this test still exercises the migration's own cleanup in case one is present (e.g. from
+        # data that predates the alias fix), by creating it by hand.
+        if doridida is None:
+            doridida = TaxonOrder.objects.create(name='Doridida', sub_order='', taxonomic_order='212')
+        family = TaxonFamily.objects.get(name='Hexabranchidae')
+        family.superfamily = 'Chromodoridoidea'
+        family.order = doridida
+        family.save()
+
+        import importlib
+        migration_module = importlib.import_module(
+            'observations.migrations.0019_fix_family_order_links_to_specific_suborder_rows'
+        )
+        migration_module.upgrade_family_order_links_to_specific_suborder_rows(django_apps, None)
+
+        family.refresh_from_db()
+        self.assertEqual(family.order.sub_order, 'Doridina')
+        self.assertFalse(TaxonOrder.objects.filter(name='Doridida').exists())
+
+    def test_doridida_legacy_order_text_never_seeds_its_own_order_row(self):
+        self.build(scientific_name='A', order='Doridida', family='Hexabranchidae', genus='Hexabranchus')
+        call_command('build_taxonomy_tables', '--apply')
+        self.assertFalse(TaxonOrder.objects.filter(name='Doridida').exists())
+        family = TaxonFamily.objects.get(name='Hexabranchidae')
+        self.assertEqual(family.order.name, 'Nudibranchia')
+
     def test_migration_0018_realigns_pre_existing_base_order_rows_to_the_reference(self):
         # Simulates a real upgrade: a "base" order row already exists from the OLD scheme (its
         # taxonomic_order came from Species.phylogenetic_order, e.g. "313"), and the migration

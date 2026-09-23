@@ -40,6 +40,12 @@ from observations.table_transfer import create_backup
 
 IGNORED_ORDER_VALUES = {'', 'Not assigned'}
 
+# Legacy synonyms still present in some species' order text -- normalized to their modern name
+# before aggregation, so they never seed their own standalone TaxonOrder row (see migration 0019
+# for the one-off cleanup of the "Doridida" row this used to create, and the families it left
+# pointed at that bogus row instead of the real Nudibranchia suborder rows).
+ORDER_NAME_ALIASES = {'Doridida': 'Nudibranchia'}
+
 # A couple of species use an informal placeholder genus name (not a real Latin genus) that the
 # spreadsheet never gave a family for via genus->family text voting. Their real family is
 # unambiguous from the placeholder name itself -- flagged here as an explicit inference, not
@@ -116,6 +122,7 @@ class Command(BaseCommand):
         genus_names = set()
 
         for order, family, genus, superfamily, phylo in rows:
+            order = ORDER_NAME_ALIASES.get(order, order)
             if order and order not in IGNORED_ORDER_VALUES:
                 order_names.add(order)
                 order_phylo[order].append(phylo)
