@@ -196,3 +196,86 @@ class ObservationsFilterTests(TestCase):
         response = self.client.get('/observations/?genus=Berg')
         self.assertContains(response, 'Berghia coerulescens')
         self.assertNotContains(response, 'Hypselodoris picta')
+
+
+class TaxonomicSortAndPanelTests(TestCase):
+    """Covers the gallery's taxonomic sort (order -> family -> genus, by each level's own
+    curated taxonomic_order) and the data app.js needs to render the group-heading panels:
+    per-species taxon ids (to detect where a group changes) and per-taxon labels/thumbnails
+    (catalog.taxa), including the sub_order value used for the suborder filter."""
+
+    def setUp(self):
+        self.owner = User.objects.create_superuser('manager', password='test-password')
+        country = Country.objects.create(name='ישראל', name_en='Israel')
+        sea = Sea.objects.create(name='ים סוף')
+        region = Region.objects.create(name='אילת', name_en='Eilat', country=country, sea=sea)
+        self.trip = DiveTrip.objects.create(title='Trip', year=2026, country=country, region=region)
+
+    def catalog(self):
+        response = self.client.get('/catalog.js')
+        self.assertEqual(response.status_code, 200)
+        return json.loads(response.content.decode().split('=', 1)[1].strip().removesuffix(';'))
+
+    def publish(self, species):
+        item = Sample(owner=self.owner, trip=self.trip, species=species, video_url='https://youtu.be/abcdefghijk')
+        item.save_reviewed()
+        return item
+
+    def test_species_sorted_by_taxon_taxonomic_order_not_just_phylogenetic_order(self):
+        from .models import TaxonOrder
+        # Two species whose raw phylogenetic_order would sort them the other way round, but
+        # whose curated TaxonOrder.taxonomic_order disagrees -- the curated rank wins.
+        TaxonOrder.objects.create(name='Sacoglossa', taxonomic_order='001')
+        TaxonOrder.objects.create(name='Nudibranchia', taxonomic_order='002')
+        sp_a = Species.objects.create(scientific_name='A species', order='Nudibranchia', phylogenetic_order='100')
+        sp_b = Species.objects.create(scientific_name='B species', order='Sacoglossa', phylogenetic_order='999')
+        self.publish(sp_a)
+        self.publish(sp_b)
+        titles = [e['title'] for e in self.catalog()['species']]
+        self.assertEqual(titles, ['B species', 'A species'])
+
+    def test_species_expose_taxon_ids_and_sub_order_for_the_gallery_panel(self):
+        from .models import TaxonOrder, TaxonFamily, TaxonGenus
+        order = TaxonOrder.objects.create(name='Nudibranchia', sub_order='Cladobranchia')
+        family = TaxonFamily.objects.create(name='Facelinidae', order=order)
+        genus = TaxonGenus.objects.create(name='Facelina', family=family)
+        species = Species.objects.create(scientific_name='Facelina test', order='Nudibranchia', family='Facelinidae', genus='Facelina')
+        self.publish(species)
+        entry = self.catalog()['species'][0]
+        self.assertEqual(entry['taxon_order_id'], str(order.pk))
+        self.assertEqual(entry['taxon_family_id'], str(family.pk))
+        self.assertEqual(entry['taxon_genus_id'], str(genus.pk))
+        self.assertEqual(entry['sub_order'], 'Cladobranchia')
+
+    def test_taxa_payload_carries_labels_and_defining_sample_thumbnail(self):
+        from .models import TaxonOrder, TaxonFamily, TaxonGenus
+        order = TaxonOrder.objects.create(name='Nudibranchia', name_he='עירומי זימים', sub_order='Cladobranchia')
+        family = TaxonFamily.objects.create(name='Facelinidae', order=order)
+        genus = TaxonGenus.objects.create(name='Facelina', family=family)
+        species = Species.objects.create(scientific_name='Facelina test', order='Nudibranchia', family='Facelinidae', genus='Facelina')
+        item = self.publish(species)
+        order.defining_sample = item
+        order.save(update_fields=['defining_sample'])
+        taxa = self.catalog()['taxa']
+        order_entry = taxa['orders'][str(order.pk)]
+        self.assertEqual(order_entry['label'], 'עירומי זימים (Cladobranchia)')
+        self.assertTrue(order_entry['thumbnail'])
+        self.assertIn(str(genus.pk), taxa['genera'])
+
+    def test_species_without_a_genus_match_falls_back_to_the_family_base_row(self):
+        from .models import TaxonFamily
+        # A species identified only to family level (no genus text) still resolves through
+        # the auto-built base family row, rather than being left with no taxon ids at all.
+        family = TaxonFamily.objects.create(name='Some family')
+        species = Species.objects.create(scientific_name='Family-only species', family='Some family')
+        self.publish(species)
+        entry = self.catalog()['species'][0]
+        self.assertEqual(entry['taxon_family_id'], str(family.pk))
+        self.assertIsNone(entry['taxon_genus_id'])
+
+    def test_species_with_no_matching_taxon_rows_gets_null_taxon_ids(self):
+        species = Species.objects.create(scientific_name='Unmatched species', order='Nowhereida')
+        self.publish(species)
+        entry = self.catalog()['species'][0]
+        self.assertIsNone(entry['taxon_order_id'])
+        self.assertEqual(entry['sub_order'], '')

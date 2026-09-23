@@ -23,9 +23,7 @@ def gallery_file(request, filename='index.html'):
     if filename == 'catalog.js':
         import json
         from django.http import HttpResponse
-        from observations.models import Sample, SpeciesArea, youtube_id
-        from django.db.models import Value
-        from django.db.models.functions import NullIf
+        from observations.models import Sample, SpeciesArea, TaxonOrder, TaxonFamily, TaxonGenus, youtube_id
 
         def sample_out(s, region):
             return {
@@ -37,9 +35,69 @@ def gallery_file(request, filename='index.html'):
                 'thumbnail': f'/observations/{s.pk}/photo/' if s.image else s.thumbnail,
             }
 
-        areas = SpeciesArea.objects.select_related('species', 'country', 'sea', 'defining_sample').order_by(
-            NullIf('species__phylogenetic_order', Value('')).asc(nulls_last=True), 'species__scientific_name')
+        # Taxon lookups, keyed by the exact Species.genus/family/order text values, used to
+        # resolve each species to its curated TaxonGenus -> TaxonFamily -> TaxonOrder chain.
+        # Going through genus (the finest text field) picks up any suborder/subfamily-specific
+        # row the family/order was manually reassigned to in admin, not just the auto-built
+        # blank-sub_order/sub_family "base" row -- see build_taxonomy_tables.py. A species with
+        # no genus match falls back to a family/order match against the base row only, since a
+        # bare family/order text value can't identify a specific suborder/subfamily row on its own.
+        taxon_genus_by_name = {g.name: g for g in TaxonGenus.objects.select_related('family', 'family__order', 'defining_sample')}
+        taxon_family_by_name = {f.name: f for f in TaxonFamily.objects.filter(sub_family='').select_related('order', 'defining_sample')}
+        taxon_order_by_name = {o.name: o for o in TaxonOrder.objects.filter(sub_order='').select_related('defining_sample')}
+
+        def resolve_taxon_chain(species):
+            genus_obj = taxon_genus_by_name.get(species.genus) if species.genus else None
+            family_obj = genus_obj.family if (genus_obj and genus_obj.family_id) else (
+                taxon_family_by_name.get(species.family) if species.family else None)
+            order_obj = family_obj.order if (family_obj and family_obj.order_id) else (
+                taxon_order_by_name.get(species.order) if species.order else None)
+            return order_obj, family_obj, genus_obj
+
+        def taxon_rank(value):
+            return (1, '') if not value else (0, value)
+
+        def species_sort_key(order_obj, family_obj, genus_obj, species):
+            return (
+                taxon_rank(order_obj.taxonomic_order if order_obj else ''),
+                order_obj.name if order_obj else '', order_obj.sub_order if order_obj else '',
+                taxon_rank(family_obj.taxonomic_order if family_obj else ''),
+                family_obj.name if family_obj else '', family_obj.sub_family if family_obj else '',
+                taxon_rank(genus_obj.taxonomic_order if genus_obj else ''),
+                genus_obj.name if genus_obj else '',
+                taxon_rank(species.phylogenetic_order),
+                species.scientific_name,
+            )
+
+        taxa_orders, taxa_families, taxa_genera = {}, {}, {}
+
+        def taxon_media(defining_sample):
+            if not defining_sample or defining_sample.status != 'published' or defining_sample.deleted_at:
+                return None, None, None
+            if not (defining_sample.image or defining_sample.video_url):
+                return None, None, None
+            thumbnail = f'/observations/{defining_sample.pk}/photo/' if defining_sample.image else defining_sample.thumbnail
+            image_url = f'/observations/{defining_sample.pk}/photo/' if defining_sample.image else None
+            video_id = youtube_id(defining_sample.video_url) if defining_sample.video_url else None
+            return thumbnail, image_url, video_id
+
+        def taxon_label_pair(obj, sub_value):
+            suffix = f' ({sub_value})' if sub_value else ''
+            return (obj.name_he or obj.name) + suffix, (obj.name_en or obj.name) + suffix
+
+        def register_taxon(dest, obj, sub_value):
+            key = str(obj.pk)
+            if key not in dest:
+                thumbnail, image_url, video_id = taxon_media(obj.defining_sample)
+                label, label_en = taxon_label_pair(obj, sub_value)
+                dest[key] = {'label': label, 'label_en': label_en, 'thumbnail': thumbnail, 'image_url': image_url, 'video_id': video_id}
+                if sub_value is not None:
+                    dest[key]['sub_value'] = sub_value
+            return key
+
+        areas = SpeciesArea.objects.select_related('species', 'country', 'sea', 'defining_sample')
         species_out, area_labels, region_out, site_out = [], {}, {}, {}
+        sortable = []
         for area in areas:
             defining = area.defining_sample
             if not defining or defining.status != 'published' or defining.deleted_at or not (defining.image or defining.video_url):
@@ -64,10 +122,19 @@ def gallery_file(request, filename='index.html'):
             if not samples:
                 continue  # area exists but its samples are no longer published/complete
             primary = next((x for x in samples if x['sample_id'] == area.defining_sample_id), samples[0])
-            species_out.append({
+            order_obj, family_obj, genus_obj = resolve_taxon_chain(area.species)
+            entry = {
                 'area_id': area.pk, 'species_id': area.species_id, 'area': area_key,
                 'title': area.species.scientific_name, 'name_he': area.species.name_he, 'name_en': area.species.name_en,
                 'genus': area.species.genus, 'epithet': area.species.species, 'family': area.species.family, 'order': area.species.order,
+                # Resolved via the TaxonGenus -> TaxonFamily -> TaxonOrder chain above: the
+                # suborder this species' order was curated into (blank when none), and the
+                # ids used both to filter by suborder and to detect group transitions for the
+                # taxonomic-sort panel headings in app.js.
+                'sub_order': order_obj.sub_order if order_obj else '',
+                'taxon_order_id': str(order_obj.pk) if order_obj else None,
+                'taxon_family_id': str(family_obj.pk) if family_obj else None,
+                'taxon_genus_id': str(genus_obj.pk) if genus_obj else None,
                 'thumbnail': primary['thumbnail'], 'image_url': primary['image_url'], 'video_id': primary['video_id'],
                 # Where/when the card's own photo was taken (the defining sample's, not
                 # necessarily the whole species-in-area's) -- shown on the card instead of
@@ -75,7 +142,17 @@ def gallery_file(request, filename='index.html'):
                 # "Philippines · Indo Pacific".
                 'region': primary['region'], 'year': primary['year'],
                 'samples': samples,
-            })
+            }
+            if order_obj:
+                register_taxon(taxa_orders, order_obj, order_obj.sub_order)
+            if family_obj:
+                register_taxon(taxa_families, family_obj, family_obj.sub_family)
+            if genus_obj:
+                register_taxon(taxa_genera, genus_obj, None)
+            sortable.append((species_sort_key(order_obj, family_obj, genus_obj, area.species), entry))
+
+        sortable.sort(key=lambda pair: pair[0])
+        species_out = [entry for _, entry in sortable]
 
         collection_rows = Sample.objects.filter(
             status='published', deleted_at__isnull=True, kind='collection', species__isnull=True,
@@ -97,7 +174,8 @@ def gallery_file(request, filename='index.html'):
                 'species_count': item.trip.display_species_count,
             })
 
-        data = {'species': species_out, 'collections': collections_out, 'areas': area_labels, 'regions': region_out, 'sites': site_out}
+        taxa = {'orders': taxa_orders, 'families': taxa_families, 'genera': taxa_genera}
+        data = {'species': species_out, 'collections': collections_out, 'areas': area_labels, 'regions': region_out, 'sites': site_out, 'taxa': taxa}
         response = HttpResponse('window.SEASLUGS = ' + json.dumps(data, ensure_ascii=False).replace('<', '\u003c') + ';', content_type='text/javascript; charset=utf-8')
         response['Cache-Control'] = 'no-store'
         return response
