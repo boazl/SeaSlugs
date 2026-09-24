@@ -15,9 +15,6 @@
         .breadcrumb{display:flex;flex-wrap:wrap;gap:8px;color:var(--muted);font-size:14px;margin-bottom:20px}
         .breadcrumb a{color:var(--accent);text-decoration:none}
         .breadcrumb a:hover{text-decoration:underline}
-        .lang-toggle{margin:0 0 16px}
-        .lang-toggle a{color:var(--accent);text-decoration:none;font-size:14px}
-        .lang-toggle a:hover{text-decoration:underline}
         .species-hero{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:28px;align-items:start}
         @media(max-width:850px){.species-hero{grid-template-columns:1fr}}
         .species-media img{width:100%;height:auto;border-radius:10px;display:block}
@@ -46,7 +43,7 @@
 <body>
     <header class="masthead"><a class="brand" href="/" aria-label="SeaSlugs — דף הבית"><span class="brand-name"
                 dir="ltr">SeaSlugs<span class="brand-dot">.</span></span><span class="brand-he">חינניות
-                ים</span></a>{% include 'observations/account_menu.html' %}</header>
+                ים</span></a>{% include 'observations/account_menu.html' %}<a class="language-switch" href="{{ lang_toggle_url }}">{% if lang == 'en' %}עברית{% else %}English{% endif %}</a></header>
     <main class="species-page">
         <nav class="breadcrumb" aria-label="מיקום בטקסונומיה">
             <a href="/">{{ "הגלריה"|t:lang }}</a>
@@ -55,7 +52,6 @@
             {% if taxon_genus_label %}<span>›</span><span>{{ taxon_genus_label }}</span>{% endif %}
             <span>›</span><span aria-current="page">{{ species.scientific_name }}</span>
         </nav>
-        <p class="lang-toggle"><a href="{{ lang_toggle_url }}">{% if lang == 'en' %}עברית{% else %}English{% endif %}</a></p>
 
         <article class="species-hero">
             <div class="species-media">
@@ -104,7 +100,7 @@
                         <span class="image-wrap"><img src="{% if s.image %}{% url 'observation-photo' s.pk %}{% else %}{{ s.thumbnail }}{% endif %}" alt="" width="640" height="360" loading="lazy"><span class="play" aria-hidden="true">{% if s.video_url %}▶{% else %}⤢{% endif %}</span></span>
                         <span class="card-info">
                             <span class="card-meta"><span>{% if s.site %}{{ s.site|loc:lang }}{% endif %}{% if s.day and s.trip.month %} · {{ s.day }}/{{ s.trip.month }}/{{ s.trip.year }}{% elif s.trip.year %} · {{ s.trip.year }}{% endif %}</span></span>
-                            {% if s.photographer_name %}<span class="photographer">{{ "צילום:"|t:lang }} {{ s.photographer_name }}</span>{% endif %}
+                            {% with photog=s|photographer_name:lang %}{% if photog %}<span class="photographer">{{ "צילום:"|t:lang }} {{ photog }}</span>{% endif %}{% endwith %}
                         </span>
                     </a>
                 </article>

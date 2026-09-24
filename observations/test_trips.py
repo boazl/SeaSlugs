@@ -110,8 +110,50 @@ class DiveTripTests(TestCase):
         form=ProfileForm({'display_name':'Public name','first_name':'Dana'},instance=profile)
         self.assertTrue(form.is_valid(),form.errors);form.save()
         self.user.refresh_from_db();self.assertEqual(self.user.first_name,'Dana')
+
+    def test_nav_greeting_uses_profile_name_not_first_name(self):
+        # The greeting used to read user.first_name directly; it must come from the
+        # profile's display name instead (the same name already used site-wide as the
+        # photographer credit), so a user's chosen public name is shown even when it
+        # differs from their raw account first name.
+        from .models import Profile
+        Profile.objects.create(user=self.user,display_name='Public name')
+        self.user.first_name='Dana';self.user.save()
         self.client.force_login(self.user)
-        self.assertContains(self.client.get('/'),'<bdi>Dana</bdi>')
+        self.assertContains(self.client.get('/'),'<bdi>Public name</bdi>')
+        self.assertNotContains(self.client.get('/'),'<bdi>Dana</bdi>')
+
+    def test_nav_greeting_prefers_english_name_in_english_mode(self):
+        from .models import Profile
+        Profile.objects.create(user=self.user,display_name='שם לתצוגה',name_en='Public name EN')
+        self.client.force_login(self.user)
+        self.assertContains(self.client.get('/?lang=en'),'<bdi>Public name EN</bdi>')
+        self.assertContains(self.client.get('/?lang=he'),'<bdi>שם לתצוגה</bdi>')
+
+    def test_logout_label_translates_in_english_mode(self):
+        self.client.force_login(self.user)
+        self.assertContains(self.client.get('/'),'>יציאה<')
+        self.assertContains(self.client.get('/?lang=en'),'>Logout<')
+
+    def test_photographer_credit_resolves_registered_user_by_language(self):
+        # DiveTrip.photographer is free text (an admin can credit a guest photographer
+        # with no account here) -- but when it matches a registered user, the credit
+        # should resolve through that user's profile the same way the nav greeting
+        # does, so it too has an English form.
+        from .models import Profile
+        Profile.objects.create(user=self.user,display_name='בעז ליבס',name_en='Boaz Liebes')
+        self.trip.photographer='בעז ליבס';self.trip.save()
+        sample=Sample(owner=self.user,species=self.species,trip=self.trip,video_url='https://youtu.be/zyxwvutsrqp')
+        self.assertEqual(sample.photographer_display_name('he'),'בעז ליבס')
+        self.assertEqual(sample.photographer_display_name('en'),'Boaz Liebes')
+
+    def test_photographer_credit_leaves_unregistered_name_unchanged(self):
+        # A guest photographer with no account has no profile to resolve against, so
+        # the free text is shown as-is regardless of language.
+        self.trip.photographer='Bart Adams';self.trip.save()
+        sample=Sample(owner=self.user,species=self.species,trip=self.trip,video_url='https://youtu.be/zyxwvutsrqp')
+        self.assertEqual(sample.photographer_display_name('he'),'Bart Adams')
+        self.assertEqual(sample.photographer_display_name('en'),'Bart Adams')
 
     def test_profile_name_en_and_phone_are_saved(self):
         from .models import Profile

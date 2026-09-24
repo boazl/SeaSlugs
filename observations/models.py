@@ -282,6 +282,42 @@ KIND_EN_NAMES = {
 }
 
 
+def _profile_lang_name(user, profile, lang):
+    """The language-aware display name for a registered user: prefer the profile's
+    English name in English mode, else the profile's display name, else the user's
+    full name. Mirrors the seaslugs_i18n.account_name template filter used for the
+    nav greeting, so a person's name resolves the same way everywhere it appears."""
+    if profile:
+        if lang == 'en' and profile.name_en.strip():
+            return profile.name_en.strip()
+        if profile.display_name.strip():
+            return profile.display_name.strip()
+    return user.get_full_name().strip()
+
+
+def _resolve_registered_photographer(raw_name, lang):
+    """DiveTrip.photographer is free text (an admin can credit anyone, including a
+    guest photographer with no account here), so it has no language dimension of its
+    own. When that text happens to match a registered user -- by full name, username,
+    or either of their profile's names -- resolve it through that user's profile for a
+    language-aware name instead. Text that matches no one (e.g. a guest photographer)
+    is returned unchanged, since there is nothing to translate it against."""
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    raw_name = raw_name.strip()
+    if not raw_name:
+        return None
+    for user in User.objects.select_related('profile').all():
+        profile = getattr(user, 'profile', None)
+        candidates = {user.get_full_name().strip(), user.username.strip()}
+        if profile:
+            candidates.update({profile.display_name.strip(), profile.name_en.strip()})
+        candidates.discard('')
+        if raw_name in candidates:
+            return _profile_lang_name(user, profile, lang)
+    return None
+
+
 class Sample(models.Model):
     class Kind(models.TextChoices):
         SPECIES = 'species', 'מין יחיד'
@@ -327,6 +363,19 @@ class Sample(models.Model):
             return self.trip.photographer.strip()
         profile = getattr(self.owner, 'profile', None)
         return (profile.display_name.strip() if profile else '') or self.owner.get_full_name().strip() or 'שם הצלם לא צוין'
+    def photographer_display_name(self, lang='he'):
+        """Language-aware version of photographer_name (see seaslugs_i18n.photographer_name,
+        the template filter that calls this): when the credited photographer -- from the
+        trip's free-text field, or the observation owner's own profile as a fallback --
+        matches a registered user, prefer that user's English name in English mode, the
+        same way the nav greeting does. Free text matching no registered user (a guest
+        photographer with no account) is shown as-is in every language."""
+        if self.trip_id and self.trip.photographer.strip():
+            raw = self.trip.photographer.strip()
+            return _resolve_registered_photographer(raw, lang) or raw
+        profile = getattr(self.owner, 'profile', None)
+        name = _profile_lang_name(self.owner, profile, lang)
+        return name or 'שם הצלם לא צוין'
     @property
     def thumbnail(self):
         return self.image.url if self.image else (f'https://i.ytimg.com/vi/{youtube_id(self.video_url)}/hqdefault.jpg' if self.video_url else '')

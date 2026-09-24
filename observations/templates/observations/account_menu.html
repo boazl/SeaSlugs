@@ -1,15 +1,15 @@
-<nav class="account-menu" aria-label="חשבון / Account">
+{% load seaslugs_i18n %}<nav class="account-menu" aria-label="חשבון / Account">
 <button type="button" class="account-menu-toggle" id="accountMenuToggle" aria-haspopup="true" aria-controls="accountMenuList" aria-expanded="false" aria-label="תפריט חשבון / Account menu">☰</button>
 <div class="account-menu-list" id="accountMenuList">
 <a href="{% url 'dive-trips' %}">מסעות צלילה / Dive trips</a>
 {% if user.is_authenticated %}
-    <span class="account-name">שלום, <bdi>{{ user.first_name|default:"חבר/ת הקהילה" }}</bdi></span>
+    <span class="account-name">{{ "שלום"|t:lang }}, <bdi>{{ user|account_name:lang|default:"חבר/ת הקהילה"|t:lang }}</bdi></span>
     <a class="community-link" href="{% url 'observations' %}">תצפיות / Observations</a>
     <a href="{% url 'profile' %}">הפרופיל שלי / Profile</a>
-    <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit">יציאה / Logout</button></form>
+    <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit">{{ "יציאה"|t:lang }}</button></form>
 {% else %}
-    <a href="{% url 'login' %}">כניסה / Login</a>
-    <a href="{% url 'signup' %}">הרשמה / Sign up</a>
+    <a href="{% url 'login' %}">{{ "כניסה"|t:lang }}</a>
+    <a href="{% url 'signup' %}">{{ "הרשמה"|t:lang }}</a>
 {% endif %}
 </div>
 </nav>

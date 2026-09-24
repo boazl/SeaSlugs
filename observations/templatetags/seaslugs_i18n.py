@@ -53,6 +53,12 @@ TRANSLATIONS = {
     'קישור לשיתוף:': 'Share link:',
     'העתקה': 'Copy',
     'הועתק!': 'Copied!',
+    # shared nav / account menu (base.html + account_menu.html)
+    'שלום': 'Hi',
+    'יציאה': 'Logout',
+    'כניסה': 'Login',
+    'הרשמה': 'Sign up',
+    'חבר/ת הקהילה': 'Community member',
 }
 
 
@@ -78,3 +84,34 @@ def get_item(mapping, key):
     if not mapping:
         return key
     return mapping.get(key, key)
+
+
+@register.filter
+def account_name(user, lang):
+    """The name to greet a logged-in user by: their profile's display name (the same
+    name already used site-wide as the photographer credit), preferring the profile's
+    English name in English mode when one has been filled in. Falls back to the Django
+    user's first name, then to nothing (the template supplies a translated default)."""
+    if not user or not getattr(user, 'is_authenticated', False):
+        return ''
+    profile = getattr(user, 'profile', None)
+    if profile:
+        if lang == 'en' and getattr(profile, 'name_en', ''):
+            return profile.name_en
+        if profile.display_name:
+            return profile.display_name
+    return user.first_name or ''
+
+
+@register.filter
+def photographer_name(sample, lang):
+    """Language-aware photographer credit for an observation card / species page
+    (see Sample.photographer_display_name): prefers a registered photographer's
+    English name in English mode, same as the nav greeting. Falls back to the
+    plain (language-neutral) property for anything that isn't a Sample."""
+    if not sample:
+        return ''
+    method = getattr(sample, 'photographer_display_name', None)
+    if callable(method):
+        return method(lang)
+    return getattr(sample, 'photographer_name', '')
