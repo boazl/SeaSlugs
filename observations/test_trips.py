@@ -103,32 +103,38 @@ class DiveTripTests(TestCase):
         sample.trip=None;self.user.first_name='Dana';self.user.save()
         self.assertEqual(sample.photographer_name,'Dana')
 
-    def test_profile_first_name_is_saved(self):
+    def test_profile_form_saves_hebrew_first_and_last_name(self):
+        # first_name/last_name are not real Profile fields -- the form piggybacks
+        # them and syncs onto the linked User model, which is where the Hebrew name
+        # actually lives.
         from .models import Profile
         from .forms import ProfileForm
-        profile=Profile.objects.create(user=self.user,display_name='Public name')
-        form=ProfileForm({'display_name':'Public name','first_name':'Dana'},instance=profile)
+        profile=Profile.objects.create(user=self.user)
+        form=ProfileForm({'first_name':'Dana','last_name':'Cohen'},instance=profile)
         self.assertTrue(form.is_valid(),form.errors);form.save()
-        self.user.refresh_from_db();self.assertEqual(self.user.first_name,'Dana')
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.first_name,'Dana')
+        self.assertEqual(self.user.last_name,'Cohen')
 
-    def test_nav_greeting_uses_profile_name_not_first_name(self):
-        # The greeting used to read user.first_name directly; it must come from the
-        # profile's display name instead (the same name already used site-wide as the
-        # photographer credit), so a user's chosen public name is shown even when it
-        # differs from their raw account first name.
-        from .models import Profile
-        Profile.objects.create(user=self.user,display_name='Public name')
-        self.user.first_name='Dana';self.user.save()
+    def test_nav_greeting_uses_hebrew_first_name(self):
+        self.user.first_name='דנה';self.user.save()
         self.client.force_login(self.user)
-        self.assertContains(self.client.get('/'),'<bdi>Public name</bdi>')
-        self.assertNotContains(self.client.get('/'),'<bdi>Dana</bdi>')
+        self.assertContains(self.client.get('/'),'<bdi>דנה</bdi>')
 
-    def test_nav_greeting_prefers_english_name_in_english_mode(self):
+    def test_nav_greeting_prefers_english_first_name_in_english_mode(self):
         from .models import Profile
-        Profile.objects.create(user=self.user,display_name='שם לתצוגה',name_en='Public name EN')
+        self.user.first_name='דנה';self.user.save()
+        Profile.objects.create(user=self.user,first_name_en='Dana')
         self.client.force_login(self.user)
-        self.assertContains(self.client.get('/?lang=en'),'<bdi>Public name EN</bdi>')
-        self.assertContains(self.client.get('/?lang=he'),'<bdi>שם לתצוגה</bdi>')
+        self.assertContains(self.client.get('/?lang=en'),'<bdi>Dana</bdi>')
+        self.assertContains(self.client.get('/?lang=he'),'<bdi>דנה</bdi>')
+
+    def test_nav_greeting_falls_back_to_other_language_when_one_is_missing(self):
+        from .models import Profile
+        self.user.first_name='דנה';self.user.save()
+        Profile.objects.create(user=self.user)  # no first_name_en set
+        self.client.force_login(self.user)
+        self.assertContains(self.client.get('/?lang=en'),'<bdi>דנה</bdi>')
 
     def test_logout_label_translates_in_english_mode(self):
         self.client.force_login(self.user)
@@ -137,11 +143,12 @@ class DiveTripTests(TestCase):
 
     def test_photographer_credit_resolves_registered_user_by_language(self):
         # DiveTrip.photographer is free text (an admin can credit a guest photographer
-        # with no account here) -- but when it matches a registered user, the credit
-        # should resolve through that user's profile the same way the nav greeting
-        # does, so it too has an English form.
+        # with no account here) -- but when it matches a registered user's full name,
+        # the credit should resolve through that user's profile the same way the nav
+        # greeting does, so it too has an English form.
         from .models import Profile
-        Profile.objects.create(user=self.user,display_name='בעז ליבס',name_en='Boaz Liebes')
+        self.user.first_name='בעז';self.user.last_name='ליבס';self.user.save()
+        Profile.objects.create(user=self.user,first_name_en='Boaz',last_name_en='Liebes')
         self.trip.photographer='בעז ליבס';self.trip.save()
         sample=Sample(owner=self.user,species=self.species,trip=self.trip,video_url='https://youtu.be/zyxwvutsrqp')
         self.assertEqual(sample.photographer_display_name('he'),'בעז ליבס')
@@ -155,21 +162,22 @@ class DiveTripTests(TestCase):
         self.assertEqual(sample.photographer_display_name('he'),'Bart Adams')
         self.assertEqual(sample.photographer_display_name('en'),'Bart Adams')
 
-    def test_profile_name_en_and_phone_are_saved(self):
+    def test_profile_english_names_and_phone_are_saved(self):
         from .models import Profile
         from .forms import ProfileForm
-        profile=Profile.objects.create(user=self.user,display_name='Public name')
-        form=ProfileForm({'display_name':'Public name','first_name':'Dana','name_en':'Boaz Liebes','phone':'+972 50-123-4567'},instance=profile)
+        profile=Profile.objects.create(user=self.user)
+        form=ProfileForm({'first_name':'Dana','first_name_en':'Dana','last_name_en':'Cohen','phone':'+972 50-123-4567'},instance=profile)
         self.assertTrue(form.is_valid(),form.errors);form.save()
         profile.refresh_from_db()
-        self.assertEqual(profile.name_en,'Boaz Liebes')
+        self.assertEqual(profile.first_name_en,'Dana')
+        self.assertEqual(profile.last_name_en,'Cohen')
         self.assertEqual(profile.phone,'+972 50-123-4567')
 
     def test_profile_phone_validator_rejects_garbage(self):
         from .models import Profile
         from .forms import ProfileForm
-        profile=Profile.objects.create(user=self.user,display_name='Public name')
-        form=ProfileForm({'display_name':'Public name','first_name':'','phone':'not a phone number!!'},instance=profile)
+        profile=Profile.objects.create(user=self.user)
+        form=ProfileForm({'first_name':'','phone':'not a phone number!!'},instance=profile)
         self.assertFalse(form.is_valid())
         self.assertIn('phone',form.errors)
 
@@ -178,5 +186,6 @@ class DiveTripTests(TestCase):
         self.client.force_login(admin_user)
         response=self.client.get(f'/admin/auth/user/{self.user.pk}/change/')
         self.assertEqual(response.status_code,200)
-        self.assertContains(response,'name="profile-0-name_en"')
+        self.assertContains(response,'name="profile-0-first_name_en"')
+        self.assertContains(response,'name="profile-0-last_name_en"')
         self.assertContains(response,'name="profile-0-phone"')

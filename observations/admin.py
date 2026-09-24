@@ -15,7 +15,7 @@ class ProfileInline(admin.StackedInline):
     model = Profile
     can_delete = False
     verbose_name_plural = 'פרופיל'
-    fields = ['display_name','name_en','phone','macro_diver','visible_to_members','countries','regions','bio']
+    fields = ['first_name_en','last_name_en','phone','macro_diver','visible_to_members','countries','regions','bio']
     filter_horizontal = ['countries','regions']
 
 

@@ -9,7 +9,7 @@ User = get_user_model()
 ACCOUNT_TABLES = {
     'groups': (Group, ['name', 'permissions']),
     'users': (User, ['username','first_name','last_name','email','is_active','is_staff','is_superuser','groups','user_permissions']),
-    'profiles': (Profile, ['user','display_name','macro_diver','visible_to_members','bio','countries','regions']),
+    'profiles': (Profile, ['user','first_name_en','last_name_en','macro_diver','visible_to_members','bio','countries','regions']),
 }
 
 def permission_key(obj):

@@ -45,7 +45,7 @@ class AccountTransferTests(TestCase):
         country = Country.objects.create(name='Israel')
         sea = Sea.objects.create(name='Red Sea')
         region = Region.objects.create(name='Eilat',country=country,sea=sea)
-        profile = Profile.objects.create(user=self.user,display_name='Boaz',macro_diver=True)
+        profile = Profile.objects.create(user=self.user,first_name_en='Boaz',macro_diver=True)
         profile.countries.add(country); profile.regions.add(region)
         doc = export_table('profiles')
         self.assertEqual(plan(doc)[0]['action'],'same')

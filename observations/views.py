@@ -205,7 +205,7 @@ def signup(request):
     if request.method == 'POST' and form.is_valid():
         user=form.save()
         user.groups.add(Group.objects.get_or_create(name='New user')[0])
-        Profile.objects.create(user=user,display_name=user.get_full_name() or user.username)
+        Profile.objects.create(user=user)
         login(request,user)
         return redirect('profile')
     return render(request,'observations/form.html',{'form':form,'title':'הרשמה / Sign up'})
@@ -213,7 +213,7 @@ def signup(request):
 
 @login_required
 def profile(request):
-    item,_=Profile.objects.get_or_create(user=request.user,defaults={'display_name':request.user.username})
+    item,_=Profile.objects.get_or_create(user=request.user)
     form=ProfileForm(request.POST or None,instance=item)
     if request.method=='POST' and form.is_valid():
         item=form.save()

@@ -184,9 +184,13 @@ PHONE_VALIDATOR = RegexValidator(r'^[0-9+\-()\s]{5,30}$', 'מספר טלפון �
 
 
 class Profile(models.Model):
+    """The Hebrew name (first/last) lives on the built-in User model itself
+    (user.first_name / user.last_name) -- these are only the English counterparts,
+    since not every user has (or needs) an English name on file. See
+    given_name_for/full_name_for below for how the two languages combine for display."""
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    display_name = models.CharField('שם לתצוגה', max_length=100)
-    name_en = models.CharField('שם באנגלית', max_length=150, blank=True)
+    first_name_en = models.CharField('שם פרטי באנגלית', max_length=150, blank=True)
+    last_name_en = models.CharField('שם משפחה באנגלית', max_length=150, blank=True)
     phone = models.CharField('טלפון', max_length=30, blank=True, validators=[PHONE_VALIDATOR])
     macro_diver = models.BooleanField('מעוניין במציאת שותפים לצלילת מאקרו', default=False)
     visible_to_members = models.BooleanField('הצגת הפרופיל למשתמשים רשומים', default=False)
@@ -194,7 +198,29 @@ class Profile(models.Model):
     countries = models.ManyToManyField(Country, blank=True, verbose_name='מדינות צלילה')
     bio = models.TextField('על עצמי', blank=True, max_length=1500)
     class Meta: verbose_name = 'פרופיל'; verbose_name_plural = 'פרופילים'
-    def __str__(self): return self.display_name
+    def __str__(self): return self.user.get_full_name() or self.user.username
+
+
+def given_name_for(user, lang):
+    """The name to greet someone by (first name only): the Hebrew first name on
+    their account in Hebrew mode, their profile's English first name in English
+    mode -- each mode falling back to whichever language is actually set, since
+    a user is not required to have both."""
+    profile = getattr(user, 'profile', None)
+    he_first = (user.first_name or '').strip()
+    en_first = (profile.first_name_en.strip() if profile and profile.first_name_en else '')
+    return (en_first or he_first) if lang == 'en' else (he_first or en_first)
+
+
+def full_name_for(user, lang):
+    """The full name to credit someone by (e.g. a photographer credit): same
+    language preference and fallback as given_name_for, but first+last together."""
+    profile = getattr(user, 'profile', None)
+    he_full = user.get_full_name().strip()
+    en_full = ''
+    if profile:
+        en_full = f'{profile.first_name_en} {profile.last_name_en}'.strip()
+    return (en_full or he_full) if lang == 'en' else (he_full or en_full)
 
 
 class DiveTrip(models.Model):
@@ -282,26 +308,13 @@ KIND_EN_NAMES = {
 }
 
 
-def _profile_lang_name(user, profile, lang):
-    """The language-aware display name for a registered user: prefer the profile's
-    English name in English mode, else the profile's display name, else the user's
-    full name. Mirrors the seaslugs_i18n.account_name template filter used for the
-    nav greeting, so a person's name resolves the same way everywhere it appears."""
-    if profile:
-        if lang == 'en' and profile.name_en.strip():
-            return profile.name_en.strip()
-        if profile.display_name.strip():
-            return profile.display_name.strip()
-    return user.get_full_name().strip()
-
-
 def _resolve_registered_photographer(raw_name, lang):
     """DiveTrip.photographer is free text (an admin can credit anyone, including a
     guest photographer with no account here), so it has no language dimension of its
-    own. When that text happens to match a registered user -- by full name, username,
-    or either of their profile's names -- resolve it through that user's profile for a
-    language-aware name instead. Text that matches no one (e.g. a guest photographer)
-    is returned unchanged, since there is nothing to translate it against."""
+    own. When that text happens to match a registered user -- by full name (Hebrew or
+    English) or username -- resolve it through that user's profile for a language-aware
+    name instead, via full_name_for. Text that matches no one (e.g. a guest
+    photographer) is returned unchanged, since there is nothing to translate it against."""
     from django.contrib.auth import get_user_model
     User = get_user_model()
     raw_name = raw_name.strip()
@@ -311,10 +324,10 @@ def _resolve_registered_photographer(raw_name, lang):
         profile = getattr(user, 'profile', None)
         candidates = {user.get_full_name().strip(), user.username.strip()}
         if profile:
-            candidates.update({profile.display_name.strip(), profile.name_en.strip()})
+            candidates.add(f'{profile.first_name_en} {profile.last_name_en}'.strip())
         candidates.discard('')
         if raw_name in candidates:
-            return _profile_lang_name(user, profile, lang)
+            return full_name_for(user, lang)
     return None
 
 
@@ -361,8 +374,7 @@ class Sample(models.Model):
     def photographer_name(self):
         if self.trip_id and self.trip.photographer.strip():
             return self.trip.photographer.strip()
-        profile = getattr(self.owner, 'profile', None)
-        return (profile.display_name.strip() if profile else '') or self.owner.get_full_name().strip() or 'שם הצלם לא צוין'
+        return self.owner.get_full_name().strip() or 'שם הצלם לא צוין'
     def photographer_display_name(self, lang='he'):
         """Language-aware version of photographer_name (see seaslugs_i18n.photographer_name,
         the template filter that calls this): when the credited photographer -- from the
@@ -373,9 +385,7 @@ class Sample(models.Model):
         if self.trip_id and self.trip.photographer.strip():
             raw = self.trip.photographer.strip()
             return _resolve_registered_photographer(raw, lang) or raw
-        profile = getattr(self.owner, 'profile', None)
-        name = _profile_lang_name(self.owner, profile, lang)
-        return name or 'שם הצלם לא צוין'
+        return full_name_for(self.owner, lang) or 'שם הצלם לא צוין'
     @property
     def thumbnail(self):
         return self.image.url if self.image else (f'https://i.ytimg.com/vi/{youtube_id(self.video_url)}/hqdefault.jpg' if self.video_url else '')

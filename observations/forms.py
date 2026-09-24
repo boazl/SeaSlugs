@@ -10,27 +10,40 @@ from .models import Sample, Profile, Species, Country, Region, Site, DiveTrip
 
 class SignupForm(UserCreationForm):
     first_name = forms.CharField(label='שם פרטי', max_length=150, required=False)
+    last_name = forms.CharField(label='שם משפחה', max_length=150, required=False)
     email = forms.EmailField(label='דואר אלקטרוני', required=True)
     class Meta:
         model = User
-        fields = ('username','first_name','email','password1','password2')
+        fields = ('username','first_name','last_name','email','password1','password2')
 
 
 class ProfileForm(forms.ModelForm):
+    # The Hebrew name lives on the linked User model itself (first_name/last_name),
+    # not on Profile -- these two fields piggyback on this form so it's edited in one
+    # place, and are synced onto the user in save() below rather than being real
+    # Profile model fields. first_name_en/last_name_en (in Meta.fields) are the only
+    # names that actually live on Profile.
     first_name = forms.CharField(label='שם פרטי', max_length=150, required=False)
+    last_name = forms.CharField(label='שם משפחה', max_length=150, required=False)
+    # Keep the Hebrew name fields next to their English counterparts rather than at
+    # the end of the form -- Django would otherwise place explicitly declared fields
+    # (first_name/last_name) after every Meta.fields model field.
+    field_order = ['first_name','last_name','first_name_en','last_name_en','phone','macro_diver','visible_to_members','countries','regions','bio']
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['first_name'].initial = self.instance.user.first_name
+        self.fields['last_name'].initial = self.instance.user.last_name
     def save(self, commit=True):
         profile = super().save(commit=commit)
         if commit:
             profile.user.first_name = self.cleaned_data['first_name']
-            profile.user.save(update_fields=['first_name'])
+            profile.user.last_name = self.cleaned_data['last_name']
+            profile.user.save(update_fields=['first_name', 'last_name'])
         return profile
 
     class Meta:
         model = Profile
-        fields = ['display_name','name_en','phone','macro_diver','visible_to_members','countries','regions','bio']
+        fields = ['first_name_en','last_name_en','phone','macro_diver','visible_to_members','countries','regions','bio']
         widgets = {'countries':forms.CheckboxSelectMultiple, 'regions':forms.CheckboxSelectMultiple}
 
 

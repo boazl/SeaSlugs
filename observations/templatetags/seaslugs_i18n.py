@@ -88,19 +88,15 @@ def get_item(mapping, key):
 
 @register.filter
 def account_name(user, lang):
-    """The name to greet a logged-in user by: their profile's display name (the same
-    name already used site-wide as the photographer credit), preferring the profile's
-    English name in English mode when one has been filled in. Falls back to the Django
-    user's first name, then to nothing (the template supplies a translated default)."""
+    """The name to greet a logged-in user by (first name only): the Hebrew first
+    name on their account in Hebrew mode, their profile's English first name in
+    English mode, each falling back to whichever language is actually set. Same
+    resolution as the photographer credit (see models.given_name_for), so a
+    person's name resolves the same way everywhere it appears."""
     if not user or not getattr(user, 'is_authenticated', False):
         return ''
-    profile = getattr(user, 'profile', None)
-    if profile:
-        if lang == 'en' and getattr(profile, 'name_en', ''):
-            return profile.name_en
-        if profile.display_name:
-            return profile.display_name
-    return user.first_name or ''
+    from ..models import given_name_for
+    return given_name_for(user, lang)
 
 
 @register.filter
