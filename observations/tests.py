@@ -457,3 +457,44 @@ class WorkflowTests(TestCase):
         thematic = DiveTrip.objects.create(title='מינים מהגרים לספסיאניים', kind=DiveTrip.Kind.THEMATIC)
         thematic.full_clean()  # a thematic collection has no year/region and must still validate
         self.assertEqual(thematic.kind, 'thematic')
+
+    def test_species_area_slug_auto_generated_and_stable(self):
+        self.record()
+        area = SpeciesArea.objects.get(species=self.species, country=self.country, sea=self.sea)
+        self.assertTrue(area.slug)
+        self.assertIn('test-species', area.slug)
+        first_slug = area.slug
+        area.save()
+        area.refresh_from_db()
+        self.assertEqual(area.slug, first_slug)
+
+    def test_species_area_slug_handles_collisions_with_a_numeric_suffix(self):
+        self.record()
+        area = SpeciesArea.objects.get(species=self.species, country=self.country, sea=self.sea)
+        base_slug = area.slug
+        # A whitespace-only difference in the scientific name slugifies to the exact same
+        # base string, so saving this second area (same country+sea) must trigger the
+        # numeric-suffix fallback rather than violate the unique constraint.
+        other_species = Species.objects.create(scientific_name='Test  species')
+        other_area = SpeciesArea.objects.create(species=other_species, country=self.country, sea=self.sea)
+        self.assertNotEqual(other_area.slug, base_slug)
+        self.assertTrue(other_area.slug.startswith(base_slug))
+
+    def test_species_page_returns_200_for_published_area_with_media(self):
+        self.record()
+        area = SpeciesArea.objects.get(species=self.species, country=self.country, sea=self.sea)
+        response = self.client.get(f'/species/{area.slug}/')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.species.scientific_name)
+
+    def test_species_page_404s_for_unknown_slug(self):
+        response = self.client.get('/species/does-not-exist/')
+        self.assertEqual(response.status_code, 404)
+
+    def test_species_page_404s_when_area_has_no_published_samples(self):
+        # An area row can exist (e.g. via the admin's "rebuild" action) without any actual
+        # published sample behind it any more -- must not render an empty page for SEO.
+        empty_species = Species.objects.create(scientific_name='Nothing published yet')
+        area = SpeciesArea.objects.create(species=empty_species, country=self.country, sea=self.sea)
+        response = self.client.get(f'/species/{area.slug}/')
+        self.assertEqual(response.status_code, 404)

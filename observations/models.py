@@ -8,6 +8,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator, FileExtensionValidator
 from django.db import models, transaction
 from django.utils import timezone
+from django.utils.text import slugify
 
 
 def youtube_id(url):
@@ -393,11 +394,32 @@ class SpeciesArea(models.Model):
     sea = models.ForeignKey(Sea, on_delete=models.PROTECT, verbose_name='ים')
     defining_sample = models.ForeignKey(Sample, null=True, blank=True, on_delete=models.SET_NULL, related_name='+', verbose_name='דגימה מגדירה',
         help_text='הדגימה שתמונתה או שרטון היוטיוב שלה יוצגו בכרטיס המין בגלריה. ניתן לבחור דגימה אחרת מבין דגימות המין באזור זה.')
+    # Identifies this species+area's own dedicated public page (species name is not unique
+    # on its own across areas -- the same species observed in two areas gets two pages).
+    # Generated once from species+country+sea and left alone after that so published URLs
+    # stay stable; blank it out in admin to force a fresh one (e.g. after a rename).
+    slug = models.SlugField('כתובת בעמוד', max_length=220, unique=True, null=True, blank=True,
+        help_text='נוצר אוטומטית משם המין+המדינה+הים בשמירה הראשונה. השאר ריק ליצירה אוטומטית, או הזן ידנית לדריסה.')
     class Meta:
         constraints = [models.UniqueConstraint(fields=['species','country','sea'], name='unique_species_area')]
         verbose_name = 'מין באזור'; verbose_name_plural = 'מינים באזורים'
     def __str__(self):
         return f'{self.species} · {self.country} · {self.sea}'
+    def _generate_slug(self):
+        country_part = self.country.name_en or self.country.name
+        sea_part = self.sea.name_en or self.sea.name
+        base = slugify(f'{self.species.scientific_name} {country_part} {sea_part}') or 'area'
+        candidate = base
+        n = 2
+        qs = SpeciesArea.objects.exclude(pk=self.pk) if self.pk else SpeciesArea.objects.all()
+        while qs.filter(slug=candidate).exists():
+            candidate = f'{base}-{n}'
+            n += 1
+        return candidate
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = self._generate_slug()
+        super().save(*args, **kwargs)
 
     @staticmethod
     def pick_defining_sample(species_id, country_id, sea_id):

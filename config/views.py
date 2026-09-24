@@ -135,6 +135,7 @@ def gallery_file(request, filename='index.html'):
             order_obj, family_obj, genus_obj = resolve_taxon_chain(area.species)
             entry = {
                 'area_id': area.pk, 'species_id': area.species_id, 'area': area_key,
+                'slug': area.slug,
                 'title': area.species.scientific_name, 'name_he': area.species.name_he, 'name_en': area.species.name_en,
                 'epithet': area.species.species,
                 # The genus/family filter+search values are the CURATED names (via genus_obj/

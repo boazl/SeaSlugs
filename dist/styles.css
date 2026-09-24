@@ -12,6 +12,8 @@ html[dir="ltr"] .search input { text-align: left; }
 
 .gallery-group-title{grid-column:1 / -1;margin:18px 0 0;color:var(--accent)}.taxon-panel{grid-column:1 / -1;display:flex;align-items:center;gap:10px;margin:10px 0 -8px;padding:6px 10px;background:var(--panel);border:1px solid var(--line);border-radius:6px;font-size:13px;color:var(--muted)}.taxon-panel img{width:26px;height:26px;object-fit:cover;border-radius:4px;flex-shrink:0}.taxon-panel-order{font-weight:700;color:var(--accent)}.taxon-panel-family{margin-inline-start:18px;opacity:.9}.taxon-panel-genus{margin-inline-start:36px;margin-bottom:10px}.taxon-panel-genus span{opacity:.75}.taxon-panel-genus img{width:calc((100% - (var(--cols) - 1)*var(--gap))/var(--cols)/2);height:auto;aspect-ratio:16/9;object-fit:cover;border-radius:4px}
 .taxon-panel-clickable{cursor:pointer;font:inherit;text-align:inherit}
+.species-page-link{display:block;margin-top:8px;font-size:13px;color:var(--accent);text-decoration:none}
+.species-page-link:hover{text-decoration:underline}
 html[dir="ltr"] .card h3.hebrew{direction:ltr;text-align:left}
 
 #frame.image-view{aspect-ratio:auto;display:flex;justify-content:center}#frame.image-view img{display:block;max-width:100%;height:auto;object-fit:contain}dialog:has(.image-view){width:min(1920px,96vw)}

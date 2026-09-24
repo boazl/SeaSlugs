@@ -52,9 +52,9 @@ class DiveTripAdmin(admin.ModelAdmin):
 
 @admin.register(SpeciesArea)
 class SpeciesAreaAdmin(admin.ModelAdmin):
-    list_display = ['species','country','sea','defining_sample']
+    list_display = ['species','country','sea','defining_sample','slug']
     list_filter = ['country','sea']
-    search_fields = ['species__scientific_name']
+    search_fields = ['species__scientific_name','slug']
     autocomplete_fields = []
     actions = ['rebuild_all']
     def formfield_for_foreignkey(self, db_field, request, **kwargs):

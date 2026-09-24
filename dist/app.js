@@ -518,6 +518,16 @@ function buildSpeciesCard(sp, index) {
     button.append(wrap, info);
     button.addEventListener('click', () => openSpeciesDialog(sp, button));
     article.append(button);
+    // The species' own dedicated, crawlable page (real navigation -- not another
+    // in-page dialog): only present once the species+area has a slug (older data
+    // before the species-page feature shipped would lack one, in theory).
+    if (sp.slug) {
+        const pageLink = document.createElement('a');
+        pageLink.className = 'species-page-link';
+        pageLink.href = `/species/${sp.slug}/`;
+        pageLink.textContent = language === 'he' ? 'עמוד המין ←' : 'Species page →';
+        article.append(pageLink);
+    }
     return article;
 }
 // Thin group-heading panel shown above the first card of a new order/family/genus group

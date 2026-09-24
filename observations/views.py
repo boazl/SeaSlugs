@@ -10,6 +10,7 @@ from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from .models import Sample, Profile, Region, Site, DiveTrip, SiteImage, Species, Country, SpeciesArea
 from .forms import SignupForm, SampleForm, ProfileForm, DiveTripForm
+from .gallery_data import TaxonResolver, taxon_media
 
 
 def is_manager(user): return user.is_authenticated and user.is_staff and user.has_perm('observations.change_sample')
@@ -22,6 +23,32 @@ def trips(request):
         species_other='', site_other='').filter(Q(kind='collection', species__isnull=True) | Q(kind='species',species__isnull=False)).select_related('species','trip')
     rows = DiveTrip.objects.filter(samples__in=published).distinct().prefetch_related(Prefetch('samples',queryset=published,to_attr='public_samples'))
     return render(request, 'observations/trips.html', {'trips':rows})
+
+
+def species_page(request, slug):
+    """Public, server-rendered, individually-URLed page for one species+area (a species
+    observed in a given country+sea -- the same unit the gallery already keys a card on,
+    since the same species observed in two different areas gets two different defining
+    photos/pages there too). Only reachable once the area has a valid published defining
+    sample, same rule the gallery feed itself uses to decide whether to show a card at all."""
+    area = get_object_or_404(
+        SpeciesArea.objects.select_related('species', 'country', 'sea', 'defining_sample'), slug=slug)
+    thumbnail, image_url, video_id = taxon_media(area.defining_sample)
+    if not (image_url or video_id):
+        raise Http404
+    samples = list(Sample.objects.filter(
+        kind=Sample.Kind.SPECIES, species_id=area.species_id, status='published', deleted_at__isnull=True,
+        trip__country_id=area.country_id, trip__region__sea_id=area.sea_id, trip__year__isnull=False,
+        species_other='', site_other='',
+    ).select_related('trip', 'trip__region', 'site', 'owner', 'owner__profile').order_by('created_at', 'pk'))
+    if not samples:
+        raise Http404
+    order_obj, family_obj, genus_obj = TaxonResolver().resolve(area.species)
+    return render(request, 'observations/species_page.html', {
+        'area': area, 'species': area.species, 'samples': samples,
+        'image_url': image_url, 'video_id': video_id, 'thumbnail': thumbnail,
+        'taxon_order': order_obj, 'taxon_family': family_obj, 'taxon_genus': genus_obj,
+    })
 
 SORT_OPTIONS = {
     'newest': ('-created_at',),

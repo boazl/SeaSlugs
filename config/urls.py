@@ -8,7 +8,7 @@ from observations.release_views import releases
 from observations.image_manager import manager as image_manager, image_file
 
 from observations.folder_import import folder_import
-from observations.views import site_image
+from observations.views import site_image, species_page
 from observations.db_replace import db_replace, db_replace_download
 
 urlpatterns = [
@@ -22,6 +22,7 @@ urlpatterns = [
     path('observations/', include('observations.urls')),
     path('healthz', health, name='health'),
     path('site-image/<slug:key>.jpg', site_image, name='site-image'),
+    path('species/<slug:slug>/', species_page, name='species-page'),
     path('admin/', admin.site.urls),
     path('', gallery_file, name='gallery'),
     path('<str:filename>', gallery_file, name='gallery-file'),

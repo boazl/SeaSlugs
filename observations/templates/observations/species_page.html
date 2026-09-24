@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ species.scientific_name }}{% if species.name_he %} — {{ species.name_he }}{% endif %} | SeaSlugs</title>
+    <meta name="description" content="{% if species.description_he %}{{ species.description_he|truncatechars:160 }}{% else %}{{ species.scientific_name }} — תצפיות, תמונות ומידע מאתר SeaSlugs, אתר חינניות הים.{% endif %}">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <link rel="icon" type="image/svg+xml"
+        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23091e28'/%3E%3Cpath d='M7 11c10-9 8 14 18 5M7 18c10-9 8 14 18 5' stroke='%235de0cb' stroke-width='3' fill='none'/%3E%3C/svg%3E">
+    <link rel="stylesheet" href="/styles.css">
+    <style>
+        .species-page{padding-top:24px;padding-bottom:60px}
+        .breadcrumb{display:flex;flex-wrap:wrap;gap:8px;color:var(--muted);font-size:14px;margin-bottom:20px}
+        .breadcrumb a{color:var(--accent);text-decoration:none}
+        .breadcrumb a:hover{text-decoration:underline}
+        .species-hero{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:28px;align-items:start}
+        @media(max-width:850px){.species-hero{grid-template-columns:1fr}}
+        .species-media img{width:100%;height:auto;border-radius:10px;object-fit:cover;aspect-ratio:4/3}
+        .species-video{position:relative;padding-top:56.25%;border-radius:10px;overflow:hidden}
+        .species-video iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+        .species-summary h1{font-family:Georgia,"Times New Roman",serif;font-weight:400;font-size:32px;margin:0 0 6px}
+        .species-common{color:var(--muted);font-size:17px;margin:0 0 6px}
+        .species-area{color:var(--muted);font-size:14px;margin:0 0 14px}
+        .species-badges{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+        .badge{display:inline-block;padding:4px 12px;border-radius:20px;background:var(--panel);border:1px solid var(--line);font-size:13px;color:var(--muted)}
+        .badge-migrant{color:var(--accent);border-color:var(--accent)}
+        .species-links{display:flex;flex-wrap:wrap;gap:14px}
+        .species-links a{color:var(--accent);text-decoration:none;font-size:15px}
+        .species-links a:hover{text-decoration:underline}
+        .species-section{margin-top:40px;padding-top:24px;border-top:1px solid var(--line)}
+        .species-section h2{font-size:22px;font-weight:600;margin:0 0 14px}
+        .species-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:24px}
+        .species-facts h3{font-size:15px;color:var(--muted);margin:0 0 6px;font-weight:600}
+        .species-facts p{margin:0}
+    </style>
+</head>
+
+<body>
+    <header class="masthead"><a class="brand" href="/" aria-label="SeaSlugs — דף הבית"><span class="brand-name"
+                dir="ltr">SeaSlugs<span class="brand-dot">.</span></span><span class="brand-he">חינניות
+                ים</span></a>{% include 'observations/account_menu.html' %}</header>
+    <main class="species-page">
+        <nav class="breadcrumb" aria-label="מיקום בטקסונומיה">
+            <a href="/">הגלריה</a>
+            {% if taxon_order %}<span>›</span><span>{{ taxon_order.name_he|default:taxon_order.name }}</span>{% endif %}
+            {% if taxon_family %}<span>›</span><span>{{ taxon_family.name_he|default:taxon_family.name }}</span>{% endif %}
+            {% if taxon_genus %}<span>›</span><span>{{ taxon_genus.name_he|default:taxon_genus.name }}</span>{% endif %}
+            <span>›</span><span aria-current="page">{{ species.scientific_name }}</span>
+        </nav>
+
+        <article class="species-hero">
+            <div class="species-media">
+                {% if video_id %}
+                <div class="species-video"><iframe src="https://www.youtube-nocookie.com/embed/{{ video_id }}" title="{{ species.scientific_name }}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
+                {% elif image_url %}
+                <img src="{{ image_url }}" alt="{{ species.scientific_name }}" width="800" height="600">
+                {% endif %}
+            </div>
+            <div class="species-summary">
+                <h1 dir="ltr">{{ species.scientific_name }}</h1>
+                {% if species.name_he or species.name_en %}<p class="species-common">{{ species.name_he }}{% if species.name_he and species.name_en %} · {% endif %}{{ species.name_en }}</p>{% endif %}
+                <p class="species-area">{{ area.country.name }} · {{ area.sea.name }}</p>
+                <div class="species-badges">
+                    {% if species.is_migrant %}<span class="badge badge-migrant">מין מהגר</span>{% endif %}
+                    {% if species.first_observed_year or species.last_observed_year %}<span class="badge">תצפיות: {% if species.first_observed_year %}{{ species.first_observed_year }}{% else %}?{% endif %}–{% if species.last_observed_year %}{{ species.last_observed_year }}{% else %}?{% endif %}</span>{% endif %}
+                </div>
+                {% if species.link or species.article_pdf %}
+                <div class="species-links">
+                    {% if species.link %}<a href="{{ species.link }}" target="_blank" rel="noopener">קישור נוסף ↗</a>{% endif %}
+                    {% if species.article_pdf %}<a href="{{ species.article_pdf.url }}" target="_blank" rel="noopener">מאמר (PDF) ↗</a>{% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </article>
+
+        {% if species.description_he or species.description_en %}
+        <section class="species-section">
+            <h2>תיאור</h2>
+            {% if species.description_he %}<p>{{ species.description_he|linebreaksbr }}</p>{% endif %}
+            {% if species.description_en %}<p dir="ltr">{{ species.description_en|linebreaksbr }}</p>{% endif %}
+        </section>
+        {% endif %}
+
+        {% if species.habitat or species.food %}
+        <section class="species-section species-facts">
+            {% if species.habitat %}<div><h3>בית גידול</h3><p>{{ species.habitat|linebreaksbr }}</p></div>{% endif %}
+            {% if species.food %}<div><h3>מזון</h3><p>{{ species.food|linebreaksbr }}</p></div>{% endif %}
+        </section>
+        {% endif %}
+
+        <section class="species-section">
+            <h2>תצפיות ({{ samples|length }})</h2>
+            <div class="grid">
+                {% for s in samples %}
+                <article class="card">
+                    <a class="video-button" href="{% if s.video_url %}{{ s.video_url }}{% else %}{% url 'observation-photo' s.pk %}{% endif %}" target="_blank" rel="noopener">
+                        <span class="image-wrap"><img src="{% if s.image %}{% url 'observation-photo' s.pk %}{% else %}{{ s.thumbnail }}{% endif %}" alt="" width="640" height="360" loading="lazy"><span class="play" aria-hidden="true">{% if s.video_url %}▶{% else %}⤢{% endif %}</span></span>
+                        <span class="card-info">
+                            <span class="card-meta"><span>{% if s.site %}{{ s.site.name }}{% endif %}{% if s.day and s.trip.month %} · {{ s.day }}/{{ s.trip.month }}/{{ s.trip.year }}{% elif s.trip.year %} · {{ s.trip.year }}{% endif %}</span></span>
+                            {% if s.photographer_name %}<span class="photographer">צילום: {{ s.photographer_name }}</span>{% endif %}
+                        </span>
+                    </a>
+                </article>
+                {% endfor %}
+            </div>
+        </section>
+    </main>
+</body>
+
+</html>
