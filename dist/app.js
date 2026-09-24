@@ -710,6 +710,7 @@ const translations = [
     ['.eyebrow', 'Through the lens, beneath the sea'],
     ['.intro-copy', 'Search, watch and publish new species here — and find macro diving partners too.'],
     ['.search > span', 'Search'],
+    ['.sort-order > span', 'Sort'],
     ['#empty h3', 'No items found'],
     ['#empty p', 'Try a different name or choose another region.'],
     ['#reset', 'Clear search and filters'],
@@ -767,6 +768,9 @@ function setLanguage(value) {
     document.querySelector('.brand').setAttribute('aria-label', en ? 'SeaSlugs — Home' : 'SeaSlugs — דף הבית');
     document.querySelector('#close').setAttribute('aria-label', en ? 'Close video' : 'סגירת התצוגה');
     document.querySelector('#filterClose').setAttribute('aria-label', en ? 'Close filters' : 'סגירת הסינון');
+    document.querySelector('#sortSelect').setAttribute('aria-label', en ? 'Sort species' : 'מיון המינים');
+    document.querySelector('#sortSelect option[value="taxonomic"]').textContent = en ? 'Taxonomic order' : 'סדר טקסונומי';
+    document.querySelector('#sortSelect option[value="alpha"]').textContent = en ? 'Alphabetical (genus then species)' : 'אלפביתי (סוג ואז מין)';
     languageButton.textContent = en ? 'עברית' : 'English';
     languageButton.lang = en ? 'he' : 'en';
     languageButton.setAttribute('aria-label', en ? 'Switch to Hebrew' : 'מעבר לאנגלית');
