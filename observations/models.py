@@ -5,7 +5,7 @@ from datetime import date
 from urllib.parse import urlparse, parse_qs
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.core.validators import MinValueValidator, MaxValueValidator
+from django.core.validators import MinValueValidator, MaxValueValidator, FileExtensionValidator
 from django.db import models, transaction
 from django.utils import timezone
 
@@ -71,10 +71,30 @@ class Species(models.Model):
     phylogenetic_order = models.CharField('סדר אבולוציוני', max_length=40, blank=True)
     full_species_name_with_order = models.TextField('שם מלא עם סדר — מהאקסל', blank=True)
     reference_author = models.TextField('מחבר נוסף / מקור זיהוי — Author באקסל', blank=True)
+    # Content for the upcoming per-species page (not from the import spreadsheet -- entered by hand).
+    habitat = models.TextField('בית גידול', blank=True)
+    food = models.TextField('מזון', blank=True)
+    is_migrant = models.BooleanField('מין מהגר', default=False)
+    first_observed_year = models.PositiveSmallIntegerField('שנת תצפית ראשונה', null=True, blank=True, validators=[MinValueValidator(1900)])
+    last_observed_year = models.PositiveSmallIntegerField('שנת תצפית אחרונה', null=True, blank=True, validators=[MinValueValidator(1900)])
+    description_he = models.TextField('תיאור בעברית', blank=True)
+    description_en = models.TextField('תיאור באנגלית', blank=True)
+    link = models.URLField('קישור', blank=True)
+    article_pdf = models.FileField('מאמר (PDF)', upload_to='articles/species/', blank=True, validators=[FileExtensionValidator(['pdf'])])
     class Meta:
         ordering = [models.functions.NullIf('phylogenetic_order', models.Value('')).asc(nulls_last=True), 'scientific_name']
         verbose_name = 'מין'; verbose_name_plural = 'מינים'
     def __str__(self): return self.scientific_name
+    def clean(self):
+        super().clean()
+        errors = {}
+        if self.first_observed_year and self.first_observed_year > date.today().year:
+            errors['first_observed_year'] = 'שנת תצפית ראשונה אינה יכולה להיות בעתיד.'
+        if self.last_observed_year and self.last_observed_year > date.today().year:
+            errors['last_observed_year'] = 'שנת תצפית אחרונה אינה יכולה להיות בעתיד.'
+        if self.first_observed_year and self.last_observed_year and self.last_observed_year < self.first_observed_year:
+            errors['last_observed_year'] = 'שנת תצפית אחרונה אינה יכולה להיות לפני שנת התצפית הראשונה.'
+        if errors: raise ValidationError(errors)
 
 
 class TaxonOrder(models.Model):
@@ -91,6 +111,10 @@ class TaxonOrder(models.Model):
     taxonomic_order = models.CharField('סדר טקסונומי', max_length=40, blank=True)
     defining_sample = models.ForeignKey('Sample', null=True, blank=True, on_delete=models.SET_NULL, related_name='+', verbose_name='דגימה מגדירה',
         help_text='הדגימה שתמונתה או סרטון היוטיוב שלה יוצגו בכותרת הסדרה בגלריה.')
+    description_he = models.TextField('תיאור בעברית', blank=True)
+    description_en = models.TextField('תיאור באנגלית', blank=True)
+    link = models.URLField('קישור', blank=True)
+    article_pdf = models.FileField('מאמר (PDF)', upload_to='articles/orders/', blank=True, validators=[FileExtensionValidator(['pdf'])])
     class Meta:
         ordering = [models.functions.NullIf('taxonomic_order', models.Value('')).asc(nulls_last=True), 'name', 'sub_order']
         verbose_name = 'סדרה (טקסונומיה)'
@@ -115,6 +139,10 @@ class TaxonFamily(models.Model):
     taxonomic_order = models.CharField('סדר טקסונומי', max_length=40, blank=True)
     defining_sample = models.ForeignKey('Sample', null=True, blank=True, on_delete=models.SET_NULL, related_name='+', verbose_name='דגימה מגדירה',
         help_text='הדגימה שתמונתה או סרטון היוטיוב שלה יוצגו בכותרת המשפחה בגלריה.')
+    description_he = models.TextField('תיאור בעברית', blank=True)
+    description_en = models.TextField('תיאור באנגלית', blank=True)
+    link = models.URLField('קישור', blank=True)
+    article_pdf = models.FileField('מאמר (PDF)', upload_to='articles/families/', blank=True, validators=[FileExtensionValidator(['pdf'])])
     class Meta:
         ordering = [models.functions.NullIf('taxonomic_order', models.Value('')).asc(nulls_last=True), 'name', 'sub_family']
         verbose_name = 'משפחה (טקסונומיה)'
@@ -131,6 +159,10 @@ class TaxonGenus(models.Model):
     taxonomic_order = models.CharField('סדר טקסונומי', max_length=40, blank=True)
     defining_sample = models.ForeignKey('Sample', null=True, blank=True, on_delete=models.SET_NULL, related_name='+', verbose_name='דגימה מגדירה',
         help_text='הדגימה שתמונתה או סרטון היוטיוב שלה יוצגו בכותרת הסוג ובאוסף המינים שלו בגלריה.')
+    description_he = models.TextField('תיאור בעברית', blank=True)
+    description_en = models.TextField('תיאור באנגלית', blank=True)
+    link = models.URLField('קישור', blank=True)
+    article_pdf = models.FileField('מאמר (PDF)', upload_to='articles/genera/', blank=True, validators=[FileExtensionValidator(['pdf'])])
     class Meta:
         ordering = [models.functions.NullIf('taxonomic_order', models.Value('')).asc(nulls_last=True), 'name']
         verbose_name = 'סוג (טקסונומיה)'
@@ -160,7 +192,12 @@ class Profile(models.Model):
 
 
 class DiveTrip(models.Model):
+    class Kind(models.TextChoices):
+        DIVE = 'dive', 'מסע צלילה'
+        THEMATIC = 'thematic', 'אוסף נושאי'
     code = models.CharField('קוד מסע', max_length=40, unique=True, default=uuid.uuid4)
+    kind = models.CharField('סוג המסע', max_length=20, choices=Kind.choices, default=Kind.DIVE,
+        help_text='מסע צלילה רגיל, לעומת אוסף נושאי של מינים (למשל מינים מהגרים לספסיאניים) שאינו בהכרח צלילה בודדת.')
     title = models.CharField('שם המסע', max_length=400)
     source_sort = models.CharField('מיון במקור', max_length=100, blank=True)
     year = models.PositiveSmallIntegerField('שנה', null=True, blank=True, validators=[MinValueValidator(1900)])
@@ -176,6 +213,10 @@ class DiveTrip(models.Model):
     photographer = models.CharField('צלם', max_length=180, blank=True)
     species_count = models.PositiveIntegerField('מספר מינים שנצפו במסע', null=True, blank=True, help_text='מספר מדווח לכל המסע; אינו מספר הסרטונים באתר. השאר ריק אם אינו ידוע.')
     source_metadata = models.JSONField(default=dict, blank=True)
+    description_he = models.TextField('תיאור בעברית', blank=True)
+    description_en = models.TextField('תיאור באנגלית', blank=True)
+    link = models.URLField('קישור', blank=True)
+    article_pdf = models.FileField('מאמר (PDF)', upload_to='articles/trips/', blank=True, validators=[FileExtensionValidator(['pdf'])])
 
     class Meta:
         db_table = 'dive_trips'

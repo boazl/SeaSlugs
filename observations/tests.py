@@ -1,4 +1,5 @@
 import tempfile
+from datetime import date
 from io import BytesIO
 from django.test import TestCase, override_settings
 from django.contrib.auth.models import User
@@ -426,3 +427,33 @@ class WorkflowTests(TestCase):
         response = self.client.post(f'/observations/{item.pk}/edit/?next=https://evil.example/phish', data)
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, f'/observations/#obs-{item.pk}')
+
+    def test_species_clean_rejects_last_observed_year_before_first(self):
+        self.species.first_observed_year = 2020
+        self.species.last_observed_year = 2015
+        with self.assertRaises(ValidationError):
+            self.species.full_clean()
+
+    def test_species_clean_rejects_future_observed_year(self):
+        self.species.first_observed_year = date.today().year + 1
+        with self.assertRaises(ValidationError):
+            self.species.full_clean()
+
+    def test_species_clean_accepts_valid_observed_year_range(self):
+        self.species.first_observed_year = 2018
+        self.species.last_observed_year = 2024
+        self.species.is_migrant = True
+        self.species.habitat = 'שוניות אלמוגים'
+        self.species.food = 'ספוגים'
+        self.species.full_clean()  # must not raise
+
+    def test_species_article_pdf_rejects_non_pdf_extension(self):
+        self.species.article_pdf = SimpleUploadedFile('notes.txt', b'not a pdf', content_type='text/plain')
+        with self.assertRaises(ValidationError):
+            self.species.full_clean()
+
+    def test_dive_trip_kind_defaults_to_dive_and_thematic_choice_is_available(self):
+        self.assertEqual(self.trip.kind, DiveTrip.Kind.DIVE)
+        thematic = DiveTrip.objects.create(title='מינים מהגרים לספסיאניים', kind=DiveTrip.Kind.THEMATIC)
+        thematic.full_clean()  # a thematic collection has no year/region and must still validate
+        self.assertEqual(thematic.kind, 'thematic')

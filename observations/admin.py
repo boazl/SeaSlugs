@@ -17,6 +17,7 @@ class SpeciesAdmin(admin.ModelAdmin):
         ('זיהוי מדעי', {'fields':['phylogenetic_order','scientific_name','genus','species','author','formatted_author','reference_author','full_species_name_with_order']}),
         ('סיווג טקסונומי', {'fields':['order','superfamily','family','accepted_genus','accepted_species']}),
         ('שמות ותפוצה', {'fields':['name_he','name_en','common_name','transliteration','language','distribution']}),
+        ('תוכן לעמוד המין', {'fields':['habitat','food','is_migrant','first_observed_year','last_observed_year','description_he','description_en','link','article_pdf']}),
     ]
 
 @admin.register(TaxonOrder)
@@ -43,8 +44,8 @@ class TaxonGenusAdmin(admin.ModelAdmin):
 
 @admin.register(DiveTrip)
 class DiveTripAdmin(admin.ModelAdmin):
-    list_display = ['code','title','year','month','country','region','photographer','species_count']
-    list_filter = ['year','country','region','photographer']
+    list_display = ['code','title','kind','year','month','country','region','photographer','species_count']
+    list_filter = ['kind','year','country','region','photographer']
     search_fields = ['code','title','region_name','reserve','photographer']
     readonly_fields = ['source_metadata']
 
