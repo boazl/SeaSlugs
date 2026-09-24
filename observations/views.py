@@ -50,6 +50,21 @@ def species_page(request, slug):
         'taxon_order': order_obj, 'taxon_family': family_obj, 'taxon_genus': genus_obj,
     })
 
+
+def species_article(request, slug):
+    """Streams a species' curated article PDF. Production never serves MEDIA_ROOT
+    directly (same reason observation-photo/site-image exist as dedicated views rather
+    than linking straight to .url) -- this is that view for Species.article_pdf. Keyed by
+    the same species+area slug the page itself uses (the file is shared by the species
+    across all its areas, but there's no separate species-only slug to key it by)."""
+    area = get_object_or_404(SpeciesArea.objects.select_related('species'), slug=slug)
+    if not area.species.article_pdf:
+        raise Http404
+    response = FileResponse(area.species.article_pdf.open('rb'), content_type='application/pdf')
+    response['Cache-Control'] = 'public, max-age=3600'
+    response['Content-Disposition'] = 'inline; filename="%s.pdf"' % area.species.scientific_name.replace('"', "'")
+    return response
+
 SORT_OPTIONS = {
     'newest': ('-created_at',),
     'oldest': ('created_at',),

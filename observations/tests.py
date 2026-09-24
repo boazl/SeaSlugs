@@ -498,3 +498,28 @@ class WorkflowTests(TestCase):
         area = SpeciesArea.objects.create(species=empty_species, country=self.country, sea=self.sea)
         response = self.client.get(f'/species/{area.slug}/')
         self.assertEqual(response.status_code, 404)
+
+    def test_species_article_view_streams_the_pdf(self):
+        self.record()
+        area = SpeciesArea.objects.get(species=self.species, country=self.country, sea=self.sea)
+        self.species.article_pdf = SimpleUploadedFile('article.pdf', b'%PDF-1.4 fake', content_type='application/pdf')
+        self.species.save()
+        response = self.client.get(f'/species/{area.slug}/article.pdf')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/pdf')
+
+    def test_species_article_view_404s_when_no_pdf_uploaded(self):
+        self.record()
+        area = SpeciesArea.objects.get(species=self.species, country=self.country, sea=self.sea)
+        response = self.client.get(f'/species/{area.slug}/article.pdf')
+        self.assertEqual(response.status_code, 404)
+
+    def test_species_page_links_to_the_article_view_not_the_raw_media_url(self):
+        # A direct .url link to MEDIA_ROOT 404s in production (nothing serves /media/
+        # there outside DEBUG) -- the page must link through the dedicated view instead.
+        self.record()
+        area = SpeciesArea.objects.get(species=self.species, country=self.country, sea=self.sea)
+        self.species.article_pdf = SimpleUploadedFile('article.pdf', b'%PDF-1.4 fake', content_type='application/pdf')
+        self.species.save()
+        response = self.client.get(f'/species/{area.slug}/')
+        self.assertContains(response, f'/species/{area.slug}/article.pdf')

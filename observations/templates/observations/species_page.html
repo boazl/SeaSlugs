@@ -69,7 +69,7 @@
                 {% if species.link or species.article_pdf %}
                 <div class="species-links">
                     {% if species.link %}<a href="{{ species.link }}" target="_blank" rel="noopener">קישור נוסף ↗</a>{% endif %}
-                    {% if species.article_pdf %}<a href="{{ species.article_pdf.url }}" target="_blank" rel="noopener">מאמר (PDF) ↗</a>{% endif %}
+                    {% if species.article_pdf %}<a href="{% url 'species-article' area.slug %}" target="_blank" rel="noopener">מאמר (PDF) ↗</a>{% endif %}
                 </div>
                 {% endif %}
             </div>
