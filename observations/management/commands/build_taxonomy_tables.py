@@ -35,7 +35,7 @@ from pathlib import Path
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-from observations.models import Species, TaxonOrder, TaxonFamily, TaxonGenus, Sample, SampleKind
+from observations.models import Species, TaxonOrder, TaxonFamily, TaxonGenus, Sample, SampleKind, KIND_EN_NAMES
 from observations.table_transfer import create_backup
 
 IGNORED_ORDER_VALUES = {'', 'Not assigned'}
@@ -78,14 +78,6 @@ def _pick_defining_sample(queryset):
     return (with_image or candidates)[0]
 
 
-
-KIND_EN_NAMES = {
-    'species': 'Species',
-    'collection': 'Collection (dive trip)',
-    'genus': 'Genus',
-    'family': 'Family',
-    'order': 'Order',
-}
 
 class Command(BaseCommand):
     help = 'Build/refresh TaxonOrder, TaxonFamily, TaxonGenus (from Species) and SampleKind (from Sample.Kind).'

@@ -269,6 +269,19 @@ class SampleKind(Named):
         verbose_name_plural = 'סוגי דגימה'
 
 
+# English fallback labels for Sample.Kind, used both to seed/refresh SampleKind (the
+# admin-editable bilingual reference table -- see build_taxonomy_tables) and, in views.py,
+# as a fallback for the observations listing's English mode when that table is empty
+# (e.g. a fresh install that hasn't run the management command yet).
+KIND_EN_NAMES = {
+    'species': 'Species',
+    'collection': 'Collection (dive trip)',
+    'genus': 'Genus',
+    'family': 'Family',
+    'order': 'Order',
+}
+
+
 class Sample(models.Model):
     class Kind(models.TextChoices):
         SPECIES = 'species', 'מין יחיד'

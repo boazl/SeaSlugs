@@ -29,3 +29,18 @@ class MaintenanceModeMiddleware:
             response['Cache-Control'] = 'private, no-store'
             return response
         return self.get_response(request)
+
+
+class LanguagePreferenceMiddleware:
+    """Remembers an explicit ?lang=he/en choice (sent by the bilingual pages'
+    language-toggle link) in a cookie, so it stays the default on later visits to
+    those pages even without the query parameter."""
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        lang = request.GET.get('lang')
+        if lang in ('he', 'en'):
+            response.set_cookie('seaslugs_lang', lang, max_age=60 * 60 * 24 * 365, samesite='Lax')
+        return response

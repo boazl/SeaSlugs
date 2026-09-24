@@ -8,9 +8,10 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
-from .models import Sample, Profile, Region, Site, DiveTrip, SiteImage, Species, Country, SpeciesArea
+from .models import Sample, Profile, Region, Site, DiveTrip, SiteImage, Species, Country, SpeciesArea, SampleKind, KIND_EN_NAMES
 from .forms import SignupForm, SampleForm, ProfileForm, DiveTripForm
 from .gallery_data import TaxonResolver, taxon_media
+from .i18n import get_lang
 
 
 def is_manager(user): return user.is_authenticated and user.is_staff and user.has_perm('observations.change_sample')
@@ -44,10 +45,24 @@ def species_page(request, slug):
     if not samples:
         raise Http404
     order_obj, family_obj, genus_obj = TaxonResolver().resolve(area.species)
+    lang = get_lang(request)
+
+    def taxon_label(obj):
+        if not obj:
+            return ''
+        return (obj.name_en or obj.name) if lang == 'en' else (obj.name_he or obj.name)
+
+    species = area.species
+    common_name = (species.name_en or species.name_he) if lang == 'en' else (species.name_he or species.name_en)
+    description = (species.description_en or species.description_he) if lang == 'en' else (species.description_he or species.description_en)
     return render(request, 'observations/species_page.html', {
-        'area': area, 'species': area.species, 'samples': samples,
+        'area': area, 'species': species, 'samples': samples,
         'image_url': image_url, 'video_id': video_id, 'thumbnail': thumbnail,
         'taxon_order': order_obj, 'taxon_family': family_obj, 'taxon_genus': genus_obj,
+        'taxon_order_label': taxon_label(order_obj), 'taxon_family_label': taxon_label(family_obj),
+        'taxon_genus_label': taxon_label(genus_obj),
+        'common_name': common_name, 'description': description,
+        'canonical_url': request.build_absolute_uri(request.path),
     })
 
 
@@ -71,6 +86,22 @@ SORT_OPTIONS = {
     'trip_desc': ('-trip__year', '-trip__month', '-created_at'),
     'trip_asc': ('trip__year', 'trip__month', 'created_at'),
     'species': ('species__scientific_name', '-created_at'),
+}
+
+# (value, {lang: label}) -- ordered as they should appear in the sort dropdown.
+SORT_LABELS = [
+    ('newest', {'he': 'החדש ביותר', 'en': 'Newest first'}),
+    ('oldest', {'he': 'הישן ביותר', 'en': 'Oldest first'}),
+    ('trip_desc', {'he': 'תאריך מסע (חדש לישן)', 'en': 'Trip date (newest first)'}),
+    ('trip_asc', {'he': 'תאריך מסע (ישן לחדש)', 'en': 'Trip date (oldest first)'}),
+    ('species', {'he': 'שם המין (א-ת)', 'en': 'Species name (A–Z)'}),
+]
+
+# Sample.Status has no admin-editable bilingual reference table the way Sample.Kind
+# does (SampleKind) -- just two fixed values, so a plain dict is enough.
+STATUS_LABELS = {
+    'pending': {'he': 'ממתינה לאישור', 'en': 'Pending approval'},
+    'published': {'he': 'מפורסמת', 'en': 'Published'},
 }
 
 
@@ -129,16 +160,33 @@ def listing(request):
     present_kinds = set(visible.order_by().values_list('kind', flat=True).distinct())
     present_statuses = set(visible.order_by().values_list('status', flat=True).distinct())
 
+    lang = get_lang(request)
+    # SampleKind is the admin-editable bilingual reference table for Sample.Kind, but it's
+    # only populated once build_taxonomy_tables has run -- fall back to the static
+    # KIND_EN_NAMES/TextChoices labels (never the raw code) so a fresh install still shows
+    # sensible English text.
+    kind_db_labels = {sk.code: sk for sk in SampleKind.objects.all()}
+    def kind_label(code, he_label):
+        sk = kind_db_labels.get(code)
+        if lang == 'en':
+            return (sk.name_en if sk and sk.name_en else '') or KIND_EN_NAMES.get(code) or he_label
+        return (sk.name if sk and sk.name else '') or he_label
+    kind_label_lookup = {code: kind_label(code, he_label) for code, he_label in Sample.Kind.choices}
+    status_label_lookup = {code: labels[lang] for code, labels in STATUS_LABELS.items()}
+
     context = {
         'observations': rows,
         'manager': manager,
         'sort': sort,
         'filters': get,
+        'kind_label_lookup': kind_label_lookup,
+        'status_label_lookup': status_label_lookup,
+        'sort_options': [(v, labels[lang]) for v, labels in SORT_LABELS],
         # A filter whose data holds only zero or one distinct value is never useful --
         # narrowing it can't change the result set -- so each list below is only rendered
         # by the template when it has more than one option (see list.html's length checks).
-        'kind_choices': [(v, label) for v, label in Sample.Kind.choices if v in present_kinds],
-        'status_choices': [(v, label) for v, label in Sample.Status.choices if v in present_statuses],
+        'kind_choices': [(v, kind_label_lookup.get(v, label)) for v, label in Sample.Kind.choices if v in present_kinds],
+        'status_choices': [(v, status_label_lookup.get(v, label)) for v, label in Sample.Status.choices if v in present_statuses],
         'countries': Country.objects.filter(dive_trips__samples__in=visible).distinct().order_by('name'),
         'regions': Region.objects.filter(dive_trips__samples__in=visible).distinct().order_by('name'),
         'years': sorted((v for v in visible.exclude(trip__year__isnull=True).order_by().values_list('trip__year', flat=True).distinct() if v), reverse=True),

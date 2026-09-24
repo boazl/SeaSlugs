@@ -523,3 +523,49 @@ class WorkflowTests(TestCase):
         self.species.save()
         response = self.client.get(f'/species/{area.slug}/')
         self.assertContains(response, f'/species/{area.slug}/article.pdf')
+
+    def test_species_page_switches_description_language(self):
+        self.species.description_he = 'תיאור בעברית'
+        self.species.description_en = 'English description text'
+        self.species.save()
+        self.record()
+        area = SpeciesArea.objects.get(species=self.species, country=self.country, sea=self.sea)
+        he_response = self.client.get(f'/species/{area.slug}/')
+        self.assertContains(he_response, 'תיאור בעברית')
+        self.assertNotContains(he_response, 'English description text')
+        en_response = self.client.get(f'/species/{area.slug}/?lang=en')
+        self.assertContains(en_response, 'English description text')
+        self.assertNotContains(en_response, 'תיאור בעברית')
+
+    def test_species_page_always_shows_a_share_link(self):
+        # Even with no description written yet, the page's canonical URL must be visible
+        # (Boaz pastes it into Facebook/Instagram captions when posting a species video).
+        self.record()
+        area = SpeciesArea.objects.get(species=self.species, country=self.country, sea=self.sea)
+        response = self.client.get(f'/species/{area.slug}/')
+        self.assertContains(response, f'http://testserver/species/{area.slug}/')
+
+    def test_species_page_language_toggle_link_points_at_the_other_language(self):
+        self.record()
+        area = SpeciesArea.objects.get(species=self.species, country=self.country, sea=self.sea)
+        he_response = self.client.get(f'/species/{area.slug}/')
+        self.assertContains(he_response, 'lang=en')
+        en_response = self.client.get(f'/species/{area.slug}/?lang=en')
+        self.assertContains(en_response, 'lang=he')
+
+    def test_observations_listing_translates_filter_labels_when_lang_en(self):
+        self.record()
+        self.record(kind=Sample.Kind.GENUS, species=None, species_other='Some genus')
+        self.client.login(username='owner', password='a-valid-password-927')
+        response = self.client.get('/observations/?lang=en')
+        self.assertContains(response, 'Record type')
+        self.assertContains(response, 'Reset filters')
+        self.assertContains(response, '>Genus<')
+        self.assertNotContains(response, 'סוג הרשומה')
+
+    def test_language_preference_is_remembered_via_cookie(self):
+        self.client.login(username='owner', password='a-valid-password-927')
+        first = self.client.get('/observations/?lang=en')
+        self.assertEqual(first.cookies['seaslugs_lang'].value, 'en')
+        second = self.client.get('/observations/')
+        self.assertContains(second, 'Reset filters')
