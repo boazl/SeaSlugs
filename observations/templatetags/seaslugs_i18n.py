@@ -59,14 +59,46 @@ TRANSLATIONS = {
     'כניסה': 'Login',
     'הרשמה': 'Sign up',
     'חבר/ת הקהילה': 'Community member',
+    'הפרופיל נשמר.': 'Profile saved.',
+    # signup / profile form field labels and help text (form.html renders these
+    # fields manually rather than via form.as_p, precisely so each label/help_text
+    # can be run through this filter -- see observations/views.py profile()/signup()).
+    'שם משתמש': 'Username',
+    'שדה חובה. 150 תווים או פחות. אותיות, ספרות ו-@/./+/-/_ בלבד.':
+        'Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only.',
+    'שם פרטי': 'First name',
+    'שם משפחה': 'Last name',
+    'דואר אלקטרוני': 'Email',
+    'סיסמה': 'Password',
+    ('<ul><li>הסיסמה שלך לא יכולה להיות דומה מדי למידע אישי אחר שלך.</li>'
+     '<li>הסיסמה שלך חייבת להכיל לפחות 8 תווים.</li>'
+     '<li>הסיסמה שלך לא יכולה להיות סיסמה שכיחה.</li>'
+     '<li>הסיסמה שלך לא יכולה להכיל רק ספרות.</li></ul>'):
+        ("<ul><li>Your password can't be too similar to your other personal information.</li>"
+         "<li>Your password must contain at least 8 characters.</li>"
+         "<li>Your password can't be a commonly used password.</li>"
+         "<li>Your password can't be entirely numeric.</li></ul>"),
+    'אימות סיסמה': 'Password confirmation',
+    'יש להזין את אותה סיסמה כמו קודם, לאימות.': 'Enter the same password as before, for verification.',
+    'שם פרטי באנגלית': 'First name (English)',
+    'שם משפחה באנגלית': 'Last name (English)',
+    'טלפון': 'Phone',
+    'מעוניין במציאת שותפים לצלילת מאקרו': 'Interested in finding macro diving partners',
+    'הצגת הפרופיל למשתמשים רשומים': 'Show my profile to other members',
+    'מדינות צלילה': 'Diving countries',
+    'אזורי צלילה': 'Diving regions',
+    'על עצמי': 'About me',
 }
 
 
 @register.filter
 def t(value, lang):
+    # `value` is usually a plain Hebrew string, but callers also run this over
+    # objects that stringify to one (e.g. a django.contrib.messages Message,
+    # which isn't hashable, so it must go through str() before a dict lookup).
     if lang != 'en':
         return value
-    return TRANSLATIONS.get(value, value)
+    return TRANSLATIONS.get(str(value), value)
 
 
 @register.filter

@@ -189,3 +189,47 @@ class DiveTripTests(TestCase):
         self.assertContains(response,'name="profile-0-first_name_en"')
         self.assertContains(response,'name="profile-0-last_name_en"')
         self.assertContains(response,'name="profile-0-phone"')
+
+    def test_profile_page_field_labels_translate_in_english_mode(self):
+        # form.html renders the profile/signup forms field-by-field (rather than
+        # via form.as_p) specifically so each label can go through the `t` filter --
+        # this is the regression test for that, covering both directions.
+        from .models import Profile
+        Profile.objects.create(user=self.user)
+        self.client.force_login(self.user)
+        he_response=self.client.get('/observations/profile/')
+        self.assertContains(he_response,'שם פרטי באנגלית:')
+        self.assertContains(he_response,'טלפון:')
+        en_response=self.client.get('/observations/profile/?lang=en')
+        self.assertContains(en_response,'First name (English):')
+        self.assertContains(en_response,'Phone:')
+        self.assertNotContains(en_response,'שם פרטי באנגלית:')
+
+    def test_profile_page_country_and_region_choices_translate_in_english_mode(self):
+        # The checkbox list for countries/regions gets its individual choice text
+        # from ProfileForm.label_from_instance, not the `t` filter (there's no fixed
+        # string to look up -- the choices are whatever Country/Region rows exist).
+        Country.objects.create(name='ישראל',name_en='Israel')
+        from .models import Profile
+        Profile.objects.create(user=self.user)
+        self.client.force_login(self.user)
+        self.assertContains(self.client.get('/observations/profile/'),'ישראל')
+        self.assertContains(self.client.get('/observations/profile/?lang=en'),'Israel')
+
+    def test_profile_save_success_message_translates_without_crashing(self):
+        # Regression test: base.html runs each message through `t:lang`, and the
+        # very first attempt at this crashed with "unhashable type: 'Message'"
+        # because django.contrib.messages.Message isn't hashable and the `t` filter
+        # did a raw dict lookup on it instead of str(value) first.
+        from .models import Profile
+        Profile.objects.create(user=self.user)
+        self.client.force_login(self.user)
+        response=self.client.post('/observations/profile/?lang=en',{'first_name':'Dana'},follow=True)
+        self.assertContains(response,'Profile saved.')
+
+    def test_signup_page_field_labels_translate_in_english_mode(self):
+        he_response=self.client.get('/observations/signup/')
+        self.assertContains(he_response,'שם משתמש:')
+        en_response=self.client.get('/observations/signup/?lang=en')
+        self.assertContains(en_response,'Username:')
+        self.assertContains(en_response,'Password confirmation:')

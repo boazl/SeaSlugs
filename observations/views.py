@@ -213,8 +213,9 @@ def signup(request):
 
 @login_required
 def profile(request):
+    lang = get_lang(request)
     item,_=Profile.objects.get_or_create(user=request.user)
-    form=ProfileForm(request.POST or None,instance=item)
+    form=ProfileForm(request.POST or None,instance=item,lang=lang)
     if request.method=='POST' and form.is_valid():
         item=form.save()
         group=Group.objects.get_or_create(name='Macro diver')[0]

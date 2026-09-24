@@ -29,10 +29,17 @@ class ProfileForm(forms.ModelForm):
     # the end of the form -- Django would otherwise place explicitly declared fields
     # (first_name/last_name) after every Meta.fields model field.
     field_order = ['first_name','last_name','first_name_en','last_name_en','phone','macro_diver','visible_to_members','countries','regions','bio']
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, lang='he', **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['first_name'].initial = self.instance.user.first_name
         self.fields['last_name'].initial = self.instance.user.last_name
+        if lang == 'en':
+            # Field labels/help_text are translated in the template (form.html runs
+            # them through the `t` filter); the countries/regions checkboxes are the
+            # one part of this form whose individual choice text (Country/Region
+            # names) is baked in Python instead, so it needs its own override here.
+            self.fields['countries'].label_from_instance = lambda obj: obj.name_en or obj.name
+            self.fields['regions'].label_from_instance = lambda obj: obj.name_en or obj.name
     def save(self, commit=True):
         profile = super().save(commit=commit)
         if commit:
