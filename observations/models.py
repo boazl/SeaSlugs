@@ -275,7 +275,10 @@ class Sample(models.Model):
         if self.deleted_at: reasons.append('התצפית מסומנת כמחוקה.')
         try: self.full_clean(validate_constraints=False)
         except ValidationError as exc: reasons.extend(exc.messages)
-        if self.species_other: reasons.append('יש להחליף את ערך המין ״אחר״ בערך מטבלת המינים לפני פרסום (או להוסיף מין חדש דרך הפעולה הייעודית).')
+        # A GENUS-kind sample uses species_other as its actual, permanent identification
+        # (the genus name) rather than an unresolved placeholder awaiting a specific
+        # species match -- only SPECIES/COLLECTION-kind samples need this nudge.
+        if self.species_other and self.kind != self.Kind.GENUS: reasons.append('יש להחליף את ערך המין ״אחר״ בערך מטבלת המינים לפני פרסום (או להוסיף מין חדש דרך הפעולה הייעודית).')
         if self.site_other: reasons.append('יש להחליף את ערך אתר הצלילה ״אחר״ בערך מטבלת אתרי הצלילה לפני פרסום.')
         if not reasons and self.status == self.Status.PENDING: reasons.append('הנתונים הושלמו; נדרש אישור מנהל.')
         return reasons
@@ -307,7 +310,9 @@ class Sample(models.Model):
             # Acquire SQLite's write lock before checking first occurrence.
             if self.species_id:
                 Species.objects.filter(pk=self.species_id).update(scientific_name=models.F('scientific_name'))
-            other = bool(self.species_other) or bool(self.site_other)
+            # Same exception as publication_reasons() above: species_other on a GENUS-kind
+            # sample is the genus identification itself, not an incomplete "other" value.
+            other = (bool(self.species_other) and self.kind != self.Kind.GENUS) or bool(self.site_other)
             complete = bool(self.trip_id and self.trip.year and (self.species_id if self.kind == self.Kind.SPECIES else True) and not other)
             if approve and not complete:
                 raise ValidationError('לפני אישור יש להשלים את שנת המסע ולהחליף ערכי ״אחר״ בערכים מטבלאות העזר.')

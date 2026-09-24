@@ -36,6 +36,33 @@ class WorkflowTests(TestCase):
         area.refresh_from_db();self.assertEqual(area.defining_sample_id,first.pk)
         unknown=self.record(species=None,species_other='Unknown');self.assertEqual(unknown.status,'pending')
         with self.assertRaises(ValidationError):unknown.save_reviewed(actor=self.user,approve=True)
+    def test_genus_kind_sample_with_species_other_can_be_approved_and_published(self):
+        # A GENUS-kind sample identifies only a genus (via species_other, e.g. "Chromodoris"),
+        # never a specific species -- unlike a SPECIES-kind sample's "other" escape hatch, this
+        # is a deliberate, permanent identification, not an unresolved placeholder, so approval
+        # must succeed even though species_other is set and species stays unlinked.
+        genus_sample = Sample(owner=self.user, kind=Sample.Kind.GENUS, species_other='Chromodoris',
+                               trip=self.trip, video_url='https://youtu.be/abcdefghijk')
+        genus_sample.save_reviewed(actor=self.user, approve=True)
+        self.assertEqual(genus_sample.status, 'published')
+        self.assertEqual(genus_sample.species_other, 'Chromodoris')
+        self.assertIsNone(genus_sample.species_id)
+    def test_genus_kind_sample_publication_reasons_omit_the_species_other_warning(self):
+        genus_sample = Sample.objects.create(owner=self.user, kind=Sample.Kind.GENUS, species_other='Chromodoris',
+                                              trip=self.trip, video_url='https://youtu.be/abcdefghijk')
+        reasons = genus_sample.publication_reasons()
+        self.assertFalse(any('להחליף את ערך המין' in reason for reason in reasons))
+    def test_species_kind_sample_with_species_other_still_blocks_approval(self):
+        # Unchanged regression coverage: the GENUS-kind exception must not leak into the
+        # default SPECIES kind, where species_other remains an incomplete placeholder.
+        species_other_sample = Sample(owner=self.user, species=None, species_other='Unknown species',
+                                       trip=self.trip, video_url='https://youtu.be/abcdefghijk')
+        species_other_sample.save_reviewed()
+        self.assertEqual(species_other_sample.status, 'pending')
+        with self.assertRaises(ValidationError):
+            species_other_sample.save_reviewed(actor=self.user, approve=True)
+        reasons = species_other_sample.publication_reasons()
+        self.assertTrue(any('להחליף את ערך המין' in reason for reason in reasons))
     def test_form_other_and_invalid_date(self):
         d=self.data();d.update(species='',species_other='New species')
         form=SampleForm(d,instance=Sample(owner=self.user));self.assertTrue(form.is_valid(),form.errors)
