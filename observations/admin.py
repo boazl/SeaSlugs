@@ -1,4 +1,6 @@
 from django.contrib import admin, messages
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.utils.html import format_html
@@ -7,6 +9,22 @@ from .forms import SampleForm
 from .models import Country, Sea, Region, Site, Species, Profile, Sample, DiveTrip, SiteImage, SpeciesArea, TaxonOrder, TaxonFamily, TaxonGenus, SampleKind
 
 for model in [Country,Sea,Region,Site,Profile,SiteImage,SampleKind]: admin.site.register(model)
+
+
+class ProfileInline(admin.StackedInline):
+    model = Profile
+    can_delete = False
+    verbose_name_plural = 'פרופיל'
+    fields = ['display_name','name_en','phone','macro_diver','visible_to_members','countries','regions','bio']
+    filter_horizontal = ['countries','regions']
+
+
+admin.site.unregister(User)
+
+
+@admin.register(User)
+class UserAdmin(BaseUserAdmin):
+    inlines = [ProfileInline]
 
 @admin.register(Species)
 class SpeciesAdmin(admin.ModelAdmin):

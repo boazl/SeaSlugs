@@ -30,7 +30,7 @@ class ProfileForm(forms.ModelForm):
 
     class Meta:
         model = Profile
-        fields = ['display_name','macro_diver','visible_to_members','countries','regions','bio']
+        fields = ['display_name','name_en','phone','macro_diver','visible_to_members','countries','regions','bio']
         widgets = {'countries':forms.CheckboxSelectMultiple, 'regions':forms.CheckboxSelectMultiple}
 
 

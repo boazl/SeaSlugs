@@ -5,7 +5,7 @@ from datetime import date
 from urllib.parse import urlparse, parse_qs
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.core.validators import MinValueValidator, MaxValueValidator, FileExtensionValidator
+from django.core.validators import MinValueValidator, MaxValueValidator, FileExtensionValidator, RegexValidator
 from django.db import models, transaction
 from django.utils import timezone
 from django.utils.text import slugify
@@ -180,9 +180,14 @@ class SiteImage(models.Model):
     def __str__(self): return self.key
 
 
+PHONE_VALIDATOR = RegexValidator(r'^[0-9+\-()\s]{5,30}$', 'מספר טלפון לא תקין.')
+
+
 class Profile(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     display_name = models.CharField('שם לתצוגה', max_length=100)
+    name_en = models.CharField('שם באנגלית', max_length=150, blank=True)
+    phone = models.CharField('טלפון', max_length=30, blank=True, validators=[PHONE_VALIDATOR])
     macro_diver = models.BooleanField('מעוניין במציאת שותפים לצלילת מאקרו', default=False)
     visible_to_members = models.BooleanField('הצגת הפרופיל למשתמשים רשומים', default=False)
     regions = models.ManyToManyField(Region, blank=True, verbose_name='אזורי צלילה')

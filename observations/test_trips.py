@@ -112,3 +112,29 @@ class DiveTripTests(TestCase):
         self.user.refresh_from_db();self.assertEqual(self.user.first_name,'Dana')
         self.client.force_login(self.user)
         self.assertContains(self.client.get('/'),'<bdi>Dana</bdi>')
+
+    def test_profile_name_en_and_phone_are_saved(self):
+        from .models import Profile
+        from .forms import ProfileForm
+        profile=Profile.objects.create(user=self.user,display_name='Public name')
+        form=ProfileForm({'display_name':'Public name','first_name':'Dana','name_en':'Boaz Liebes','phone':'+972 50-123-4567'},instance=profile)
+        self.assertTrue(form.is_valid(),form.errors);form.save()
+        profile.refresh_from_db()
+        self.assertEqual(profile.name_en,'Boaz Liebes')
+        self.assertEqual(profile.phone,'+972 50-123-4567')
+
+    def test_profile_phone_validator_rejects_garbage(self):
+        from .models import Profile
+        from .forms import ProfileForm
+        profile=Profile.objects.create(user=self.user,display_name='Public name')
+        form=ProfileForm({'display_name':'Public name','first_name':'','phone':'not a phone number!!'},instance=profile)
+        self.assertFalse(form.is_valid())
+        self.assertIn('phone',form.errors)
+
+    def test_user_admin_change_page_shows_profile_fields(self):
+        admin_user=User.objects.create_superuser('admin','admin@example.com','pw')
+        self.client.force_login(admin_user)
+        response=self.client.get(f'/admin/auth/user/{self.user.pk}/change/')
+        self.assertEqual(response.status_code,200)
+        self.assertContains(response,'name="profile-0-name_en"')
+        self.assertContains(response,'name="profile-0-phone"')
