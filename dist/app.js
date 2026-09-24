@@ -453,8 +453,12 @@ function buildCollectionCard(c, index) {
 function buildSpeciesCard(sp, index) {
     const article = document.createElement('article');
     article.className = 'card';
-    const button = document.createElement('button');
-    button.type = 'button';
+    // Real navigation to the species' own dedicated, crawlable page when one exists
+    // (every species+area does, once slugs have been backfilled) -- otherwise (older
+    // data without a slug, in theory) fall back to the in-page preview dialog.
+    const button = sp.slug ? document.createElement('a') : document.createElement('button');
+    if (sp.slug) button.href = `/species/${sp.slug}/`;
+    else button.type = 'button';
     button.className = 'video-button';
     const common = language === 'he' ? (sp.name_he || sp.name_en) : (sp.name_en || sp.name_he);
     button.setAttribute('aria-label', `${language === 'he' ? 'צפייה' : 'Watch'}: ${sp.title}${common ? ' — ' + common : ''}`);
@@ -516,18 +520,8 @@ function buildSpeciesCard(sp, index) {
     if (common) info.append(sub);
     info.append(credit, meta);
     button.append(wrap, info);
-    button.addEventListener('click', () => openSpeciesDialog(sp, button));
+    if (!sp.slug) button.addEventListener('click', () => openSpeciesDialog(sp, button));
     article.append(button);
-    // The species' own dedicated, crawlable page (real navigation -- not another
-    // in-page dialog): only present once the species+area has a slug (older data
-    // before the species-page feature shipped would lack one, in theory).
-    if (sp.slug) {
-        const pageLink = document.createElement('a');
-        pageLink.className = 'species-page-link';
-        pageLink.href = `/species/${sp.slug}/`;
-        pageLink.textContent = language === 'he' ? 'עמוד המין ←' : 'Species page →';
-        article.append(pageLink);
-    }
     return article;
 }
 // Thin group-heading panel shown above the first card of a new order/family/genus group
