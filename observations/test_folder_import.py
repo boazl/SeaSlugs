@@ -106,3 +106,20 @@ class FolderImportTests(TestCase):
             self.assertEqual(match_species(filename,[item]),item.pk)
         self.assertEqual(filename_species('C20-Thuridilla sp. 4 (2021)-Edit.jpg'),'Thuridilla sp. 4 (2021)')
         self.assertEqual(filename_species('713-Tenellia sp. 18 2023-Edit.jpg'),'Tenellia sp. 18')
+
+    def test_matches_despite_cf_aff_and_juvenile_qualifiers(self):
+        # cf./aff. mark a tentative ID and sit between genus and epithet; juv. marks a
+        # juvenile specimen and usually trails the name (sometimes right before the
+        # extension, where filename_stem's own extension-stripping used to eat the
+        # trailing dot off "juv." before match_species ever saw it). None of the three
+        # should stop the photo from matching its already-catalogued species.
+        species=[self.species]  # 'Micromelo undatus'
+        self.assertEqual(match_species('Micromelo cf. undatus (Author, 1900).jpg',species),self.species.pk)
+        self.assertEqual(match_species('Micromelo aff. undatus (Author, 1900).jpg',species),self.species.pk)
+        self.assertEqual(match_species('002-Micromelo undatus juv.jpg',species),self.species.pk)
+        self.assertEqual(match_species('Micromelo undatus (Author, 1900) juv.jpg',species),self.species.pk)
+        self.assertEqual(match_species('002-Micromelo undatus juv. (Author, 1900)-Edit.jpg',species),self.species.pk)
+        # A genuinely new (uncatalogued) species proposal still keeps "cf." -- this isn't
+        # about matching an existing row, it's the tentative-ID name for a new one.
+        from .folder_import import filename_species
+        self.assertEqual(filename_species('Micromelo cf. novum (Author, 1900).jpg'),'Micromelo cf. novum')

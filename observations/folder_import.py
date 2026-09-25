@@ -47,8 +47,18 @@ def filename_species(filename):
     return name
 
 
+# Qualifiers that appear alongside a species name but don't change which catalogued
+# species the photo is of: cf./aff. mark a tentative ID (between genus and epithet,
+# e.g. "Nembrotha cf. kubaryana"), juv. marks a juvenile specimen (usually trailing,
+# e.g. "kubaryana juv." or "kubaryana Bergh, 1877 juv."). Stripped out before matching
+# against the catalog so a hedge like this doesn't stop an otherwise-known species from
+# being recognised. filename_species() (the *new*-species name proposal, used only when
+# no catalog match is found) deliberately keeps "cf." -- that's unaffected by this.
+QUALIFIER_RE=re.compile(r'\b(?:cf|aff|juv)\.?(?=\s|$)',re.IGNORECASE)
+
+
 def match_species(filename,species):
-    stem=filename_stem(filename)
+    stem=normalized(QUALIFIER_RE.sub('',filename_stem(filename)))
     matches=[]
     for item in species:
         aliases={normalized(item.scientific_name),re.sub(r'\s+\([^)]*\)$','',normalized(item.scientific_name))}
