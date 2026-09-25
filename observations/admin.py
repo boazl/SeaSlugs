@@ -6,9 +6,9 @@ from django.core.exceptions import ValidationError
 from django.utils.html import format_html
 from django.urls import reverse
 from .forms import SampleForm
-from .models import Country, Sea, Region, Site, Species, Profile, Sample, DiveTrip, SiteImage, SpeciesArea, TaxonOrder, TaxonFamily, TaxonGenus, SampleKind, Reserve, Photographer
+from .models import Country, Sea, Region, Site, Species, Profile, Sample, DiveTrip, SiteImage, SpeciesArea, TaxonOrder, TaxonFamily, TaxonGenus, SampleKind, Photographer
 
-for model in [Country,Sea,Region,Site,Profile,SiteImage,SampleKind,Reserve,Photographer]: admin.site.register(model)
+for model in [Country,Sea,Region,Site,Profile,SiteImage,SampleKind,Photographer]: admin.site.register(model)
 
 
 class ProfileInline(admin.StackedInline):
@@ -62,12 +62,14 @@ class TaxonGenusAdmin(admin.ModelAdmin):
 
 @admin.register(DiveTrip)
 class DiveTripAdmin(admin.ModelAdmin):
-    list_display = ['code','title','kind','year','month','country','region','sea','photographer_fk','species_count']
-    list_filter = ['kind','year','country','region','reserve_fk','photographer_fk']
-    search_fields = ['code','title','region_name','reserve','reserve_fk__name','photographer','photographer_fk__name']
+    list_display = ['code','title','kind','year','month','country','region','sea','site','photographer_fk','species_count']
+    list_filter = ['kind','year','country','region','site','photographer_fk']
+    search_fields = ['code','title','region_name','reserve','site__name','photographer','photographer_fk__name']
     readonly_fields = ['source_metadata']
-    # Hides the "sea" field's row while a region is selected -- it only matters for a trip
-    # that has no region (see DiveTrip.resolved_sea).
+    # Hides the "sea" field's row while a region is selected (it only matters for a trip
+    # with no region -- see DiveTrip.resolved_sea), and narrows the "region" options to the
+    # selected country/sea and the "site" options to the selected region, fetched from
+    # views.divetrip_locations. See divetrip_admin.js.
     class Media:
         js = ['observations/js/divetrip_admin.js']
 

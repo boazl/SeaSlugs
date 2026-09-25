@@ -51,17 +51,14 @@ class Site(Named):
     class Meta(Named.Meta): verbose_name = 'אתר צלילה'; verbose_name_plural = 'אתרי צלילה'
 
 
-# Lookup tables for DiveTrip.reserve_fk / DiveTrip.photographer_fk -- so a reserve/dive site
-# or a photographer can be picked from a dropdown "just like country", instead of retyped as
-# free text every time. DiveTrip.reserve / DiveTrip.photographer stay around as free-text
-# fields for the raw value as originally recorded / a one-off note, exactly like
-# country_name/region_name do alongside country/region. A guest photographer with no user
-# account here is added straight into the Photographer table via the admin's own "+" popup,
-# same as adding a new region or reserve.
-class Reserve(Named):
-    class Meta(Named.Meta): verbose_name = 'שמורה / אתר'; verbose_name_plural = 'שמורות / אתרים'
-
-
+# Lookup table for DiveTrip.photographer_fk -- so a photographer can be picked from a
+# dropdown "just like country", instead of retyped as free text every time.
+# DiveTrip.photographer stays around as a free-text field for the raw value as originally
+# recorded / a one-off note, exactly like country_name/region_name do alongside
+# country/region. A guest photographer with no user account here is added straight into
+# this table via the admin's own "+" popup, same as adding a new region.
+# (There is no separate Reserve table: DiveTrip.site below reuses the existing Site table,
+# which already has the full country/region/sea hierarchy a reserve needs.)
 class Photographer(Named):
     class Meta(Named.Meta): verbose_name = 'צלם'; verbose_name_plural = 'צלמים'
 
@@ -259,7 +256,10 @@ class DiveTrip(models.Model):
     sea = models.ForeignKey(Sea, null=True, blank=True, on_delete=models.PROTECT, verbose_name='ים', related_name='dive_trips',
         help_text='נבחר מהטבלה. רלוונטי רק כאשר לא נבחר אזור -- כאשר יש אזור, הים נקבע ממנו אוטומטית.')
     reserve = models.CharField('שמורה / אתר (טקסט חופשי)', max_length=180, blank=True)
-    reserve_fk = models.ForeignKey(Reserve, null=True, blank=True, on_delete=models.PROTECT, verbose_name='שמורה / אתר', related_name='dive_trips')
+    # Reuses the existing Site table (already has the full country/region/sea hierarchy)
+    # instead of a separate Reserve lookup table. The admin's cascading filter only lets you
+    # pick a site that belongs to the trip's own region -- see divetrip_admin.js.
+    site = models.ForeignKey(Site, null=True, blank=True, on_delete=models.PROTECT, verbose_name='שמורה / אתר', related_name='dive_trips')
     photographer = models.CharField('צלם (טקסט חופשי)', max_length=180, blank=True)
     photographer_fk = models.ForeignKey(Photographer, null=True, blank=True, on_delete=models.PROTECT, verbose_name='צלם', related_name='dive_trips')
     species_count = models.PositiveIntegerField('מספר מינים שנצפו במסע', null=True, blank=True, help_text='מספר מדווח לכל המסע; אינו מספר הסרטונים באתר. השאר ריק אם אינו ידוע.')

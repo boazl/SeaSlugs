@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth import login
+from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group
 from django.db.models import Q
@@ -274,6 +275,19 @@ def species_area_status(request):
         candidate = SpeciesArea.next_candidate(species.pk, trip.country_id, trip.resolved_sea, sample_id)
         next_info = {'kind': 'with_media', 'id': candidate['sample'].pk} if candidate['kind'] == 'with_media' else {'kind': candidate['kind']}
     return JsonResponse({'matched': True, 'is_defining': is_defining, 'appears': appears, 'next': next_info})
+
+
+@staff_member_required
+def divetrip_locations(request):
+    """Region->country/sea and Site->region mappings, for the DiveTrip admin's cascading
+    dropdowns (divetrip_admin.js): narrows the "region" choices to the trip's own
+    country/sea, and the "site" choices to the trip's own region. These tables are tiny, so
+    the whole mapping is fetched once rather than re-queried per keystroke."""
+    from django.http import JsonResponse
+    return JsonResponse({
+        'regions': list(Region.objects.values('id', 'country_id', 'sea_id')),
+        'sites': list(Site.objects.values('id', 'region_id')),
+    })
 
 
 @login_required

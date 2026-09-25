@@ -8,7 +8,7 @@ from observations.release_views import releases
 from observations.image_manager import manager as image_manager, image_file
 
 from observations.folder_import import folder_import
-from observations.views import site_image, species_page, species_article
+from observations.views import site_image, species_page, species_article, divetrip_locations
 from observations.db_replace import db_replace, db_replace_download
 
 urlpatterns = [
@@ -19,6 +19,7 @@ urlpatterns = [
     path('admin/table-transfer/', transfer, name='table-transfer'),
     path('admin/db-replace/', db_replace, name='db-replace'),
     path('admin/db-replace/download/', db_replace_download, name='db-replace-download'),
+    path('admin/observations/divetrip-locations/', divetrip_locations, name='divetrip-locations'),
     path('observations/', include('observations.urls')),
     path('healthz', health, name='health'),
     path('site-image/<slug:key>.jpg', site_image, name='site-image'),

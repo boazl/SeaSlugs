@@ -2,7 +2,7 @@ from pathlib import Path
 from unittest.mock import patch
 from django.test import TestCase
 from django.contrib.auth.models import User
-from .models import Sample, Species, Country, Region, Sea, DiveTrip, SpeciesArea, Reserve, Photographer
+from .models import Sample, Species, Country, Region, Sea, Site, DiveTrip, SpeciesArea, Photographer
 from .table_transfer import export_table, plan, apply, fingerprint
 
 
@@ -149,8 +149,8 @@ class SpeciesAreaTests(TestCase):
 
 class DiveTripSeaReserveFieldsTests(TestCase):
     """DiveTrip.resolved_sea (region.sea wins when there is a region, otherwise the sea
-    picked directly on the trip) and the new reserve_fk/photographer_fk lookup fields
-    added alongside the existing free-text reserve/photographer fields."""
+    picked directly on the trip) and the new site/photographer_fk lookup fields added
+    alongside the existing free-text reserve/photographer fields."""
 
     def setUp(self):
         self.user = User.objects.create_superuser('manager', password='test-password')
@@ -199,14 +199,34 @@ class DiveTripSeaReserveFieldsTests(TestCase):
         area = SpeciesArea.objects.get(species=self.species, country=self.country, sea=self.red)
         self.assertEqual(area.defining_sample_id, sample.pk)
 
-    def test_reserve_and_photographer_lookup_fields_are_independent_of_free_text_fields(self):
-        reserve = Reserve.objects.create(name='Ras Mohammed')
+    def test_site_and_photographer_lookup_fields_are_independent_of_free_text_fields(self):
+        # site reuses the existing Site table (region-scoped) instead of a separate
+        # reserve table -- the free-text reserve field is unaffected by it either way.
+        site = Site.objects.create(name='Akhziv reef', region=self.region)
         photographer = Photographer.objects.create(name='Jane Diver')
         trip = DiveTrip.objects.create(title='Lookup fields', year=2026, country=self.country,
-                                        reserve='Ras Mohammed (as typed)', reserve_fk=reserve,
+                                        reserve='Ras Mohammed (as typed)', site=site,
                                         photographer='Jane D.', photographer_fk=photographer)
         trip.refresh_from_db()
         self.assertEqual(trip.reserve, 'Ras Mohammed (as typed)')
-        self.assertEqual(trip.reserve_fk, reserve)
+        self.assertEqual(trip.site, site)
         self.assertEqual(trip.photographer, 'Jane D.')
         self.assertEqual(trip.photographer_fk, photographer)
+
+    def test_divetrip_locations_endpoint_returns_region_and_site_mappings(self):
+        site = Site.objects.create(name='Akhziv reef', region=self.region)
+        self.client.force_login(self.user)
+        response = self.client.get('/admin/observations/divetrip-locations/')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        region_row = next(r for r in data['regions'] if r['id'] == self.region.pk)
+        self.assertEqual(region_row['country_id'], self.country.pk)
+        self.assertEqual(region_row['sea_id'], self.med.pk)
+        site_row = next(s for s in data['sites'] if s['id'] == site.pk)
+        self.assertEqual(site_row['region_id'], self.region.pk)
+
+    def test_divetrip_locations_endpoint_requires_staff(self):
+        outsider = User.objects.create_user('diver')
+        self.client.force_login(outsider)
+        response = self.client.get('/admin/observations/divetrip-locations/')
+        self.assertNotEqual(response.status_code, 200)
