@@ -3,7 +3,7 @@ from unittest.mock import patch
 from django.test import TestCase
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
-from .models import Species,Country,Sea,Region,Site
+from .models import Species,Country,Sea,Region,Site,DiveTrip,Photographer
 from .table_transfer import export_table,plan,fingerprint,apply
 
 class TransferTests(TestCase):
@@ -64,3 +64,43 @@ class TransferTests(TestCase):
         response=self.client.get(f'/admin/observations/species/{self.species.pk}/change/')
         self.assertContains(response,'name="genus"');self.assertContains(response,'name="author"')
         self.assertNotContains(response,'name="source_id"')
+
+    def test_trip_transfer_roundtrips_sea_site_and_photographer_fk(self):
+        # sea/site/photographer_fk were added after the original trips transfer -- this
+        # covers each one's natural-key shape end to end (export -> plan -> apply).
+        country=Country.objects.create(name='Israel');sea=Sea.objects.create(name='Mediterranean')
+        region=Region.objects.create(name='Akhziv',country=country,sea=sea)
+        site=Site.objects.create(name='Akhziv reef',region=region)
+        photographer=Photographer.objects.create(name='Jane Diver')
+        trip=DiveTrip.objects.create(title='Sea only',year=2026,country=country,sea=sea,
+                                      site=site,photographer_fk=photographer)
+        doc=export_table('trips')
+        row=next(r for r in doc['rows'] if r['code']==str(trip.code))
+        self.assertEqual(row['sea'],'Mediterranean')
+        self.assertEqual(row['site'],{'name':'Akhziv reef','region':'Akhziv','country':'Israel'})
+        self.assertEqual(row['photographer_fk'],'Jane Diver')
+        self.assertEqual(plan(doc)[0]['action'],'same')
+        # Import into a fresh target: only the reference rows exist, not the trip itself.
+        DiveTrip.objects.all().delete()
+        planned=[p for p in plan(doc) if p['object'].code==str(trip.code)][0]
+        self.assertEqual(planned['action'],'new')
+        self.assertEqual(planned['object'].sea_id,sea.pk)
+        self.assertEqual(planned['object'].site_id,site.pk)
+        self.assertEqual(planned['object'].photographer_fk_id,photographer.pk)
+
+    def test_trip_transfer_requires_photographer_and_site_transferred_first(self):
+        country=Country.objects.create(name='Israel')
+        trip=DiveTrip.objects.create(title='Missing refs',year=2026,country=country)
+        doc=export_table('trips')
+        row=next(r for r in doc['rows'] if r['code']==str(trip.code))
+        row['photographer_fk']='Nobody Yet'
+        with self.assertRaises(ValidationError):plan(doc)
+        row['photographer_fk']=None
+        row['site']={'name':'Nonexistent','region':'Nowhere','country':'Israel'}
+        with self.assertRaises(ValidationError):plan(doc)
+
+    def test_photographers_table_transfers_like_other_lookup_tables(self):
+        Photographer.objects.create(name='Bart Adams')
+        doc=export_table('photographers')
+        self.assertEqual(doc['rows'],[{'name':'Bart Adams','name_en':''}])
+        self.assertEqual(plan(doc)[0]['action'],'same')

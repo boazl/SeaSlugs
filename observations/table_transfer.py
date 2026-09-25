@@ -9,7 +9,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
-from .models import Country, Sea, Region, Site, Species, Sample, DiveTrip, SpeciesArea, youtube_id
+from .models import Country, Sea, Region, Site, Species, Sample, DiveTrip, SpeciesArea, Photographer, youtube_id
 from django.contrib.auth import get_user_model
 from .account_transfer import ACCOUNT_TABLES, account_row, account_plan
 
@@ -20,15 +20,17 @@ from .account_transfer import ACCOUNT_TABLES, account_row, account_plan
 TABLES = {'groups': ACCOUNT_TABLES['groups'], 'users': ACCOUNT_TABLES['users'],
           'countries': (Country,['name','name_en']), 'seas': (Sea,['name','name_en']),
           'regions': (Region,['name','name_en','country','sea']), 'sites': (Site,['name','name_en','region']),
+          'photographers': (Photographer,['name','name_en']),
           'profiles': ACCOUNT_TABLES['profiles'],
           'species': (Species, ['scientific_name','name_he','name_en','source_id','genus','species','author','order','family','superfamily','accepted_genus','accepted_species','common_name','transliteration','language','formatted_author','distribution','phylogenetic_order','full_species_name_with_order','reference_author']),
-          'trips': (DiveTrip, ['code','title','source_sort','year','month','start_day','duration_days','country','region','country_name','region_name','reserve','sea_name','photographer','species_count','source_metadata']),
+          'trips': (DiveTrip, ['code','title','source_sort','year','month','start_day','duration_days','country','region','sea','site','photographer_fk','country_name','region_name','reserve','sea_name','photographer','species_count','source_metadata']),
           'samples': (Sample, ['title','kind','trip','owner','species','site','species_other','site_other','day','depth','video_url','status','source_id','gallery_order','source_metadata','transfer_id','image'])}
 
 
 def reference(obj):
     if obj is None: return None
     if isinstance(obj, Region): return {'name':obj.name,'country':obj.country.name}
+    if isinstance(obj, Site): return {'name':obj.name,'region':obj.region.name,'country':obj.region.country.name}
     return obj.name
 
 
@@ -38,7 +40,7 @@ def row(obj, fields):
     if isinstance(obj, Sample):
         from .sample_transfer import sample_row
         return sample_row(obj, fields)
-    return {f:reference(getattr(obj,f)) if f in ('country','sea','region') else getattr(obj,f) for f in fields}
+    return {f:reference(getattr(obj,f)) if f in ('country','sea','region','site','photographer_fk') else getattr(obj,f) for f in fields}
 
 
 def export_table(table):
@@ -68,9 +70,13 @@ def related(field,value,required=True):
     if field=='region':
         if not isinstance(value,dict) or set(value)!= {'name','country'} or not all(isinstance(v,str) for v in value.values()): raise ValidationError('מפתח אזור לא תקין.')
         obj=unique(Region,name=value['name'],country__name=value['country'])
+    elif field=='site':
+        if not isinstance(value,dict) or set(value)!= {'name','region','country'} or not all(isinstance(v,str) for v in value.values()): raise ValidationError('מפתח אתר לא תקין.')
+        obj=unique(Site,name=value['name'],region__name=value['region'],region__country__name=value['country'])
     else:
         if not isinstance(value,str): raise ValidationError('מפתח קשר לא תקין.')
-        obj=unique(Country if field=='country' else Sea,name=value)
+        model={'country':Country,'sea':Sea,'photographer_fk':Photographer}[field]
+        obj=unique(model,name=value)
     if obj is None: raise ValidationError(f'חסר ערך מקושר ({field}: {value}). יש להעביר קודם את טבלת העזר שלו.')
     return obj
 
@@ -91,7 +97,7 @@ def plan(document):
         if not isinstance(incoming,dict) or set(incoming)!=set(fields): raise ValidationError(f'שדות לא תואמים בשורה {number}; יש לעדכן את הקוד בשתי הסביבות.')
         values={}
         for f,v in incoming.items():
-            if f in ('country','sea','region'): values[f]=related(f,v,required=not (model is DiveTrip))
+            if f in ('country','sea','region','site','photographer_fk'): values[f]=related(f,v,required=not (model is DiveTrip))
             elif model is DiveTrip and f in ('year','month','start_day','duration_days','species_count'):
                 if v is not None and type(v) is not int: raise ValidationError('נדרש מספר שלם: '+f)
                 values[f] = v
@@ -172,10 +178,10 @@ def apply(document, expected, actor=None):
                 sample = item['object']
                 if (sample.status == Sample.Status.PUBLISHED and sample.kind == Sample.Kind.SPECIES
                         and sample.species_id and sample.trip_id
-                        and sample.trip.country_id and sample.trip.region_id):
+                        and sample.trip.country_id and sample.trip.resolved_sea_id):
                     SpeciesArea.objects.update_or_create(
-                        species_id=sample.species_id, country_id=sample.trip.country_id, sea_id=sample.trip.region.sea_id,
+                        species_id=sample.species_id, country_id=sample.trip.country_id, sea_id=sample.trip.resolved_sea_id,
                         defaults={'defining_sample': SpeciesArea.pick_defining_sample(
-                            sample.species_id, sample.trip.country_id, sample.trip.region.sea_id)},
+                            sample.species_id, sample.trip.country_id, sample.trip.resolved_sea_id)},
                     )
     return items,backup.name
