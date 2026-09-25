@@ -51,6 +51,21 @@ class Site(Named):
     class Meta(Named.Meta): verbose_name = 'אתר צלילה'; verbose_name_plural = 'אתרי צלילה'
 
 
+# Lookup tables for DiveTrip.reserve_fk / DiveTrip.photographer_fk -- so a reserve/dive site
+# or a photographer can be picked from a dropdown "just like country", instead of retyped as
+# free text every time. DiveTrip.reserve / DiveTrip.photographer stay around as free-text
+# fields for the raw value as originally recorded / a one-off note, exactly like
+# country_name/region_name do alongside country/region. A guest photographer with no user
+# account here is added straight into the Photographer table via the admin's own "+" popup,
+# same as adding a new region or reserve.
+class Reserve(Named):
+    class Meta(Named.Meta): verbose_name = 'שמורה / אתר'; verbose_name_plural = 'שמורות / אתרים'
+
+
+class Photographer(Named):
+    class Meta(Named.Meta): verbose_name = 'צלם'; verbose_name_plural = 'צלמים'
+
+
 class Species(models.Model):
     scientific_name = models.CharField('שם מדעי', max_length=200, unique=True)
     name_he = models.CharField('שם בעברית', max_length=200, blank=True)
@@ -238,11 +253,15 @@ class DiveTrip(models.Model):
     duration_days = models.PositiveSmallIntegerField('מספר ימים', null=True, blank=True, validators=[MinValueValidator(1)])
     country_name = models.CharField('מדינה כפי שנרשמה במקור', max_length=180, blank=True)
     region_name = models.CharField('אזור כפי שנרשם במקור', max_length=180, blank=True)
-    reserve = models.CharField('שמורה / אתר', max_length=180, blank=True)
-    sea_name = models.CharField('ים', max_length=180, blank=True)
+    sea_name = models.CharField('ים כפי שנרשם במקור', max_length=180, blank=True)
     country = models.ForeignKey(Country, null=True, blank=True, on_delete=models.PROTECT, verbose_name='מדינה', related_name='dive_trips')
     region = models.ForeignKey(Region, null=True, blank=True, on_delete=models.PROTECT, verbose_name='אזור', related_name='dive_trips')
-    photographer = models.CharField('צלם', max_length=180, blank=True)
+    sea = models.ForeignKey(Sea, null=True, blank=True, on_delete=models.PROTECT, verbose_name='ים', related_name='dive_trips',
+        help_text='נבחר מהטבלה. רלוונטי רק כאשר לא נבחר אזור -- כאשר יש אזור, הים נקבע ממנו אוטומטית.')
+    reserve = models.CharField('שמורה / אתר (טקסט חופשי)', max_length=180, blank=True)
+    reserve_fk = models.ForeignKey(Reserve, null=True, blank=True, on_delete=models.PROTECT, verbose_name='שמורה / אתר', related_name='dive_trips')
+    photographer = models.CharField('צלם (טקסט חופשי)', max_length=180, blank=True)
+    photographer_fk = models.ForeignKey(Photographer, null=True, blank=True, on_delete=models.PROTECT, verbose_name='צלם', related_name='dive_trips')
     species_count = models.PositiveIntegerField('מספר מינים שנצפו במסע', null=True, blank=True, help_text='מספר מדווח לכל המסע; אינו מספר הסרטונים באתר. השאר ריק אם אינו ידוע.')
     source_metadata = models.JSONField(default=dict, blank=True)
     description_he = models.TextField('תיאור בעברית', blank=True)
@@ -270,8 +289,16 @@ class DiveTrip(models.Model):
         ).order_by().values('species_id').distinct().count()
 
     @property
-    def sea(self):
-        return self.region.sea if self.region_id else None
+    def resolved_sea(self):
+        """The sea this trip is actually in: the region's sea when a region is set
+        (authoritative -- a Region already pins down a specific sea), otherwise falls back
+        to the sea chosen directly on the trip (for a trip that has no region of its own,
+        e.g. a thematic collection not tied to one dive site)."""
+        return self.region.sea if self.region_id else self.sea
+
+    @property
+    def resolved_sea_id(self):
+        return self.region.sea_id if self.region_id else self.sea_id
 
     def clean(self):
         super().clean()
@@ -439,28 +466,29 @@ class Sample(models.Model):
             self.approved_by = actor if approve else None
             self.approved_at = timezone.now() if approve else None
             self.save()
-            if self.status == self.Status.PUBLISHED and self.kind == self.Kind.SPECIES and self.species_id and self.trip.country_id and self.trip.region_id:
+            if self.status == self.Status.PUBLISHED and self.kind == self.Kind.SPECIES and self.species_id and self.trip.country_id and self.trip.resolved_sea_id:
                 # update_or_create (not get_or_create) so an area that already exists but has
                 # no defining sample yet -- e.g. after the previous one was deleted and no
                 # replacement existed at that moment -- self-heals as soon as a valid sample
-                # for it is published again.
+                # for it is published again. resolved_sea_id (not region.sea_id) so this also
+                # works for a trip with no region that has a sea chosen directly on it.
                 SpeciesArea.objects.update_or_create(
-                    species_id=self.species_id, country_id=self.trip.country_id, sea_id=self.trip.region.sea_id,
+                    species_id=self.species_id, country_id=self.trip.country_id, sea_id=self.trip.resolved_sea_id,
                     defaults={'defining_sample': SpeciesArea.pick_defining_sample(
-                        self.species_id, self.trip.country_id, self.trip.region.sea_id)},
+                        self.species_id, self.trip.country_id, self.trip.resolved_sea_id)},
                 )
     def soft_delete(self, actor):
         self.deleted_at = timezone.now(); self.deleted_by = actor
         self.save(update_fields=['deleted_at','deleted_by','updated_at'])
-        if self.kind == self.Kind.SPECIES and self.species_id and self.trip_id and self.trip.country_id and self.trip.region_id:
+        if self.kind == self.Kind.SPECIES and self.species_id and self.trip_id and self.trip.country_id and self.trip.resolved_sea_id:
             # If this sample was defining its species in the gallery, replace it with another
             # published sample of the same species+area if one exists, else clear the field --
             # pick_defining_sample already excludes this sample now that it is marked deleted.
             SpeciesArea.objects.filter(
-                species_id=self.species_id, country_id=self.trip.country_id, sea_id=self.trip.region.sea_id,
+                species_id=self.species_id, country_id=self.trip.country_id, sea_id=self.trip.resolved_sea_id,
                 defining_sample_id=self.pk,
             ).update(defining_sample=SpeciesArea.pick_defining_sample(
-                self.species_id, self.trip.country_id, self.trip.region.sea_id))
+                self.species_id, self.trip.country_id, self.trip.resolved_sea_id))
 
 
 class SpeciesArea(models.Model):
@@ -503,9 +531,12 @@ class SpeciesArea(models.Model):
         """Best sample to represent this species in this country+sea: prefer one with an
         uploaded image over a video-only one, only among published/non-deleted samples,
         tie-broken by whichever was created first."""
+        # A trip's sea is its region's sea when it has a region, otherwise the sea chosen
+        # directly on the trip (DiveTrip.resolved_sea) -- match either shape here.
+        sea_match = models.Q(trip__region__sea_id=sea_id) | models.Q(trip__region__isnull=True, trip__sea_id=sea_id)
         candidates = list(Sample.objects.filter(
-            kind=Sample.Kind.SPECIES, species_id=species_id, status=Sample.Status.PUBLISHED,
-            deleted_at__isnull=True, trip__country_id=country_id, trip__region__sea_id=sea_id,
+            models.Q(kind=Sample.Kind.SPECIES, species_id=species_id, status=Sample.Status.PUBLISHED,
+                     deleted_at__isnull=True, trip__country_id=country_id) & sea_match,
         ).order_by('created_at', 'pk'))
         if not candidates:
             return None
@@ -522,9 +553,10 @@ class SpeciesArea(models.Model):
         on the observation form (species_area_status) and to actually carry it out when
         releasing a sample from its species (views.observation_action) -- the two must
         agree, so both go through this one method."""
+        sea_match = models.Q(trip__region__sea=sea) | models.Q(trip__region__isnull=True, trip__sea=sea)
         others = Sample.objects.filter(
-            kind=Sample.Kind.SPECIES, species_id=species_id, status=Sample.Status.PUBLISHED,
-            deleted_at__isnull=True, trip__country_id=country_id, trip__region__sea=sea,
+            models.Q(kind=Sample.Kind.SPECIES, species_id=species_id, status=Sample.Status.PUBLISHED,
+                     deleted_at__isnull=True, trip__country_id=country_id) & sea_match,
         ).exclude(pk=exclude_pk)
         with_media = others.exclude(image='', video_url='').order_by('-created_at', '-pk').first()
         if with_media:
@@ -541,11 +573,21 @@ class SpeciesArea(models.Model):
         -- only this table is touched, Sample data is never changed."""
         with transaction.atomic():
             SpeciesArea.objects.all().delete()
+            # A trip's sea is its region's sea when it has a region, otherwise the sea chosen
+            # directly on the trip (DiveTrip.resolved_sea) -- the annotation below picks
+            # whichever applies so a region-less trip's samples are included too.
             keys = Sample.objects.filter(
                 kind=Sample.Kind.SPECIES, status=Sample.Status.PUBLISHED, deleted_at__isnull=True,
                 species__isnull=False, species_other='', site_other='',
-                trip__country__isnull=False, trip__region__isnull=False,
-            ).order_by().values_list('species_id', 'trip__country_id', 'trip__region__sea_id').distinct()
+                trip__country__isnull=False,
+            ).filter(
+                models.Q(trip__region__isnull=False) | models.Q(trip__sea__isnull=False)
+            ).annotate(
+                resolved_sea_id=models.Case(
+                    models.When(trip__region__isnull=False, then=models.F('trip__region__sea_id')),
+                    default=models.F('trip__sea_id'),
+                )
+            ).order_by().values_list('species_id', 'trip__country_id', 'resolved_sea_id').distinct()
             # .order_by() clears Sample's default ordering (Meta.ordering = ['-created_at']);
             # without it Django silently adds created_at to the SELECT DISTINCT columns to
             # support that ordering, which defeats the intended (species,country,sea) dedup

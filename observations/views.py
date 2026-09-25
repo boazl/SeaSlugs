@@ -262,16 +262,16 @@ def species_area_status(request):
     from django.http import JsonResponse
     species_text = (request.GET.get('species') or '').strip()
     species = Species.objects.filter(scientific_name__iexact=species_text).first() if species_text else None
-    trip = DiveTrip.objects.filter(pk=request.GET.get('trip')).select_related('country','region__sea').first()
-    if not species or not trip or not trip.country_id or not trip.sea:
+    trip = DiveTrip.objects.filter(pk=request.GET.get('trip')).select_related('country','region__sea','sea').first()
+    if not species or not trip or not trip.country_id or not trip.resolved_sea:
         return JsonResponse({'matched': False})
-    area = SpeciesArea.objects.filter(species=species, country_id=trip.country_id, sea=trip.sea).first()
+    area = SpeciesArea.objects.filter(species=species, country_id=trip.country_id, sea=trip.resolved_sea).first()
     sample_id = request.GET.get('sample') or None
     is_defining = bool(area and sample_id and str(area.defining_sample_id) == str(sample_id))
     appears = bool(area and area.defining_sample_id)
     next_info = None
     if is_defining:
-        candidate = SpeciesArea.next_candidate(species.pk, trip.country_id, trip.sea, sample_id)
+        candidate = SpeciesArea.next_candidate(species.pk, trip.country_id, trip.resolved_sea, sample_id)
         next_info = {'kind': 'with_media', 'id': candidate['sample'].pk} if candidate['kind'] == 'with_media' else {'kind': candidate['kind']}
     return JsonResponse({'matched': True, 'is_defining': is_defining, 'appears': appears, 'next': next_info})
 
@@ -353,15 +353,15 @@ def observation_action(request, pk):
     item = get_object_or_404(Sample, pk=pk, owner=request.user, deleted_at__isnull=True)
     action = request.POST.get('action')
     area = None
-    if item.kind == Sample.Kind.SPECIES and item.species_id and item.trip_id and item.trip.country_id and item.trip.region_id:
-        area = SpeciesArea.objects.filter(species_id=item.species_id, country_id=item.trip.country_id, sea=item.trip.region.sea).first()
+    if item.kind == Sample.Kind.SPECIES and item.species_id and item.trip_id and item.trip.country_id and item.trip.resolved_sea_id:
+        area = SpeciesArea.objects.filter(species_id=item.species_id, country_id=item.trip.country_id, sea=item.trip.resolved_sea).first()
     is_defining = bool(area and area.defining_sample_id == item.pk)
 
     if action == 'release_species':
         if not is_defining:
             messages.error(request, 'התצפית אינה מגדירה את המין כרגע.')
         else:
-            candidate = SpeciesArea.next_candidate(item.species_id, item.trip.country_id, item.trip.region.sea, item.pk)
+            candidate = SpeciesArea.next_candidate(item.species_id, item.trip.country_id, item.trip.resolved_sea, item.pk)
             area.defining_sample = candidate['sample'] if candidate['kind'] == 'with_media' else None
             area.save(update_fields=['defining_sample'])
             messages.success(request, 'המין שנבחר מופיע בגלריה.' if area.defining_sample_id else 'המין שנבחר אינו מופיע בגלריה.')

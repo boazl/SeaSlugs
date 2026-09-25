@@ -2,7 +2,7 @@ from pathlib import Path
 from unittest.mock import patch
 from django.test import TestCase
 from django.contrib.auth.models import User
-from .models import Sample, Species, Country, Region, Sea, DiveTrip, SpeciesArea
+from .models import Sample, Species, Country, Region, Sea, DiveTrip, SpeciesArea, Reserve, Photographer
 from .table_transfer import export_table, plan, apply, fingerprint
 
 
@@ -145,3 +145,68 @@ class SpeciesAreaTests(TestCase):
         self.assertEqual(SpeciesArea.objects.filter(species=self.species).count(),1)
         area=SpeciesArea.objects.get(species=self.species,country=self.country,sea=self.sea)
         self.assertEqual(area.defining_sample_id,self.first.pk)
+
+
+class DiveTripSeaReserveFieldsTests(TestCase):
+    """DiveTrip.resolved_sea (region.sea wins when there is a region, otherwise the sea
+    picked directly on the trip) and the new reserve_fk/photographer_fk lookup fields
+    added alongside the existing free-text reserve/photographer fields."""
+
+    def setUp(self):
+        self.user = User.objects.create_superuser('manager', password='test-password')
+        self.country = Country.objects.create(name='Israel')
+        self.med = Sea.objects.create(name='Mediterranean')
+        self.red = Sea.objects.create(name='Red Sea')
+        self.region = Region.objects.create(name='Akhziv', country=self.country, sea=self.med)
+        self.species = Species.objects.create(scientific_name='Resolved sea species')
+
+    def test_resolved_sea_prefers_region_sea_over_own_sea_field(self):
+        trip = DiveTrip.objects.create(title='With region', year=2026, country=self.country,
+                                        region=self.region, sea=self.red)
+        self.assertEqual(trip.resolved_sea, self.med)
+        self.assertEqual(trip.resolved_sea_id, self.med.pk)
+
+    def test_resolved_sea_falls_back_to_own_sea_field_without_region(self):
+        trip = DiveTrip.objects.create(title='No region', year=2026, country=self.country, sea=self.red)
+        self.assertEqual(trip.resolved_sea, self.red)
+        self.assertEqual(trip.resolved_sea_id, self.red.pk)
+
+    def test_resolved_sea_is_none_without_region_or_sea(self):
+        trip = DiveTrip.objects.create(title='Neither', year=2026, country=self.country)
+        self.assertIsNone(trip.resolved_sea)
+        self.assertIsNone(trip.resolved_sea_id)
+
+    def test_publishing_a_sample_on_a_region_less_trip_still_creates_a_species_area(self):
+        # Before resolved_sea existed, the SpeciesArea side effect in Sample.save_reviewed
+        # was gated on trip.region_id, so a trip with no region (only a directly-chosen sea)
+        # never got its species into the public gallery at all.
+        trip = DiveTrip.objects.create(title='No region', year=2026, country=self.country, sea=self.red)
+        sample = Sample(owner=self.user, species=self.species, trip=trip,
+                         video_url='https://youtu.be/abcdefghijk')
+        sample.save_reviewed()
+        area = SpeciesArea.objects.get(species=self.species, country=self.country, sea=self.red)
+        self.assertEqual(area.defining_sample_id, sample.pk)
+
+    def test_rebuild_also_covers_region_less_trips(self):
+        # SpeciesArea.rebuild() regenerates the whole table from scratch (used by an admin
+        # action); it used to only look at samples whose trip had a region.
+        trip = DiveTrip.objects.create(title='No region', year=2026, country=self.country, sea=self.red)
+        sample = Sample(owner=self.user, species=self.species, trip=trip,
+                         video_url='https://youtu.be/abcdefghijk')
+        sample.save_reviewed()
+        SpeciesArea.objects.all().delete()
+        SpeciesArea.rebuild()
+        area = SpeciesArea.objects.get(species=self.species, country=self.country, sea=self.red)
+        self.assertEqual(area.defining_sample_id, sample.pk)
+
+    def test_reserve_and_photographer_lookup_fields_are_independent_of_free_text_fields(self):
+        reserve = Reserve.objects.create(name='Ras Mohammed')
+        photographer = Photographer.objects.create(name='Jane Diver')
+        trip = DiveTrip.objects.create(title='Lookup fields', year=2026, country=self.country,
+                                        reserve='Ras Mohammed (as typed)', reserve_fk=reserve,
+                                        photographer='Jane D.', photographer_fk=photographer)
+        trip.refresh_from_db()
+        self.assertEqual(trip.reserve, 'Ras Mohammed (as typed)')
+        self.assertEqual(trip.reserve_fk, reserve)
+        self.assertEqual(trip.photographer, 'Jane D.')
+        self.assertEqual(trip.photographer_fk, photographer)
