@@ -427,11 +427,6 @@ function playCollection(c, button) {
     showMedia(c.video_id, c.image_url, collectionTitle(c), collectionSubtitle(c));
     openDialog();
 }
-function playTaxon(entry, title, button) {
-    opener = button;
-    showMedia(entry.video_id, entry.image_url, title, '');
-    openDialog();
-}
 
 // ---- cards / grid ----
 
@@ -562,19 +557,16 @@ function renderTaxonPanel(level, id) {
         : (language === 'he' ? 'סוג' : 'Genus');
     const name = entry ? (language === 'en' ? (entry.label_en || entry.label) : entry.label) : '';
     const title = `${levelLabel} - ${name}`;
-    // Only when the taxon has a photo/video of its own (via defining_sample) is the
-    // panel clickable. A genus has its own public page (see buildSpeciesCard's identical
-    // sp.slug pattern) -- link straight to it there; order/family have no page of their
-    // own yet, so they still just open the lightweight media viewer.
+    // A genus has its own public page (see buildSpeciesCard's identical sp.slug pattern) --
+    // link straight to it there whenever it has a photo/video of its own (via
+    // defining_sample). Order/family have no page of their own yet, so their panels are
+    // always plain, non-interactive (not even a media-preview click) until that exists.
     const hasMedia = !!(entry && (entry.image_url || entry.video_id));
     const isGenusLink = hasMedia && level === 'genus';
-    const panel = document.createElement(isGenusLink ? 'a' : (hasMedia ? 'button' : 'div'));
-    panel.className = `taxon-panel taxon-panel-${level}${hasMedia ? ' taxon-panel-clickable' : ''}`;
+    const panel = document.createElement(isGenusLink ? 'a' : 'div');
+    panel.className = `taxon-panel taxon-panel-${level}${isGenusLink ? ' taxon-panel-clickable' : ''}`;
     if (isGenusLink) {
         panel.href = `/genus/${encodeURIComponent(entry.name)}/`;
-        panel.setAttribute('aria-label', title);
-    } else if (hasMedia) {
-        panel.type = 'button';
         panel.setAttribute('aria-label', title);
     }
     if (entry && entry.thumbnail) {
@@ -587,9 +579,6 @@ function renderTaxonPanel(level, id) {
     const text = document.createElement('span');
     text.textContent = title;
     panel.append(text);
-    if (hasMedia && !isGenusLink) {
-        panel.addEventListener('click', () => playTaxon(entry, title, panel));
-    }
     return panel;
 }
 function speciesSortKey(sp) {
