@@ -22,7 +22,14 @@ class WorkflowTests(TestCase):
         self.trip=DiveTrip.objects.create(title='Akhziv dive',year=2026,month=2,country=self.country,region=self.region)
         self.species=Species.objects.create(scientific_name='Test species')
     def record(self,**kwargs):
-        data=dict(owner=self.user,species=self.species,trip=self.trip,video_url='https://youtu.be/abcdefghijk')
+        # A distinct video_url per call by default (unless the caller passes its own
+        # video_url/image), now that Sample.clean() blocks reusing the same photo/video
+        # across two active samples -- most callers just need "a valid sample", not this
+        # exact URL, and many tests create more than one sample per test method.
+        if 'video_url' not in kwargs and 'image' not in kwargs:
+            self._video_counter=getattr(self,'_video_counter',0)+1
+            kwargs=dict(kwargs,video_url=f'https://youtu.be/{str(self._video_counter).zfill(11)}')
+        data=dict(owner=self.user,species=self.species,trip=self.trip)
         data.update(kwargs)
         item=Sample(**data);item.save_reviewed();return item
     def data(self):
@@ -399,6 +406,55 @@ class WorkflowTests(TestCase):
         self.assertEqual(response.context['sort'], 'species')
         names = [item.species.scientific_name for item in response.context['observations']]
         self.assertEqual(names, sorted(names))
+
+    def test_listing_kind_filter_supports_genus_family_and_order_not_just_species_and_collection(self):
+        # Regression: ?kind=genus (and family/order) used to be silently ignored -- the
+        # filter only ever recognised 'species' and 'collection', a leftover from before
+        # the GENUS/FAMILY/ORDER sample kinds existed, so picking any of those three in the
+        # "סוג הרשומה" dropdown had no effect on the results at all.
+        self.client.force_login(self.user)
+        genus_species = Species.objects.create(scientific_name='Chelidonura varians', genus='Chelidonura')
+        species_sample = self.record(species=genus_species, video_url='https://youtu.be/aaaaaaaaaaa')
+        genus_sample = Sample(owner=self.user, kind=Sample.Kind.GENUS, species=None, species_other='Chelidonura',
+                               trip=self.trip, video_url='https://youtu.be/bbbbbbbbbbb')
+        genus_sample.save_reviewed(actor=self.user, approve=True)
+        response = self.client.get('/observations/?kind=genus')
+        self.assertEqual([item.pk for item in response.context['observations']], [genus_sample.pk])
+        response = self.client.get('/observations/?kind=species')
+        self.assertEqual([item.pk for item in response.context['observations']], [species_sample.pk])
+
+    def test_listing_genus_search_also_matches_the_genus_kind_sample_that_defines_it(self):
+        # Regression: searching "סוג (Genus)" for a genus name matched only SPECIES-kind
+        # samples (via species__genus) -- the one GENUS-kind sample that IS that genus
+        # (identified through species_other, since it has no linked Species -- see
+        # Sample.clean()) never showed up in its own search, with or without also filtering
+        # by kind=genus.
+        self.client.force_login(self.user)
+        genus_species = Species.objects.create(scientific_name='Chelidonura varians', genus='Chelidonura')
+        species_sample = self.record(species=genus_species, video_url='https://youtu.be/ccccccccccc')
+        genus_sample = Sample(owner=self.user, kind=Sample.Kind.GENUS, species=None, species_other='Chelidonura',
+                               trip=self.trip, video_url='https://youtu.be/ddddddddddd')
+        genus_sample.save_reviewed(actor=self.user, approve=True)
+        response = self.client.get('/observations/?genus=Chelidonura')
+        self.assertEqual({item.pk for item in response.context['observations']}, {species_sample.pk, genus_sample.pk})
+        response = self.client.get('/observations/?genus=Chelidonura&kind=genus')
+        self.assertEqual([item.pk for item in response.context['observations']], [genus_sample.pk])
+
+    def test_listing_family_and_order_search_also_match_their_own_defining_sample(self):
+        # Same fix as the genus search, for the FAMILY and ORDER sample kinds. Created
+        # directly (not via save_reviewed()) since completing a FAMILY/ORDER-kind sample's
+        # approval is a separate, unrelated concern from this listing-filter fix.
+        self.client.force_login(self.user)
+        family_sample = Sample.objects.create(owner=self.user, kind=Sample.Kind.FAMILY, species=None,
+            species_other='Chromodorididae', trip=self.trip, video_url='https://youtu.be/eeeeeeeeeee',
+            status=Sample.Status.PUBLISHED)
+        order_sample = Sample.objects.create(owner=self.user, kind=Sample.Kind.ORDER, species=None,
+            species_other='Nudibranchia', trip=self.trip, video_url='https://youtu.be/fffffffffff',
+            status=Sample.Status.PUBLISHED)
+        response = self.client.get('/observations/?family=Chromodorididae&kind=family')
+        self.assertEqual([item.pk for item in response.context['observations']], [family_sample.pk])
+        response = self.client.get('/observations/?order=Nudibranchia&kind=order')
+        self.assertEqual([item.pk for item in response.context['observations']], [order_sample.pk])
 
     def test_edit_redirects_back_to_the_list_url_it_came_from(self):
         # Without an explicit ?next=, fall back to the plain list -- scrolled to the

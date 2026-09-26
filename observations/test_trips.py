@@ -17,7 +17,12 @@ class DiveTripTests(TestCase):
         self.species=Species.objects.create(scientific_name='Test species')
 
     def collection(self):
-        return Sample(owner=self.user,kind='collection',trip=self.trip,title='Trip collection',video_url='https://youtu.be/abcdefghijk')
+        # A distinct video_url per call -- several tests call this more than once per test
+        # method to build up several samples, and Sample.clean() now blocks two active
+        # samples sharing the exact same video.
+        self._video_counter=getattr(self,'_video_counter',0)+1
+        return Sample(owner=self.user,kind='collection',trip=self.trip,title='Trip collection',
+                       video_url=f'https://youtu.be/{str(self._video_counter).zfill(11)}')
 
     def test_collection_needs_trip_not_species_and_admin_approval(self):
         sample=self.collection();sample.trip=None
@@ -33,7 +38,9 @@ class DiveTripTests(TestCase):
         # species_count (the field) is deliberately left at 153 (set in setUp) to prove the
         # displayed/catalog count ignores it and reflects only real published species samples.
         for name in ['Species A','Species B','Species C','Species D']:
-            species_sample=Sample(owner=self.user,kind='species',trip=self.trip,species=Species.objects.create(scientific_name=name),video_url='https://youtu.be/abcdefghijk')
+            self._video_counter=getattr(self,'_video_counter',0)+1
+            species_sample=Sample(owner=self.user,kind='species',trip=self.trip,species=Species.objects.create(scientific_name=name),
+                                   video_url=f'https://youtu.be/{str(self._video_counter).zfill(11)}')
             species_sample.save_reviewed()
         sample=self.collection();sample.save_reviewed()
         self.assertNotContains(self.client.get('/observations/trips/'),'Trip collection')

@@ -21,8 +21,10 @@ class AssignGenusDefiningSamplesTests(TestCase):
         self.genus = TaxonGenus.objects.create(name='Chromodoris')
 
     def genus_sample(self, **kwargs):
-        data = dict(owner=self.user, kind=Sample.Kind.GENUS, species_other='Chromodoris',
-                    trip=self.trip, video_url='https://youtu.be/abcdefghijk')
+        if 'video_url' not in kwargs:
+            self._video_counter = getattr(self, '_video_counter', 0) + 1
+            kwargs = dict(kwargs, video_url=f'https://youtu.be/{str(self._video_counter).zfill(11)}')
+        data = dict(owner=self.user, kind=Sample.Kind.GENUS, species_other='Chromodoris', trip=self.trip)
         data.update(kwargs)
         item = Sample(**data)
         item.save_reviewed(actor=self.user, approve=True)
@@ -45,7 +47,7 @@ class AssignGenusDefiningSamplesTests(TestCase):
         # build_taxonomy_tables) -- a purpose-built genus photo should take priority.
         species = Species.objects.create(scientific_name='Chromodoris annae')
         species_sample = Sample(owner=self.user, species=species, trip=self.trip,
-                                 video_url='https://youtu.be/abcdefghijk')
+                                 video_url='https://youtu.be/zzzzzzzzzzz')
         species_sample.save_reviewed()
         self.genus.defining_sample = species_sample
         self.genus.save(update_fields=['defining_sample'])

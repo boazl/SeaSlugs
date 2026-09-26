@@ -49,12 +49,15 @@ class MediaTransferTests(TestCase):
         from .image_manager import files
         zebra=Species.objects.create(scientific_name='Zzz species',genus='Zebra',species='stripey',phylogenetic_order='50')
         aardvark=Species.objects.create(scientific_name='Aaa species',genus='Aardvark',species='snouty',phylogenetic_order='10')
-        def add_sample(species,filename):
-            output=io.BytesIO();Image.new('RGB',(60,40),'red').save(output,'JPEG')
+        def add_sample(species,filename,color):
+            # A distinct color per call -- Sample.clean() now blocks two active samples
+            # from sharing the exact same image, and two identically-sized same-color
+            # JPEGs hash identically.
+            output=io.BytesIO();Image.new('RGB',(60,40),color).save(output,'JPEG')
             sample=Sample(owner=self.sample.owner,species=species,trip=self.sample.trip)
             sample.image.save(filename,ContentFile(output.getvalue()),save=False)
             sample.save_reviewed();return sample
-        add_sample(zebra,'z.jpg');add_sample(aardvark,'a.jpg')
+        add_sample(zebra,'z.jpg','red');add_sample(aardvark,'a.jpg','green')
 
         def names(sort):
             return [row['refs'][0].species.scientific_name for row in files(sort)]
@@ -140,10 +143,11 @@ class MediaTransferTests(TestCase):
         self.assertEqual(response.status_code,302)
         created=Sample.objects.get(species=species2)
         self.assertRegex(created.image.name,r'^observations/transfer/[0-9a-f]{64}\.jpg$')
-        # Uploading the exact same bytes again, for a different sample, must reuse
-        # the same stored file rather than create a second copy.
+        # Regression: uploading the exact same bytes again, for a different sample, used to
+        # silently reuse the same stored file -- now Sample.clean() blocks it outright (the
+        # same photo may not be entered twice, full stop), so no second sample is created.
         response=self.client.post('/observations/new/',dict(base,species=species3.scientific_name,trip=self.sample.trip.pk,
             image=SimpleUploadedFile('photo-again.jpg',raw,content_type='image/jpeg')))
-        self.assertEqual(response.status_code,302)
-        other=Sample.objects.get(species=species3)
-        self.assertEqual(other.image.name,created.image.name)
+        self.assertEqual(response.status_code,200)
+        self.assertContains(response,'התמונה הזו כבר קיימת בתצפית אחרת')
+        self.assertFalse(Sample.objects.filter(species=species3).exists())

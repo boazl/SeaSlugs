@@ -134,15 +134,16 @@ class ObservationsFilterTests(TestCase):
         self.client.force_login(self.owner)
 
     def make(self, species, owner=None):
+        self._video_counter = getattr(self, '_video_counter', 0) + 1
         sample = Sample(owner=owner or self.owner, trip=self.trip, species=species,
-                         video_url='https://youtu.be/abcdefghijk')
+                         video_url=f'https://youtu.be/{str(self._video_counter).zfill(11)}')
         sample.save_reviewed(actor=self.owner, approve=True)
         return sample
 
     def test_kind_filter_narrows_observations_list(self):
         self.make(Species.objects.create(scientific_name='Aeolid species'))
         collection = Sample(owner=self.owner, kind='collection', trip=self.trip, title='Trip collection',
-                             video_url='https://youtu.be/abcdefghijk')
+                             video_url='https://youtu.be/22222222222')
         collection.save_reviewed(actor=self.owner, approve=True)
         response = self.client.get('/observations/?kind=collection')
         self.assertContains(response, 'Trip collection')
@@ -232,7 +233,9 @@ class TaxonomicSortAndPanelTests(TestCase):
         return json.loads(response.content.decode().split('=', 1)[1].strip().removesuffix(';'))
 
     def publish(self, species):
-        item = Sample(owner=self.owner, trip=self.trip, species=species, video_url='https://youtu.be/abcdefghijk')
+        self._video_counter = getattr(self, '_video_counter', 0) + 1
+        item = Sample(owner=self.owner, trip=self.trip, species=species,
+                       video_url=f'https://youtu.be/{str(self._video_counter).zfill(11)}')
         item.save_reviewed()
         return item
 

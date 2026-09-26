@@ -120,7 +120,7 @@ def manager(request):
                     # No archive or retained copy: remove files only after checking all selections.
                     for name,path in selected:
                         path.unlink()
-                        Sample.objects.filter(image=name).update(image='')
+                        Sample.objects.filter(image=name).update(image='', image_hash='')
                 messages.success(request,f'נמחקו {len(selected)} תמונות ללא גיבוי.')
                 return redirect(redirect_target)
             elif action=='upload':

@@ -18,7 +18,10 @@ class SpeciesAreaTests(TestCase):
         self.first=self.record(self.user)
 
     def record(self,owner,**kwargs):
-        data=dict(owner=owner,species=self.species,trip=self.trip,video_url='https://youtu.be/abcdefghijk')
+        if 'video_url' not in kwargs and 'image' not in kwargs:
+            self._video_counter=getattr(self,'_video_counter',0)+1
+            kwargs=dict(kwargs,video_url=f'https://youtu.be/{str(self._video_counter).zfill(11)}')
+        data=dict(owner=owner,species=self.species,trip=self.trip)
         data.update(kwargs)
         item=Sample(**data);item.save_reviewed();return item
 

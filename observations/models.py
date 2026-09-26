@@ -1,4 +1,5 @@
 import calendar
+import hashlib
 import re
 import uuid
 from datetime import date
@@ -384,6 +385,12 @@ class Sample(models.Model):
     transfer_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     video_url = models.URLField('קישור YouTube', blank=True, validators=[youtube_id])
     image = models.ImageField('תמונה חלופית (רשות)', upload_to='observations/', blank=True)
+    # SHA-256 of the image's bytes (recomputed in clean() whenever an image is present) -- lets
+    # clean() detect "this exact photo/video was already entered as a different sample" without
+    # caring what storage path/filename it ended up under (uploads that don't go through the
+    # content-hash-named storage convention used elsewhere, e.g. a plain admin upload, still get
+    # caught).
+    image_hash = models.CharField(max_length=64, blank=True, default='', editable=False, db_index=True)
     status = models.CharField('מצב פרסום', choices=Status.choices, default=Status.PENDING, max_length=20)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -431,6 +438,12 @@ class Sample(models.Model):
     def clean(self):
         super().clean()
         errors = {}
+        # The stored values before this edit, so the duplicate-media checks below only fire
+        # when a photo/video is actually being newly entered/replaced -- not on every unrelated
+        # re-save of a sample whose media hasn't changed (which would otherwise wrongly relitigate
+        # legacy rows that predate this check, e.g. two samples that intentionally share one photo
+        # showing two different species).
+        original = Sample.objects.filter(pk=self.pk).values('image', 'video_url').first() if self.pk else None
         if not self.video_url and not self.image:
             errors['video_url'] = 'יש לספק קישור YouTube או להעלות תמונה, או את שניהם.'
         if self.kind == self.Kind.COLLECTION:
@@ -449,6 +462,45 @@ class Sample(models.Model):
         if self.day and self.trip_id and self.trip.year and self.trip.month:
             try: date(self.trip.year, self.trip.month, self.day)
             except ValueError: errors['day'] = 'תאריך לא תקין.'
+        if self.image:
+            # The content-hash storage naming convention used everywhere an image actually
+            # gets uploaded (the observation edit form, the folder importer, the image
+            # manager's re-upload flow -- see media_transfer.py/folder_import.py) sets
+            # self.image to that not-yet-written path and calls clean() before the file is
+            # actually saved to storage, so self.image.read() would raise FileNotFoundError
+            # in that window. The hash is already spelled out in the filename in that case,
+            # so read it straight from there instead of touching the file.
+            hash_from_name = re.fullmatch(r'observations/transfer/([0-9a-f]{64})\.jpg', self.image.name)
+            if hash_from_name:
+                digest = hash_from_name.group(1)
+            else:
+                try:
+                    self.image.seek(0)
+                    digest = hashlib.sha256(self.image.read()).hexdigest()
+                    self.image.seek(0)
+                except (FileNotFoundError, OSError):
+                    digest = None
+            if digest:
+                self.image_hash = digest
+                image_changed = not original or original['image'] != self.image.name
+                if image_changed:
+                    duplicate = Sample.objects.exclude(pk=self.pk).filter(deleted_at__isnull=True, image_hash=digest).first()
+                    if duplicate: errors['image'] = f'התמונה הזו כבר קיימת בתצפית אחרת ({duplicate}). לא ניתן להשתמש באותה תמונה פעמיים.'
+        else:
+            self.image_hash = ''
+        if self.video_url:
+            video_changed = not original or original['video_url'] != self.video_url
+            if video_changed:
+                try: video_id = youtube_id(self.video_url)
+                except ValidationError: video_id = None
+                if video_id:
+                    duplicate = None
+                    others = Sample.objects.exclude(pk=self.pk).filter(deleted_at__isnull=True).exclude(video_url='')
+                    for other in others:
+                        try: other_video_id = youtube_id(other.video_url)
+                        except ValidationError: continue
+                        if other_video_id == video_id: duplicate = other; break
+                    if duplicate: errors['video_url'] = f'הסרטון הזה כבר קיים בתצפית אחרת ({duplicate}). לא ניתן להשתמש באותו סרטון פעמיים.'
         if errors: raise ValidationError(errors)
     def save_reviewed(self, actor=None, approve=False):
         self.full_clean(validate_constraints=False)

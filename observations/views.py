@@ -122,7 +122,7 @@ def listing(request):
     if request.GET.get('mine') and request.user.is_authenticated:
         rows = rows.filter(owner=request.user)
     get = request.GET
-    if get.get('kind') in ('species', 'collection'):
+    if get.get('kind') in dict(Sample.Kind.choices):
         rows = rows.filter(kind=get['kind'])
     if get.get('status') in ('pending', 'published'):
         rows = rows.filter(status=get['status'])
@@ -137,13 +137,20 @@ def listing(request):
         rows = rows.filter(trip__year=year)
     # order/family/genus/photographer/owner are typed into free-text autocomplete fields
     # (some have hundreds of possible values, so a <select> isn't practical) -- icontains
-    # keeps a partial or not-quite-exact typed value still useful as a search.
+    # keeps a partial or not-quite-exact typed value still useful as a search. A SPECIES-kind
+    # sample carries its order/family/genus through the linked Species row -- but an
+    # ORDER/FAMILY/GENUS-kind sample IS the taxon itself, identified by species_other rather
+    # than a linked Species (see Sample.clean()), so each search also has to match that, or
+    # the one sample defining the searched-for taxon would never show up in its own search.
     if get.get('order'):
-        rows = rows.filter(species__order__icontains=get['order'])
+        rows = rows.filter(Q(species__order__icontains=get['order']) |
+                            Q(kind=Sample.Kind.ORDER, species_other__icontains=get['order']))
     if get.get('family'):
-        rows = rows.filter(species__family__icontains=get['family'])
+        rows = rows.filter(Q(species__family__icontains=get['family']) |
+                            Q(kind=Sample.Kind.FAMILY, species_other__icontains=get['family']))
     if get.get('genus'):
-        rows = rows.filter(species__genus__icontains=get['genus'])
+        rows = rows.filter(Q(species__genus__icontains=get['genus']) |
+                            Q(kind=Sample.Kind.GENUS, species_other__icontains=get['genus']))
     if get.get('photographer'):
         rows = rows.filter(trip__photographer__icontains=get['photographer'])
     if manager and get.get('owner'):
@@ -388,7 +395,8 @@ def observation_action(request, pk):
             from .media_transfer import delete_image_if_unused
             old_name = item.image.name
             item.image = ''
-            item.save(update_fields=['image', 'updated_at'])
+            item.image_hash = ''
+            item.save(update_fields=['image', 'image_hash', 'updated_at'])
             delete_image_if_unused(old_name)
             messages.success(request, 'התמונה נמחקה.')
     elif action == 'delete_video':
