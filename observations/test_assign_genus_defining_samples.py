@@ -31,7 +31,12 @@ class AssignGenusDefiningSamplesTests(TestCase):
         return item
 
     def test_dry_run_makes_no_database_changes(self):
+        # Sample.save() (see models.py) now keeps the genus pointed at its own genus-kind
+        # sample automatically as soon as one is saved -- simulate stale legacy data that
+        # predates that behavior (e.g. imported straight into the database) by clearing it
+        # back out, so this test still exercises the command's own dry-run guarantee.
         sample = self.genus_sample()
+        TaxonGenus.objects.filter(pk=self.genus.pk).update(defining_sample=None)
         call_command('assign_genus_defining_samples')
         self.genus.refresh_from_db()
         self.assertIsNone(self.genus.defining_sample_id)
@@ -79,6 +84,30 @@ class AssignGenusDefiningSamplesTests(TestCase):
         self.genus.refresh_from_db()
         self.assertEqual(self.genus.defining_sample_id, sample.pk)
 
+    def test_creating_a_genus_sample_immediately_points_the_genus_at_it(self):
+        # Regression test: Sample.save() (models.py) must keep TaxonGenus.defining_sample
+        # correct on its own, without needing the management command run afterward -- this
+        # is what image_manager.py's transfer upload relies on (it saves genus-kind samples
+        # with a plain .save(), never through save_reviewed() or this command).
+        sample = self.genus_sample()
+        self.genus.refresh_from_db()
+        self.assertEqual(self.genus.defining_sample_id, sample.pk)
+
+    def test_soft_delete_repoints_to_another_genus_sample(self):
+        first = self.genus_sample()
+        second = self.genus_sample()
+        self.genus.refresh_from_db()
+        self.assertEqual(self.genus.defining_sample_id, first.pk)
+        first.soft_delete(self.user)
+        self.genus.refresh_from_db()
+        self.assertEqual(self.genus.defining_sample_id, second.pk)
+
+    def test_soft_delete_clears_defining_sample_when_no_replacement_exists(self):
+        sample = self.genus_sample()
+        sample.soft_delete(self.user)
+        self.genus.refresh_from_db()
+        self.assertIsNone(self.genus.defining_sample_id)
+
     def test_unpublished_genus_sample_is_not_used(self):
         # A pending (unapproved) genus-kind sample must not become the genus's public photo.
         pending = Sample.objects.create(owner=self.user, kind=Sample.Kind.GENUS, species_other='Chromodoris',
@@ -87,3 +116,27 @@ class AssignGenusDefiningSamplesTests(TestCase):
         call_command('assign_genus_defining_samples', '--apply')
         self.genus.refresh_from_db()
         self.assertIsNone(self.genus.defining_sample_id)
+
+
+class TaxonGenusAdminActionTests(TestCase):
+    def setUp(self):
+        # create_backup() does real file I/O -- irrelevant here, same reasoning as above.
+        patcher = patch('observations.management.commands.assign_genus_defining_samples.create_backup', return_value=Path('backup-stub.sqlite3'))
+        self.addCleanup(patcher.stop)
+        patcher.start()
+        self.manager = User.objects.create_superuser('manager', password='test-password')
+        self.trip = DiveTrip.objects.create(title='Genus library', year=2026)
+        self.genus = TaxonGenus.objects.create(name='Chromodoris')
+
+    def test_refresh_action_runs_regardless_of_selection(self):
+        sample = Sample(owner=self.manager, kind=Sample.Kind.GENUS, species_other='Chromodoris',
+                         trip=self.trip, video_url='https://youtu.be/abcdefghijk')
+        sample.save_reviewed(actor=self.manager, approve=True)
+        # corrupt it first, to prove the action truly recomputes rather than trusting the row
+        TaxonGenus.objects.filter(pk=self.genus.pk).update(defining_sample=None)
+        self.client.force_login(self.manager)
+        response = self.client.post('/admin/observations/taxongenus/',
+            {'action': 'refresh_defining_samples', '_selected_action': [str(self.genus.pk)]})
+        self.assertEqual(response.status_code, 302)
+        self.genus.refresh_from_db()
+        self.assertEqual(self.genus.defining_sample_id, sample.pk)

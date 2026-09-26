@@ -58,6 +58,14 @@ class TaxonGenusAdmin(admin.ModelAdmin):
     list_filter = ['family__order']
     search_fields = ['name', 'name_he', 'name_en']
     autocomplete_fields = ['family']
+    actions = ['refresh_defining_samples']
+    @admin.action(description='עדכון דגימה מגדירה לכל הסוגים מתוך דגימות ה"סוג" הקיימות (מתעלם מהבחירה)')
+    def refresh_defining_samples(self, request, queryset):
+        from io import StringIO
+        from django.core.management import call_command
+        output = StringIO()
+        call_command('assign_genus_defining_samples', '--apply', stdout=output)
+        messages.success(request, output.getvalue().strip())
 
 
 @admin.register(DiveTrip)

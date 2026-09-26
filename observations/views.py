@@ -9,7 +9,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
-from .models import Sample, Profile, Region, Site, DiveTrip, SiteImage, Species, Country, SpeciesArea, SampleKind, KIND_EN_NAMES
+from .models import Sample, Profile, Region, Site, DiveTrip, SiteImage, Species, Country, SpeciesArea, SampleKind, KIND_EN_NAMES, TaxonGenus
 from .forms import SignupForm, SampleForm, ProfileForm, DiveTripForm
 from .gallery_data import TaxonResolver, taxon_media
 from .i18n import get_lang
@@ -79,6 +79,64 @@ def species_article(request, slug):
     response = FileResponse(area.species.article_pdf.open('rb'), content_type='application/pdf')
     response['Cache-Control'] = 'public, max-age=3600'
     response['Content-Disposition'] = 'inline; filename="%s.pdf"' % area.species.scientific_name.replace('"', "'")
+    return response
+
+
+def genus_page(request, name):
+    """Public, server-rendered page for one genus -- the genus-level analogue of
+    species_page above, keyed directly by TaxonGenus.name (already unique, and a plain
+    single Latin word, so no separate slug field is needed the way SpeciesArea has one).
+    Shows every species observed in this genus (across all its areas), each linking to its
+    own species page. Only reachable once the genus has a valid defining sample with media,
+    the same rule species_page uses."""
+    genus = get_object_or_404(
+        TaxonGenus.objects.select_related('family', 'family__order', 'defining_sample'), name=name)
+    thumbnail, image_url, video_id = taxon_media(genus.defining_sample)
+    if not (image_url or video_id):
+        raise Http404
+    resolver = TaxonResolver()
+    areas = []
+    for area in SpeciesArea.objects.select_related(
+            'species', 'country', 'sea', 'defining_sample', 'defining_sample__trip', 'defining_sample__trip__region'
+    ).order_by('species__scientific_name'):
+        defining = area.defining_sample
+        if not defining or defining.status != 'published' or defining.deleted_at or not (defining.image or defining.video_url):
+            continue  # same gate species_page/catalog.js use -- an area only counts once it can actually show something
+        _, _, genus_obj = resolver.resolve(area.species)
+        if genus_obj and genus_obj.pk == genus.pk:
+            areas.append(area)
+    if not areas:
+        raise Http404
+    lang = get_lang(request)
+
+    def taxon_label(obj):
+        if not obj:
+            return ''
+        return (obj.name_en or obj.name) if lang == 'en' else (obj.name_he or obj.name)
+
+    taxon_family = genus.family
+    taxon_order = taxon_family.order if (taxon_family and taxon_family.order_id) else None
+    common_name = (genus.name_en or genus.name_he) if lang == 'en' else (genus.name_he or genus.name_en)
+    description = (genus.description_en or genus.description_he) if lang == 'en' else (genus.description_he or genus.description_en)
+    return render(request, 'observations/genus_page.html', {
+        'genus': genus, 'areas': areas,
+        'image_url': image_url, 'video_id': video_id, 'thumbnail': thumbnail,
+        'taxon_order': taxon_order, 'taxon_family': taxon_family,
+        'taxon_order_label': taxon_label(taxon_order), 'taxon_family_label': taxon_label(taxon_family),
+        'common_name': common_name, 'description': description,
+        'canonical_url': request.build_absolute_uri(request.path),
+    })
+
+
+def genus_article(request, name):
+    """Streams a genus' curated article PDF -- the genus-level analogue of species_article
+    above, keyed directly by TaxonGenus.name."""
+    genus = get_object_or_404(TaxonGenus, name=name)
+    if not genus.article_pdf:
+        raise Http404
+    response = FileResponse(genus.article_pdf.open('rb'), content_type='application/pdf')
+    response['Cache-Control'] = 'public, max-age=3600'
+    response['Content-Disposition'] = 'inline; filename="%s.pdf"' % genus.name.replace('"', "'")
     return response
 
 SORT_OPTIONS = {

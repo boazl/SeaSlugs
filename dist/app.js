@@ -563,11 +563,17 @@ function renderTaxonPanel(level, id) {
     const name = entry ? (language === 'en' ? (entry.label_en || entry.label) : entry.label) : '';
     const title = `${levelLabel} - ${name}`;
     // Only when the taxon has a photo/video of its own (via defining_sample) is the
-    // panel clickable -- it then opens the same viewer species/collection cards use.
+    // panel clickable. A genus has its own public page (see buildSpeciesCard's identical
+    // sp.slug pattern) -- link straight to it there; order/family have no page of their
+    // own yet, so they still just open the lightweight media viewer.
     const hasMedia = !!(entry && (entry.image_url || entry.video_id));
-    const panel = document.createElement(hasMedia ? 'button' : 'div');
+    const isGenusLink = hasMedia && level === 'genus';
+    const panel = document.createElement(isGenusLink ? 'a' : (hasMedia ? 'button' : 'div'));
     panel.className = `taxon-panel taxon-panel-${level}${hasMedia ? ' taxon-panel-clickable' : ''}`;
-    if (hasMedia) {
+    if (isGenusLink) {
+        panel.href = `/genus/${encodeURIComponent(entry.name)}/`;
+        panel.setAttribute('aria-label', title);
+    } else if (hasMedia) {
         panel.type = 'button';
         panel.setAttribute('aria-label', title);
     }
@@ -581,7 +587,7 @@ function renderTaxonPanel(level, id) {
     const text = document.createElement('span');
     text.textContent = title;
     panel.append(text);
-    if (hasMedia) {
+    if (hasMedia && !isGenusLink) {
         panel.addEventListener('click', () => playTaxon(entry, title, panel));
     }
     return panel;

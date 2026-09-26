@@ -6,8 +6,8 @@ page are simply never added here -- there is no separate "exclude" step needed f
 """
 from django.contrib.sitemaps import Sitemap
 from django.urls import reverse
-from .gallery_data import taxon_media
-from .models import Sample, SpeciesArea
+from .gallery_data import TaxonResolver, taxon_media
+from .models import Sample, SpeciesArea, TaxonGenus
 
 
 class StaticViewSitemap(Sitemap):
@@ -54,7 +54,36 @@ class SpeciesPageSitemap(Sitemap):
         return reverse('species-page', args=[area.slug])
 
 
+class GenusPageSitemap(Sitemap):
+    """Each genus's dedicated public page (views.genus_page) -- only ones that are actually
+    live. genus_page() 404s when either check below fails (no defining photo/video of its
+    own, or no species actually shown under it), so the sitemap mirrors both."""
+    protocol = 'https'
+    changefreq = 'weekly'
+    priority = 0.5
+
+    def items(self):
+        genera = list(TaxonGenus.objects.select_related('defining_sample'))
+        live = [g for g in genera if any(taxon_media(g.defining_sample)[1:])]
+        if not live:
+            return []
+        resolver = TaxonResolver()
+        genus_ids_with_species = set()
+        for area in SpeciesArea.objects.select_related('species', 'defining_sample'):
+            defining = area.defining_sample
+            if not defining or defining.status != 'published' or defining.deleted_at or not (defining.image or defining.video_url):
+                continue
+            _, _, genus_obj = resolver.resolve(area.species)
+            if genus_obj:
+                genus_ids_with_species.add(genus_obj.pk)
+        return [g for g in live if g.pk in genus_ids_with_species]
+
+    def location(self, genus):
+        return reverse('genus-page', args=[genus.name])
+
+
 SITEMAPS = {
     'static': StaticViewSitemap,
     'species': SpeciesPageSitemap,
+    'genera': GenusPageSitemap,
 }

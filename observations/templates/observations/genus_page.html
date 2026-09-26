@@ -4,8 +4,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ species.scientific_name }}{% if common_name %} — {{ common_name }}{% endif %} | SeaSlugs</title>
-    <meta name="description" content="{% if description %}{{ description|truncatechars:160 }}{% else %}{{ species.scientific_name }} — {{ "תצפיות, תמונות ומידע מאתר SeaSlugs, אתר חינניות הים."|t:lang }}{% endif %}">
+    <title>{{ genus.name }}{% if common_name %} — {{ common_name }}{% endif %} | SeaSlugs</title>
+    <meta name="description" content="{% if description %}{{ description|truncatechars:160 }}{% else %}{{ genus.name }} — {{ "תצפיות, תמונות ומידע מאתר SeaSlugs, אתר חינניות הים."|t:lang }}{% endif %}">
     <meta name="referrer" content="strict-origin-when-cross-origin">
     <link rel="icon" type="image/svg+xml"
         href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23091e28'/%3E%3Cpath d='M7 11c10-9 8 14 18 5M7 18c10-9 8 14 18 5' stroke='%235de0cb' stroke-width='3' fill='none'/%3E%3C/svg%3E">
@@ -22,18 +22,11 @@
         .species-video iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
         .species-summary h1{font-family:Georgia,"Times New Roman",serif;font-weight:400;font-size:32px;margin:0 0 6px}
         .species-common{color:var(--muted);font-size:17px;margin:0 0 6px}
-        .species-area{color:var(--muted);font-size:14px;margin:0 0 14px}
-        .species-badges{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
-        .badge{display:inline-block;padding:4px 12px;border-radius:20px;background:var(--panel);border:1px solid var(--line);font-size:13px;color:var(--muted)}
-        .badge-migrant{color:var(--accent);border-color:var(--accent)}
         .species-links{display:flex;flex-wrap:wrap;gap:14px}
         .species-links a{color:var(--accent);text-decoration:none;font-size:15px}
         .species-links a:hover{text-decoration:underline}
         .species-section{margin-top:40px;padding-top:24px;border-top:1px solid var(--line)}
         .species-section h2{font-size:22px;font-weight:600;margin:0 0 14px}
-        .species-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:24px}
-        .species-facts h3{font-size:15px;color:var(--muted);margin:0 0 6px;font-weight:600}
-        .species-facts p{margin:0}
         .species-share{margin-top:18px;font-size:14px;color:var(--muted);display:flex;flex-wrap:wrap;align-items:center;gap:10px}
         .species-share a{color:var(--accent);word-break:break-all}
         .species-share button{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:4px 10px;font-size:13px;cursor:pointer}
@@ -49,63 +42,55 @@
             <a href="/">{{ "הגלריה"|t:lang }}</a>
             {% if taxon_order_label %}<span>›</span><span>{{ taxon_order_label }}</span>{% endif %}
             {% if taxon_family_label %}<span>›</span><span>{{ taxon_family_label }}</span>{% endif %}
-            {% if taxon_genus_label %}<span>›</span>{% if taxon_genus.defining_sample_id %}<a href="{% url 'genus-page' taxon_genus.name %}">{{ taxon_genus_label }}</a>{% else %}<span>{{ taxon_genus_label }}</span>{% endif %}{% endif %}
-            <span>›</span><span aria-current="page">{{ species.scientific_name }}</span>
+            <span>›</span><span aria-current="page" dir="ltr">{{ genus.name }}</span>
         </nav>
 
         <article class="species-hero">
             <div class="species-media">
                 {% if video_id %}
-                <div class="species-video"><iframe src="https://www.youtube-nocookie.com/embed/{{ video_id }}" title="{{ species.scientific_name }}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
+                <div class="species-video"><iframe src="https://www.youtube-nocookie.com/embed/{{ video_id }}" title="{{ genus.name }}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
                 {% elif image_url %}
-                <img src="{{ image_url }}" alt="{{ species.scientific_name }}" width="800" height="600">
+                <img src="{{ image_url }}" alt="{{ genus.name }}" width="800" height="600">
                 {% endif %}
             </div>
             <div class="species-summary">
-                <h1 dir="ltr">{{ species.scientific_name }}</h1>
+                <h1 dir="ltr">{{ genus.name }}</h1>
                 {% if common_name %}<p class="species-common">{{ common_name }}</p>{% endif %}
-                <p class="species-area">{{ area.country|loc:lang }} · {{ area.sea|loc:lang }}</p>
-                <div class="species-badges">
-                    {% if species.is_migrant %}<span class="badge badge-migrant">{{ "מין מהגר"|t:lang }}</span>{% endif %}
-                    {% if species.first_observed_year or species.last_observed_year %}<span class="badge">{{ "תצפיות:"|t:lang }} {% if species.first_observed_year %}{{ species.first_observed_year }}{% else %}?{% endif %}–{% if species.last_observed_year %}{{ species.last_observed_year }}{% else %}?{% endif %}</span>{% endif %}
-                </div>
-                {% if species.link or species.article_pdf %}
+                {% if genus.link or genus.article_pdf %}
                 <div class="species-links">
-                    {% if species.link %}<a href="{{ species.link }}" target="_blank" rel="noopener">{{ "קישור נוסף ↗"|t:lang }}</a>{% endif %}
-                    {% if species.article_pdf %}<a href="{% url 'species-article' area.slug %}" target="_blank" rel="noopener">{{ "מאמר (PDF) ↗"|t:lang }}</a>{% endif %}
+                    {% if genus.link %}<a href="{{ genus.link }}" target="_blank" rel="noopener">{{ "קישור נוסף ↗"|t:lang }}</a>{% endif %}
+                    {% if genus.article_pdf %}<a href="{% url 'genus-article' genus.name %}" target="_blank" rel="noopener">{{ "מאמר (PDF) ↗"|t:lang }}</a>{% endif %}
                 </div>
                 {% endif %}
             </div>
         </article>
 
+        {% if description %}
         <section class="species-section">
             <h2>{{ "תיאור"|t:lang }}</h2>
-            {% if description %}<p>{{ description|linebreaksbr }}</p>{% endif %}
-            <p class="species-share"><span>{{ "קישור לשיתוף:"|t:lang }}</span> <a href="{{ canonical_url }}" id="species-share-link">{{ canonical_url }}</a> <button type="button" id="species-share-copy" data-copy-label="{{ "העתקה"|t:lang }}" data-copied-label="{{ "הועתק!"|t:lang }}">{{ "העתקה"|t:lang }}</button></p>
-        </section>
-
-        {% if species.habitat or species.food %}
-        <section class="species-section species-facts">
-            {% if species.habitat %}<div><h3>{{ "בית גידול"|t:lang }}</h3><p>{{ species.habitat|linebreaksbr }}</p></div>{% endif %}
-            {% if species.food %}<div><h3>{{ "מזון"|t:lang }}</h3><p>{{ species.food|linebreaksbr }}</p></div>{% endif %}
+            <p>{{ description|linebreaksbr }}</p>
         </section>
         {% endif %}
 
         <section class="species-section">
-            <h2>{{ "תצפיות"|t:lang }} ({{ samples|length }})</h2>
+            <h2>{{ "מינים בסוג זה"|t:lang }} ({{ areas|length }})</h2>
             <div class="grid">
-                {% for s in samples %}
+                {% for area in areas %}
                 <article class="card">
-                    <a class="video-button" href="{% if s.video_url %}{{ s.video_url }}{% else %}{% url 'observation-photo' s.pk %}{% endif %}" target="_blank" rel="noopener">
-                        <span class="image-wrap"><img src="{% if s.image %}{% url 'observation-photo' s.pk %}{% else %}{{ s.thumbnail }}{% endif %}" alt="" width="640" height="360" loading="lazy"><span class="play" aria-hidden="true">{% if s.video_url %}▶{% else %}⤢{% endif %}</span></span>
+                    <a class="video-button" href="{% url 'species-page' area.slug %}">
+                        <span class="image-wrap"><img src="{% if area.defining_sample.image %}{% url 'observation-photo' area.defining_sample.pk %}{% else %}{{ area.defining_sample.thumbnail }}{% endif %}" alt="" width="640" height="360" loading="lazy"><span class="play" aria-hidden="true">{% if area.defining_sample.video_url %}▶{% else %}⤢{% endif %}</span></span>
                         <span class="card-info">
-                            <span class="card-meta"><span>{% if s.site %}{{ s.site|loc:lang }}{% endif %}{% if s.day and s.trip.month %} · {{ s.day }}/{{ s.trip.month }}/{{ s.trip.year }}{% elif s.trip.year %} · {{ s.trip.year }}{% endif %}</span></span>
-                            {% with photog=s|photographer_name:lang %}{% if photog %}<span class="photographer">{{ "צילום:"|t:lang }} {{ photog }}</span>{% endif %}{% endwith %}
+                            <h3 class="hebrew" dir="ltr">{{ area.species.scientific_name }}</h3>
+                            <span class="card-meta"><span>{{ area.country|loc:lang }} · {{ area.sea|loc:lang }}</span></span>
                         </span>
                     </a>
                 </article>
                 {% endfor %}
             </div>
+        </section>
+
+        <section class="species-section">
+            <p class="species-share"><span>{{ "קישור לשיתוף:"|t:lang }}</span> <a href="{{ canonical_url }}" id="species-share-link">{{ canonical_url }}</a> <button type="button" id="species-share-copy" data-copy-label="{{ "העתקה"|t:lang }}" data-copied-label="{{ "הועתק!"|t:lang }}">{{ "העתקה"|t:lang }}</button></p>
         </section>
     </main>
     <script>

@@ -182,6 +182,23 @@ class TaxonGenus(models.Model):
         verbose_name = 'סוג (טקסונומיה)'
         verbose_name_plural = 'סוגים (טקסונומיה)'
     def __str__(self): return self.name
+    @staticmethod
+    def pick_defining_sample(name):
+        """Best genus-kind sample to represent a genus by this exact name: prefer one with
+        an uploaded image over a video-only one, only among published/non-deleted genus-kind
+        samples identifying this genus, tie-broken by whichever was created first. Same
+        algorithm as SpeciesArea.pick_defining_sample above and the assign_genus_defining_
+        samples management command's own copy (kept separate on purpose -- see gallery_data.
+        py's note on this codebase's convention of small local copies over cross-module
+        coupling for this kind of picking logic)."""
+        candidates = list(Sample.objects.filter(
+            kind=Sample.Kind.GENUS, species_other=name, status=Sample.Status.PUBLISHED, deleted_at__isnull=True,
+        ).order_by('created_at', 'pk'))
+        candidates = [c for c in candidates if c.image or c.video_url]
+        if not candidates:
+            return None
+        with_image = [c for c in candidates if c.image]
+        return (with_image or candidates)[0]
 
 
 class SiteImage(models.Model):
@@ -502,6 +519,18 @@ class Sample(models.Model):
                         if other_video_id == video_id: duplicate = other; break
                     if duplicate: errors['video_url'] = f'הסרטון הזה כבר קיים בתצפית אחרת ({duplicate}). לא ניתן להשתמש באותו סרטון פעמיים.'
         if errors: raise ValidationError(errors)
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # A GENUS-kind sample is a purpose-built photo/video for its whole genus -- keep the
+        # genus it identifies pointed at the current best genus-kind sample for it on every
+        # save, not just through save_reviewed() below: sample transfer (image_manager.py /
+        # sample_transfer.py) saves genus-kind samples with a plain .save() and never goes
+        # through save_reviewed() at all, and soft_delete() below is itself just a save()
+        # call that sets deleted_at -- both need this to stay in sync, so it belongs here
+        # rather than duplicated in each caller.
+        if self.kind == self.Kind.GENUS and self.species_other:
+            TaxonGenus.objects.filter(name=self.species_other).update(
+                defining_sample=TaxonGenus.pick_defining_sample(self.species_other))
     def save_reviewed(self, actor=None, approve=False):
         self.full_clean(validate_constraints=False)
         with transaction.atomic():
