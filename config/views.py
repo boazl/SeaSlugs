@@ -22,14 +22,28 @@ def gallery_file(request, filename='index.html'):
         return response
     if filename == 'catalog.js':
         import json
+        from django.contrib.auth import get_user_model
         from django.http import HttpResponse
         from observations.models import Sample, SpeciesArea, TaxonOrder, TaxonFamily, TaxonGenus, youtube_id
+
+        # Fetched once and reused for every sample/collection below, rather than each
+        # photographer_display_name() call re-querying every registered user on its own --
+        # see _resolve_registered_photographer's docstring in observations/models.py.
+        registered_users = list(get_user_model().objects.select_related('profile').all())
 
         def sample_out(s, region):
             return {
                 'sample_id': s.pk, 'trip_id': s.trip_id,
                 'region': str(region.pk), 'site': str(s.site_id) if s.site_id else None,
-                'photographer': s.photographer_name, 'year': s.trip.year, 'month': s.trip.month,
+                # 'photographer' stays the raw, language-invariant credit text -- it is the
+                # filter/identity value (see photographerCount and the photographer checkbox
+                # filter in app.js). 'photographer_he'/'photographer_en' are only for display,
+                # so a registered user's credit shows in the page's own language (see
+                # sampleSubtitle/collectionSubtitle/buildSpeciesCard in app.js).
+                'photographer': s.photographer_name,
+                'photographer_he': s.photographer_display_name('he', registered_users=registered_users),
+                'photographer_en': s.photographer_display_name('en', registered_users=registered_users),
+                'year': s.trip.year, 'month': s.trip.month,
                 'video_id': youtube_id(s.video_url) if s.video_url else None,
                 'image_url': f'/observations/{s.pk}/photo/' if s.image else None,
                 'thumbnail': f'/observations/{s.pk}/photo/' if s.image else s.thumbnail,
@@ -210,7 +224,10 @@ def gallery_file(request, filename='index.html'):
             trip_objects[item.trip_id] = item.trip
             collections_out.append({
                 'sample_id': item.pk, 'trip_id': item.trip_id, 'title': item.title,
-                'photographer': item.photographer_name, 'area': area_key,
+                'photographer': item.photographer_name,
+                'photographer_he': item.photographer_display_name('he', registered_users=registered_users),
+                'photographer_en': item.photographer_display_name('en', registered_users=registered_users),
+                'area': area_key,
                 'region': str(region.pk), 'year': item.trip.year, 'month': item.trip.month,
                 'video_id': youtube_id(item.video_url) if item.video_url else None,
                 'image_url': f'/observations/{item.pk}/photo/' if item.image else None,

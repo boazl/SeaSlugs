@@ -353,19 +353,24 @@ KIND_EN_NAMES = {
 }
 
 
-def _resolve_registered_photographer(raw_name, lang):
+def _resolve_registered_photographer(raw_name, lang, users=None):
     """DiveTrip.photographer is free text (an admin can credit anyone, including a
     guest photographer with no account here), so it has no language dimension of its
     own. When that text happens to match a registered user -- by full name (Hebrew or
     English) or username -- resolve it through that user's profile for a language-aware
     name instead, via full_name_for. Text that matches no one (e.g. a guest
-    photographer) is returned unchanged, since there is nothing to translate it against."""
-    from django.contrib.auth import get_user_model
-    User = get_user_model()
+    photographer) is returned unchanged, since there is nothing to translate it against.
+
+    `users` lets a caller that resolves many samples at once (e.g. the gallery's
+    catalog.js builder in config/views.py) pass in one pre-fetched, select_related('profile')
+    list instead of this function re-querying every registered user on every single call."""
     raw_name = raw_name.strip()
     if not raw_name:
         return None
-    for user in User.objects.select_related('profile').all():
+    if users is None:
+        from django.contrib.auth import get_user_model
+        users = get_user_model().objects.select_related('profile').all()
+    for user in users:
         profile = getattr(user, 'profile', None)
         candidates = {user.get_full_name().strip(), user.username.strip()}
         if profile:
@@ -426,16 +431,19 @@ class Sample(models.Model):
         if self.trip_id and self.trip.photographer.strip():
             return self.trip.photographer.strip()
         return self.owner.get_full_name().strip() or 'שם הצלם לא צוין'
-    def photographer_display_name(self, lang='he'):
+    def photographer_display_name(self, lang='he', registered_users=None):
         """Language-aware version of photographer_name (see seaslugs_i18n.photographer_name,
         the template filter that calls this): when the credited photographer -- from the
         trip's free-text field, or the observation owner's own profile as a fallback --
         matches a registered user, prefer that user's English name in English mode, the
         same way the nav greeting does. Free text matching no registered user (a guest
-        photographer with no account) is shown as-is in every language."""
+        photographer with no account) is shown as-is in every language.
+
+        `registered_users` is passed straight through to _resolve_registered_photographer
+        for a caller resolving many samples at once -- see that function's docstring."""
         if self.trip_id and self.trip.photographer.strip():
             raw = self.trip.photographer.strip()
-            return _resolve_registered_photographer(raw, lang) or raw
+            return _resolve_registered_photographer(raw, lang, users=registered_users) or raw
         return full_name_for(self.owner, lang) or 'שם הצלם לא צוין'
     @property
     def thumbnail(self):

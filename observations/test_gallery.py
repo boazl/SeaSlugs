@@ -78,6 +78,39 @@ class GalleryTests(TestCase):
         collection.save_reviewed(actor=self.owner, approve=True)
         self.assertEqual(self.catalog()['trips'][str(collection_trip.pk)]['species_count'], 0)
 
+    def test_catalog_exposes_hebrew_and_english_photographer_credit_for_a_registered_user(self):
+        # A registered user's credit should read in whichever language the page is in --
+        # not always in whatever language happened to be typed into the trip's free-text
+        # photographer field (see Sample.photographer_display_name).
+        from .models import Profile
+        self.owner.first_name = 'בעז'; self.owner.last_name = 'ליבס'; self.owner.save()
+        Profile.objects.create(user=self.owner, first_name_en='Boaz', last_name_en='Liebes')
+        self.trip.photographer = 'Boaz Liebes'; self.trip.save()
+        entry = self.catalog()['species'][0]['samples'][0]
+        self.assertEqual(entry['photographer'], 'Boaz Liebes')  # raw filter/identity value, unchanged
+        self.assertEqual(entry['photographer_he'], 'בעז ליבס')
+        self.assertEqual(entry['photographer_en'], 'Boaz Liebes')
+
+    def test_catalog_leaves_a_guest_photographer_credit_unchanged_in_both_languages(self):
+        # A guest photographer with no account has no per-language variant to resolve --
+        # the free text is shown as-is regardless of the page's language.
+        self.trip.photographer = 'Bart Adams'; self.trip.save()
+        entry = self.catalog()['species'][0]['samples'][0]
+        self.assertEqual(entry['photographer_he'], 'Bart Adams')
+        self.assertEqual(entry['photographer_en'], 'Bart Adams')
+
+    def test_catalog_exposes_photographer_credit_for_collections_too(self):
+        from .models import Profile
+        self.owner.first_name = 'בעז'; self.owner.last_name = 'ליבס'; self.owner.save()
+        Profile.objects.create(user=self.owner, first_name_en='Boaz', last_name_en='Liebes')
+        self.trip.photographer = 'Boaz Liebes'; self.trip.save()
+        collection = Sample(owner=self.owner, kind='collection', trip=self.trip, title='Trip collection',
+                             video_url='https://youtu.be/33333333333')
+        collection.save_reviewed(actor=self.owner, approve=True)
+        entry = self.catalog()['collections'][0]
+        self.assertEqual(entry['photographer_he'], 'בעז ליבס')
+        self.assertEqual(entry['photographer_en'], 'Boaz Liebes')
+
     def test_species_hidden_when_area_has_no_defining_sample(self):
         from .models import SpeciesArea
         area = SpeciesArea.objects.get(species=self.item.species)

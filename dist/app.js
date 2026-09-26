@@ -42,6 +42,14 @@ function labelFor(id, dict) {
     if (!e) return '';
     return language === 'en' ? (e.label_en || e.label) : e.label;
 }
+// A sample/collection's credited photographer, in the page's current language: a
+// registered user's name resolves per-language server-side (photographer_he/
+// photographer_en in catalog.js -- see photographer_display_name in observations/
+// models.py); a guest photographer with no account has no per-language variant, so
+// entry.photographer (the raw, language-invariant credit text) is the fallback.
+function photographerLabel(entry) {
+    return (language === 'he' ? entry.photographer_he : entry.photographer_en) || entry.photographer;
+}
 
 const collectionStatus = document.createElement('div');
 collectionStatus.className = 'collection-selection';
@@ -351,12 +359,12 @@ function sampleSubtitle(sm) {
     const siteText = sm.site ? labelFor(sm.site, siteLabelsData) : '';
     const dateText = [monthLabel, sm.year].filter(Boolean).join(' ');
     const location = [regionText, siteText, dateText].filter(Boolean).join(' · ');
-    const credit = sm.photographer ? `${language === 'he' ? 'צילום: ' : 'Photography: '}${sm.photographer}` : '';
+    const credit = sm.photographer ? `${language === 'he' ? 'צילום: ' : 'Photography: '}${photographerLabel(sm)}` : '';
     return [location, credit].filter(Boolean).join(' · ');
 }
 function collectionSubtitle(c) {
     const regionText = labelFor(c.region, regionLabelsData);
-    const credit = c.photographer ? `${language === 'he' ? 'צילום: ' : 'Photography: '}${c.photographer}` : '';
+    const credit = c.photographer ? `${language === 'he' ? 'צילום: ' : 'Photography: '}${photographerLabel(c)}` : '';
     return [regionText, credit].filter(Boolean).join(' · ');
 }
 function showMedia(video_id, image_url, title, subtitle) {
@@ -465,7 +473,7 @@ function buildCollectionCard(c, index) {
     h3.textContent = title;
     const credit = document.createElement('span');
     credit.className = 'photographer';
-    if (c.photographer) credit.textContent = (language === 'he' ? 'צילום: ' : 'Photography: ') + c.photographer;
+    if (c.photographer) credit.textContent = (language === 'he' ? 'צילום: ' : 'Photography: ') + photographerLabel(c);
     const meta = document.createElement('span');
     meta.className = 'card-meta';
     const region = document.createElement('span');
@@ -528,7 +536,7 @@ function buildSpeciesCard(sp, index) {
     credit.className = 'photographer';
     const creditSample = cardSample || (sp.samples.length === 1 ? sp.samples[0] : null);
     if (creditSample && creditSample.photographer) {
-        credit.textContent = (language === 'he' ? 'צילום: ' : 'Photography: ') + creditSample.photographer;
+        credit.textContent = (language === 'he' ? 'צילום: ' : 'Photography: ') + photographerLabel(creditSample);
     }
     const meta = document.createElement('span');
     meta.className = 'card-meta';
