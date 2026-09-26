@@ -105,6 +105,27 @@ class MediaTransferTests(TestCase):
         self.assertEqual(self.client.get('/admin/images/').status_code,302)
         self.client.force_login(User.objects.create_user('staff',is_staff=True))
         self.assertEqual(self.client.get('/admin/images/').status_code,403)
+    def test_image_manager_upload_accepts_published_genus_kind_with_species_other(self):
+        # Regression test: sample_plan() used to reject every published GENUS-kind sample
+        # during transfer, because species_other holds the genus name itself -- the sample's
+        # actual, permanent identification, not a placeholder "other" value awaiting a species
+        # match -- and the 'אין לפרסם רשומה עם ערכי אחר' check didn't carve out the same GENUS
+        # exception that Sample.publication_reasons()/save_reviewed() already do.
+        from .image_manager import files
+        genus_sample=Sample(owner=self.sample.owner,kind=Sample.Kind.GENUS,species_other='Chelidonura',trip=self.sample.trip)
+        output=io.BytesIO();Image.new('RGB',(60,40),'yellow').save(output,'JPEG')
+        genus_sample.image.save('genus.jpg',ContentFile(output.getvalue()),save=False)
+        genus_sample.save_reviewed(actor=genus_sample.owner,approve=True)
+        self.assertEqual(genus_sample.status,'published')
+        self.client.force_login(genus_sample.owner)
+        row=next(r for r in files() if genus_sample in r['refs'])
+        response=self.client.get('/admin/images/file/',{'file':row['token'],'download':'1'})
+        raw=b''.join(response.streaming_content);response.close()
+        response=self.client.post('/admin/images/',{'action':'upload','replace':'yes','images':SimpleUploadedFile('transfer.jpg',raw,content_type='image/jpeg')})
+        self.assertEqual(response.status_code,302)
+        genus_sample.refresh_from_db()
+        self.assertEqual(genus_sample.status,'published');self.assertEqual(genus_sample.species_other,'Chelidonura')
+
     def test_json_export_and_update_preserves_destination_image(self):
         import json
         self.client.force_login(self.sample.owner)

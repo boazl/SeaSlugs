@@ -102,7 +102,10 @@ def sample_plan(document, fields):
                 for field in ('species','trip'):
                     errors.pop(field, None)
             if errors: raise ValidationError(errors)
-        if candidate.status == 'published' and (candidate.species_other or candidate.site_other):
+        # Same exception as Sample.publication_reasons()/save_reviewed(): species_other on a
+        # GENUS-kind sample is the genus identification itself, not an incomplete "other" value.
+        other = (candidate.species_other and candidate.kind != Sample.Kind.GENUS) or candidate.site_other
+        if candidate.status == 'published' and other:
             raise ValidationError('אין לפרסם רשומה עם ערכי אחר.')
         before = sample_row(obj, fields) if obj else {}
         after = sample_row(candidate, fields)
