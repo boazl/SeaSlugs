@@ -1,8 +1,10 @@
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
+from django.contrib.sitemaps.views import sitemap
 from django.urls import path, include
 from .views import gallery_file, health
+from observations.sitemaps import SITEMAPS
 from observations.transfer_views import transfer
 from observations.release_views import releases
 from observations.image_manager import manager as image_manager, image_file
@@ -25,6 +27,9 @@ urlpatterns = [
     path('site-image/<slug:key>.jpg', site_image, name='site-image'),
     path('species/<slug:slug>/', species_page, name='species-page'),
     path('species/<slug:slug>/article.pdf', species_article, name='species-article'),
+    # Must come before the catch-all gallery-file pattern below, or that route (which only
+    # knows about the static dist/ files) would swallow this request first.
+    path('sitemap.xml', sitemap, {'sitemaps': SITEMAPS}, name='sitemap'),
     path('admin/', admin.site.urls),
     path('', gallery_file, name='gallery'),
     path('<str:filename>', gallery_file, name='gallery-file'),

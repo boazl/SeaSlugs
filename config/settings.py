@@ -53,7 +53,15 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.sites',
+    'django.contrib.sitemaps',
 ]
+
+# Used by the sitemap framework (django.contrib.sites) to build absolute URLs -- the actual
+# domain/HTTPS values come from the Site row (see observations' 0029 migration), not from
+# whatever host served the request, so /sitemap.xml is identical whether it's fetched from
+# localhost during development or from the real production host.
+SITE_ID = 1
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
