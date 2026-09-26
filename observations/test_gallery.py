@@ -65,6 +65,19 @@ class GalleryTests(TestCase):
         collection.save_reviewed(actor=self.owner, approve=True)
         self.assertEqual(self.catalog()['trips'][str(collection_trip.pk)]['label'], 'Collection-only trip')
 
+    def test_catalog_exposes_species_count_for_the_trip_filter(self):
+        # The trip dropdown shows how many species are actually in the gallery for each
+        # trip -- reused from DiveTrip.display_species_count, not recomputed separately.
+        self.assertEqual(self.catalog()['trips'][str(self.trip.pk)]['species_count'], 1)
+
+    def test_catalog_species_count_is_zero_for_a_collection_only_trip(self):
+        collection_trip = DiveTrip.objects.create(title='Collection-only trip', year=2026,
+                                                   country=self.trip.country, region=self.trip.region)
+        collection = Sample(owner=self.owner, kind='collection', trip=collection_trip, title='Video title',
+                             video_url='https://youtu.be/44444444444')
+        collection.save_reviewed(actor=self.owner, approve=True)
+        self.assertEqual(self.catalog()['trips'][str(collection_trip.pk)]['species_count'], 0)
+
     def test_species_hidden_when_area_has_no_defining_sample(self):
         from .models import SpeciesArea
         area = SpeciesArea.objects.get(species=self.item.species)

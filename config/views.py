@@ -113,6 +113,7 @@ def gallery_file(request, filename='index.html'):
 
         areas = SpeciesArea.objects.select_related('species', 'country', 'sea', 'defining_sample')
         species_out, area_labels, region_out, site_out, trip_out = [], {}, {}, {}, {}
+        trip_objects = {}  # trip_id -> its (already select_related) DiveTrip instance, for the species_count merge below
         sortable = []
         for area in areas:
             defining = area.defining_sample
@@ -135,6 +136,7 @@ def gallery_file(request, filename='index.html'):
                 if s.site_id:
                     site_out[str(s.site_id)] = {'label': s.site.name, 'label_en': s.site.name_en or s.site.name, 'region': str(region.pk)}
                 trip_out[str(s.trip_id)] = {'label': s.trip.title, 'area': area_key}
+                trip_objects[s.trip_id] = s.trip
                 samples.append(sample_out(s, region))
             if not samples:
                 continue  # area exists but its samples are no longer published/complete
@@ -205,6 +207,7 @@ def gallery_file(request, filename='index.html'):
             area_key = f'{item.trip.country_id}-{region.sea_id}'
             region_out[str(region.pk)] = {'label': region.name, 'label_en': region.name_en or region.name, 'area': area_key}
             trip_out[str(item.trip_id)] = {'label': item.trip.title, 'area': area_key}
+            trip_objects[item.trip_id] = item.trip
             collections_out.append({
                 'sample_id': item.pk, 'trip_id': item.trip_id, 'title': item.title,
                 'photographer': item.photographer_name, 'area': area_key,
@@ -214,6 +217,13 @@ def gallery_file(request, filename='index.html'):
                 'thumbnail': f'/observations/{item.pk}/photo/' if item.image else item.thumbnail,
                 'species_count': item.trip.display_species_count,
             })
+
+        # One species_count per distinct trip (not per sample/collection row) -- reused
+        # from display_species_count so the trip filter dropdown never disagrees with the
+        # count already shown on collection cards (see collections_out above), rather than
+        # recomputing the same rule a third time here.
+        for trip_id, trip in trip_objects.items():
+            trip_out[str(trip_id)]['species_count'] = trip.display_species_count
 
         taxa = {'orders': taxa_orders, 'families': taxa_families, 'genera': taxa_genera}
         data = {'species': species_out, 'collections': collections_out, 'areas': area_labels, 'regions': region_out, 'sites': site_out, 'trips': trip_out, 'taxa': taxa}

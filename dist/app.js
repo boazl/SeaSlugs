@@ -255,7 +255,14 @@ function renderSidebar() {
         .sort((a, b) => a[1].localeCompare(b[1]));
     renderCheckboxGroup(document.querySelector('#photographerOptions'), photographerEntries, state.photographers);
     const tripEntries = [...opts.trips]
-        .map(id => [id, labelFor(id, tripLabelsData) || id])
+        .map(id => {
+            const label = labelFor(id, tripLabelsData) || id;
+            const count = tripLabelsData[id] && tripLabelsData[id].species_count;
+            // Sortable text comes first, the count in parens after -- same convention as a
+            // checkbox row's separate count <small>, just inlined since <option> text can't
+            // contain child elements.
+            return [id, count ? `${label} (${count})` : label];
+        })
         .sort((a, b) => a[1].localeCompare(b[1], language === 'he' ? 'he' : 'en'));
     const tripSelect = document.querySelector('#tripSelect');
     fillLabeledSelect(tripSelect, tripEntries, state.collection || 'all', language === 'he' ? 'כל המסעות' : 'All trips');
