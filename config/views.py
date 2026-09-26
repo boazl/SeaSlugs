@@ -106,7 +106,7 @@ def gallery_file(request, filename='index.html'):
             return key
 
         areas = SpeciesArea.objects.select_related('species', 'country', 'sea', 'defining_sample')
-        species_out, area_labels, region_out, site_out = [], {}, {}, {}
+        species_out, area_labels, region_out, site_out, trip_out = [], {}, {}, {}, {}
         sortable = []
         for area in areas:
             defining = area.defining_sample
@@ -128,6 +128,7 @@ def gallery_file(request, filename='index.html'):
                 region_out[str(region.pk)] = {'label': region.name, 'label_en': region.name_en or region.name, 'area': area_key}
                 if s.site_id:
                     site_out[str(s.site_id)] = {'label': s.site.name, 'label_en': s.site.name_en or s.site.name, 'region': str(region.pk)}
+                trip_out[str(s.trip_id)] = {'label': s.trip.title, 'area': area_key}
                 samples.append(sample_out(s, region))
             if not samples:
                 continue  # area exists but its samples are no longer published/complete
@@ -197,6 +198,7 @@ def gallery_file(request, filename='index.html'):
             region = item.trip.region
             area_key = f'{item.trip.country_id}-{region.sea_id}'
             region_out[str(region.pk)] = {'label': region.name, 'label_en': region.name_en or region.name, 'area': area_key}
+            trip_out[str(item.trip_id)] = {'label': item.trip.title, 'area': area_key}
             collections_out.append({
                 'sample_id': item.pk, 'trip_id': item.trip_id, 'title': item.title,
                 'photographer': item.photographer_name, 'area': area_key,
@@ -208,7 +210,7 @@ def gallery_file(request, filename='index.html'):
             })
 
         taxa = {'orders': taxa_orders, 'families': taxa_families, 'genera': taxa_genera}
-        data = {'species': species_out, 'collections': collections_out, 'areas': area_labels, 'regions': region_out, 'sites': site_out, 'taxa': taxa}
+        data = {'species': species_out, 'collections': collections_out, 'areas': area_labels, 'regions': region_out, 'sites': site_out, 'trips': trip_out, 'taxa': taxa}
         response = HttpResponse('window.SEASLUGS = ' + json.dumps(data, ensure_ascii=False).replace('<', '\u003c') + ';', content_type='text/javascript; charset=utf-8')
         response['Cache-Control'] = 'no-store'
         return response

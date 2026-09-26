@@ -5,6 +5,7 @@ const collectionsList = catalog.collections || [];
 const areaLabelsData = catalog.areas || {};
 const regionLabelsData = catalog.regions || {};
 const siteLabelsData = catalog.sites || {};
+const tripLabelsData = catalog.trips || {};
 const taxaData = catalog.taxa || { orders: {}, families: {}, genera: {} };
 
 let language = 'he';
@@ -51,7 +52,8 @@ function updateCollectionStatus() {
     if (!state.collection) return;
     const c = collectionsList.find(x => String(x.trip_id) === state.collection);
     const label = document.createElement('span');
-    label.textContent = (language === 'he' ? 'מינים באוסף: ' : 'Species in collection: ') + (c ? collectionTitle(c) : '');
+    const description = c ? collectionTitle(c) : (labelFor(state.collection, tripLabelsData) || '');
+    label.textContent = (language === 'he' ? 'מינים באוסף: ' : 'Species in collection: ') + description;
     const back = document.createElement('button');
     back.type = 'button';
     back.textContent = language === 'he' ? 'חזרה לכל הגלריה' : 'Back to full gallery';
@@ -62,27 +64,32 @@ function updateCollectionStatus() {
 // ---- option scoping ----
 
 function optionsForArea(area) {
-    const regionIds = new Set(), siteIds = new Set(), photographers = new Set();
+    const regionIds = new Set(), siteIds = new Set(), photographers = new Set(), trips = new Set();
     for (const sp of speciesList) {
         if (area !== 'all' && sp.area !== area) continue;
         for (const sm of sp.samples) {
             regionIds.add(sm.region);
             if (sm.site) siteIds.add(sm.site);
             if (sm.photographer) photographers.add(sm.photographer);
+            if (sm.trip_id != null) trips.add(String(sm.trip_id));
         }
     }
     for (const c of collectionsList) {
         if (area !== 'all' && c.area !== area) continue;
         regionIds.add(c.region);
         if (c.photographer) photographers.add(c.photographer);
+        if (c.trip_id != null) trips.add(String(c.trip_id));
     }
-    return { regionIds, siteIds, photographers };
+    return { regionIds, siteIds, photographers, trips };
 }
 function regionCount(area, id) {
     return speciesList.filter(sp => (area === 'all' || sp.area === area) && sp.samples.some(sm => sm.region === id)).length;
 }
 function siteCount(area, id) {
     return speciesList.filter(sp => (area === 'all' || sp.area === area) && sp.samples.some(sm => sm.site === id)).length;
+}
+function tripCount(area, id) {
+    return speciesList.filter(sp => (area === 'all' || sp.area === area) && sp.samples.some(sm => String(sm.trip_id) === id)).length;
 }
 function photographerCount(area, name) {
     let n = 0;
@@ -177,6 +184,20 @@ function fillSelect(select, values, current, allLabel) {
     }
     select.value = sorted.includes(current) ? current : 'all';
 }
+function fillLabeledSelect(select, entries, current, allLabel) {
+    select.replaceChildren();
+    const allOpt = document.createElement('option');
+    allOpt.value = 'all';
+    allOpt.textContent = allLabel;
+    select.append(allOpt);
+    for (const [value, label] of entries) {
+        const opt = document.createElement('option');
+        opt.value = value;
+        opt.textContent = label;
+        select.append(opt);
+    }
+    select.value = entries.some(([v]) => v === current) ? current : 'all';
+}
 function renderTaxonomySelects() {
     const area = state.area;
     const t1 = taxonomyOptions(area, 'all', 'all', 'all', 'all');
@@ -233,6 +254,12 @@ function renderSidebar() {
         .map(name => [name, name, photographerCount(area, name)])
         .sort((a, b) => a[1].localeCompare(b[1]));
     renderCheckboxGroup(document.querySelector('#photographerOptions'), photographerEntries, state.photographers);
+    const tripEntries = [...opts.trips]
+        .map(id => [id, labelFor(id, tripLabelsData) || id])
+        .sort((a, b) => a[1].localeCompare(b[1], language === 'he' ? 'he' : 'en'));
+    const tripSelect = document.querySelector('#tripSelect');
+    fillLabeledSelect(tripSelect, tripEntries, state.collection || 'all', language === 'he' ? 'כל המסעות' : 'All trips');
+    if (tripSelect.value === 'all') state.collection = null;
     renderTaxonomySelects();
 }
 
@@ -684,6 +711,7 @@ document.querySelector('#subOrderSelect').addEventListener('change', e => { stat
 document.querySelector('#superfamilySelect').addEventListener('change', e => { state.superfamily = e.target.value; state.family = 'all'; state.genus = 'all'; renderTaxonomySelects(); render(); });
 document.querySelector('#familySelect').addEventListener('change', e => { state.family = e.target.value; state.genus = 'all'; renderTaxonomySelects(); render(); });
 document.querySelector('#genusSelect').addEventListener('change', e => { state.genus = e.target.value; render(); });
+document.querySelector('#tripSelect').addEventListener('change', e => { state.collection = e.target.value === 'all' ? null : e.target.value; render(); });
 document.querySelector('#sortSelect').addEventListener('change', e => { state.sort = e.target.value; render(); });
 document.querySelector('#close').addEventListener('click', () => dialog.close());
 dialog.addEventListener('click', e => {
@@ -723,6 +751,7 @@ const translations = [
     ['#areaGroupTitle', 'Area'],
     ['#regionGroupTitle', 'Dive region'],
     ['#siteGroupTitle', 'Dive site'],
+    ['#tripGroupTitle', 'Dive trip'],
     ['#photographerGroupTitle', 'Photographer'],
     ['#orderGroupTitle', 'Order'],
     ['#subOrderGroupTitle', 'Suborder'],

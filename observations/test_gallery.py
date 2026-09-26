@@ -50,6 +50,21 @@ class GalleryTests(TestCase):
         self.assertEqual(entry['year'], 2026)
         self.assertEqual(self.catalog()['regions'][str(self.trip.region_id)]['label'], 'אילת')
 
+    def test_catalog_exposes_trip_labels_for_the_trip_filter(self):
+        # The gallery's trip dropdown (app.js) looks up each option's display label from
+        # catalog.js's 'trips' dict, keyed by trip id -- same shape as 'regions'/'sites'.
+        self.assertEqual(self.catalog()['trips'][str(self.trip.pk)]['label'], 'Trip')
+
+    def test_catalog_exposes_trip_labels_from_collection_only_trips_too(self):
+        # A trip can have a collection video but no species samples at all -- the trip
+        # label must come from the trip's own title, not the collection video's own title.
+        collection_trip = DiveTrip.objects.create(title='Collection-only trip', year=2026,
+                                                   country=self.trip.country, region=self.trip.region)
+        collection = Sample(owner=self.owner, kind='collection', trip=collection_trip, title='Video title',
+                             video_url='https://youtu.be/33333333333')
+        collection.save_reviewed(actor=self.owner, approve=True)
+        self.assertEqual(self.catalog()['trips'][str(collection_trip.pk)]['label'], 'Collection-only trip')
+
     def test_species_hidden_when_area_has_no_defining_sample(self):
         from .models import SpeciesArea
         area = SpeciesArea.objects.get(species=self.item.species)
