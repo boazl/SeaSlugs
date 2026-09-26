@@ -253,3 +253,61 @@ class DiveTripSeaReserveFieldsTests(TestCase):
             apply(doc, fingerprint())
         area = SpeciesArea.objects.get(species=imported_species, country=self.country, sea=self.red)
         self.assertEqual(area.defining_sample.species_id, imported_species.pk)
+
+
+class RegionCountryMismatchDataFixTests(TestCase):
+    """Regression for a real production bug: duplicate Region rows sharing the same name
+    under two different countries (e.g. two separate "Romblon" rows -- one correctly under
+    Philippines, one mistakenly created under Solomon Islands with a different sea) let a
+    trip end up pointing at the WRONG one. That silently sent the trip's samples into the
+    wrong country+sea gallery area -- real, published species quietly stopped showing up
+    under the area a site visitor expected, with no error anywhere. Migration 0027 repoints
+    any such trip to the region that actually matches its own country. These tests exercise
+    that migration's fix function directly (the same technique Django's own migration runner
+    uses to import a numbered migration module) rather than replaying the whole migration
+    history, since the fix only touches plain, long-standing fields."""
+
+    def fix(self):
+        import importlib
+        from django.apps import apps as live_apps
+        module = importlib.import_module(
+            'observations.migrations.0027_fix_trips_pointing_at_a_region_under_the_wrong_country')
+        module.fix_region_country_mismatches(live_apps, None)
+
+    def test_repoints_a_trip_whose_region_belongs_to_a_different_country_than_the_trip(self):
+        philippines = Country.objects.create(name='פיליפינים')
+        solomon = Country.objects.create(name='איי שלמה')
+        sea_correct = Sea.objects.create(name='Indo Pacific')
+        sea_wrong = Sea.objects.create(name='Indo Pacific - Western Pacific')
+        correct_region = Region.objects.create(name='רומבלון', country=philippines, sea=sea_correct)
+        wrong_region = Region.objects.create(name='רומבלון', country=solomon, sea=sea_wrong)
+        trip = DiveTrip.objects.create(title='Romblon trip', year=2026, country=philippines, region=wrong_region)
+
+        self.fix()
+
+        trip.refresh_from_db()
+        self.assertEqual(trip.region_id, correct_region.pk)
+
+    def test_leaves_a_trip_alone_when_no_same_named_region_exists_under_its_own_country(self):
+        # Nothing safe to repoint to -- this needs a human decision, not a guess.
+        solomon = Country.objects.create(name='איי שלמה')
+        sea = Sea.objects.create(name='Indo Pacific')
+        region = Region.objects.create(name='Anilao', country=solomon, sea=sea)
+        philippines = Country.objects.create(name='פיליפינים')
+        trip = DiveTrip.objects.create(title='Mismatched, unresolved', year=2026, country=philippines, region=region)
+
+        self.fix()
+
+        trip.refresh_from_db()
+        self.assertEqual(trip.region_id, region.pk)
+
+    def test_leaves_a_consistent_trip_untouched(self):
+        philippines = Country.objects.create(name='פיליפינים')
+        sea = Sea.objects.create(name='Indo Pacific')
+        region = Region.objects.create(name='אנילאו', country=philippines, sea=sea)
+        trip = DiveTrip.objects.create(title='Consistent trip', year=2026, country=philippines, region=region)
+
+        self.fix()
+
+        trip.refresh_from_db()
+        self.assertEqual(trip.region_id, region.pk)
