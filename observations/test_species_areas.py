@@ -311,3 +311,57 @@ class RegionCountryMismatchDataFixTests(TestCase):
 
         trip.refresh_from_db()
         self.assertEqual(trip.region_id, region.pk)
+
+
+class UnanimousRegionCountryDataFixTests(TestCase):
+    """Regression for the same real bug as RegionCountryMismatchDataFixTests, but for a
+    database that never had a duplicate region row -- only ONE "Romblon"-named region exists,
+    tagged with the wrong country outright. Migration 0028 covers that case: when every trip
+    that actually uses a region unanimously disagrees with the region's own country, the
+    region's country is corrected to match them, rather than leaving it stuck with no
+    duplicate to repoint to (which is what 0027 alone would do here)."""
+
+    def fix(self):
+        import importlib
+        from django.apps import apps as live_apps
+        module = importlib.import_module(
+            'observations.migrations.0028_fix_region_country_when_all_its_trips_disagree')
+        module.fix_region_country_when_its_trips_unanimously_disagree(live_apps, None)
+
+    def test_corrects_a_region_whose_trips_unanimously_disagree_with_it(self):
+        solomon = Country.objects.create(name='איי שלמה')
+        philippines = Country.objects.create(name='פיליפינים')
+        sea = Sea.objects.create(name='Indo Pacific')
+        region = Region.objects.create(name='רומבלון', country=solomon, sea=sea)
+        DiveTrip.objects.create(title='Trip A', year=2026, country=philippines, region=region)
+        DiveTrip.objects.create(title='Trip B', year=2026, country=philippines, region=region)
+
+        self.fix()
+
+        region.refresh_from_db()
+        self.assertEqual(region.country_id, philippines.pk)
+
+    def test_leaves_a_region_alone_when_its_trips_disagree_with_each_other(self):
+        # Some trips agree with the region, some don't -- a real judgment call, not something
+        # to guess at automatically.
+        solomon = Country.objects.create(name='איי שלמה')
+        philippines = Country.objects.create(name='פיליפינים')
+        sea = Sea.objects.create(name='Indo Pacific')
+        region = Region.objects.create(name='אנילאו', country=solomon, sea=sea)
+        DiveTrip.objects.create(title='Trip A', year=2026, country=philippines, region=region)
+        DiveTrip.objects.create(title='Trip B', year=2026, country=solomon, region=region)
+
+        self.fix()
+
+        region.refresh_from_db()
+        self.assertEqual(region.country_id, solomon.pk)
+
+    def test_leaves_a_region_with_no_referencing_trips_alone(self):
+        solomon = Country.objects.create(name='איי שלמה')
+        sea = Sea.objects.create(name='Indo Pacific')
+        region = Region.objects.create(name='Unused region', country=solomon, sea=sea)
+
+        self.fix()
+
+        region.refresh_from_db()
+        self.assertEqual(region.country_id, solomon.pk)
