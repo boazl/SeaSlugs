@@ -1,5 +1,5 @@
 {% load seaslugs_i18n %}<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8">
-{% if request.path|slice:":7" != "/admin/" %}
+{% if request.path|slice:":7" != "/admin/" and request.COOKIES.exclude_analytics != "1" %}
 <!-- Google tag (gtag.js) -- skipped under /admin/: Boaz's own management tools
 (image manager, table transfer, releases, db-replace, folder import -- see
 config/urls.py) live there, not just Django's own admin site, and none of it

@@ -3,7 +3,7 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.contrib.sitemaps.views import sitemap
 from django.urls import path, include
-from .views import gallery_file, health
+from .views import gallery_file, health, analytics_exclude, analytics_include
 from observations.sitemaps import SITEMAPS
 from observations.transfer_views import transfer
 from observations.release_views import releases
@@ -24,6 +24,8 @@ urlpatterns = [
     path('admin/observations/divetrip-locations/', divetrip_locations, name='divetrip-locations'),
     path('observations/', include('observations.urls')),
     path('healthz', health, name='health'),
+    path('analytics/exclude/', analytics_exclude, name='analytics-exclude'),
+    path('analytics/include/', analytics_include, name='analytics-include'),
     path('site-image/<slug:key>.jpg', site_image, name='site-image'),
     path('species/<slug:slug>/', species_page, name='species-page'),
     path('species/<slug:slug>/article.pdf', species_article, name='species-article'),

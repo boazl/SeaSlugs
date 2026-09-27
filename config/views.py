@@ -259,3 +259,30 @@ def health(request):
     with connection.cursor() as cursor:
         cursor.execute("SELECT 1")
     return JsonResponse({"status": "ok"})
+
+
+# A personal opt-out of the site's Google Analytics tag (see base.html, dist/index.html,
+# species_page.html and genus_page.html, which all skip the gtag.js snippet when this
+# cookie is "1") -- for Boaz's own browser, so his own visits never reach GA4 even if his
+# IP address changes. Deliberately unauthenticated (like a standard analytics opt-out link)
+# and not linked from anywhere in the public navigation -- reaching either URL at all is
+# the only "permission" this needs, the same way Google's own analytics opt-out works.
+_EXCLUDE_ANALYTICS_COOKIE = 'exclude_analytics'
+_EXCLUDE_ANALYTICS_MAX_AGE = 60 * 60 * 24 * 366  # a little over a year
+
+
+def analytics_exclude(request):
+    from django.http import HttpResponse
+    response = HttpResponse('מעקב Google Analytics באתר בוטל עבור הדפדפן הזה.')
+    response.set_cookie(
+        _EXCLUDE_ANALYTICS_COOKIE, '1', max_age=_EXCLUDE_ANALYTICS_MAX_AGE, path='/',
+        secure=settings.PRODUCTION, httponly=True, samesite='Lax',
+    )
+    return response
+
+
+def analytics_include(request):
+    from django.http import HttpResponse
+    response = HttpResponse('מעקב Google Analytics באתר הופעל מחדש עבור הדפדפן הזה.')
+    response.delete_cookie(_EXCLUDE_ANALYTICS_COOKIE, path='/', samesite='Lax')
+    return response
