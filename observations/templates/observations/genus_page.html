@@ -3,6 +3,13 @@
 
 <head>
     <meta charset="utf-8">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-CPGTC09P2P"></script>
+<script>window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-CPGTC09P2P');</script>
+
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ genus.name }}{% if common_name %} — {{ common_name }}{% endif %} | SeaSlugs</title>
     <meta name="description" content="{% if description %}{{ description|truncatechars:160 }}{% else %}{{ genus.name }} — {{ "תצפיות, תמונות ומידע מאתר SeaSlugs, אתר חינניות הים."|t:lang }}{% endif %}">
