@@ -280,6 +280,26 @@ class WorkflowTests(TestCase):
         form=SampleForm(d,instance=Sample(owner=self.user));self.assertTrue(form.is_valid(),form.errors)
         self.assertEqual(form.cleaned_data['species'],unspaced)
 
+    def test_species_field_resolves_undetermined_variant_by_the_typed_letter(self):
+        # Two visibly distinct, still-undescribed "sp." species of the same genus share one
+        # bare scientific_name (see Species.undetermined_variant) -- typing the variant
+        # letter (with or without a space) must resolve to the matching row, not just
+        # whichever "Coryphellina sp." row the database happens to return first.
+        first=Species.objects.create(scientific_name='Coryphellina sp.',undetermined_variant='A')
+        second=Species.objects.create(scientific_name='Coryphellina sp.',undetermined_variant='B')
+        d=self.data();d.update(species='Coryphellina sp.A',video_url='https://youtu.be/aaaaaaaaaaa')
+        form=SampleForm(d,instance=Sample(owner=self.user));self.assertTrue(form.is_valid(),form.errors)
+        self.assertEqual(form.cleaned_data['species'],first)
+
+        d=self.data();d.update(species='Coryphellina sp. B',video_url='https://youtu.be/bbbbbbbbbbb')
+        form=SampleForm(d,instance=Sample(owner=self.user));self.assertTrue(form.is_valid(),form.errors)
+        self.assertEqual(form.cleaned_data['species'],second)
+
+        # No un-suffixed "Coryphellina sp." row exists here -- typing the bare name must
+        # not silently guess one of the two variants.
+        d=self.data();d.update(species='Coryphellina sp.',video_url='https://youtu.be/ccccccccccc')
+        form=SampleForm(d,instance=Sample(owner=self.user));self.assertFalse(form.is_valid())
+
     def test_species_options_datalist_and_visible_species_other(self):
         self.client.force_login(self.user)
         content=self.client.get('/observations/new/').content.decode()
@@ -524,6 +544,24 @@ class WorkflowTests(TestCase):
         self.species.habitat = 'שוניות אלמוגים'
         self.species.food = 'ספוגים'
         self.species.full_clean()  # must not raise
+
+    def test_undetermined_variant_lets_distinct_sp_forms_of_one_genus_coexist(self):
+        # An undescribed species is sometimes only catalogued as "Genus sp." in the
+        # authoritative source list this table is periodically re-synced from -- with no
+        # way to record that the photographer found two visibly distinct such forms of the
+        # same genus. undetermined_variant lets two rows share a scientific_name as long as
+        # the variant differs, combined into the displayed name, while two rows with the
+        # very same (scientific_name, variant) pair -- including both blank, exactly like
+        # before this field existed -- are still rejected as duplicates.
+        first=Species.objects.create(scientific_name='Coryphellina sp.',undetermined_variant='A')
+        second=Species.objects.create(scientific_name='Coryphellina sp.',undetermined_variant='B')
+        self.assertEqual(str(first),'Coryphellina sp. A')
+        self.assertEqual(str(second),'Coryphellina sp. B')
+        with self.assertRaises(ValidationError):
+            Species(scientific_name='Coryphellina sp.',undetermined_variant='A').full_clean()
+        Species.objects.create(scientific_name='Coryphellina sp.')  # the bare, un-suffixed form
+        with self.assertRaises(ValidationError):
+            Species(scientific_name='Coryphellina sp.').full_clean()
 
     def test_species_article_pdf_rejects_non_pdf_extension(self):
         self.species.article_pdf = SimpleUploadedFile('notes.txt', b'not a pdf', content_type='text/plain')

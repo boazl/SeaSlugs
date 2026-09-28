@@ -94,7 +94,7 @@ class SampleForm(forms.ModelForm):
         self.fields['kind'].required = False
         self.fields['video_url'].help_text = 'אפשר להשאיר ריק כאשר מעלים תמונה. ניתן להוסיף סרטון בהמשך.'
         if self.instance.pk:
-            self.initial['species'] = self.instance.species.scientific_name if self.instance.species_id else ''
+            self.initial['species'] = str(self.instance.species) if self.instance.species_id else ''
         self.fields['species_other'].help_text = 'אם המין לא נמצא ברשימה שלמעלה, אפשר לפרט כאן במקום לבחור מהרשימה.'
         self.fields['site'].choices = [('', 'בחרו…')] + [(str(x.pk), str(x)) for x in Site.objects.all()] + [('other','אחר — פירוט')]
         if self.instance.pk:

@@ -28,6 +28,16 @@ class FolderImportTests(TestCase):
         self.assertEqual(match_species('002-Micromelo undatus (Author, 1900).jpg',species),self.species.pk)
         self.assertEqual(match_species('C16-Elysia sp. 5 2025.jpg',species),species[-1].pk)
         self.assertIsNone(match_species('C16-Elysia sp. 7.jpg',species))
+    def test_matching_distinguishes_undetermined_variants_of_the_same_genus(self):
+        # Two visibly distinct, still-undescribed "sp." species of one genus share a bare
+        # scientific_name (see Species.undetermined_variant) -- a filename naming the
+        # variant letter must match only the corresponding catalog row, not either one.
+        species=[Species.objects.create(scientific_name='Coryphellina sp.',undetermined_variant='A'),
+                  Species.objects.create(scientific_name='Coryphellina sp.',undetermined_variant='B')]
+        self.assertEqual(match_species("701-Coryphellina sp.B O'Donoghue, 1929-Edit.jpg",species),species[1].pk)
+        self.assertEqual(match_species('Coryphellina sp. A.jpg',species),species[0].pk)
+        # the bare, un-suffixed name alone must not match either variant
+        self.assertIsNone(match_species('Coryphellina sp..jpg',species))
     def test_matching_ignores_whether_sp_qualifier_has_a_space_before_its_number(self):
         # Filenames and the species table don't always agree on "sp.18" vs "sp. 18" --
         # a photographer's export tool may drop the space the species table uses, or add

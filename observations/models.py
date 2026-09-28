@@ -13,11 +13,13 @@ from django.utils.text import slugify
 
 
 def normalize_sp_spacing(text):
-    """Canonicalize the space between an sp./spp. numeral qualifier and its number, so
-    'Tenellia sp.18', 'Tenellia sp.  18' and 'Tenellia sp. 18' are all treated as the same
-    text -- photographers' filenames and the species table don't always agree on whether
-    there's a space there."""
-    return re.sub(r'(?i)\b(spp?\.)\s*(\d)', r'\1 \2', text or '')
+    """Canonicalize the space between an sp./spp. qualifier and its number or single-letter
+    variant marker, so 'Tenellia sp.18'/'Tenellia sp. 18' and 'Coryphellina sp.A'/
+    'Coryphellina sp. A' each compare equal -- photographers' filenames, the species table
+    and Species.undetermined_variant don't always agree on whether there's a space there.
+    The letter case stays case-SENSITIVE (unlike the "sp."/"spp." word itself) so an
+    ordinary lowercase continuation like "sp.aff" is never mistaken for a variant marker."""
+    return re.sub(r'\b((?i:spp?\.))\s*(\d|[A-Z](?![A-Za-z]))', r'\1 \2', text or '')
 
 
 def youtube_id(url):
@@ -73,7 +75,19 @@ class Photographer(Named):
 
 
 class Species(models.Model):
-    scientific_name = models.CharField('שם מדעי', max_length=200, unique=True)
+    scientific_name = models.CharField('שם מדעי', max_length=200, db_index=True)
+    # A genuinely distinct, undescribed species is sometimes only recorded as "Genus sp."
+    # in the authoritative source list this table is periodically re-synced from (via
+    # table-transfer's species import -- see table_transfer.py), with no way to tell two
+    # such species of the same genus apart there. When the photographer has found two (or
+    # more) visibly distinct "sp." forms of one genus, this field lets them tell the
+    # catalog they're different species (A, B, C...) -- combined with scientific_name (see
+    # __str__ and find_by_name) -- WITHOUT touching scientific_name itself, so a future
+    # re-sync from the source list never overwrites or collides with this distinction.
+    undetermined_variant = models.CharField('סימון מין לא מזוהה (sp.) — א׳/ב׳/A/B וכו׳', max_length=10, blank=True,
+        help_text='כשיש כמה מינים שונים מאותו סוג שכולם רשומים כ"sp." ברשימת המינים הרשמית, אפשר לסמן כאן אות '
+                   '(A, B, C…) כדי שהאתר יתייחס אליהם כמינים שונים -- בלי לשנות את השם המדעי הרשמי למעלה, כך '
+                   'שעדכון עתידי של רשימת המינים מהמקור הרשמי לא ידרוס את ההבחנה.')
     name_he = models.CharField('שם בעברית', max_length=200, blank=True)
     name_en = models.CharField('שם באנגלית', max_length=200, blank=True)
     source_id = models.CharField('מזהה מקור לייבוא', max_length=200, blank=True, editable=False)
@@ -104,26 +118,32 @@ class Species(models.Model):
     link = models.URLField('קישור', blank=True)
     article_pdf = models.FileField('מאמר (PDF)', upload_to='articles/species/', blank=True, validators=[FileExtensionValidator(['pdf'])])
     class Meta:
-        ordering = [models.functions.NullIf('phylogenetic_order', models.Value('')).asc(nulls_last=True), 'scientific_name']
+        ordering = [models.functions.NullIf('phylogenetic_order', models.Value('')).asc(nulls_last=True), 'scientific_name', 'undetermined_variant']
         verbose_name = 'מין'; verbose_name_plural = 'מינים'
-    def __str__(self): return self.scientific_name
+        constraints = [models.UniqueConstraint(fields=['scientific_name','undetermined_variant'], name='unique_species_scientific_name_variant')]
+    def __str__(self): return f'{self.scientific_name} {self.undetermined_variant}'.strip()
     @classmethod
     def find_by_name(cls, text):
         """Match `text` (typed into the observation form, or extracted from a bulk-import
-        filename) against scientific_name: an exact case-insensitive match first (the
-        common case, and the fastest query), falling back to a spacing-tolerant compare so
-        'sp.18' and 'sp. 18' are recognised as the same species regardless of which the
-        catalog or the photographer used (see normalize_sp_spacing)."""
+        filename) against the catalog: an exact case-insensitive match on scientific_name
+        among species with no undetermined_variant first (the common case, and the fastest
+        query), falling back to a spacing-tolerant compare of the full displayed name
+        (scientific_name plus undetermined_variant -- see __str__) so 'sp.18'/'sp. 18' and
+        'sp.A'/'sp. A' are each recognised as the same species regardless of which spacing
+        the catalog, Species.undetermined_variant or the photographer used, and so two
+        species sharing one undetermined "sp." scientific_name but a different variant
+        letter are told apart (see normalize_sp_spacing)."""
         text = (text or '').strip()
         if not text:
             return None
-        match = cls.objects.filter(scientific_name__iexact=text).first()
+        match = cls.objects.filter(scientific_name__iexact=text, undetermined_variant='').first()
         if match:
             return match
         key = normalize_sp_spacing(text).casefold()
-        return next((item for item in cls.objects.all() if normalize_sp_spacing(item.scientific_name).casefold() == key), None)
+        return next((item for item in cls.objects.all() if normalize_sp_spacing(str(item)).casefold() == key), None)
     def clean(self):
         super().clean()
+        self.undetermined_variant = (self.undetermined_variant or '').strip()
         errors = {}
         if self.first_observed_year and self.first_observed_year > date.today().year:
             errors['first_observed_year'] = 'שנת תצפית ראשונה אינה יכולה להיות בעתיד.'

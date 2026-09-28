@@ -314,7 +314,7 @@ def species_search(request):
     # picker on the observation form behaves like an open dropdown you can browse by
     # clicking, not only a search box that stays empty until you type something.
     rows = rows.order_by('scientific_name')[:40]
-    results = [{'id': str(item.pk), 'label': item.scientific_name + (f' — {item.name_he}' if item.name_he else '')} for item in rows]
+    results = [{'id': str(item.pk), 'label': str(item) + (f' — {item.name_he}' if item.name_he else '')} for item in rows]
     return JsonResponse({'results': results})
 
 
@@ -414,7 +414,9 @@ def edit(request,pk=None):
         return redirect(f'{next_url}#obs-{item.pk}')
     return render(request,'observations/form.html',{'form':form,'title':'תצפית / Sample','observation_form':True,
         'trip_new_url':reverse('trip-new'),'next':next_url,
-        'species_options':Species.objects.order_by('scientific_name').values_list('scientific_name',flat=True),
+        # str(item) folds in undetermined_variant (e.g. "Coryphellina sp. A"), since
+        # that combined text is what SampleForm.clean() actually matches against.
+        'species_options':[str(item) for item in Species.objects.order_by('scientific_name','undetermined_variant')],
         'locations':{'trips':list(DiveTrip.objects.values('id','region_id')),'sites':list(Site.objects.values('id','region_id'))}})
 
 

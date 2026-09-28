@@ -28,11 +28,11 @@ class UserAdmin(BaseUserAdmin):
 
 @admin.register(Species)
 class SpeciesAdmin(admin.ModelAdmin):
-    list_display = ['phylogenetic_order','scientific_name','genus','species','author','family','order']
-    search_fields = ['scientific_name','genus','species','author','family','name_he']
+    list_display = ['phylogenetic_order','scientific_name','undetermined_variant','genus','species','author','family','order']
+    search_fields = ['scientific_name','undetermined_variant','genus','species','author','family','name_he']
     list_filter = ['order','family','genus']
     fieldsets = [
-        ('זיהוי מדעי', {'fields':['phylogenetic_order','scientific_name','genus','species','author','formatted_author','reference_author','full_species_name_with_order']}),
+        ('זיהוי מדעי', {'fields':['phylogenetic_order','scientific_name','undetermined_variant','genus','species','author','formatted_author','reference_author','full_species_name_with_order']}),
         ('סיווג טקסונומי', {'fields':['order','superfamily','family','accepted_genus','accepted_species']}),
         ('שמות ותפוצה', {'fields':['name_he','name_en','common_name','transliteration','language','distribution']}),
         ('תוכן לעמוד המין', {'fields':['habitat','food','is_migrant','first_observed_year','last_observed_year','description_he','description_en','link','article_pdf']}),

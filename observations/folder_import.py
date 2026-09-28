@@ -66,7 +66,10 @@ def match_species(filename,species):
     stem=normalize_sp_spacing(normalized(QUALIFIER_RE.sub('',filename_stem(filename))))
     matches=[]
     for item in species:
-        name=normalize_sp_spacing(normalized(item.scientific_name))
+        # str(item) folds in Species.undetermined_variant (e.g. "Coryphellina sp. A"), so a
+        # filename naming that letter matches only the corresponding catalog row rather
+        # than colliding with a sibling "sp." variant of the same genus.
+        name=normalize_sp_spacing(normalized(str(item)))
         aliases={name,re.sub(r'\s+\([^)]*\)$','',name)}
         for alias in aliases:
             if not stem.casefold().startswith(alias.casefold()):continue
