@@ -89,6 +89,23 @@ class FolderImportTests(TestCase):
         self.assertFalse(rows[0]['checked'])
         self.assertEqual(rows[1]['error'],'')
         self.assertTrue(rows[1]['checked'])
+    def test_new_sample_action_text_is_bolded_but_others_are_not(self):
+        # "יצירת תצפית עם תמונה" (creating a brand-new observation) is the action worth the
+        # operator's eye first when scanning a big batch, unlike replacing/completing an
+        # existing one -- see the analogous highlight for the single-observation form's own
+        # success message.
+        existing=Sample(owner=self.user,species=self.species,trip=self.trip)
+        output=io.BytesIO();Image.new('RGB',(40,30),'blue').save(output,'JPEG')
+        existing.image.save('original.jpg',ContentFile(output.getvalue()),save=False)
+        existing.save_reviewed()
+        Species.objects.create(scientific_name='Phyllidia elegans')
+        self.client.force_login(self.user)
+        new_species_photo=self.photo();new_species_photo.name='403-Phyllidia elegans 2025.jpg'
+        response=self.client.post('/admin/images/folder/',{'action':'preview','trip':self.trip.pk,'images':[self.photo(),new_species_photo]})
+        content=response.content.decode()
+        self.assertIn('<strong>יצירת תצפית עם תמונה</strong>',content)
+        self.assertNotIn('<strong>החלפת תמונה קיימת</strong>',content)
+        self.assertIn('החלפת תמונה קיימת',content)
     def test_species_dropdown_is_sorted_alphabetically(self):
         # The species table's default ordering is taxonomic (phylogenetic order), not
         # alphabetical -- fine for the public listing, but the autocomplete datalist backing
