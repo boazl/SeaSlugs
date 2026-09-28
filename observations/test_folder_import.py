@@ -47,6 +47,22 @@ class FolderImportTests(TestCase):
             response=self.client.post('/admin/images/folder/',{'action':'apply','token':response.context['token'],'selected':['0'],'species_0':self.species.pk,'confirm':'yes'})
         self.assertEqual(response.status_code,302)
         item=Sample.objects.get();self.assertEqual(item.trip.year,2026);self.assertEqual(item.trip.month,1);self.assertIsNone(item.day);self.assertTrue(item.image);self.assertEqual(item.trip,self.trip)
+    def test_species_dropdown_is_sorted_alphabetically_and_has_an_autocomplete_filter(self):
+        # The species table's default ordering is taxonomic (phylogenetic order), not
+        # alphabetical -- fine for the public listing, but this dropdown has hundreds of
+        # entries an operator picks from by name, so it needs its own alphabetical order.
+        # A companion text input (bound to a shared <datalist>) lets them type to jump to
+        # an entry instead of scrolling a long <select>.
+        Species.objects.create(scientific_name='Aaa species')
+        Species.objects.create(scientific_name='Zzz species')
+        self.client.force_login(self.user)
+        response=self.client.post('/admin/images/folder/',{'action':'preview','trip':self.trip.pk,'images':self.photo()})
+        content=response.content.decode()
+        datalist=content[content.index('<datalist id="species-options">'):content.index('</datalist>')]
+        self.assertLess(datalist.index('Aaa species'),datalist.index('Micromelo undatus'))
+        self.assertLess(datalist.index('Micromelo undatus'),datalist.index('Zzz species'))
+        self.assertIn('class="species-filter"',content)
+        self.assertIn('id="species-select-0"',content)
     def test_preview_defaults_to_unchecked_when_the_photo_would_replace_an_existing_image(self):
         # Overwriting a sample's existing image is destructive (the previous file is
         # deleted, no backup) -- an operator must actively opt in, not just click through
