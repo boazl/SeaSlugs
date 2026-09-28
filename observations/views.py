@@ -380,14 +380,35 @@ def edit(request,pk=None):
     form=SampleForm(request.POST or None,request.FILES or None,instance=item,initial=initial)
     if request.method=='POST' and form.is_valid():
         item=form.save(commit=False)
-        if 'image' in form.changed_data and item.image:
+        def hashed_image_name(sample):
             # Store by content hash, exactly like the bulk folder importer and the
             # image manager, so the same photo always resolves to the same image
             # reference whether it was uploaded here or arrived through a transfer.
             import hashlib
             from .media_transfer import save_images
-            raw=item.image.read();name='observations/transfer/'+hashlib.sha256(raw).hexdigest()+'.jpg'
-            save_images({name:raw});item.image=name
+            raw=sample.image.read();name='observations/transfer/'+hashlib.sha256(raw).hexdigest()+'.jpg'
+            save_images({name:raw})
+            return name
+        # A brand-new SPECIES-kind observation (pk is None -- never one being edited) for a
+        # species already observed on this same trip is folded into that existing observation
+        # instead of creating a duplicate: whichever of image/video the new submission actually
+        # supplies replaces that observation's, rather than piling up a second row for the same
+        # species+trip. Sample.clean()'s own species+trip duplicate check (models.py) is what
+        # would otherwise reject this outright -- catching it here first turns that rejection
+        # into an update. Editing an EXISTING observation into a collision is deliberately not
+        # redirected this way -- it still hits that hard validation error, since silently
+        # overwriting a different observation than the one being edited would be surprising.
+        existing = Sample.objects.filter(
+            kind=Sample.Kind.SPECIES, species_id=item.species_id, trip_id=item.trip_id, deleted_at__isnull=True,
+        ).first() if (item.pk is None and item.kind==Sample.Kind.SPECIES and item.species_id and item.trip_id) else None
+        if existing:
+            if item.image: existing.image = hashed_image_name(item)
+            if item.video_url: existing.video_url = item.video_url
+            existing.save_reviewed()
+            messages.success(request,'תצפית של מין זה כבר קיימת במסע זה — התמונה/הסרטון עודכנו בתצפית הקיימת במקום יצירת כפילות.')
+            return redirect(f'{next_url}#obs-{existing.pk}')
+        if 'image' in form.changed_data and item.image:
+            item.image = hashed_image_name(item)
         item.save_reviewed()
         messages.success(request,'התצפית פורסמה.' if item.status=='published' else 'התצפית נשמרה וממתינה להשלמת נתונים ולאישור מנהל.')
         return redirect(f'{next_url}#obs-{item.pk}')

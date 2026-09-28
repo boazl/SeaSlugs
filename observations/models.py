@@ -480,6 +480,22 @@ class Sample(models.Model):
         self.site_other = self.site_other.strip()
         if self.species_id and self.species_other: errors['species_other'] = 'יש לבחור מין מהרשימה או לפרט אחר, לא את שניהם.'
         if self.kind != self.Kind.COLLECTION and not self.species_id and not self.species_other: errors['species'] = 'יש לבחור מין או לפרט אחר.'
+        # A single trip may not carry two non-deleted SPECIES-kind samples for the exact same
+        # catalogued species -- species_other (an unresolved, free-text identification) is
+        # deliberately excluded, since matching that reliably would mean fuzzy text comparison
+        # rather than a real FK. This is deliberately a hard block ONLY when editing an
+        # EXISTING sample (self.pk is set) into a collision with a different one -- silently
+        # overwriting a different observation than the one being edited would be surprising.
+        # A brand-new observation (self.pk is None) never reaches this error at all: the web
+        # observation form (views.edit) checks for the very same collision itself, earlier,
+        # and folds the submission into the existing sample (updating its image/video) instead
+        # of ever calling full_clean() on a second, colliding new instance.
+        if self.pk and self.kind == self.Kind.SPECIES and self.species_id and self.trip_id:
+            duplicate = Sample.objects.exclude(pk=self.pk).filter(
+                kind=self.Kind.SPECIES, species_id=self.species_id, trip_id=self.trip_id, deleted_at__isnull=True,
+            ).first()
+            if duplicate:
+                errors['species'] = f'מין זה כבר נקלט למסע זה בתצפית קיימת ({duplicate}). אי אפשר לקלוט אותו מין פעמיים באותו מסע.'
         if self.site_id and self.site_other: errors['site_other'] = 'יש לבחור אתר צלילה מהרשימה או לפרט אחר, לא את שניהם.'
         if self.site_id and self.trip_id and self.trip.region_id and self.site.region_id != self.trip.region_id:
             errors['site'] = 'אתר הצלילה אינו שייך לאזור המסע שנבחר.'

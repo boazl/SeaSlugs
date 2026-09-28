@@ -172,3 +172,69 @@ class MediaTransferTests(TestCase):
         self.assertEqual(response.status_code,200)
         self.assertContains(response,'התמונה הזו כבר קיימת בתצפית אחרת')
         self.assertFalse(Sample.objects.filter(species=species3).exists())
+
+
+class DuplicateSpeciesInTripTests(TestCase):
+    """A new observation for a species already observed on the same trip must not create a
+    second row for it: views.edit folds it into the existing observation instead, updating
+    whichever of image/video the new submission actually supplies (see views.edit and
+    Sample.clean())."""
+    def setUp(self):
+        self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
+        self.settings_override=override_settings(MEDIA_ROOT=self.temp.name,DATA_DIR=self.temp.name)
+        self.settings_override.enable();self.addCleanup(self.settings_override.disable)
+        self.owner=User.objects.create_superuser('admin2',password='testing')
+        country=Country.objects.create(name='Israel');sea=Sea.objects.create(name='Red Sea')
+        region=Region.objects.create(name='Eilat',country=country,sea=sea)
+        self.trip=DiveTrip.objects.create(title='Eilat trip',year=2026,country=country,region=region)
+        self.species=Species.objects.create(scientific_name='Test species')
+        self.existing=Sample(owner=self.owner,species=self.species,trip=self.trip)
+        output=io.BytesIO();Image.new('RGB',(100,80),'blue').save(output,'JPEG')
+        self.existing.image.save('original.jpg',ContentFile(output.getvalue()),save=False)
+        self.existing.save_reviewed()
+        self.client.force_login(self.owner)
+        self.base={'kind':'species','species_other':'','site':'','site_other':'','day':'','depth':'','video_url':'','title':''}
+
+    def test_new_observation_of_same_species_and_trip_updates_the_existing_image_instead_of_duplicating(self):
+        original_name=self.existing.image.name
+        output=io.BytesIO();Image.new('RGB',(90,70),'red').save(output,'JPEG');raw=output.getvalue()
+        response=self.client.post('/observations/new/',dict(self.base,species=self.species.scientific_name,trip=self.trip.pk,
+            image=SimpleUploadedFile('new.jpg',raw,content_type='image/jpeg')))
+        self.assertEqual(response.status_code,302)
+        self.assertEqual(Sample.objects.filter(species=self.species,trip=self.trip).count(),1)
+        self.existing.refresh_from_db()
+        # The uploaded image is re-encoded by SampleForm.clean_image (resized/re-saved as
+        # JPEG) before it's hashed, so its stored name won't match a hash of the raw upload
+        # bytes -- just confirm it's a real, freshly content-hashed file, distinct from the
+        # sample's original image.
+        self.assertRegex(self.existing.image.name,r'^observations/transfer/[0-9a-f]{64}\.jpg$')
+        self.assertNotEqual(self.existing.image.name,original_name)
+
+    def test_new_observation_of_same_species_and_trip_updates_the_existing_video_instead_of_duplicating(self):
+        response=self.client.post('/observations/new/',dict(self.base,species=self.species.scientific_name,trip=self.trip.pk,
+            video_url='https://youtu.be/22222222222'))
+        self.assertEqual(response.status_code,302)
+        self.assertEqual(Sample.objects.filter(species=self.species,trip=self.trip).count(),1)
+        self.existing.refresh_from_db()
+        self.assertEqual(self.existing.video_url,'https://youtu.be/22222222222')
+
+    def test_same_species_on_a_different_trip_is_not_merged(self):
+        other_trip=DiveTrip.objects.create(title='Other trip',year=2026,country=self.trip.country,region=self.trip.region)
+        response=self.client.post('/observations/new/',dict(self.base,species=self.species.scientific_name,trip=other_trip.pk,
+            video_url='https://youtu.be/33333333333'))
+        self.assertEqual(response.status_code,302)
+        self.assertEqual(Sample.objects.filter(species=self.species).count(),2)
+
+    def test_editing_a_different_sample_into_a_collision_is_rejected_not_merged(self):
+        other_species=Species.objects.create(scientific_name='Other species')
+        other=Sample(owner=self.owner,species=other_species,trip=self.trip)
+        output=io.BytesIO();Image.new('RGB',(60,40),'green').save(output,'JPEG')
+        other.image.save('other.jpg',ContentFile(output.getvalue()),save=False)
+        other.save_reviewed()
+        response=self.client.post(f'/observations/{other.pk}/edit/',dict(self.base,species=self.species.scientific_name,trip=self.trip.pk,
+            video_url='https://youtu.be/44444444444'))
+        self.assertEqual(response.status_code,200)
+        self.assertContains(response,'כבר נקלט למסע זה')
+        other.refresh_from_db();self.existing.refresh_from_db()
+        self.assertEqual(other.species_id,other_species.pk)
+        self.assertNotEqual(self.existing.video_url,'https://youtu.be/44444444444')
