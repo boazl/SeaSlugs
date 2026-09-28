@@ -417,8 +417,14 @@ def edit(request,pk=None):
             return redirect(f'{next_url}#obs-{existing.pk}')
         if 'image' in form.changed_data and item.image:
             item.image = hashed_image_name(item)
+        # A brand-new observation (never one being edited) is the message worth the reader's
+        # eye first among the run-of-the-mill notices this page and others show (profile
+        # saved, trip added, etc.) -- extra_tags carries that distinction through to
+        # base.html, which renders it with its own highlighted style.
+        is_new_observation = item.pk is None
         item.save_reviewed()
-        messages.success(request,'התצפית פורסמה.' if item.status=='published' else 'התצפית נשמרה וממתינה להשלמת נתונים ולאישור מנהל.')
+        messages.success(request,'התצפית פורסמה.' if item.status=='published' else 'התצפית נשמרה וממתינה להשלמת נתונים ולאישור מנהל.',
+            extra_tags='new-observation' if is_new_observation else '')
         return redirect(f'{next_url}#obs-{item.pk}')
     return render(request,'observations/form.html',{'form':form,'title':'תצפית / Sample','observation_form':True,
         'trip_new_url':reverse('trip-new'),'next':next_url,

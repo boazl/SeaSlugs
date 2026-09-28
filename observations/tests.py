@@ -188,6 +188,18 @@ class WorkflowTests(TestCase):
         item.refresh_from_db();self.assertEqual(item.status,'pending')
         self.client.logout();self.assertEqual(self.client.get('/observations/').status_code,302)
 
+    def test_new_observation_success_message_is_highlighted_but_edit_is_not(self):
+        # A brand-new observation's success notice should stand out from the page's other,
+        # routine notices (profile saved, trip added, etc.) -- editing an existing one is
+        # comparatively unremarkable and keeps the plain style.
+        self.client.force_login(self.user)
+        response=self.client.post('/observations/new/',self.data(),follow=True)
+        self.assertContains(response,'class="notice new-observation"')
+        item=Sample.objects.get()
+        d=self.data();d.update(video_url='https://youtu.be/zzzzzzzzzzz')
+        response=self.client.post(f'/observations/{item.pk}/edit/',d,follow=True)
+        self.assertNotContains(response,'class="notice new-observation"')
+        self.assertContains(response,'<p class="notice">')
     def test_species_search_browses_all_when_query_is_empty(self):
         # The species picker on the observation form opens as a browsable dropdown on
         # focus/click, before anything is typed -- so the endpoint it calls must return
