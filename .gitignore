@@ -21,3 +21,7 @@ maintenance.flag
 * - Google Docs.html
 * - Google Docs.pdf
 Claude outputs/
+
+# Folder-import staging: transient working data auto-cleaned after 1 hour by
+# folder_import.py, never meant to be tracked (was accidentally committed once).
+folder-import-staging/
