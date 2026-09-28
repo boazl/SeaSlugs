@@ -59,6 +59,36 @@ class FolderImportTests(TestCase):
             response=self.client.post('/admin/images/folder/',{'action':'apply','token':response.context['token'],'selected':['0'],'species_0':str(self.species),'confirm':'yes'})
         self.assertEqual(response.status_code,302)
         item=Sample.objects.get();self.assertEqual(item.trip.year,2026);self.assertEqual(item.trip.month,1);self.assertIsNone(item.day);self.assertTrue(item.image);self.assertEqual(item.trip,self.trip)
+    def test_preview_flags_a_photo_already_used_by_a_different_observation(self):
+        # Sample.clean() already refuses to save an image whose content matches another
+        # sample's (see its image_hash duplicate check) -- but until now that check only ran
+        # inside apply()'s single atomic transaction, where ONE such conflict anywhere in a
+        # big batch aborted and rolled back every other row in the same submission, with no
+        # indication which file was at fault. Running the same check during preview instead
+        # flags just the offending row (disabling its checkbox) and leaves the rest of the
+        # batch completely unaffected.
+        from observations.forms import SampleForm
+        raw=io.BytesIO();Image.new('RGB',(40,30),'green').save(raw,'JPEG');raw=raw.getvalue()
+        # clean_image() re-encodes on every upload (even a folder-import one) -- run it once
+        # here too so the "existing" sample's stored image is byte-identical to what preview
+        # will independently produce for the same raw input below.
+        form=SampleForm();form.cleaned_data={'image':SimpleUploadedFile('x.jpg',raw,content_type='image/jpeg')}
+        processed=form.clean_image().read()
+        # A DIFFERENT trip -- otherwise plan_row would (correctly) treat the new row as
+        # updating this very sample's own image rather than as a conflict with another one.
+        other_trip=DiveTrip.objects.create(title='Other',year=2026,country_name='Philippines',region_name='Romblon')
+        other_species=Species.objects.create(scientific_name='Elysia sp.')
+        existing=Sample(owner=self.user,species=other_species,trip=other_trip)
+        existing.image.save('existing.jpg',ContentFile(processed),save=False)
+        existing.save_reviewed()
+        self.client.force_login(self.user)
+        duplicate_photo=SimpleUploadedFile('317-Elysia sp. 2025.jpg',raw,content_type='image/jpeg')
+        response=self.client.post('/admin/images/folder/',{'action':'preview','trip':self.trip.pk,'images':[duplicate_photo,self.photo()]})
+        rows=response.context['rows']
+        self.assertIn('כבר קיימת בתצפית אחרת',rows[0]['error'])
+        self.assertFalse(rows[0]['checked'])
+        self.assertEqual(rows[1]['error'],'')
+        self.assertTrue(rows[1]['checked'])
     def test_species_dropdown_is_sorted_alphabetically(self):
         # The species table's default ordering is taxonomic (phylogenetic order), not
         # alphabetical -- fine for the public listing, but the autocomplete datalist backing

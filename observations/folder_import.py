@@ -160,8 +160,23 @@ def folder_import(request):
                             total+=len(raw)
                             if total>100*1024*1024:raise ValidationError('היבוא גדול מ־100MB לאחר הקטנה; פצלו לתיקיות.')
                             (stage/f'{number}.jpg').write_bytes(raw);row['digest']=hashlib.sha256(raw).hexdigest()
+                            item=None
                             if row['species_id']:
                                 item,row['action']=plan_row(trip,row['species_id'],request.user,row['variant'])
+                            # Sample.clean() itself already refuses to save an image whose content
+                            # (sha256, same as image_hash) matches another sample's -- but that check
+                            # only runs inside apply()'s single atomic transaction, where ONE such
+                            # conflict anywhere in a big batch aborts and rolls back every other row
+                            # in the same submission, with no indication which file was at fault.
+                            # Running the same check here, per row, at preview time instead catches it
+                            # before anything is selected: the offending row is flagged and its
+                            # checkbox disabled, while every other row in the batch is unaffected.
+                            duplicate=Sample.objects.filter(deleted_at__isnull=True,image_hash=row['digest'])
+                            if item and item.pk:duplicate=duplicate.exclude(pk=item.pk)
+                            duplicate=duplicate.first()
+                            if duplicate:
+                                raise ValidationError(f'התמונה הזו כבר קיימת בתצפית אחרת ({duplicate}). לא ניתן להשתמש באותה תמונה פעמיים.')
+                            if row['species_id']:
                                 row['replaces_image']=bool(item.image)
                                 row['description']='החלפת תמונה קיימת' if item.image else 'הוספת תמונה לתצפית' if item.pk else 'יצירת תצפית עם תמונה'
                                 if row['variant']:row['description']+=f' (צורה לא מזוהה "{row["variant"]}")'
