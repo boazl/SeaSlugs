@@ -95,6 +95,20 @@ def location(trip):
     raise ValidationError('למסע אין מדינה ואזור מוגדרים. יש להשלים אותם בניהול מסעות הצלילה לפני יבוא.')
 
 
+def resolve_species_text(text):
+    """Resolve free-typed species text (an operator's edit of a folder-import row's
+    species field, which is prefilled with the automatic filename guess but always
+    editable, exactly like the observation form's own species field) to
+    (species_pk_or_None, variant): split off an undetermined-species variant letter (see
+    split_undetermined_variant) and match the rest against the catalog the same way
+    Species.find_by_name does for the observation form. Returns (None, '') when nothing
+    in the catalog matches -- the caller (folder_import's apply step) then creates a new
+    catalog species from the text as typed, letter included, same as it always could."""
+    base_text,variant=split_undetermined_variant(normalized(text or ''))
+    match=Species.find_by_name(base_text)
+    return (match.pk,variant) if match else (None,'')
+
+
 def plan_row(trip,species_id,owner,variant=''):
     location(trip)  # validates the trip has a resolvable country+region before importing into it
     matches=list(Sample.objects.filter(kind='species',species_id=species_id,trip=trip,deleted_at__isnull=True,undetermined_variant=variant))
@@ -129,11 +143,14 @@ def folder_import(request):
                 import shutil
                 for old in root.iterdir():
                     if old.is_dir() and not old.is_symlink() and timezone.now().timestamp()-old.stat().st_mtime>3600:shutil.rmtree(old)
-                stage=root/uuid.uuid4().hex;stage.mkdir(mode=0o700);rows=[];species=list(Species.objects.all());total=0
+                stage=root/uuid.uuid4().hex;stage.mkdir(mode=0o700);rows=[];species=list(Species.objects.all());species_by_pk={s.pk:s for s in species};total=0
                 try:
                     for number,(name,source) in enumerate(entries):
                         species_id,variant=match_species(name,species)
-                        row={'index':number,'filename':name,'species_id':species_id,'variant':variant,'error':'','proposed':filename_species(name),'replaces_image':False}
+                        proposed=filename_species(name)
+                        species_text=f'{species_by_pk[species_id].scientific_name} {variant}'.strip() if species_id else proposed
+                        row={'index':number,'filename':name,'species_id':species_id,'variant':variant,'species_text':species_text,
+                             'error':'','proposed':proposed,'replaces_image':False}
                         try:
                             size=source.stat().st_size if isinstance(source,Path) else source.size
                             if size>10*1024*1024:raise ValidationError('תמונה גדולה מ־10MB.')
@@ -184,27 +201,32 @@ def folder_import(request):
                 for row in manifest['rows']:
                     if str(row['index']) not in selected:continue
                     if row['error']:raise ValidationError(row['error'])
-                    choice=request.POST.get('species_'+str(row['index']))
+                    # The species field is a free-text input (with catalog suggestions),
+                    # exactly like the observation form's own species field -- prefilled
+                    # with the automatic filename guess, but the operator can retype it
+                    # entirely (to fix a typo, pick a different species, or add/correct
+                    # the undetermined-species letter) before importing.
+                    typed=normalized(request.POST.get('species_'+str(row['index']),''))
+                    if not typed:raise ValidationError('יש להזין שם מין.')
                     proposal=None
-                    if choice=='new':
-                        proposed=normalized(request.POST.get('new_name_'+str(row['index']),''))
-                        if not proposed or len(proposed)>200 or filename_species(proposed+'.jpg')!=proposed:
-                            raise ValidationError('שם מין חדש לא תקין. יש להזין סוג ומין בלבד, עם sp. או cf. לפי הצורך.')
-                        matches=[item for item in Species.objects.all() if normalized(item.scientific_name).casefold()==proposed.casefold()]
-                        if len(matches)>1:raise ValidationError('שם המין מתאים לכמה רשומות קיימות.')
-                        species=matches[0] if matches else None
-                        if not species:
-                            genus,epithet=proposed.split(' ',1)
-                            prefix=re.match(r'^([A-Za-z]*\d+)[ ._-]',row['filename'])
-                            proposal={'scientific_name':proposed,'genus':genus,'species':epithet,'phylogenetic_order':prefix.group(1) if prefix else ''}
-                    else:species=Species.objects.get(pk=choice)
-                    # The undetermined-species letter (if any) describes the physical
-                    # specimen the photo shows, from the filename -- it applies whichever
-                    # catalog species ends up chosen, EXCEPT when creating a brand-new
-                    # catalog row for it (choice=='new'), since there the letter is already
-                    # part of that row's own scientific_name instead.
-                    variant=row.get('variant','') if choice!='new' else ''
-                    key=(species.pk,variant) if species else proposed.casefold()
+                    species_pk,variant=resolve_species_text(typed)
+                    if species_pk:
+                        species=Species.objects.get(pk=species_pk)
+                    else:
+                        # Nothing in the catalog matches even after stripping a variant
+                        # letter -- a genuinely new, not-yet-catalogued species, exactly
+                        # like typing a brand-new name used to via the separate "new"
+                        # option. The letter (if any) is kept as part of the new row's
+                        # own scientific_name, since there's no existing bare "sp." row
+                        # to attach it to as a variant.
+                        if len(typed)>200 or filename_species(typed+'.jpg')!=typed:
+                            raise ValidationError('שם מין לא תקין. יש להזין סוג ומין בלבד, עם sp. או cf. לפי הצורך.')
+                        species=None
+                        genus,epithet=typed.split(' ',1)
+                        prefix=re.match(r'^([A-Za-z]*\d+)[ ._-]',row['filename'])
+                        proposal={'scientific_name':typed,'genus':genus,'species':epithet,'phylogenetic_order':prefix.group(1) if prefix else ''}
+                        variant=''
+                    key=(species.pk,variant) if species else typed.casefold()
                     if key in seen:
                         skipped+=1
                         continue

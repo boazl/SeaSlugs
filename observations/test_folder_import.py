@@ -56,24 +56,23 @@ class FolderImportTests(TestCase):
         response=self.client.post('/admin/images/folder/',{'action':'preview','trip':self.trip.pk,'images':self.photo()})
         self.assertEqual(Sample.objects.count(),0);self.assertIn('token',response.context)
         with patch('observations.folder_import.create_backup',return_value=Path('backup.sqlite3')):
-            response=self.client.post('/admin/images/folder/',{'action':'apply','token':response.context['token'],'selected':['0'],'species_0':self.species.pk,'confirm':'yes'})
+            response=self.client.post('/admin/images/folder/',{'action':'apply','token':response.context['token'],'selected':['0'],'species_0':str(self.species),'confirm':'yes'})
         self.assertEqual(response.status_code,302)
         item=Sample.objects.get();self.assertEqual(item.trip.year,2026);self.assertEqual(item.trip.month,1);self.assertIsNone(item.day);self.assertTrue(item.image);self.assertEqual(item.trip,self.trip)
     def test_species_dropdown_is_sorted_alphabetically(self):
         # The species table's default ordering is taxonomic (phylogenetic order), not
-        # alphabetical -- fine for the public listing, but this dropdown has hundreds of
-        # entries an operator picks from by name, so it needs its own alphabetical order
-        # (browsers, Chrome included, offer type-to-filter inside a long <select> natively,
-        # so no separate filter control is needed here).
+        # alphabetical -- fine for the public listing, but the autocomplete datalist backing
+        # the free-text species field has hundreds of entries an operator picks from by
+        # name, so it needs its own alphabetical order.
         Species.objects.create(scientific_name='Aaa species')
         Species.objects.create(scientific_name='Zzz species')
         self.client.force_login(self.user)
         response=self.client.post('/admin/images/folder/',{'action':'preview','trip':self.trip.pk,'images':self.photo()})
         content=response.content.decode()
-        start=content.index('<select name="species_0"')
-        select=content[start:content.index('</select>',start)]
-        self.assertLess(select.index('Aaa species'),select.index('Micromelo undatus'))
-        self.assertLess(select.index('Micromelo undatus'),select.index('Zzz species'))
+        start=content.index('<datalist id="species-options"')
+        datalist=content[start:content.index('</datalist>',start)]
+        self.assertLess(datalist.index('Aaa species'),datalist.index('Micromelo undatus'))
+        self.assertLess(datalist.index('Micromelo undatus'),datalist.index('Zzz species'))
     def test_preview_defaults_to_unchecked_when_the_photo_would_replace_an_existing_image(self):
         # Overwriting a sample's existing image is destructive (the previous file is
         # deleted, no backup) -- an operator must actively opt in, not just click through
@@ -113,7 +112,7 @@ class FolderImportTests(TestCase):
         token=response.context['token']
         first_digest=response.context['rows'][0]['digest']
         with patch('observations.folder_import.create_backup',return_value=Path('backup.sqlite3')):
-            response=self.client.post('/admin/images/folder/',{'action':'apply','token':token,'selected':['1','0'],'species_0':self.species.pk,'species_1':self.species.pk,'confirm':'yes'},follow=True)
+            response=self.client.post('/admin/images/folder/',{'action':'apply','token':token,'selected':['1','0'],'species_0':str(self.species),'species_1':str(self.species),'confirm':'yes'},follow=True)
         self.assertEqual(Sample.objects.count(),1)
         item=Sample.objects.get()
         self.assertEqual(hashlib.sha256(Path(item.image.path).read_bytes()).hexdigest(),first_digest)
@@ -136,7 +135,7 @@ class FolderImportTests(TestCase):
         self.assertEqual(response.context['rows'][0]['proposed'],'Thecacera picta')
         self.assertFalse(Species.objects.filter(scientific_name='Thecacera picta').exists())
         with patch('observations.folder_import.create_backup',return_value=Path('backup.sqlite3')):
-            response=self.client.post('/admin/images/folder/',{'action':'apply','token':response.context['token'],'selected':['0','1'],'species_0':'new','species_1':'new','new_name_0':'Thecacera picta','new_name_1':'Thecacera picta','confirm':'yes'},follow=True)
+            response=self.client.post('/admin/images/folder/',{'action':'apply','token':response.context['token'],'selected':['0','1'],'species_0':'Thecacera picta','species_1':'Thecacera picta','confirm':'yes'},follow=True)
         species=Species.objects.get(scientific_name='Thecacera picta')
         self.assertEqual(species.genus,'Thecacera');self.assertEqual(species.species,'picta');self.assertEqual(species.phylogenetic_order,'205')
         self.assertEqual(Sample.objects.filter(species=species).count(),1)
@@ -154,7 +153,7 @@ class FolderImportTests(TestCase):
         self.client.force_login(self.user)
         response=self.client.post('/admin/images/folder/',{'action':'preview','trip':self.trip.pk,'images':self.photo()})
         with patch('observations.folder_import.create_backup',return_value=Path('backup.sqlite3')):
-            response=self.client.post('/admin/images/folder/',{'action':'apply','token':response.context['token'],'selected':['0'],'species_0':self.species.pk,'confirm':'yes'})
+            response=self.client.post('/admin/images/folder/',{'action':'apply','token':response.context['token'],'selected':['0'],'species_0':str(self.species),'confirm':'yes'})
         self.assertEqual(response.status_code,302)
         existing.refresh_from_db()
         self.assertEqual(existing.status,'published')
