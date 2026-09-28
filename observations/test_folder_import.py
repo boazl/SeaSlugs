@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError
 from pathlib import Path
 from unittest.mock import patch
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.files.base import ContentFile
 from django.test import TestCase,override_settings
 from django.contrib.auth.models import User
 from .models import Country,Sea,Region
@@ -46,6 +47,30 @@ class FolderImportTests(TestCase):
             response=self.client.post('/admin/images/folder/',{'action':'apply','token':response.context['token'],'selected':['0'],'species_0':self.species.pk,'confirm':'yes'})
         self.assertEqual(response.status_code,302)
         item=Sample.objects.get();self.assertEqual(item.trip.year,2026);self.assertEqual(item.trip.month,1);self.assertIsNone(item.day);self.assertTrue(item.image);self.assertEqual(item.trip,self.trip)
+    def test_preview_defaults_to_unchecked_when_the_photo_would_replace_an_existing_image(self):
+        # Overwriting a sample's existing image is destructive (the previous file is
+        # deleted, no backup) -- an operator must actively opt in, not just click through
+        # a checkbox that was already ticked for them.
+        existing=Sample(owner=self.user,species=self.species,trip=self.trip)
+        output=io.BytesIO();Image.new('RGB',(40,30),'blue').save(output,'JPEG')
+        existing.image.save('original.jpg',ContentFile(output.getvalue()),save=False)
+        existing.save_reviewed()
+        self.client.force_login(self.user)
+        response=self.client.post('/admin/images/folder/',{'action':'preview','trip':self.trip.pk,'images':self.photo()})
+        row=response.context['rows'][0]
+        self.assertEqual(row['description'],'החלפת תמונה קיימת')
+        self.assertFalse(row['checked'])
+    def test_preview_defaults_to_checked_when_completing_a_video_only_sample(self):
+        # No existing image means nothing is at risk of being overwritten -- this is just
+        # adding the first photo to an otherwise media-complete observation, so it should
+        # stay checked like a brand-new sample would.
+        Sample.objects.create(owner=self.user,species=self.species,trip=self.trip,
+            kind=Sample.Kind.SPECIES,status=Sample.Status.PENDING,video_url='https://youtu.be/abcdefghijk')
+        self.client.force_login(self.user)
+        response=self.client.post('/admin/images/folder/',{'action':'preview','trip':self.trip.pk,'images':self.photo()})
+        row=response.context['rows'][0]
+        self.assertEqual(row['description'],'הוספת תמונה לתצפית')
+        self.assertTrue(row['checked'])
     def test_other_trip_creates_new_sample_and_same_trip_updates(self):
         item=Sample(owner=self.user,species=self.species,trip=self.trip,video_url='https://youtu.be/abcdefghijk');item.save_reviewed()
         self.assertEqual(plan_row(self.trip,self.species.pk,self.user)[1],'update')

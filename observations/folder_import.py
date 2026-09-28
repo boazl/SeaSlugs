@@ -126,7 +126,7 @@ def folder_import(request):
                 stage=root/uuid.uuid4().hex;stage.mkdir(mode=0o700);rows=[];species=list(Species.objects.all());total=0
                 try:
                     for number,(name,source) in enumerate(entries):
-                        row={'index':number,'filename':name,'species_id':match_species(name,species),'error':'','proposed':filename_species(name)}
+                        row={'index':number,'filename':name,'species_id':match_species(name,species),'error':'','proposed':filename_species(name),'replaces_image':False}
                         try:
                             size=source.stat().st_size if isinstance(source,Path) else source.size
                             if size>10*1024*1024:raise ValidationError('תמונה גדולה מ־10MB.')
@@ -138,6 +138,7 @@ def folder_import(request):
                             (stage/f'{number}.jpg').write_bytes(raw);row['digest']=hashlib.sha256(raw).hexdigest()
                             if row['species_id']:
                                 item,row['action']=plan_row(trip,row['species_id'],request.user)
+                                row['replaces_image']=bool(item.image)
                                 row['description']='החלפת תמונה קיימת' if item.image else 'הוספת תמונה לתצפית' if item.pk else 'יצירת תצפית עם תמונה'
                             else:row['description']='יצירת מין חדש ותצפית עם תמונה' if row['proposed'] else 'לא זוהה שם — בחרו מין קיים'
                         except ValidationError as exc:row['error']='; '.join(exc.messages)
@@ -145,9 +146,18 @@ def folder_import(request):
                     picked=set()
                     for row in rows:
                         key=row['species_id'] or normalized(row['proposed']).casefold()
-                        row['checked']=bool(key and not row['error'] and key not in picked)
-                        if row['checked']:picked.add(key)
-                        elif row['species_id'] and not row['error']:row['description']+=' — תמונה נוספת לאותו מין, לא נבחרה'
+                        is_first=bool(key and not row['error'] and key not in picked)
+                        if is_first:
+                            picked.add(key)
+                            # A photo that would overwrite a sample's existing image is left
+                            # unchecked by default -- an operator must actively confirm an
+                            # overwrite, whereas adding a first photo to a video-only sample
+                            # (or creating a brand-new sample) carries no such risk and stays
+                            # checked, same as before this distinction existed.
+                            row['checked']=not row['replaces_image']
+                        else:
+                            row['checked']=False
+                            if row['species_id'] and not row['error']:row['description']+=' — תמונה נוספת לאותו מין, לא נבחרה'
                     snapshot=fingerprint();manifest={'trip':trip.pk,'rows':rows,'snapshot':snapshot,'user':request.user.pk}
                     raw=json.dumps(manifest,ensure_ascii=False).encode();(stage/'manifest.json').write_bytes(raw)
                     token=signing.dumps({'stage':stage.name,'digest':hashlib.sha256(raw).hexdigest(),'user':request.user.pk},salt='folder-import')
