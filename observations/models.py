@@ -12,6 +12,14 @@ from django.utils import timezone
 from django.utils.text import slugify
 
 
+def normalize_sp_spacing(text):
+    """Canonicalize the space between an sp./spp. numeral qualifier and its number, so
+    'Tenellia sp.18', 'Tenellia sp.  18' and 'Tenellia sp. 18' are all treated as the same
+    text -- photographers' filenames and the species table don't always agree on whether
+    there's a space there."""
+    return re.sub(r'(?i)\b(spp?\.)\s*(\d)', r'\1 \2', text or '')
+
+
 def youtube_id(url):
     p = urlparse(url)
     host = (p.hostname or '').lower()
@@ -99,6 +107,21 @@ class Species(models.Model):
         ordering = [models.functions.NullIf('phylogenetic_order', models.Value('')).asc(nulls_last=True), 'scientific_name']
         verbose_name = 'מין'; verbose_name_plural = 'מינים'
     def __str__(self): return self.scientific_name
+    @classmethod
+    def find_by_name(cls, text):
+        """Match `text` (typed into the observation form, or extracted from a bulk-import
+        filename) against scientific_name: an exact case-insensitive match first (the
+        common case, and the fastest query), falling back to a spacing-tolerant compare so
+        'sp.18' and 'sp. 18' are recognised as the same species regardless of which the
+        catalog or the photographer used (see normalize_sp_spacing)."""
+        text = (text or '').strip()
+        if not text:
+            return None
+        match = cls.objects.filter(scientific_name__iexact=text).first()
+        if match:
+            return match
+        key = normalize_sp_spacing(text).casefold()
+        return next((item for item in cls.objects.all() if normalize_sp_spacing(item.scientific_name).casefold() == key), None)
     def clean(self):
         super().clean()
         errors = {}

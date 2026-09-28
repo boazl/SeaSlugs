@@ -231,6 +231,14 @@ class WorkflowTests(TestCase):
             {'species': 'Not yet published', 'trip': self.trip.pk}).json()
         self.assertEqual(resp, {'matched': True, 'is_defining': False, 'appears': False, 'next': None})
 
+    def test_species_area_status_endpoint_ignores_sp_qualifier_spacing(self):
+        self.client.force_login(self.user)
+        species=Species.objects.create(scientific_name='Tenellia sp. 18')
+        self.record(species=species)
+        resp = self.client.get('/observations/species-area-status/',
+            {'species': 'Tenellia sp.18', 'trip': self.trip.pk}).json()
+        self.assertEqual(resp, {'matched': True, 'is_defining': False, 'appears': True, 'next': None})
+
     def test_next_candidate_prefers_most_recent_with_media_then_falls_back(self):
         first = self.record()
         self.assertEqual(SpeciesArea.next_candidate(self.species.pk, self.country.pk, self.sea, first.pk), {'kind': 'single'})
@@ -257,6 +265,20 @@ class WorkflowTests(TestCase):
         item=form.save(commit=False);item.save_reviewed()
         # editing an existing item must show its scientific name in the field, not its pk
         self.assertEqual(SampleForm(instance=item).initial['species'],self.species.scientific_name)
+
+    def test_species_field_matches_regardless_of_sp_qualifier_spacing(self):
+        # A photographer may type "Tenellia sp.18" (no space) or paste it from a filename,
+        # while the species table stores "Tenellia sp. 18" (or vice versa) -- either must
+        # still resolve to the same species rather than being rejected as unrecognized.
+        spaced=Species.objects.create(scientific_name='Tenellia sp. 18')
+        d=self.data();d.update(species='Tenellia sp.18')
+        form=SampleForm(d,instance=Sample(owner=self.user));self.assertTrue(form.is_valid(),form.errors)
+        self.assertEqual(form.cleaned_data['species'],spaced)
+
+        unspaced=Species.objects.create(scientific_name='Doto sp.7')
+        d=self.data();d.update(species='Doto sp. 7',video_url='https://youtu.be/zzzzzzzzzzz')
+        form=SampleForm(d,instance=Sample(owner=self.user));self.assertTrue(form.is_valid(),form.errors)
+        self.assertEqual(form.cleaned_data['species'],unspaced)
 
     def test_species_options_datalist_and_visible_species_other(self):
         self.client.force_login(self.user)

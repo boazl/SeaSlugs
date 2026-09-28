@@ -119,7 +119,7 @@ class SampleForm(forms.ModelForm):
             data['species'] = None
             data['species_other'] = other_text
         elif species_text:
-            match = Species.objects.filter(scientific_name__iexact=species_text).first()
+            match = Species.find_by_name(species_text)
             if match:
                 data['species'] = match
                 data['species_other'] = ''

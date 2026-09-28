@@ -327,7 +327,7 @@ def species_area_status(request):
     determine which SpeciesArea is relevant."""
     from django.http import JsonResponse
     species_text = (request.GET.get('species') or '').strip()
-    species = Species.objects.filter(scientific_name__iexact=species_text).first() if species_text else None
+    species = Species.find_by_name(species_text)
     trip = DiveTrip.objects.filter(pk=request.GET.get('trip')).select_related('country','region__sea','sea').first()
     if not species or not trip or not trip.country_id or not trip.resolved_sea:
         return JsonResponse({'matched': False})

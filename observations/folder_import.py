@@ -16,7 +16,7 @@ from django.db import transaction
 from django.shortcuts import render,redirect
 from django.utils import timezone
 from .forms import SampleForm
-from .models import Sample, Species, DiveTrip, Country, Region
+from .models import Sample, Species, DiveTrip, Country, Region, normalize_sp_spacing
 from .table_transfer import fingerprint,create_backup
 from .media_transfer import save_images
 
@@ -37,12 +37,17 @@ def filename_stem(filename):
 
 
 def filename_species(filename):
+    # sp./spp. numeral qualifiers are matched with an optional space before the number
+    # ("sp.18" as well as "sp. 18") since filenames and the species table don't always
+    # agree on that spacing; normalize_sp_spacing() below canonicalizes whichever the
+    # filename used to the single-space form the species table uses.
     text=filename_stem(filename)
-    match=re.match(r'^([A-Za-z]+\s+(?:cf\.\s+)?(?:spp?\.(?:\s+(?:\d{1,3}(?!\d)|[A-Z](?![A-Za-z])))?|[A-Za-z][a-z]+(?:-[a-z]+)*))',text)
+    match=re.match(r'^([A-Za-z]+\s+(?:cf\.\s+)?(?:spp?\.(?:\s*(?:\d{1,3}(?!\d)|[A-Z](?![A-Za-z])))?|[A-Za-z][a-z]+(?:-[a-z]+)*))',text)
     if not match:return ''
     name=match.group(1)
-    if re.search(r'sp\.\s+\d+$',name):
-        qualifier=re.match(r'^\s+(\(\d{4}\))',text[len(name):])
+    if re.search(r'sp\.\s*\d+$',name):
+        name=normalize_sp_spacing(name)
+        qualifier=re.match(r'^\s+(\(\d{4}\))',text[len(match.group(1)):])
         if qualifier:name+=' '+qualifier.group(1)
     return name
 
@@ -58,10 +63,11 @@ QUALIFIER_RE=re.compile(r'\b(?:cf|aff|juv)\.?(?=\s|$)',re.IGNORECASE)
 
 
 def match_species(filename,species):
-    stem=normalized(QUALIFIER_RE.sub('',filename_stem(filename)))
+    stem=normalize_sp_spacing(normalized(QUALIFIER_RE.sub('',filename_stem(filename))))
     matches=[]
     for item in species:
-        aliases={normalized(item.scientific_name),re.sub(r'\s+\([^)]*\)$','',normalized(item.scientific_name))}
+        name=normalize_sp_spacing(normalized(item.scientific_name))
+        aliases={name,re.sub(r'\s+\([^)]*\)$','',name)}
         for alias in aliases:
             if not stem.casefold().startswith(alias.casefold()):continue
             tail=stem[len(alias):]

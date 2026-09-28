@@ -27,6 +27,17 @@ class FolderImportTests(TestCase):
         self.assertEqual(match_species('002-Micromelo undatus (Author, 1900).jpg',species),self.species.pk)
         self.assertEqual(match_species('C16-Elysia sp. 5 2025.jpg',species),species[-1].pk)
         self.assertIsNone(match_species('C16-Elysia sp. 7.jpg',species))
+    def test_matching_ignores_whether_sp_qualifier_has_a_space_before_its_number(self):
+        # Filenames and the species table don't always agree on "sp.18" vs "sp. 18" --
+        # a photographer's export tool may drop the space the species table uses, or add
+        # one it doesn't have. Either direction must still match.
+        species=[Species.objects.create(scientific_name='Tenellia sp. 18'),
+                  Species.objects.create(scientific_name='Doto sp.7')]
+        self.assertEqual(match_species('713-Tenellia sp.18 2023.jpg',species),species[0].pk)
+        self.assertEqual(match_species('713-Tenellia sp.18-Edit.jpg',species),species[0].pk)
+        self.assertEqual(match_species('C16-Doto sp. 7.jpg',species),species[1].pk)
+        # Still correctly distinguishes a different number either way.
+        self.assertIsNone(match_species('713-Tenellia sp.19.jpg',species))
     def test_preview_then_create_from_trip_not_filename_year(self):
         self.client.force_login(self.user)
         response=self.client.post('/admin/images/folder/',{'action':'preview','trip':self.trip.pk,'images':self.photo()})
