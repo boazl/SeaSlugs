@@ -44,7 +44,7 @@ class SpeciesPageSitemap(Sitemap):
             has_a_sample = Sample.objects.filter(
                 kind=Sample.Kind.SPECIES, species_id=area.species_id, status=Sample.Status.PUBLISHED,
                 deleted_at__isnull=True, trip__country_id=area.country_id, trip__region__sea_id=area.sea_id,
-                trip__year__isnull=False, species_other='', site_other='',
+                trip__year__isnull=False, species_other='', site_other='', undetermined_variant=area.undetermined_variant,
             ).exists()
             if has_a_sample:
                 live.append(area)

@@ -141,7 +141,7 @@ def gallery_file(request, filename='index.html'):
             samples_qs = Sample.objects.filter(
                 kind='species', species_id=area.species_id, status='published', deleted_at__isnull=True,
                 trip__country_id=area.country_id, trip__region__sea_id=area.sea_id, trip__year__isnull=False,
-                species_other='', site_other='',
+                species_other='', site_other='', undetermined_variant=area.undetermined_variant,
             ).select_related('trip', 'trip__region', 'site', 'owner', 'owner__profile').order_by('created_at', 'pk')
             samples = []
             for s in samples_qs:
@@ -159,7 +159,12 @@ def gallery_file(request, filename='index.html'):
             entry = {
                 'area_id': area.pk, 'species_id': area.species_id, 'area': area_key,
                 'slug': area.slug,
-                'title': area.species.scientific_name, 'name_he': area.species.name_he, 'name_en': area.species.name_en,
+                # Two areas can share one bare catalog species (e.g. "Coryphellina sp.") while
+                # the photographer has told them apart with an undetermined_variant letter
+                # (see Sample.undetermined_variant / SpeciesArea.undetermined_variant) --
+                # the card title carries that letter too, so the two cards aren't identical.
+                'title': f'{area.species.scientific_name} {area.undetermined_variant}'.strip(),
+                'name_he': area.species.name_he, 'name_en': area.species.name_en,
                 'epithet': area.species.species,
                 # The genus/family filter+search values are the CURATED names (via genus_obj/
                 # family_obj, already resolved above), not the species' raw genus/family text --

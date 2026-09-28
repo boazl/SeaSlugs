@@ -280,25 +280,28 @@ class WorkflowTests(TestCase):
         form=SampleForm(d,instance=Sample(owner=self.user));self.assertTrue(form.is_valid(),form.errors)
         self.assertEqual(form.cleaned_data['species'],unspaced)
 
-    def test_species_field_resolves_undetermined_variant_by_the_typed_letter(self):
-        # Two visibly distinct, still-undescribed "sp." species of the same genus share one
-        # bare scientific_name (see Species.undetermined_variant) -- typing the variant
-        # letter (with or without a space) must resolve to the matching row, not just
-        # whichever "Coryphellina sp." row the database happens to return first.
-        first=Species.objects.create(scientific_name='Coryphellina sp.',undetermined_variant='A')
-        second=Species.objects.create(scientific_name='Coryphellina sp.',undetermined_variant='B')
+    def test_species_field_resolves_undetermined_variant_letter_onto_the_sample(self):
+        # Two visibly distinct, still-undescribed "sp." forms of the same genus share one
+        # bare catalog row (there is no per-form row in Species any more -- see
+        # Sample.undetermined_variant) -- typing the letter (with or without a space) must
+        # still resolve to that one catalog species, with the letter itself recorded on the
+        # sample, not silently dropped.
+        bare=Species.objects.create(scientific_name='Coryphellina sp.')
         d=self.data();d.update(species='Coryphellina sp.A',video_url='https://youtu.be/aaaaaaaaaaa')
         form=SampleForm(d,instance=Sample(owner=self.user));self.assertTrue(form.is_valid(),form.errors)
-        self.assertEqual(form.cleaned_data['species'],first)
+        self.assertEqual(form.cleaned_data['species'],bare)
+        self.assertEqual(form.instance.undetermined_variant,'A')
 
         d=self.data();d.update(species='Coryphellina sp. B',video_url='https://youtu.be/bbbbbbbbbbb')
         form=SampleForm(d,instance=Sample(owner=self.user));self.assertTrue(form.is_valid(),form.errors)
-        self.assertEqual(form.cleaned_data['species'],second)
+        self.assertEqual(form.cleaned_data['species'],bare)
+        self.assertEqual(form.instance.undetermined_variant,'B')
 
-        # No un-suffixed "Coryphellina sp." row exists here -- typing the bare name must
-        # not silently guess one of the two variants.
+        # The bare (unmarked) form resolves too, with no letter recorded.
         d=self.data();d.update(species='Coryphellina sp.',video_url='https://youtu.be/ccccccccccc')
-        form=SampleForm(d,instance=Sample(owner=self.user));self.assertFalse(form.is_valid())
+        form=SampleForm(d,instance=Sample(owner=self.user));self.assertTrue(form.is_valid(),form.errors)
+        self.assertEqual(form.cleaned_data['species'],bare)
+        self.assertEqual(form.instance.undetermined_variant,'')
 
     def test_species_options_datalist_and_visible_species_other(self):
         self.client.force_login(self.user)
@@ -545,23 +548,30 @@ class WorkflowTests(TestCase):
         self.species.food = 'ספוגים'
         self.species.full_clean()  # must not raise
 
-    def test_undetermined_variant_lets_distinct_sp_forms_of_one_genus_coexist(self):
-        # An undescribed species is sometimes only catalogued as "Genus sp." in the
-        # authoritative source list this table is periodically re-synced from -- with no
-        # way to record that the photographer found two visibly distinct such forms of the
-        # same genus. undetermined_variant lets two rows share a scientific_name as long as
-        # the variant differs, combined into the displayed name, while two rows with the
-        # very same (scientific_name, variant) pair -- including both blank, exactly like
-        # before this field existed -- are still rejected as duplicates.
-        first=Species.objects.create(scientific_name='Coryphellina sp.',undetermined_variant='A')
-        second=Species.objects.create(scientific_name='Coryphellina sp.',undetermined_variant='B')
-        self.assertEqual(str(first),'Coryphellina sp. A')
-        self.assertEqual(str(second),'Coryphellina sp. B')
-        with self.assertRaises(ValidationError):
-            Species(scientific_name='Coryphellina sp.',undetermined_variant='A').full_clean()
-        Species.objects.create(scientific_name='Coryphellina sp.')  # the bare, un-suffixed form
-        with self.assertRaises(ValidationError):
-            Species(scientific_name='Coryphellina sp.').full_clean()
+    def test_undetermined_variant_keeps_distinct_sp_forms_of_one_genus_apart(self):
+        # An undescribed species is sometimes only catalogued as "Genus sp." -- with no
+        # way for the catalog itself to record that the photographer found two visibly
+        # distinct such forms of the same genus. Sample.undetermined_variant (entered per
+        # observation, not on Species -- see SampleForm.clean) is what tells them apart:
+        # both share the one bare catalog row, but get their own SpeciesArea row (and so
+        # their own gallery card and public page) as long as their letters differ.
+        bare=Species.objects.create(scientific_name='Coryphellina sp.')
+        first=self.record(species=bare,undetermined_variant='A')
+        second=self.record(species=bare,undetermined_variant='B')
+        self.assertEqual(first.status,'published');self.assertEqual(second.status,'published')
+        area_a=SpeciesArea.objects.get(species=bare,country=self.country,sea=self.sea,undetermined_variant='A')
+        area_b=SpeciesArea.objects.get(species=bare,country=self.country,sea=self.sea,undetermined_variant='B')
+        self.assertEqual(area_a.defining_sample_id,first.pk)
+        self.assertEqual(area_b.defining_sample_id,second.pk)
+        self.assertNotEqual(area_a.pk,area_b.pk)
+        self.assertNotEqual(area_a.slug,area_b.slug)
+
+        # A second sample of the SAME variant is just another observation of that same
+        # form -- same as the plain (no-variant) case -- not a third SpeciesArea row.
+        third=self.record(species=bare,undetermined_variant='A')
+        self.assertEqual(third.status,'published')
+        self.assertEqual(SpeciesArea.objects.filter(species=bare,country=self.country,sea=self.sea).count(),2)
+        area_a.refresh_from_db();self.assertEqual(area_a.defining_sample_id,first.pk)
 
     def test_species_article_pdf_rejects_non_pdf_extension(self):
         self.species.article_pdf = SimpleUploadedFile('notes.txt', b'not a pdf', content_type='text/plain')

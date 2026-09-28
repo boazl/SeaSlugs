@@ -25,30 +25,32 @@ class FolderImportTests(TestCase):
         return SimpleUploadedFile('002-Micromelo undatus 2025.jpg',output.getvalue(),content_type='image/jpeg')
     def test_matching_keeps_species_identifiers(self):
         species=[self.species,Species.objects.create(scientific_name='Elysia sp.'),Species.objects.create(scientific_name='Elysia sp. 5')]
-        self.assertEqual(match_species('002-Micromelo undatus (Author, 1900).jpg',species),self.species.pk)
-        self.assertEqual(match_species('C16-Elysia sp. 5 2025.jpg',species),species[-1].pk)
-        self.assertIsNone(match_species('C16-Elysia sp. 7.jpg',species))
-    def test_matching_distinguishes_undetermined_variants_of_the_same_genus(self):
-        # Two visibly distinct, still-undescribed "sp." species of one genus share a bare
-        # scientific_name (see Species.undetermined_variant) -- a filename naming the
-        # variant letter must match only the corresponding catalog row, not either one.
-        species=[Species.objects.create(scientific_name='Coryphellina sp.',undetermined_variant='A'),
-                  Species.objects.create(scientific_name='Coryphellina sp.',undetermined_variant='B')]
-        self.assertEqual(match_species("701-Coryphellina sp.B O'Donoghue, 1929-Edit.jpg",species),species[1].pk)
-        self.assertEqual(match_species('Coryphellina sp. A.jpg',species),species[0].pk)
-        # the bare, un-suffixed name alone must not match either variant
-        self.assertIsNone(match_species('Coryphellina sp..jpg',species))
+        self.assertEqual(match_species('002-Micromelo undatus (Author, 1900).jpg',species),(self.species.pk,''))
+        self.assertEqual(match_species('C16-Elysia sp. 5 2025.jpg',species),(species[-1].pk,''))
+        self.assertEqual(match_species('C16-Elysia sp. 7.jpg',species),(None,''))
+    def test_matching_extracts_the_undetermined_variant_letter_from_the_filename(self):
+        # Two visibly distinct, still-undescribed "sp." forms of one genus share ONE bare
+        # catalog row -- there is no per-form row in Species any more (see
+        # Sample.undetermined_variant / split_undetermined_variant). A filename naming a
+        # variant letter must still match that one row, with the letter returned alongside
+        # the pk so the caller can record it on the resulting Sample; a bare, un-suffixed
+        # filename matches too, with an empty variant.
+        bare=Species.objects.create(scientific_name='Coryphellina sp.')
+        species=[bare]
+        self.assertEqual(match_species("701-Coryphellina sp.B O'Donoghue, 1929-Edit.jpg",species),(bare.pk,'B'))
+        self.assertEqual(match_species('Coryphellina sp. A.jpg',species),(bare.pk,'A'))
+        self.assertEqual(match_species('Coryphellina sp..jpg',species),(bare.pk,''))
     def test_matching_ignores_whether_sp_qualifier_has_a_space_before_its_number(self):
         # Filenames and the species table don't always agree on "sp.18" vs "sp. 18" --
         # a photographer's export tool may drop the space the species table uses, or add
         # one it doesn't have. Either direction must still match.
         species=[Species.objects.create(scientific_name='Tenellia sp. 18'),
                   Species.objects.create(scientific_name='Doto sp.7')]
-        self.assertEqual(match_species('713-Tenellia sp.18 2023.jpg',species),species[0].pk)
-        self.assertEqual(match_species('713-Tenellia sp.18-Edit.jpg',species),species[0].pk)
-        self.assertEqual(match_species('C16-Doto sp. 7.jpg',species),species[1].pk)
+        self.assertEqual(match_species('713-Tenellia sp.18 2023.jpg',species),(species[0].pk,''))
+        self.assertEqual(match_species('713-Tenellia sp.18-Edit.jpg',species),(species[0].pk,''))
+        self.assertEqual(match_species('C16-Doto sp. 7.jpg',species),(species[1].pk,''))
         # Still correctly distinguishes a different number either way.
-        self.assertIsNone(match_species('713-Tenellia sp.19.jpg',species))
+        self.assertEqual(match_species('713-Tenellia sp.19.jpg',species),(None,''))
     def test_preview_then_create_from_trip_not_filename_year(self):
         self.client.force_login(self.user)
         response=self.client.post('/admin/images/folder/',{'action':'preview','trip':self.trip.pk,'images':self.photo()})
@@ -164,7 +166,7 @@ class FolderImportTests(TestCase):
             filename='727-Phyllodesmium magnum'+suffix+'.jpeg'
             self.assertEqual(filename_stem(filename),'Phyllodesmium magnum')
             self.assertEqual(filename_species(filename),'Phyllodesmium magnum')
-            self.assertEqual(match_species(filename,[item]),item.pk)
+            self.assertEqual(match_species(filename,[item]),(item.pk,''))
         self.assertEqual(filename_species('C20-Thuridilla sp. 4 (2021)-Edit.jpg'),'Thuridilla sp. 4 (2021)')
         self.assertEqual(filename_species('713-Tenellia sp. 18 2023-Edit.jpg'),'Tenellia sp. 18')
 
@@ -175,11 +177,11 @@ class FolderImportTests(TestCase):
         # trailing dot off "juv." before match_species ever saw it). None of the three
         # should stop the photo from matching its already-catalogued species.
         species=[self.species]  # 'Micromelo undatus'
-        self.assertEqual(match_species('Micromelo cf. undatus (Author, 1900).jpg',species),self.species.pk)
-        self.assertEqual(match_species('Micromelo aff. undatus (Author, 1900).jpg',species),self.species.pk)
-        self.assertEqual(match_species('002-Micromelo undatus juv.jpg',species),self.species.pk)
-        self.assertEqual(match_species('Micromelo undatus (Author, 1900) juv.jpg',species),self.species.pk)
-        self.assertEqual(match_species('002-Micromelo undatus juv. (Author, 1900)-Edit.jpg',species),self.species.pk)
+        self.assertEqual(match_species('Micromelo cf. undatus (Author, 1900).jpg',species),(self.species.pk,''))
+        self.assertEqual(match_species('Micromelo aff. undatus (Author, 1900).jpg',species),(self.species.pk,''))
+        self.assertEqual(match_species('002-Micromelo undatus juv.jpg',species),(self.species.pk,''))
+        self.assertEqual(match_species('Micromelo undatus (Author, 1900) juv.jpg',species),(self.species.pk,''))
+        self.assertEqual(match_species('002-Micromelo undatus juv. (Author, 1900)-Edit.jpg',species),(self.species.pk,''))
         # A genuinely new (uncatalogued) species proposal still keeps "cf." -- this isn't
         # about matching an existing row, it's the tentative-ID name for a new one.
         from .folder_import import filename_species

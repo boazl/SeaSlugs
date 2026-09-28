@@ -15,11 +15,31 @@ from django.utils.text import slugify
 def normalize_sp_spacing(text):
     """Canonicalize the space between an sp./spp. qualifier and its number or single-letter
     variant marker, so 'Tenellia sp.18'/'Tenellia sp. 18' and 'Coryphellina sp.A'/
-    'Coryphellina sp. A' each compare equal -- photographers' filenames, the species table
-    and Species.undetermined_variant don't always agree on whether there's a space there.
-    The letter case stays case-SENSITIVE (unlike the "sp."/"spp." word itself) so an
-    ordinary lowercase continuation like "sp.aff" is never mistaken for a variant marker."""
+    'Coryphellina sp. A' each compare equal -- photographers' filenames and the species
+    table don't always agree on whether there's a space there. The letter case stays
+    case-SENSITIVE (unlike the "sp."/"spp." word itself) so an ordinary lowercase
+    continuation like "sp.aff" is never mistaken for a variant marker (see
+    Sample.undetermined_variant/SpeciesArea.undetermined_variant for what the marker means)."""
     return re.sub(r'\b((?i:spp?\.))\s*(\d|[A-Z](?![A-Za-z]))', r'\1 \2', text or '')
+
+
+UNDETERMINED_VARIANT_RE = re.compile(r'\b((?i:spp?\.))\s([A-Z])(?![A-Za-z])')
+
+
+def split_undetermined_variant(text):
+    """Split off a photographer's ad hoc A/B/C... undetermined-species marker (immediately
+    following an sp./spp. qualifier, e.g. 'Coryphellina sp. A') from `text`, returning
+    (text_without_the_marker, the_marker) -- or (text, '') when there is none. The marker
+    can be followed by further text (an author citation, a qualifier...), exactly like the
+    bare "sp." qualifier itself can be, since it only marks which physical, still-undescribed
+    form of the genus this observation is -- it is not part of the catalogued scientific
+    name (see Sample.undetermined_variant / SpeciesArea.undetermined_variant)."""
+    normalized_text = normalize_sp_spacing(text or '').strip()
+    match = UNDETERMINED_VARIANT_RE.search(normalized_text)
+    if not match:
+        return normalized_text, ''
+    stripped = normalized_text[:match.start()] + match.group(1) + normalized_text[match.end():]
+    return stripped.strip(), match.group(2)
 
 
 def youtube_id(url):
@@ -76,18 +96,6 @@ class Photographer(Named):
 
 class Species(models.Model):
     scientific_name = models.CharField('שם מדעי', max_length=200, db_index=True)
-    # A genuinely distinct, undescribed species is sometimes only recorded as "Genus sp."
-    # in the authoritative source list this table is periodically re-synced from (via
-    # table-transfer's species import -- see table_transfer.py), with no way to tell two
-    # such species of the same genus apart there. When the photographer has found two (or
-    # more) visibly distinct "sp." forms of one genus, this field lets them tell the
-    # catalog they're different species (A, B, C...) -- combined with scientific_name (see
-    # __str__ and find_by_name) -- WITHOUT touching scientific_name itself, so a future
-    # re-sync from the source list never overwrites or collides with this distinction.
-    undetermined_variant = models.CharField('סימון מין לא מזוהה (sp.) — א׳/ב׳/A/B וכו׳', max_length=10, blank=True,
-        help_text='כשיש כמה מינים שונים מאותו סוג שכולם רשומים כ"sp." ברשימת המינים הרשמית, אפשר לסמן כאן אות '
-                   '(A, B, C…) כדי שהאתר יתייחס אליהם כמינים שונים -- בלי לשנות את השם המדעי הרשמי למעלה, כך '
-                   'שעדכון עתידי של רשימת המינים מהמקור הרשמי לא ידרוס את ההבחנה.')
     name_he = models.CharField('שם בעברית', max_length=200, blank=True)
     name_en = models.CharField('שם באנגלית', max_length=200, blank=True)
     source_id = models.CharField('מזהה מקור לייבוא', max_length=200, blank=True, editable=False)
@@ -118,32 +126,28 @@ class Species(models.Model):
     link = models.URLField('קישור', blank=True)
     article_pdf = models.FileField('מאמר (PDF)', upload_to='articles/species/', blank=True, validators=[FileExtensionValidator(['pdf'])])
     class Meta:
-        ordering = [models.functions.NullIf('phylogenetic_order', models.Value('')).asc(nulls_last=True), 'scientific_name', 'undetermined_variant']
+        ordering = [models.functions.NullIf('phylogenetic_order', models.Value('')).asc(nulls_last=True), 'scientific_name']
         verbose_name = 'מין'; verbose_name_plural = 'מינים'
-        constraints = [models.UniqueConstraint(fields=['scientific_name','undetermined_variant'], name='unique_species_scientific_name_variant')]
-    def __str__(self): return f'{self.scientific_name} {self.undetermined_variant}'.strip()
+    def __str__(self): return self.scientific_name
     @classmethod
     def find_by_name(cls, text):
         """Match `text` (typed into the observation form, or extracted from a bulk-import
-        filename) against the catalog: an exact case-insensitive match on scientific_name
-        among species with no undetermined_variant first (the common case, and the fastest
-        query), falling back to a spacing-tolerant compare of the full displayed name
-        (scientific_name plus undetermined_variant -- see __str__) so 'sp.18'/'sp. 18' and
-        'sp.A'/'sp. A' are each recognised as the same species regardless of which spacing
-        the catalog, Species.undetermined_variant or the photographer used, and so two
-        species sharing one undetermined "sp." scientific_name but a different variant
-        letter are told apart (see normalize_sp_spacing)."""
+        filename) against the catalog: an exact case-insensitive match on scientific_name,
+        falling back to a spacing-tolerant compare (normalize_sp_spacing) so 'sp.18'/'sp. 18'
+        are each recognised as the same species regardless of which spacing the catalog or
+        the photographer used. Two undescribed "sp." forms of one genus that the photographer
+        wants to tell apart are NOT distinguished here -- see Sample.undetermined_variant /
+        SpeciesArea.undetermined_variant, and split_undetermined_variant, for that."""
         text = (text or '').strip()
         if not text:
             return None
-        match = cls.objects.filter(scientific_name__iexact=text, undetermined_variant='').first()
+        match = cls.objects.filter(scientific_name__iexact=text).first()
         if match:
             return match
         key = normalize_sp_spacing(text).casefold()
-        return next((item for item in cls.objects.all() if normalize_sp_spacing(str(item)).casefold() == key), None)
+        return next((item for item in cls.objects.all() if normalize_sp_spacing(item.scientific_name).casefold() == key), None)
     def clean(self):
         super().clean()
-        self.undetermined_variant = (self.undetermined_variant or '').strip()
         errors = {}
         if self.first_observed_year and self.first_observed_year > date.today().year:
             errors['first_observed_year'] = 'שנת תצפית ראשונה אינה יכולה להיות בעתיד.'
@@ -444,6 +448,18 @@ class Sample(models.Model):
     species = models.ForeignKey(Species, null=True, blank=True, on_delete=models.PROTECT, verbose_name='מין')
     site = models.ForeignKey(Site, null=True, blank=True, on_delete=models.PROTECT, verbose_name='אתר צלילה')
     species_other = models.CharField('מין אחר', max_length=200, blank=True)
+    # A genuinely distinct, undescribed species is sometimes only recorded as "Genus sp."
+    # in the species catalog (Species), with no way to tell two visibly distinct "sp."
+    # forms of one genus apart there. When the photographer has found two (or more) such
+    # forms, they mark this observation with a letter (A, B, C...) so it isn't folded
+    # together with the other form's observations in the gallery (SpeciesArea is keyed by
+    # species+country+sea+this field -- see SpeciesArea.undetermined_variant) -- entered
+    # per-observation, not on the catalog itself, since the letters are only meaningful as
+    # the photographer's own bookkeeping, not a real taxonomic split of the species (see
+    # split_undetermined_variant for how it's recognised from typed/filename text).
+    undetermined_variant = models.CharField('סימון מין לא מזוהה (sp.) — א׳/ב׳/A/B וכו׳', max_length=10, blank=True,
+        help_text='כשיש כמה מינים שונים מאותו סוג שכולם רשומים כ"sp." ברשימת המינים הרשמית, אפשר לסמן כאן אות '
+                   '(A, B, C…) כדי שהאתר לא יאחד את התצפית הזו עם תצפיות של הצורה האחרת מאותו סוג בגלריה.')
     site_other = models.CharField('אתר צלילה אחר', max_length=200, blank=True)
     day = models.PositiveSmallIntegerField('יום', null=True, blank=True, validators=[MinValueValidator(1),MaxValueValidator(31)])
     depth = models.DecimalField('עומק במטרים', max_digits=6, decimal_places=1, null=True, blank=True, validators=[MinValueValidator(0)])
@@ -533,9 +549,11 @@ class Sample(models.Model):
         # observation form (views.edit) checks for the very same collision itself, earlier,
         # and folds the submission into the existing sample (updating its image/video) instead
         # of ever calling full_clean() on a second, colliding new instance.
+        self.undetermined_variant = (self.undetermined_variant or '').strip()
         if self.pk and self.kind == self.Kind.SPECIES and self.species_id and self.trip_id:
             duplicate = Sample.objects.exclude(pk=self.pk).filter(
                 kind=self.Kind.SPECIES, species_id=self.species_id, trip_id=self.trip_id, deleted_at__isnull=True,
+                undetermined_variant=self.undetermined_variant,
             ).first()
             if duplicate:
                 errors['species'] = f'מין זה כבר נקלט למסע זה בתצפית קיימת ({duplicate}). אי אפשר לקלוט אותו מין פעמיים באותו מסע.'
@@ -622,8 +640,9 @@ class Sample(models.Model):
                 # works for a trip with no region that has a sea chosen directly on it.
                 SpeciesArea.objects.update_or_create(
                     species_id=self.species_id, country_id=self.trip.country_id, sea_id=self.trip.resolved_sea_id,
+                    undetermined_variant=self.undetermined_variant,
                     defaults={'defining_sample': SpeciesArea.pick_defining_sample(
-                        self.species_id, self.trip.country_id, self.trip.resolved_sea_id)},
+                        self.species_id, self.trip.country_id, self.trip.resolved_sea_id, self.undetermined_variant)},
                 )
     def soft_delete(self, actor):
         self.deleted_at = timezone.now(); self.deleted_by = actor
@@ -634,34 +653,46 @@ class Sample(models.Model):
             # pick_defining_sample already excludes this sample now that it is marked deleted.
             SpeciesArea.objects.filter(
                 species_id=self.species_id, country_id=self.trip.country_id, sea_id=self.trip.resolved_sea_id,
-                defining_sample_id=self.pk,
+                undetermined_variant=self.undetermined_variant, defining_sample_id=self.pk,
             ).update(defining_sample=SpeciesArea.pick_defining_sample(
-                self.species_id, self.trip.country_id, self.trip.resolved_sea_id))
+                self.species_id, self.trip.country_id, self.trip.resolved_sea_id, self.undetermined_variant))
 
 
 class SpeciesArea(models.Model):
     """Links a Species to a country+sea it has been observed in, together with the
-    sample that defines how it is presented in the gallery (photo/thumbnail)."""
+    sample that defines how it is presented in the gallery (photo/thumbnail).
+
+    A species+country+sea can be split into more than one row when the photographer has
+    marked some of its observations there with an undetermined_variant letter (see
+    Sample.undetermined_variant): each letter (and the unmarked '' case) gets its own row,
+    its own gallery card and its own public page, since the letters mark forms the
+    photographer has deliberately chosen not to fold together even though the catalog
+    only has one "Genus sp." entry for all of them."""
     species = models.ForeignKey(Species, on_delete=models.CASCADE, related_name='areas', verbose_name='מין')
     country = models.ForeignKey(Country, on_delete=models.PROTECT, verbose_name='מדינה')
     sea = models.ForeignKey(Sea, on_delete=models.PROTECT, verbose_name='ים')
+    undetermined_variant = models.CharField('סימון מין לא מזוהה (sp.) — א׳/ב׳/A/B וכו׳', max_length=10, blank=True,
+        help_text='מועתק מתצפיות (Sample.undetermined_variant) שסומנו באותה אות -- שורה נפרדת לכל אות, כדי שלא '
+                   'תתמזג עם תצפיות של צורה אחרת מאותו סוג באותו אזור.')
     defining_sample = models.ForeignKey(Sample, null=True, blank=True, on_delete=models.SET_NULL, related_name='+', verbose_name='דגימה מגדירה',
         help_text='הדגימה שתמונתה או שרטון היוטיוב שלה יוצגו בכרטיס המין בגלריה. ניתן לבחור דגימה אחרת מבין דגימות המין באזור זה.')
     # Identifies this species+area's own dedicated public page (species name is not unique
     # on its own across areas -- the same species observed in two areas gets two pages).
-    # Generated once from species+country+sea and left alone after that so published URLs
-    # stay stable; blank it out in admin to force a fresh one (e.g. after a rename).
+    # Generated once from species+country+sea(+variant) and left alone after that so
+    # published URLs stay stable; blank it out in admin to force a fresh one (e.g. after a
+    # rename).
     slug = models.SlugField('כתובת בעמוד', max_length=220, unique=True, null=True, blank=True,
         help_text='נוצר אוטומטית משם המין+המדינה+הים בשמירה הראשונה. השאר ריק ליצירה אוטומטית, או הזן ידנית לדריסה.')
     class Meta:
-        constraints = [models.UniqueConstraint(fields=['species','country','sea'], name='unique_species_area')]
+        constraints = [models.UniqueConstraint(fields=['species','country','sea','undetermined_variant'], name='unique_species_area')]
         verbose_name = 'מין באזור'; verbose_name_plural = 'מינים באזורים'
     def __str__(self):
-        return f'{self.species} · {self.country} · {self.sea}'
+        label = f'{self.species} {self.undetermined_variant}'.strip()
+        return f'{label} · {self.country} · {self.sea}'
     def _generate_slug(self):
         country_part = self.country.name_en or self.country.name
         sea_part = self.sea.name_en or self.sea.name
-        base = slugify(f'{self.species.scientific_name} {country_part} {sea_part}') or 'area'
+        base = slugify(f'{self.species.scientific_name} {self.undetermined_variant} {country_part} {sea_part}') or 'area'
         candidate = base
         n = 2
         qs = SpeciesArea.objects.exclude(pk=self.pk) if self.pk else SpeciesArea.objects.all()
@@ -675,16 +706,16 @@ class SpeciesArea(models.Model):
         super().save(*args, **kwargs)
 
     @staticmethod
-    def pick_defining_sample(species_id, country_id, sea_id):
-        """Best sample to represent this species in this country+sea: prefer one with an
-        uploaded image over a video-only one, only among published/non-deleted samples,
-        tie-broken by whichever was created first."""
+    def pick_defining_sample(species_id, country_id, sea_id, undetermined_variant=''):
+        """Best sample to represent this species(+variant) in this country+sea: prefer one
+        with an uploaded image over a video-only one, only among published/non-deleted
+        samples, tie-broken by whichever was created first."""
         # A trip's sea is its region's sea when it has a region, otherwise the sea chosen
         # directly on the trip (DiveTrip.resolved_sea) -- match either shape here.
         sea_match = models.Q(trip__region__sea_id=sea_id) | models.Q(trip__region__isnull=True, trip__sea_id=sea_id)
         candidates = list(Sample.objects.filter(
             models.Q(kind=Sample.Kind.SPECIES, species_id=species_id, status=Sample.Status.PUBLISHED,
-                     deleted_at__isnull=True, trip__country_id=country_id) & sea_match,
+                     deleted_at__isnull=True, trip__country_id=country_id, undetermined_variant=undetermined_variant) & sea_match,
         ).order_by('created_at', 'pk'))
         if not candidates:
             return None
@@ -692,19 +723,19 @@ class SpeciesArea(models.Model):
         return (with_image or candidates)[0]
 
     @staticmethod
-    def next_candidate(species_id, country_id, sea, exclude_pk):
+    def next_candidate(species_id, country_id, sea, exclude_pk, undetermined_variant=''):
         """Describes what would take over as the defining sample for this species+area if
         the sample identified by exclude_pk stopped being it: the most recently created
-        OTHER published, non-deleted sample of the species there that has media (an image
-        or a video), if one exists; otherwise whether some other (media-less) sample of
-        the species exists there at all, or none at all. Used both to preview the outcome
-        on the observation form (species_area_status) and to actually carry it out when
-        releasing a sample from its species (views.observation_action) -- the two must
-        agree, so both go through this one method."""
+        OTHER published, non-deleted sample of the species(+variant) there that has media
+        (an image or a video), if one exists; otherwise whether some other (media-less)
+        sample of the species(+variant) exists there at all, or none at all. Used both to
+        preview the outcome on the observation form (species_area_status) and to actually
+        carry it out when releasing a sample from its species (views.observation_action) --
+        the two must agree, so both go through this one method."""
         sea_match = models.Q(trip__region__sea=sea) | models.Q(trip__region__isnull=True, trip__sea=sea)
         others = Sample.objects.filter(
             models.Q(kind=Sample.Kind.SPECIES, species_id=species_id, status=Sample.Status.PUBLISHED,
-                     deleted_at__isnull=True, trip__country_id=country_id) & sea_match,
+                     deleted_at__isnull=True, trip__country_id=country_id, undetermined_variant=undetermined_variant) & sea_match,
         ).exclude(pk=exclude_pk)
         with_media = others.exclude(image='', video_url='').order_by('-created_at', '-pk').first()
         if with_media:
@@ -716,9 +747,9 @@ class SpeciesArea(models.Model):
     @staticmethod
     def rebuild():
         """Delete every SpeciesArea row and regenerate it from scratch from the samples
-        that currently exist: one row per species+country+sea with at least one published
-        sample, each pointing at pick_defining_sample's choice. Safe to re-run at any time
-        -- only this table is touched, Sample data is never changed."""
+        that currently exist: one row per species+country+sea+undetermined_variant with at
+        least one published sample, each pointing at pick_defining_sample's choice. Safe to
+        re-run at any time -- only this table is touched, Sample data is never changed."""
         with transaction.atomic():
             SpeciesArea.objects.all().delete()
             # A trip's sea is its region's sea when it has a region, otherwise the sea chosen
@@ -735,16 +766,17 @@ class SpeciesArea(models.Model):
                     models.When(trip__region__isnull=False, then=models.F('trip__region__sea_id')),
                     default=models.F('trip__sea_id'),
                 )
-            ).order_by().values_list('species_id', 'trip__country_id', 'resolved_sea_id').distinct()
+            ).order_by().values_list('species_id', 'trip__country_id', 'resolved_sea_id', 'undetermined_variant').distinct()
             # .order_by() clears Sample's default ordering (Meta.ordering = ['-created_at']);
             # without it Django silently adds created_at to the SELECT DISTINCT columns to
-            # support that ordering, which defeats the intended (species,country,sea) dedup
-            # and can raise a UNIQUE-constraint IntegrityError below when two samples for the
-            # same species+area have different created_at timestamps.
+            # support that ordering, which defeats the intended (species,country,sea,variant)
+            # dedup and can raise a UNIQUE-constraint IntegrityError below when two samples
+            # for the same species+area have different created_at timestamps.
             count = 0
-            for species_id, country_id, sea_id in keys:
-                defining = SpeciesArea.pick_defining_sample(species_id, country_id, sea_id)
+            for species_id, country_id, sea_id, variant in keys:
+                defining = SpeciesArea.pick_defining_sample(species_id, country_id, sea_id, variant)
                 if defining:
-                    SpeciesArea.objects.create(species_id=species_id, country_id=country_id, sea_id=sea_id, defining_sample=defining)
+                    SpeciesArea.objects.create(species_id=species_id, country_id=country_id, sea_id=sea_id,
+                                                undetermined_variant=variant, defining_sample=defining)
                     count += 1
         return count

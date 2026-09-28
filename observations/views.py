@@ -41,7 +41,7 @@ def species_page(request, slug):
     samples = list(Sample.objects.filter(
         kind=Sample.Kind.SPECIES, species_id=area.species_id, status='published', deleted_at__isnull=True,
         trip__country_id=area.country_id, trip__region__sea_id=area.sea_id, trip__year__isnull=False,
-        species_other='', site_other='',
+        species_other='', site_other='', undetermined_variant=area.undetermined_variant,
     ).select_related('trip', 'trip__region', 'site', 'owner', 'owner__profile').order_by('created_at', 'pk'))
     if not samples:
         raise Http404
@@ -54,10 +54,15 @@ def species_page(request, slug):
         return (obj.name_en or obj.name) if lang == 'en' else (obj.name_he or obj.name)
 
     species = area.species
+    # Two areas can share one bare catalog species (e.g. "Coryphellina sp.") while the
+    # photographer has told them apart with an undetermined_variant letter (see
+    # Sample.undetermined_variant / SpeciesArea.undetermined_variant) -- the page's title
+    # and headings show that letter too, so the two pages are distinguishable.
+    species_label = f'{species.scientific_name} {area.undetermined_variant}'.strip()
     common_name = (species.name_en or species.name_he) if lang == 'en' else (species.name_he or species.name_en)
     description = (species.description_en or species.description_he) if lang == 'en' else (species.description_he or species.description_en)
     return render(request, 'observations/species_page.html', {
-        'area': area, 'species': species, 'samples': samples,
+        'area': area, 'species': species, 'species_label': species_label, 'samples': samples,
         'image_url': image_url, 'video_id': video_id, 'thumbnail': thumbnail,
         'taxon_order': order_obj, 'taxon_family': family_obj, 'taxon_genus': genus_obj,
         'taxon_order_label': taxon_label(order_obj), 'taxon_family_label': taxon_label(family_obj),
@@ -326,18 +331,20 @@ def species_area_status(request):
     observation form whenever the species or trip field changes, since both together
     determine which SpeciesArea is relevant."""
     from django.http import JsonResponse
+    from .models import split_undetermined_variant
     species_text = (request.GET.get('species') or '').strip()
-    species = Species.find_by_name(species_text)
+    base_text, variant = split_undetermined_variant(species_text)
+    species = Species.find_by_name(base_text)
     trip = DiveTrip.objects.filter(pk=request.GET.get('trip')).select_related('country','region__sea','sea').first()
     if not species or not trip or not trip.country_id or not trip.resolved_sea:
         return JsonResponse({'matched': False})
-    area = SpeciesArea.objects.filter(species=species, country_id=trip.country_id, sea=trip.resolved_sea).first()
+    area = SpeciesArea.objects.filter(species=species, country_id=trip.country_id, sea=trip.resolved_sea, undetermined_variant=variant).first()
     sample_id = request.GET.get('sample') or None
     is_defining = bool(area and sample_id and str(area.defining_sample_id) == str(sample_id))
     appears = bool(area and area.defining_sample_id)
     next_info = None
     if is_defining:
-        candidate = SpeciesArea.next_candidate(species.pk, trip.country_id, trip.resolved_sea, sample_id)
+        candidate = SpeciesArea.next_candidate(species.pk, trip.country_id, trip.resolved_sea, sample_id, variant)
         next_info = {'kind': 'with_media', 'id': candidate['sample'].pk} if candidate['kind'] == 'with_media' else {'kind': candidate['kind']}
     return JsonResponse({'matched': True, 'is_defining': is_defining, 'appears': appears, 'next': next_info})
 
@@ -400,6 +407,7 @@ def edit(request,pk=None):
         # overwriting a different observation than the one being edited would be surprising.
         existing = Sample.objects.filter(
             kind=Sample.Kind.SPECIES, species_id=item.species_id, trip_id=item.trip_id, deleted_at__isnull=True,
+            undetermined_variant=item.undetermined_variant,
         ).first() if (item.pk is None and item.kind==Sample.Kind.SPECIES and item.species_id and item.trip_id) else None
         if existing:
             if item.image: existing.image = hashed_image_name(item)
@@ -414,9 +422,7 @@ def edit(request,pk=None):
         return redirect(f'{next_url}#obs-{item.pk}')
     return render(request,'observations/form.html',{'form':form,'title':'תצפית / Sample','observation_form':True,
         'trip_new_url':reverse('trip-new'),'next':next_url,
-        # str(item) folds in undetermined_variant (e.g. "Coryphellina sp. A"), since
-        # that combined text is what SampleForm.clean() actually matches against.
-        'species_options':[str(item) for item in Species.objects.order_by('scientific_name','undetermined_variant')],
+        'species_options':[str(item) for item in Species.objects.order_by('scientific_name')],
         'locations':{'trips':list(DiveTrip.objects.values('id','region_id')),'sites':list(Site.objects.values('id','region_id'))}})
 
 
@@ -456,14 +462,15 @@ def observation_action(request, pk):
     action = request.POST.get('action')
     area = None
     if item.kind == Sample.Kind.SPECIES and item.species_id and item.trip_id and item.trip.country_id and item.trip.resolved_sea_id:
-        area = SpeciesArea.objects.filter(species_id=item.species_id, country_id=item.trip.country_id, sea=item.trip.resolved_sea).first()
+        area = SpeciesArea.objects.filter(species_id=item.species_id, country_id=item.trip.country_id, sea=item.trip.resolved_sea,
+                                           undetermined_variant=item.undetermined_variant).first()
     is_defining = bool(area and area.defining_sample_id == item.pk)
 
     if action == 'release_species':
         if not is_defining:
             messages.error(request, 'התצפית אינה מגדירה את המין כרגע.')
         else:
-            candidate = SpeciesArea.next_candidate(item.species_id, item.trip.country_id, item.trip.resolved_sea, item.pk)
+            candidate = SpeciesArea.next_candidate(item.species_id, item.trip.country_id, item.trip.resolved_sea, item.pk, item.undetermined_variant)
             area.defining_sample = candidate['sample'] if candidate['kind'] == 'with_media' else None
             area.save(update_fields=['defining_sample'])
             messages.success(request, 'המין שנבחר מופיע בגלריה.' if area.defining_sample_id else 'המין שנבחר אינו מופיע בגלריה.')

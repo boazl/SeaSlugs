@@ -5,7 +5,7 @@ from django import forms
 from django.core.files.base import ContentFile
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
-from .models import Sample, Profile, Species, Country, Region, Site, DiveTrip
+from .models import Sample, Profile, Species, Country, Region, Site, DiveTrip, split_undetermined_variant
 
 
 class SignupForm(UserCreationForm):
@@ -94,7 +94,11 @@ class SampleForm(forms.ModelForm):
         self.fields['kind'].required = False
         self.fields['video_url'].help_text = 'אפשר להשאיר ריק כאשר מעלים תמונה. ניתן להוסיף סרטון בהמשך.'
         if self.instance.pk:
-            self.initial['species'] = str(self.instance.species) if self.instance.species_id else ''
+            # The undetermined_variant letter (if any) lives on the Sample, not the Species
+            # it points to (see Sample.undetermined_variant) -- append it back onto the
+            # displayed text so re-editing shows exactly what was typed, and clean() below
+            # round-trips it the same way it does on first entry.
+            self.initial['species'] = f'{self.instance.species} {self.instance.undetermined_variant}'.strip() if self.instance.species_id else ''
         self.fields['species_other'].help_text = 'אם המין לא נמצא ברשימה שלמעלה, אפשר לפרט כאן במקום לבחור מהרשימה.'
         self.fields['site'].choices = [('', 'בחרו…')] + [(str(x.pk), str(x)) for x in Site.objects.all()] + [('other','אחר — פירוט')]
         if self.instance.pk:
@@ -115,14 +119,20 @@ class SampleForm(forms.ModelForm):
         # "unidentified species" record.
         species_text = (data.get('species') or '').strip()
         other_text = (data.get('species_other') or '').strip()
+        # instance.undetermined_variant only ever comes from the catalog-match branch
+        # below -- reset it up front so a switch to species_other, or clearing the
+        # field, drops any letter left over from a previous edit of this instance.
+        self.instance.undetermined_variant = ''
         if other_text:
             data['species'] = None
             data['species_other'] = other_text
         elif species_text:
-            match = Species.find_by_name(species_text)
+            base_text, variant = split_undetermined_variant(species_text)
+            match = Species.find_by_name(base_text)
             if match:
                 data['species'] = match
                 data['species_other'] = ''
+                self.instance.undetermined_variant = variant
             else:
                 self.add_error('species', 'לא נמצא מין תואם ברשימה. יש לבחור מין קיים, או למלא "מין אחר".')
                 data['species'] = None

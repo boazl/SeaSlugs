@@ -14,8 +14,8 @@ gtag('config', 'G-CPGTC09P2P');</script>
 {% endif %}
 
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ species.scientific_name }}{% if common_name %} — {{ common_name }}{% endif %} | SeaSlugs</title>
-    <meta name="description" content="{% if description %}{{ description|truncatechars:160 }}{% else %}{{ species.scientific_name }} — {{ "תצפיות, תמונות ומידע מאתר SeaSlugs, אתר חינניות הים."|t:lang }}{% endif %}">
+    <title>{{ species_label }}{% if common_name %} — {{ common_name }}{% endif %} | SeaSlugs</title>
+    <meta name="description" content="{% if description %}{{ description|truncatechars:160 }}{% else %}{{ species_label }} — {{ "תצפיות, תמונות ומידע מאתר SeaSlugs, אתר חינניות הים."|t:lang }}{% endif %}">
     <meta name="referrer" content="strict-origin-when-cross-origin">
     <link rel="icon" type="image/svg+xml"
         href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23091e28'/%3E%3Cpath d='M7 11c10-9 8 14 18 5M7 18c10-9 8 14 18 5' stroke='%235de0cb' stroke-width='3' fill='none'/%3E%3C/svg%3E">
@@ -60,19 +60,19 @@ gtag('config', 'G-CPGTC09P2P');</script>
             {% if taxon_order_label %}<span>›</span><span>{{ taxon_order_label }}</span>{% endif %}
             {% if taxon_family_label %}<span>›</span><span>{{ taxon_family_label }}</span>{% endif %}
             {% if taxon_genus_label %}<span>›</span>{% if taxon_genus.defining_sample_id %}<a href="{% url 'genus-page' taxon_genus.name %}">{{ taxon_genus_label }}</a>{% else %}<span>{{ taxon_genus_label }}</span>{% endif %}{% endif %}
-            <span>›</span><span aria-current="page">{{ species.scientific_name }}</span>
+            <span>›</span><span aria-current="page">{{ species_label }}</span>
         </nav>
 
         <article class="species-hero">
             <div class="species-media">
                 {% if video_id %}
-                <div class="species-video"><iframe src="https://www.youtube-nocookie.com/embed/{{ video_id }}" title="{{ species.scientific_name }}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
+                <div class="species-video"><iframe src="https://www.youtube-nocookie.com/embed/{{ video_id }}" title="{{ species_label }}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
                 {% elif image_url %}
-                <img src="{{ image_url }}" alt="{{ species.scientific_name }}" width="800" height="600">
+                <img src="{{ image_url }}" alt="{{ species_label }}" width="800" height="600">
                 {% endif %}
             </div>
             <div class="species-summary">
-                <h1 dir="ltr">{{ species.scientific_name }}</h1>
+                <h1 dir="ltr">{{ species_label }}</h1>
                 {% if common_name %}<p class="species-common">{{ common_name }}</p>{% endif %}
                 <p class="species-area">{{ area.country|loc:lang }} · {{ area.sea|loc:lang }}</p>
                 <div class="species-badges">

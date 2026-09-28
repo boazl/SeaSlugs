@@ -24,7 +24,7 @@ TABLES = {'groups': ACCOUNT_TABLES['groups'], 'users': ACCOUNT_TABLES['users'],
           'profiles': ACCOUNT_TABLES['profiles'],
           'species': (Species, ['scientific_name','name_he','name_en','source_id','genus','species','author','order','family','superfamily','accepted_genus','accepted_species','common_name','transliteration','language','formatted_author','distribution','phylogenetic_order','full_species_name_with_order','reference_author']),
           'trips': (DiveTrip, ['code','title','source_sort','year','month','start_day','duration_days','country','region','sea','site','photographer_fk','country_name','region_name','reserve','sea_name','photographer','species_count','source_metadata']),
-          'samples': (Sample, ['title','kind','trip','owner','species','site','species_other','site_other','day','depth','video_url','status','source_id','gallery_order','source_metadata','transfer_id','image'])}
+          'samples': (Sample, ['title','kind','trip','owner','species','site','species_other','undetermined_variant','site_other','day','depth','video_url','status','source_id','gallery_order','source_metadata','transfer_id','image'])}
 
 
 def reference(obj):
@@ -181,7 +181,8 @@ def apply(document, expected, actor=None):
                         and sample.trip.country_id and sample.trip.resolved_sea_id):
                     SpeciesArea.objects.update_or_create(
                         species_id=sample.species_id, country_id=sample.trip.country_id, sea_id=sample.trip.resolved_sea_id,
+                        undetermined_variant=sample.undetermined_variant,
                         defaults={'defining_sample': SpeciesArea.pick_defining_sample(
-                            sample.species_id, sample.trip.country_id, sample.trip.resolved_sea_id)},
+                            sample.species_id, sample.trip.country_id, sample.trip.resolved_sea_id, sample.undetermined_variant)},
                     )
     return items,backup.name

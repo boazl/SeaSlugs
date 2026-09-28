@@ -28,11 +28,11 @@ class UserAdmin(BaseUserAdmin):
 
 @admin.register(Species)
 class SpeciesAdmin(admin.ModelAdmin):
-    list_display = ['phylogenetic_order','scientific_name','undetermined_variant','genus','species','author','family','order']
-    search_fields = ['scientific_name','undetermined_variant','genus','species','author','family','name_he']
+    list_display = ['phylogenetic_order','scientific_name','genus','species','author','family','order']
+    search_fields = ['scientific_name','genus','species','author','family','name_he']
     list_filter = ['order','family','genus']
     fieldsets = [
-        ('זיהוי מדעי', {'fields':['phylogenetic_order','scientific_name','undetermined_variant','genus','species','author','formatted_author','reference_author','full_species_name_with_order']}),
+        ('זיהוי מדעי', {'fields':['phylogenetic_order','scientific_name','genus','species','author','formatted_author','reference_author','full_species_name_with_order']}),
         ('סיווג טקסונומי', {'fields':['order','superfamily','family','accepted_genus','accepted_species']}),
         ('שמות ותפוצה', {'fields':['name_he','name_en','common_name','transliteration','language','distribution']}),
         ('תוכן לעמוד המין', {'fields':['habitat','food','is_migrant','first_observed_year','last_observed_year','description_he','description_en','link','article_pdf']}),
@@ -84,17 +84,18 @@ class DiveTripAdmin(admin.ModelAdmin):
 
 @admin.register(SpeciesArea)
 class SpeciesAreaAdmin(admin.ModelAdmin):
-    list_display = ['species','country','sea','defining_sample','slug']
+    list_display = ['species','undetermined_variant','country','sea','defining_sample','slug']
     list_filter = ['country','sea']
-    search_fields = ['species__scientific_name','slug']
+    search_fields = ['species__scientific_name','undetermined_variant','slug']
     autocomplete_fields = []
     actions = ['rebuild_all']
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == 'defining_sample' and getattr(self, '_obj', None):
             # Only samples that would actually qualify to show the species in the gallery --
-            # published, not deleted, matching this row's species+country+sea.
+            # published, not deleted, matching this row's species+country+sea+variant.
             kwargs['queryset'] = Sample.objects.filter(kind='species', species_id=self._obj.species_id, status='published',
-                trip__country_id=self._obj.country_id, trip__region__sea_id=self._obj.sea_id, deleted_at__isnull=True)
+                trip__country_id=self._obj.country_id, trip__region__sea_id=self._obj.sea_id, deleted_at__isnull=True,
+                undetermined_variant=self._obj.undetermined_variant)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
     def get_form(self, request, obj=None, **kwargs):
         self._obj = obj
