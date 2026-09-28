@@ -83,7 +83,14 @@ def sample_plan(document, fields):
             else:
                 if not isinstance(value, dict) or set(value) != {'name','region','country'} or not all(isinstance(v,str) for v in value.values()): raise ValidationError('מפתח אתר לא תקין.')
                 values[field] = unique(Site, name=value['name'], region__name=value['region'], region__country__name=value['country'])
-            if values[field] is None: raise ValidationError('חסר ערך בטבלת עזר: ' + field)
+            if values[field] is None:
+                # Name the actual missing value (not just "some reference-table value is
+                # missing") -- this is the one thing an operator receiving files/rows from
+                # another environment (image manager uploads, or a plain samples-table
+                # transfer, both of which land here) needs to act on: add that species to
+                # the target's species table first, or fix a typo, before transferring again.
+                if field == 'species': raise ValidationError(f'המין "{value}" אינו קיים בטבלת המינים ביעד. יש להוסיף אותו קודם (או להעביר את טבלת המינים), או לתקן את שם המין, ואז לייבא שוב.')
+                raise ValidationError('חסר ערך בטבלת עזר: ' + field)
         for field in ('day','gallery_order'):
             if values[field] is not None and type(values[field]) is not int: raise ValidationError('נדרש מספר שלם: '+field)
         try: values['depth'] = Decimal(str(values['depth'])) if values['depth'] is not None else None

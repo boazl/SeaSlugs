@@ -5,6 +5,7 @@ from unittest.mock import patch
 from PIL import Image
 from django.test import TestCase,override_settings
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from .models import Sample,Species,Country,Sea,Region,DiveTrip
@@ -141,6 +142,30 @@ class MediaTransferTests(TestCase):
         self.assertEqual(response.status_code,302)
         self.sample.refresh_from_db();self.assertEqual(self.sample.title,'Table update');self.assertEqual(self.sample.image.name,original)
         self.assertTrue(Path(self.sample.image.path).exists())
+    def test_sample_transfer_names_the_missing_species_instead_of_a_generic_message(self):
+        # A samples-table row referencing a species that doesn't exist in this environment's
+        # species table (e.g. transferred in from an environment where it does) must say so
+        # by name -- not a generic "missing reference value" -- so whoever is importing knows
+        # exactly what to add to the species table (or fix) before importing again.
+        from .table_transfer import plan
+        doc=export_table('samples');doc['media_mode']='separate';doc['rows'][0]['species']='Nonexistent species'
+        with self.assertRaises(ValidationError) as ctx:
+            plan(doc)
+        self.assertIn('Nonexistent species',str(ctx.exception))
+        self.assertIn('אינו קיים בטבלת המינים',str(ctx.exception))
+    def test_table_transfer_preview_reports_the_missing_species_by_name(self):
+        # Same check, exercised through the actual file-upload endpoint (a samples-table
+        # JSON file), rather than calling plan() directly -- the preview step must surface
+        # the same specific message, and never reach an apply that could import the row.
+        import json
+        self.client.force_login(self.sample.owner)
+        response=self.client.post('/admin/table-transfer/',{'action':'export','table':'samples'})
+        doc=json.loads(response.content);doc['rows'][0]['species']='Nonexistent species'
+        response=self.client.post('/admin/table-transfer/',{'action':'preview','file':SimpleUploadedFile('table.json',json.dumps(doc).encode())})
+        self.assertEqual(response.status_code,200)
+        self.assertContains(response,'Nonexistent species')
+        self.assertContains(response,'אינו קיים בטבלת המינים')
+        self.assertNotIn('token',response.context)
     def test_missing_photo_skips_only_that_row(self):
         import uuid
         doc=export_table('samples');doc['media_mode']='separate'
