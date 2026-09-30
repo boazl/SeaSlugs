@@ -185,7 +185,7 @@ function renderAreaFilters() {
     const entries = [
         ['all', language === 'he' ? 'כל האזורים' : 'All areas'],
         ['multi-area', language === 'he' ? 'מינים ממספר אזורים' : 'Species from multiple areas'],
-        ['migrant', language === 'he' ? 'מינים מהגרים' : 'Migrant species'],
+        ['migrant', language === 'he' ? 'מינים מהגרים' : 'Mediterranean Exotic species'],
         ...Object.keys(areaLabelsData).map(k => [k, areaLabelFor(k)]),
     ];
     for (const [key, label] of entries) {
