@@ -120,21 +120,31 @@ function yearCount(area, year) {
     for (const c of collectionsList) { if (area !== 'all' && c.area !== area) continue; if (String(c.year) === year && (!state.regions.size || state.regions.has(c.region))) n++; }
     return n;
 }
+// Each of orders/subOrders/superfamilies/families is a Map of value -> species count,
+// scoped by area plus every ANCESTOR level already selected (not by a selection at its
+// own level -- these are the alternatives that would appear in that level's own <select>,
+// so a value can't scope itself). ordersUnclassified etc. count species that have no
+// value at all for that level, within that same ancestor scope -- the "unclassified" row
+// (value '') added in fillTaxonSelect below, e.g. a species with no superfamily still has
+// an order and (maybe) a suborder, so it's scoped by those exactly like a real superfamily
+// value would be, and its "unclassified" count moves with the order/suborder selection.
 function taxonomyOptions(area, order, subOrder, superfamily, family) {
-    const orders = new Set(), subOrders = new Set(), superfamilies = new Set(), families = new Set(), genera = new Set();
+    const orders = new Map(), subOrders = new Map(), superfamilies = new Map(), families = new Map(), genera = new Set();
+    let ordersUnclassified = 0, subOrdersUnclassified = 0, superfamiliesUnclassified = 0, familiesUnclassified = 0;
+    const bump = (map, key) => map.set(key, (map.get(key) || 0) + 1);
     for (const sp of speciesList) {
         if (area !== 'all' && sp.area !== area) continue;
-        if (sp.order) orders.add(sp.order);
+        if (sp.order) bump(orders, sp.order); else ordersUnclassified++;
         if (order !== 'all' && sp.order !== order) continue;
-        if (sp.sub_order) subOrders.add(sp.sub_order);
+        if (sp.sub_order) bump(subOrders, sp.sub_order); else subOrdersUnclassified++;
         if (subOrder !== 'all' && sp.sub_order !== subOrder) continue;
-        if (sp.superfamily) superfamilies.add(sp.superfamily);
+        if (sp.superfamily) bump(superfamilies, sp.superfamily); else superfamiliesUnclassified++;
         if (superfamily !== 'all' && sp.superfamily !== superfamily) continue;
-        if (sp.family) families.add(sp.family);
+        if (sp.family) bump(families, sp.family); else familiesUnclassified++;
         if (family !== 'all' && sp.family !== family) continue;
         if (sp.genus) genera.add(sp.genus);
     }
-    return { orders, subOrders, superfamilies, families, genera };
+    return { orders, subOrders, superfamilies, families, genera, ordersUnclassified, subOrdersUnclassified, superfamiliesUnclassified, familiesUnclassified };
 }
 
 // ---- sidebar rendering ----
@@ -221,19 +231,49 @@ function fillLabeledSelect(select, entries, current, allLabel) {
     }
     select.value = entries.some(([v]) => v === current) ? current : 'all';
 }
+// Order/suborder/superfamily/family selects: 'all' first, then an "unclassified" option
+// (value '', the same falsy value Species.order/sub_order/superfamily/family already use
+// for "not set" -- see resolve_taxon_chain in config/views.py) when at least one species
+// in scope has no value at this level, then every real value sorted alphabetically -- each
+// non-'all' option's label carries its species count in parens, same convention the trip
+// select already uses.
+function fillTaxonSelect(select, counts, unclassifiedCount, current, allLabel, unclassifiedLabel) {
+    select.replaceChildren();
+    const allOpt = document.createElement('option');
+    allOpt.value = 'all';
+    allOpt.textContent = allLabel;
+    select.append(allOpt);
+    const validValues = new Set(['all']);
+    if (unclassifiedCount > 0) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = `${unclassifiedLabel} (${unclassifiedCount})`;
+        select.append(opt);
+        validValues.add('');
+    }
+    for (const v of [...counts.keys()].sort((a, b) => a.localeCompare(b))) {
+        const opt = document.createElement('option');
+        opt.value = v;
+        opt.textContent = `${v} (${counts.get(v)})`;
+        select.append(opt);
+        validValues.add(v);
+    }
+    select.value = validValues.has(current) ? current : 'all';
+}
 function renderTaxonomySelects() {
+    const unclassifiedLabel = language === 'he' ? 'ללא סיווג' : 'Unclassified';
     const area = state.area;
     const t1 = taxonomyOptions(area, 'all', 'all', 'all', 'all');
     const orderSelect = document.querySelector('#orderSelect');
-    fillSelect(orderSelect, t1.orders, state.order, language === 'he' ? 'כל הסדרות' : 'All orders');
+    fillTaxonSelect(orderSelect, t1.orders, t1.ordersUnclassified, state.order, language === 'he' ? 'כל הסדרות' : 'All orders', unclassifiedLabel);
     if (orderSelect.value !== state.order) state.order = 'all';
 
     const t2 = taxonomyOptions(area, state.order, 'all', 'all', 'all');
     const subOrderGroup = document.querySelector('#subOrderGroup');
     const subOrderSelect = document.querySelector('#subOrderSelect');
-    if (t2.subOrders.size) {
+    if (t2.subOrders.size || t2.subOrdersUnclassified) {
         subOrderGroup.hidden = false;
-        fillSelect(subOrderSelect, t2.subOrders, state.subOrder, language === 'he' ? 'כל תתי-הסדרה' : 'All suborders');
+        fillTaxonSelect(subOrderSelect, t2.subOrders, t2.subOrdersUnclassified, state.subOrder, language === 'he' ? 'כל תתי-הסדרה' : 'All suborders', unclassifiedLabel);
         if (subOrderSelect.value !== state.subOrder) state.subOrder = 'all';
     } else {
         subOrderGroup.hidden = true;
@@ -243,9 +283,9 @@ function renderTaxonomySelects() {
     const t2b = taxonomyOptions(area, state.order, state.subOrder, 'all', 'all');
     const superfamilyGroup = document.querySelector('#superfamilyGroup');
     const superfamilySelect = document.querySelector('#superfamilySelect');
-    if (t2b.superfamilies.size) {
+    if (t2b.superfamilies.size || t2b.superfamiliesUnclassified) {
         superfamilyGroup.hidden = false;
-        fillSelect(superfamilySelect, t2b.superfamilies, state.superfamily, language === 'he' ? 'כל העל-משפחות' : 'All superfamilies');
+        fillTaxonSelect(superfamilySelect, t2b.superfamilies, t2b.superfamiliesUnclassified, state.superfamily, language === 'he' ? 'כל העל-משפחות' : 'All superfamilies', unclassifiedLabel);
         if (superfamilySelect.value !== state.superfamily) state.superfamily = 'all';
     } else {
         superfamilyGroup.hidden = true;
@@ -254,7 +294,7 @@ function renderTaxonomySelects() {
 
     const t3 = taxonomyOptions(area, state.order, state.subOrder, state.superfamily, 'all');
     const familySelect = document.querySelector('#familySelect');
-    fillSelect(familySelect, t3.families, state.family, language === 'he' ? 'כל המשפחות' : 'All families');
+    fillTaxonSelect(familySelect, t3.families, t3.familiesUnclassified, state.family, language === 'he' ? 'כל המשפחות' : 'All families', unclassifiedLabel);
     if (familySelect.value !== state.family) state.family = 'all';
     const t4 = taxonomyOptions(area, state.order, state.subOrder, state.superfamily, state.family);
     const genusSelect = document.querySelector('#genusSelect');
