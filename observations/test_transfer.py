@@ -58,6 +58,29 @@ class TransferTests(TestCase):
         legacy['rows'][0]['name_he']='updated'
         with patch('observations.table_transfer.create_backup',return_value=Path('test.sqlite3')):apply(legacy,fingerprint())
         self.species.refresh_from_db();self.assertEqual(self.species.author,'Author, 2020')
+    def test_species_migrant_status_transfers(self):
+        # Regression test: is_migrant was for a while missing from the species table's
+        # TABLES fields, so downloading the species table from one environment and
+        # importing it into another silently dropped every migrant flag -- an admin
+        # marking species as migrant in production would see 0 migrant species locally
+        # after a normal export/import, with no error or warning anywhere in the flow.
+        self.species.is_migrant = True
+        self.species.save()
+        doc = export_table('species')
+        self.assertIs(doc['rows'][0]['is_migrant'], True)
+        other = Species.objects.create(scientific_name='Species c')
+        self.assertFalse(other.is_migrant)
+        doc['rows'][0]['scientific_name'] = 'Species c'
+        doc['rows'][0]['source_id'] = ''
+        with patch('observations.table_transfer.create_backup', return_value=Path('test.sqlite3')):
+            apply(doc, fingerprint())
+        other.refresh_from_db()
+        self.assertTrue(other.is_migrant)
+        doc2 = export_table('species')
+        doc2['rows'][0]['is_migrant'] = 'yes'
+        with self.assertRaises(ValidationError):
+            plan(doc2)
+
     def test_species_admin_scientific_fields_and_hidden_import_id(self):
         user=User.objects.create_superuser('scientific-admin',password='test-password')
         self.client.force_login(user)

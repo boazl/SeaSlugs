@@ -22,7 +22,7 @@ TABLES = {'groups': ACCOUNT_TABLES['groups'], 'users': ACCOUNT_TABLES['users'],
           'regions': (Region,['name','name_en','country','sea']), 'sites': (Site,['name','name_en','region']),
           'photographers': (Photographer,['name','name_en']),
           'profiles': ACCOUNT_TABLES['profiles'],
-          'species': (Species, ['scientific_name','name_he','name_en','source_id','genus','species','author','order','family','superfamily','accepted_genus','accepted_species','common_name','transliteration','language','formatted_author','distribution','phylogenetic_order','full_species_name_with_order','reference_author']),
+          'species': (Species, ['scientific_name','name_he','name_en','source_id','genus','species','author','order','family','superfamily','accepted_genus','accepted_species','common_name','transliteration','language','formatted_author','distribution','phylogenetic_order','full_species_name_with_order','reference_author','is_migrant']),
           'trips': (DiveTrip, ['code','title','source_sort','year','month','start_day','duration_days','country','region','sea','site','photographer_fk','country_name','region_name','reserve','sea_name','photographer','species_count','source_metadata']),
           'samples': (Sample, ['title','kind','trip','owner','species','site','species_other','undetermined_variant','site_other','day','depth','video_url','status','source_id','gallery_order','source_metadata','transfer_id','image'])}
 
@@ -103,6 +103,9 @@ def plan(document):
                 values[f] = v
             elif model is DiveTrip and f == 'source_metadata':
                 if not isinstance(v,dict): raise ValidationError('מידע מקור לא תקין.')
+                values[f] = v
+            elif model is Species and f == 'is_migrant':
+                if not isinstance(v,bool): raise ValidationError('נדרש ערך בוליאני: is_migrant.')
                 values[f] = v
             elif not isinstance(v,str): raise ValidationError(f'ערך לא תקין בשורה {number}.')
             else: values[f]=v.strip()
