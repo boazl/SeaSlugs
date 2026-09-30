@@ -1,5 +1,6 @@
 import tempfile
 from datetime import date
+from decimal import Decimal
 from io import BytesIO
 from django.test import TestCase, override_settings
 from django.contrib.auth.models import User
@@ -559,6 +560,60 @@ class WorkflowTests(TestCase):
         self.species.habitat = 'שוניות אלמוגים'
         self.species.food = 'ספוגים'
         self.species.full_clean()  # must not raise
+
+    def test_species_clean_rejects_size_to_below_size_from(self):
+        self.species.size_from = Decimal('30')
+        self.species.size_to = Decimal('20')
+        with self.assertRaises(ValidationError):
+            self.species.full_clean()
+
+    def test_species_clean_rejects_size_max_below_typical_range(self):
+        self.species.size_from = Decimal('10')
+        self.species.size_to = Decimal('30')
+        self.species.size_max = Decimal('20')
+        with self.assertRaises(ValidationError):
+            self.species.full_clean()
+
+    def test_species_clean_accepts_valid_size_fields(self):
+        self.species.size_from = Decimal('10')
+        self.species.size_to = Decimal('30')
+        self.species.size_max = Decimal('45')
+        self.species.full_clean()  # must not raise
+
+    def test_size_text_with_no_size_fields_is_empty(self):
+        self.assertEqual(self.species.size_text('he'), '')
+        self.assertEqual(self.species.size_text('en'), '')
+
+    def test_size_text_full_range_and_max_hebrew(self):
+        self.species.size_from = Decimal('10')
+        self.species.size_to = Decimal('30')
+        self.species.size_max = Decimal('45')
+        self.assertEqual(self.species.size_text('he'), 'גודל: מ- 10מ״מ עד 30מ״מ גודל מקסימלי שנצפה 45מ״מ.')
+
+    def test_size_text_full_range_and_max_english(self):
+        self.species.size_from = Decimal('10')
+        self.species.size_to = Decimal('30')
+        self.species.size_max = Decimal('45')
+        self.assertEqual(self.species.size_text('en'), 'Size: from 10mm to 30mm maximum observed size 45mm.')
+
+    def test_size_text_range_without_max(self):
+        self.species.size_from = Decimal('10')
+        self.species.size_to = Decimal('30')
+        self.assertEqual(self.species.size_text('he'), 'גודל: מ- 10מ״מ עד 30מ״מ.')
+
+    def test_size_text_single_value_without_max(self):
+        # Only one of size_from/size_to set -- written as a bare value, not a "from...to" range.
+        self.species.size_to = Decimal('25.5')
+        self.assertEqual(self.species.size_text('he'), 'גודל: 25.5מ״מ.')
+
+    def test_size_text_single_value_with_max(self):
+        self.species.size_from = Decimal('12')
+        self.species.size_max = Decimal('18')
+        self.assertEqual(self.species.size_text('he'), 'גודל: 12מ״מ גודל מקסימלי שנצפה 18מ״מ.')
+
+    def test_size_text_max_only(self):
+        self.species.size_max = Decimal('50')
+        self.assertEqual(self.species.size_text('he'), 'גודל מקסימלי שנצפה 50מ״מ.')
 
     def test_undetermined_variant_keeps_distinct_sp_forms_of_one_genus_apart(self):
         # An undescribed species is sometimes only catalogued as "Genus sp." -- with no

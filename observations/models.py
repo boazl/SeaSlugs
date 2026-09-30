@@ -121,6 +121,12 @@ class Species(models.Model):
     is_migrant = models.BooleanField('מין מהגר', default=False)
     first_observed_year = models.PositiveSmallIntegerField('שנת תצפית ראשונה', null=True, blank=True, validators=[MinValueValidator(1900)])
     last_observed_year = models.PositiveSmallIntegerField('שנת תצפית אחרונה', null=True, blank=True, validators=[MinValueValidator(1900)])
+    # A typical size range (size_from/size_to) plus, separately, the largest individual
+    # actually observed (size_max, which may exceed the typical range) -- see size_text()
+    # below for how these three combine into the sentence shown on the species page.
+    size_from = models.DecimalField('גודל אופייני מינימלי (מ״מ)', max_digits=6, decimal_places=1, null=True, blank=True, validators=[MinValueValidator(0)])
+    size_to = models.DecimalField('גודל אופייני מקסימלי (מ״מ)', max_digits=6, decimal_places=1, null=True, blank=True, validators=[MinValueValidator(0)])
+    size_max = models.DecimalField('גודל מקסימלי שנצפה (מ״מ)', max_digits=6, decimal_places=1, null=True, blank=True, validators=[MinValueValidator(0)])
     description_he = models.TextField('תיאור בעברית', blank=True)
     description_en = models.TextField('תיאור באנגלית', blank=True)
     link = models.URLField('קישור', blank=True)
@@ -155,7 +161,44 @@ class Species(models.Model):
             errors['last_observed_year'] = 'שנת תצפית אחרונה אינה יכולה להיות בעתיד.'
         if self.first_observed_year and self.last_observed_year and self.last_observed_year < self.first_observed_year:
             errors['last_observed_year'] = 'שנת תצפית אחרונה אינה יכולה להיות לפני שנת התצפית הראשונה.'
+        if self.size_from is not None and self.size_to is not None and self.size_to < self.size_from:
+            errors['size_to'] = 'הגודל המקסימלי האופייני אינו יכול להיות קטן מהגודל המינימלי האופייני.'
+        largest_typical = self.size_to if self.size_to is not None else self.size_from
+        if self.size_max is not None and largest_typical is not None and self.size_max < largest_typical:
+            errors['size_max'] = 'הגודל המקסימלי שנצפה אינו יכול להיות קטן מהגודל האופייני.'
         if errors: raise ValidationError(errors)
+
+    def size_text(self, lang='he'):
+        """The species page's size sentence, built from size_from/size_to (a typical size
+        range) and size_max (the largest individual actually observed, which may exceed
+        that range) -- fully resolved here in Python rather than through the seaslugs_i18n
+        `t` filter, since that filter is a static string lookup and can't parametrize a
+        dynamic, numeric sentence like this one. Returns '' when none of the three fields
+        are set (nothing to show on the page)."""
+        def fmt(value):
+            if value == value.to_integral_value():
+                return str(int(value))
+            return str(value.normalize())
+        if self.size_from is not None and self.size_to is not None:
+            range_text = (f'מ- {fmt(self.size_from)}מ״מ עד {fmt(self.size_to)}מ״מ' if lang != 'en'
+                          else f'from {fmt(self.size_from)}mm to {fmt(self.size_to)}mm')
+        elif self.size_from is not None or self.size_to is not None:
+            only = self.size_from if self.size_from is not None else self.size_to
+            range_text = f'{fmt(only)}מ״מ' if lang != 'en' else f'{fmt(only)}mm'
+        else:
+            range_text = ''
+        max_text = ''
+        if self.size_max is not None:
+            max_text = (f'גודל מקסימלי שנצפה {fmt(self.size_max)}מ״מ' if lang != 'en'
+                       else f'maximum observed size {fmt(self.size_max)}mm')
+        if not range_text and not max_text:
+            return ''
+        label = 'גודל: ' if lang != 'en' else 'Size: '
+        if range_text and max_text:
+            return f'{label}{range_text} {max_text}.'
+        if range_text:
+            return f'{label}{range_text}.'
+        return f'{max_text[0].upper()}{max_text[1:]}.' if lang == 'en' else f'{max_text}.'
 
 
 class TaxonOrder(models.Model):

@@ -94,10 +94,11 @@ gtag('config', 'G-CPGTC09P2P');</script>
             <p class="species-share"><span>{{ "קישור לשיתוף:"|t:lang }}</span> <a href="{{ canonical_url }}" id="species-share-link">{{ canonical_url }}</a> <button type="button" id="species-share-copy" data-copy-label="{{ "העתקה"|t:lang }}" data-copied-label="{{ "הועתק!"|t:lang }}">{{ "העתקה"|t:lang }}</button></p>
         </section>
 
-        {% if species.habitat or species.food %}
+        {% if species.habitat or species.food or size_text %}
         <section class="species-section species-facts">
             {% if species.habitat %}<div><h3>{{ "בית גידול"|t:lang }}</h3><p>{{ species.habitat|linebreaksbr }}</p></div>{% endif %}
             {% if species.food %}<div><h3>{{ "מזון"|t:lang }}</h3><p>{{ species.food|linebreaksbr }}</p></div>{% endif %}
+            {% if size_text %}<div><p>{{ size_text }}</p></div>{% endif %}
         </section>
         {% endif %}
 

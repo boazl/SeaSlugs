@@ -68,7 +68,7 @@ def species_page(request, slug):
         'taxon_order': order_obj, 'taxon_family': family_obj, 'taxon_genus': genus_obj,
         'taxon_order_label': taxon_label(order_obj), 'taxon_family_label': taxon_label(family_obj),
         'taxon_genus_label': taxon_label(genus_obj),
-        'common_name': common_name, 'description': description,
+        'common_name': common_name, 'description': description, 'size_text': species.size_text(lang),
         'canonical_url': request.build_absolute_uri(request.path),
     })
 

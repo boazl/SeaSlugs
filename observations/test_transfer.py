@@ -119,6 +119,41 @@ class TransferTests(TestCase):
         with self.assertRaises(ValidationError):
             plan(doc2)
 
+    def test_species_size_fields_transfer_and_validate(self):
+        # Regression test: DecimalField values (size_from/size_to/size_max) aren't
+        # JSON-native -- row() must convert them to strings (mirroring sample_transfer's
+        # 'depth' handling) or the real export endpoint's plain json.dumps crashes.
+        from decimal import Decimal
+        self.species.size_from = Decimal('10.5')
+        self.species.size_to = Decimal('30')
+        self.species.size_max = Decimal('45')
+        self.species.save()
+        doc = export_table('species')
+        row = doc['rows'][0]
+        self.assertEqual(row['size_from'], '10.5')
+        self.assertEqual(row['size_to'], '30.0')
+        self.assertEqual(row['size_max'], '45.0')
+        import json
+        json.dumps(doc, ensure_ascii=False)  # must not raise (plain json.dumps, no Decimal support)
+        self.assertEqual(plan(doc)[0]['action'], 'same')
+        other = Species.objects.create(scientific_name='Species e')
+        doc['rows'][0]['scientific_name'] = 'Species e'
+        doc['rows'][0]['source_id'] = ''
+        with patch('observations.table_transfer.create_backup', return_value=Path('test.sqlite3')):
+            apply(doc, fingerprint())
+        other.refresh_from_db()
+        self.assertEqual(other.size_from, Decimal('10.5'))
+        self.assertEqual(other.size_to, Decimal('30.0'))
+        self.assertEqual(other.size_max, Decimal('45.0'))
+        doc2 = export_table('species')
+        doc2['rows'][0]['size_from'] = 12.5  # must be a string, not a raw number
+        with self.assertRaises(ValidationError):
+            plan(doc2)
+        doc3 = export_table('species')
+        doc3['rows'][0]['size_from'] = 'not-a-number'
+        with self.assertRaises(ValidationError):
+            plan(doc3)
+
     def test_trip_content_fields_transfer(self):
         # Same class of bug as the species content fields above: kind/description_he/
         # description_en/link were missing from the trips table's TABLES fields.

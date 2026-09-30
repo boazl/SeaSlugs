@@ -63,7 +63,7 @@ class SpeciesAdmin(admin.ModelAdmin):
         ('זיהוי מדעי', {'fields':['phylogenetic_order','scientific_name','genus','species','author','formatted_author','reference_author','full_species_name_with_order']}),
         ('סיווג טקסונומי', {'fields':['order','superfamily','family','accepted_genus','accepted_species']}),
         ('שמות ותפוצה', {'fields':['name_he','name_en','common_name','transliteration','language','distribution']}),
-        ('תוכן לעמוד המין', {'fields':['habitat','food','is_migrant','first_observed_year','last_observed_year','description_he','description_en','link','article_pdf']}),
+        ('תוכן לעמוד המין', {'fields':['habitat','food','is_migrant','first_observed_year','last_observed_year','size_from','size_to','size_max','description_he','description_en','link','article_pdf']}),
     ]
     def _order_options(self):
         canonical = TaxonOrder.objects.exclude(name='').values_list('name', flat=True)

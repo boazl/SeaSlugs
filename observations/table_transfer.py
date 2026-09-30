@@ -3,6 +3,7 @@ import hashlib
 import json
 import sqlite3
 import uuid
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -22,7 +23,7 @@ TABLES = {'groups': ACCOUNT_TABLES['groups'], 'users': ACCOUNT_TABLES['users'],
           'regions': (Region,['name','name_en','country','sea']), 'sites': (Site,['name','name_en','region']),
           'photographers': (Photographer,['name','name_en']),
           'profiles': ACCOUNT_TABLES['profiles'],
-          'species': (Species, ['scientific_name','name_he','name_en','source_id','genus','species','author','order','family','superfamily','accepted_genus','accepted_species','common_name','transliteration','language','formatted_author','distribution','phylogenetic_order','full_species_name_with_order','reference_author','is_migrant','habitat','food','first_observed_year','last_observed_year','description_he','description_en','link']),
+          'species': (Species, ['scientific_name','name_he','name_en','source_id','genus','species','author','order','family','superfamily','accepted_genus','accepted_species','common_name','transliteration','language','formatted_author','distribution','phylogenetic_order','full_species_name_with_order','reference_author','is_migrant','habitat','food','first_observed_year','last_observed_year','size_from','size_to','size_max','description_he','description_en','link']),
           'trips': (DiveTrip, ['code','title','source_sort','year','month','start_day','duration_days','country','region','sea','site','photographer_fk','country_name','region_name','reserve','sea_name','photographer','species_count','source_metadata','kind','description_he','description_en','link']),
           'samples': (Sample, ['title','kind','trip','owner','species','site','species_other','undetermined_variant','site_other','day','depth','video_url','status','source_id','gallery_order','source_metadata','transfer_id','image'])}
 
@@ -40,7 +41,17 @@ def row(obj, fields):
     if isinstance(obj, Sample):
         from .sample_transfer import sample_row
         return sample_row(obj, fields)
-    return {f:reference(getattr(obj,f)) if f in ('country','sea','region','site','photographer_fk') else getattr(obj,f) for f in fields}
+    result = {}
+    for f in fields:
+        if f in ('country','sea','region','site','photographer_fk'):
+            result[f] = reference(getattr(obj,f))
+        else:
+            value = getattr(obj,f)
+            # Decimal isn't JSON-native -- the real export endpoint (transfer_views.py)
+            # serializes with plain json.dumps, which crashes on a raw Decimal. Stored as
+            # a string, same convention as sample_transfer.sample_row's 'depth' handling.
+            result[f] = str(value) if isinstance(value, Decimal) else value
+    return result
 
 
 def export_table(table):
@@ -109,6 +120,12 @@ def plan(document):
                 values[f] = v
             elif model is Species and f in ('first_observed_year','last_observed_year'):
                 if v is not None and type(v) is not int: raise ValidationError('נדרש מספר שלם: '+f)
+                values[f] = v
+            elif model is Species and f in ('size_from','size_to','size_max'):
+                if v is not None:
+                    if not isinstance(v,str): raise ValidationError('נדרש ערך גודל תקין: '+f)
+                    try: v = Decimal(v)
+                    except InvalidOperation: raise ValidationError('נדרש ערך גודל תקין: '+f)
                 values[f] = v
             elif not isinstance(v,str): raise ValidationError(f'ערך לא תקין בשורה {number}.')
             else: values[f]=v.strip()
