@@ -52,11 +52,11 @@ class DatalistTextInput(forms.TextInput):
 
 @admin.register(Species)
 class SpeciesAdmin(admin.ModelAdmin):
-    list_display = ['phylogenetic_order','scientific_name','is_migrant','genus','species','author','family','order']
+    list_display = ['phylogenetic_order','scientific_name','is_migrant','name_he','name_en','genus','species','author','family','order']
     # Migrant status is checked far more often than any other field is edited here, so it's
     # editable straight from the changelist (a checkbox + one "Save" for the whole page) --
     # no need to open a species' full change form just to flag it as migrant.
-    list_editable = ['is_migrant','author','family','order']
+    list_editable = ['is_migrant','name_he','name_en','author','family','order']
     search_fields = ['scientific_name','genus','species','author','family','name_he']
     list_filter = ['order','family','genus','is_migrant']
     fieldsets = [

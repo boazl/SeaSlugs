@@ -5,18 +5,19 @@ from .models import Species, TaxonFamily, TaxonOrder
 
 
 class SpeciesAdminMigrantColumnTests(TestCase):
-    """Species.is_migrant, author, family and order are all editable straight from the
-    species changelist (see observations/admin.py's list_editable) -- a manager can fix
-    these without opening the full change form. family/order additionally get an HTML5
-    datalist of known values (existing Species values plus the curated TaxonFamily/
-    TaxonOrder names) for a dropdown-with-autocomplete feel, without being restricted to
-    it -- they stay plain text fields, so an unlisted value still saves fine."""
+    """Species.is_migrant, name_he, name_en, author, family and order are all editable
+    straight from the species changelist (see observations/admin.py's list_editable) --
+    a manager can fix these without opening the full change form. family/order
+    additionally get an HTML5 datalist of known values (existing Species values plus the
+    curated TaxonFamily/TaxonOrder names) for a dropdown-with-autocomplete feel, without
+    being restricted to it -- they stay plain text fields, so an unlisted value still
+    saves fine."""
 
     def setUp(self):
         self.manager = User.objects.create_superuser('manager', password='test-password')
         self.species = Species.objects.create(
-            scientific_name='Test species', author='(Someone, 2020)',
-            family='Flabellinidae', order='Nudibranchia',
+            scientific_name='Test species', name_he='שם בדיקה', name_en='Test name',
+            author='(Someone, 2020)', family='Flabellinidae', order='Nudibranchia',
         )
 
     def changelist_post(self, **field_overrides):
@@ -26,6 +27,8 @@ class SpeciesAdminMigrantColumnTests(TestCase):
         data = {
             'form-TOTAL_FORMS': '1', 'form-INITIAL_FORMS': '1', 'form-MIN_NUM_FORMS': '0', 'form-MAX_NUM_FORMS': '1000',
             'form-0-id': str(self.species.pk),
+            'form-0-name_he': self.species.name_he,
+            'form-0-name_en': self.species.name_en,
             'form-0-author': self.species.author,
             'form-0-family': self.species.family,
             'form-0-order': self.species.order,
@@ -71,14 +74,27 @@ class SpeciesAdminMigrantColumnTests(TestCase):
         self.assertEqual(self.species.family, 'Facelinidae')
         self.assertEqual(self.species.order, 'Pleurobranchida')
 
-    def test_saving_a_different_field_does_not_clear_author_family_or_order(self):
+    def test_editing_name_he_and_name_en_from_the_changelist(self):
+        response = self.changelist_post(**{
+            'form-0-name_he': 'שם חדש',
+            'form-0-name_en': 'New name',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.species.refresh_from_db()
+        self.assertEqual(self.species.name_he, 'שם חדש')
+        self.assertEqual(self.species.name_en, 'New name')
+
+    def test_saving_a_different_field_does_not_clear_the_other_editable_fields(self):
         # Regression guard for the exact failure mode a naive list_editable addition risks:
         # Django's changelist formset blanks out any list_editable field missing from the
         # POST, so a page that doesn't resend every input's current value would silently
-        # wipe author/family/order the moment someone just toggles is_migrant.
+        # wipe name_he/name_en/author/family/order the moment someone just toggles
+        # is_migrant.
         response = self.changelist_post(**{'form-0-is_migrant': 'on'})
         self.assertEqual(response.status_code, 200)
         self.species.refresh_from_db()
+        self.assertEqual(self.species.name_he, 'שם בדיקה')
+        self.assertEqual(self.species.name_en, 'Test name')
         self.assertEqual(self.species.author, '(Someone, 2020)')
         self.assertEqual(self.species.family, 'Flabellinidae')
         self.assertEqual(self.species.order, 'Nudibranchia')
