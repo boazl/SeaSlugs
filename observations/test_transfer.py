@@ -81,6 +81,66 @@ class TransferTests(TestCase):
         with self.assertRaises(ValidationError):
             plan(doc2)
 
+    def test_species_content_fields_transfer(self):
+        # Regression test: habitat/food/first_observed_year/last_observed_year/
+        # description_he/description_en/link were all missing from the species table's
+        # TABLES fields for a while -- these are entered by hand per species (not part of
+        # the import spreadsheet), so a species table export/import silently dropped every
+        # one of them, with no error anywhere in the flow.
+        self.species.habitat = 'שוניות אלמוגים'
+        self.species.food = 'ספוגים'
+        self.species.first_observed_year = 2010
+        self.species.last_observed_year = 2020
+        self.species.description_he = 'תיאור בעברית'
+        self.species.description_en = 'English description'
+        self.species.link = 'https://example.com/species'
+        self.species.save()
+        doc = export_table('species')
+        row = doc['rows'][0]
+        self.assertEqual(row['habitat'], 'שוניות אלמוגים')
+        self.assertEqual(row['food'], 'ספוגים')
+        self.assertEqual(row['first_observed_year'], 2010)
+        self.assertEqual(row['last_observed_year'], 2020)
+        self.assertEqual(row['description_he'], 'תיאור בעברית')
+        self.assertEqual(row['description_en'], 'English description')
+        self.assertEqual(row['link'], 'https://example.com/species')
+        self.assertEqual(plan(doc)[0]['action'], 'same')
+        other = Species.objects.create(scientific_name='Species d')
+        doc['rows'][0]['scientific_name'] = 'Species d'
+        doc['rows'][0]['source_id'] = ''
+        with patch('observations.table_transfer.create_backup', return_value=Path('test.sqlite3')):
+            apply(doc, fingerprint())
+        other.refresh_from_db()
+        self.assertEqual(other.habitat, 'שוניות אלמוגים')
+        self.assertEqual(other.first_observed_year, 2010)
+        self.assertEqual(other.description_en, 'English description')
+        doc2 = export_table('species')
+        doc2['rows'][0]['first_observed_year'] = 'not-a-year'
+        with self.assertRaises(ValidationError):
+            plan(doc2)
+
+    def test_trip_content_fields_transfer(self):
+        # Same class of bug as the species content fields above: kind/description_he/
+        # description_en/link were missing from the trips table's TABLES fields.
+        country = Country.objects.create(name='Israel')
+        trip = DiveTrip.objects.create(
+            title='Thematic collection', year=2026, country=country,
+            kind=DiveTrip.Kind.THEMATIC, description_he='תיאור מסע', description_en='Trip description',
+            link='https://example.com/trip',
+        )
+        doc = export_table('trips')
+        row = next(r for r in doc['rows'] if r['code'] == str(trip.code))
+        self.assertEqual(row['kind'], 'thematic')
+        self.assertEqual(row['description_he'], 'תיאור מסע')
+        self.assertEqual(row['description_en'], 'Trip description')
+        self.assertEqual(row['link'], 'https://example.com/trip')
+        self.assertEqual(plan(doc)[0]['action'], 'same')
+        DiveTrip.objects.all().delete()
+        planned = [p for p in plan(doc) if p['object'].code == str(trip.code)][0]
+        self.assertEqual(planned['action'], 'new')
+        self.assertEqual(planned['object'].kind, DiveTrip.Kind.THEMATIC)
+        self.assertEqual(planned['object'].description_en, 'Trip description')
+
     def test_species_admin_scientific_fields_and_hidden_import_id(self):
         user=User.objects.create_superuser('scientific-admin',password='test-password')
         self.client.force_login(user)

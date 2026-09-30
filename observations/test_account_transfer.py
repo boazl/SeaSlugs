@@ -55,6 +55,18 @@ class AccountTransferTests(TestCase):
         self.assertEqual(profile.bio,'New bio')
         self.assertFalse(profile.regions.exists())
 
+    def test_profile_phone_transfers(self):
+        # Regression test: phone was missing from the profiles table's ACCOUNT_TABLES
+        # fields, so a profile table export/import silently dropped the phone number.
+        profile = Profile.objects.create(user=self.user, phone='050-1234567')
+        doc = export_table('profiles')
+        self.assertEqual(doc['rows'][0]['phone'], '050-1234567')
+        self.assertEqual(plan(doc)[0]['action'], 'same')
+        doc['rows'][0]['phone'] = '050-7654321'
+        self.execute(doc)
+        profile.refresh_from_db()
+        self.assertEqual(profile.phone, '050-7654321')
+
     def test_self_lockout_and_stale_preview_blocked(self):
         doc = export_table('users'); doc['rows'][0]['is_superuser'] = False
         with self.assertRaises(ValidationError): self.execute(doc)
