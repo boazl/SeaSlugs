@@ -19,6 +19,7 @@ const state = {
     regions: new Set(),
     sites: new Set(),
     photographers: new Set(),
+    years: new Set(),
     order: 'all',
     subOrder: 'all',
     superfamily: 'all',
@@ -72,7 +73,7 @@ function updateCollectionStatus() {
 // ---- option scoping ----
 
 function optionsForArea(area) {
-    const regionIds = new Set(), siteIds = new Set(), photographers = new Set(), trips = new Set();
+    const regionIds = new Set(), siteIds = new Set(), photographers = new Set(), trips = new Set(), years = new Set();
     for (const sp of speciesList) {
         if (area !== 'all' && sp.area !== area) continue;
         for (const sm of sp.samples) {
@@ -80,6 +81,7 @@ function optionsForArea(area) {
             if (sm.site) siteIds.add(sm.site);
             if (sm.photographer) photographers.add(sm.photographer);
             if (sm.trip_id != null) trips.add(String(sm.trip_id));
+            if (sm.year != null) years.add(String(sm.year));
         }
     }
     for (const c of collectionsList) {
@@ -87,8 +89,9 @@ function optionsForArea(area) {
         regionIds.add(c.region);
         if (c.photographer) photographers.add(c.photographer);
         if (c.trip_id != null) trips.add(String(c.trip_id));
+        if (c.year != null) years.add(String(c.year));
     }
-    return { regionIds, siteIds, photographers, trips };
+    return { regionIds, siteIds, photographers, trips, years };
 }
 function regionCount(area, id) {
     return speciesList.filter(sp => (area === 'all' || sp.area === area) && sp.samples.some(sm => sm.region === id)).length;
@@ -103,6 +106,12 @@ function photographerCount(area, name) {
     let n = 0;
     for (const sp of speciesList) { if (area !== 'all' && sp.area !== area) continue; if (sp.samples.some(sm => sm.photographer === name)) n++; }
     for (const c of collectionsList) { if (area !== 'all' && c.area !== area) continue; if (c.photographer === name) n++; }
+    return n;
+}
+function yearCount(area, year) {
+    let n = 0;
+    for (const sp of speciesList) { if (area !== 'all' && sp.area !== area) continue; if (sp.samples.some(sm => String(sm.year) === year)) n++; }
+    for (const c of collectionsList) { if (area !== 'all' && c.area !== area) continue; if (String(c.year) === year) n++; }
     return n;
 }
 function taxonomyOptions(area, order, subOrder, superfamily, family) {
@@ -146,7 +155,7 @@ function renderAreaFilters() {
         b.addEventListener('click', () => {
             if (state.area === key) return;
             state.area = key;
-            state.regions.clear(); state.sites.clear(); state.photographers.clear();
+            state.regions.clear(); state.sites.clear(); state.photographers.clear(); state.years.clear();
             state.order = 'all'; state.subOrder = 'all'; state.superfamily = 'all'; state.family = 'all'; state.genus = 'all';
             renderSidebar(); render();
         });
@@ -262,6 +271,10 @@ function renderSidebar() {
         .map(name => [name, name, photographerCount(area, name)])
         .sort((a, b) => a[1].localeCompare(b[1]));
     renderCheckboxGroup(document.querySelector('#photographerOptions'), photographerEntries, state.photographers);
+    const yearEntries = [...opts.years]
+        .map(year => [year, year, yearCount(area, year)])
+        .sort((a, b) => Number(b[0]) - Number(a[0]));
+    renderCheckboxGroup(document.querySelector('#yearOptions'), yearEntries, state.years);
     const tripEntries = [...opts.trips]
         .map(id => {
             const label = labelFor(id, tripLabelsData) || id;
@@ -280,10 +293,11 @@ function renderSidebar() {
 
 // ---- matching / search ----
 
-function sampleMatchesGeo(sm) {
+function sampleMatchesFilters(sm) {
     if (state.regions.size && !state.regions.has(sm.region)) return false;
     if (state.sites.size && !(sm.site && state.sites.has(sm.site))) return false;
     if (state.photographers.size && !state.photographers.has(sm.photographer)) return false;
+    if (state.years.size && !state.years.has(String(sm.year))) return false;
     return true;
 }
 // When a dive-trip collection and/or dive region/site/photographer filters are active,
@@ -294,14 +308,14 @@ function sampleMatchesGeo(sm) {
 // different samples, one per criterion). Returns null when no such filter is active at all,
 // so callers fall back to the species' own defining sample as before.
 function scopedSamples(sp) {
-    if (!(state.collection || state.regions.size || state.sites.size || state.photographers.size)) return null;
+    if (!(state.collection || state.regions.size || state.sites.size || state.photographers.size || state.years.size)) return null;
     let pool = sp.samples;
     if (state.collection) {
         const byTrip = pool.filter(sm => String(sm.trip_id) === state.collection);
         if (byTrip.length) pool = byTrip;
     }
-    if (state.regions.size || state.sites.size || state.photographers.size) {
-        const byGeo = pool.filter(sampleMatchesGeo);
+    if (state.regions.size || state.sites.size || state.photographers.size || state.years.size) {
+        const byGeo = pool.filter(sampleMatchesFilters);
         if (byGeo.length) pool = byGeo;
     }
     return pool;
@@ -325,7 +339,7 @@ function speciesMatches(sp, q) {
     if (state.superfamily !== 'all' && sp.superfamily !== state.superfamily) return false;
     if (state.family !== 'all' && sp.family !== state.family) return false;
     if (state.genus !== 'all' && sp.genus !== state.genus) return false;
-    if ((state.regions.size || state.sites.size || state.photographers.size) && !sp.samples.some(sampleMatchesGeo)) return false;
+    if ((state.regions.size || state.sites.size || state.photographers.size || state.years.size) && !sp.samples.some(sampleMatchesFilters)) return false;
     if (q && !speciesSearchText(sp).includes(q)) return false;
     return true;
 }
@@ -335,6 +349,7 @@ function collectionMatches(c, q) {
     if (state.regions.size && !state.regions.has(c.region)) return false;
     if (state.sites.size) return false;
     if (state.photographers.size && !state.photographers.has(c.photographer)) return false;
+    if (state.years.size && !state.years.has(String(c.year))) return false;
     if (state.order !== 'all' || state.subOrder !== 'all' || state.superfamily !== 'all' || state.family !== 'all' || state.genus !== 'all') return false;
     if (q) {
         const r = regionLabelsData[c.region];
@@ -665,7 +680,7 @@ function openFilterDrawer() {
 }
 function updateFilterToggleCount() {
     if (!filterToggleCount) return;
-    let n = state.regions.size + state.sites.size + state.photographers.size;
+    let n = state.regions.size + state.sites.size + state.photographers.size + state.years.size;
     if (state.area !== 'all') n++;
     if (state.order !== 'all') n++;
     if (state.subOrder !== 'all') n++;
@@ -711,7 +726,7 @@ document.querySelector('#total').textContent = `(${speciesList.length})`;
 search.addEventListener('input', render);
 document.querySelector('#reset').addEventListener('click', () => {
     search.value = '';
-    state.area = 'all'; state.regions.clear(); state.sites.clear(); state.photographers.clear();
+    state.area = 'all'; state.regions.clear(); state.sites.clear(); state.photographers.clear(); state.years.clear();
     state.order = 'all'; state.subOrder = 'all'; state.superfamily = 'all'; state.family = 'all'; state.genus = 'all'; state.collection = null;
     state.sort = 'taxonomic'; document.querySelector('#sortSelect').value = 'taxonomic';
     renderSidebar(); render(); search.focus();
@@ -763,6 +778,7 @@ const translations = [
     ['#siteGroupTitle', 'Dive site'],
     ['#tripGroupTitle', 'Dive trip'],
     ['#photographerGroupTitle', 'Photographer'],
+    ['#yearGroupTitle', 'Year'],
     ['#orderGroupTitle', 'Order'],
     ['#subOrderGroupTitle', 'Suborder'],
     ['#superfamilyGroupTitle', 'Superfamily'],
