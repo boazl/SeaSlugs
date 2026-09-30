@@ -41,6 +41,15 @@ class GalleryTests(TestCase):
         self.assertEqual(entry['genus'], 'Testus')
         self.assertEqual(entry['epithet'], 'exemplaris')
 
+    def test_catalog_exposes_is_migrant_for_the_area_filter(self):
+        # The gallery's "migrant species" area-filter button (app.js) is driven entirely by
+        # this field, straight from Species.is_migrant -- default False must reach catalog.js
+        # as False, and switching it on must actually flip the exposed value.
+        self.assertIs(self.catalog()['species'][0]['is_migrant'], False)
+        self.item.species.is_migrant = True
+        self.item.species.save()
+        self.assertIs(self.catalog()['species'][0]['is_migrant'], True)
+
     def test_catalog_exposes_defining_samples_region_and_year_for_the_card_caption(self):
         # The species card shows "<region>, <year>" (e.g. "Eilat, 2026") for the defining
         # sample's own trip, rather than the coarser country+sea area label -- both fields

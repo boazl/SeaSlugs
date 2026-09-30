@@ -166,6 +166,10 @@ def gallery_file(request, filename='index.html'):
                 'title': f'{area.species.scientific_name} {area.undetermined_variant}'.strip(),
                 'name_he': area.species.name_he, 'name_en': area.species.name_en,
                 'epithet': area.species.species,
+                # Species.is_migrant, straight through -- drives the "migrant species" area
+                # filter button in app.js (a species-level flag, not species+area-specific,
+                # so it's the same for every area entry of the same species).
+                'is_migrant': area.species.is_migrant,
                 # The genus/family filter+search values are the CURATED names (via genus_obj/
                 # family_obj, already resolved above), not the species' raw genus/family text --
                 # both fields are blank on many species whose genus is still resolvable (via

@@ -8,6 +8,12 @@ const siteLabelsData = catalog.sites || {};
 const tripLabelsData = catalog.trips || {};
 const taxaData = catalog.taxa || { orders: {}, families: {}, genera: {} };
 
+// How many area-rows (SpeciesArea rows -- one catalog species entry per area a species
+// was observed in) each species_id has, computed once up front -- backs the "species from
+// multiple areas" pseudo-area button in the area filter (see matchesAreaFilter below).
+const speciesAreaCountById = new Map();
+for (const sp of speciesList) speciesAreaCountById.set(sp.species_id, (speciesAreaCountById.get(sp.species_id) || 0) + 1);
+
 let language = 'he';
 
 const grid = document.querySelector('#grid');
@@ -72,6 +78,25 @@ function updateCollectionStatus() {
 
 // ---- option scoping ----
 
+// The area filter has two pseudo-area values alongside real country+sea keys ('all' plus
+// one per SpeciesArea.country/sea pair): 'multi-area' (species observed in more than one
+// area -- more than one SpeciesArea row) and 'migrant' (Species.is_migrant). Every place
+// that used to compare sp.area === area goes through this instead, so those two behave
+// exactly like picking a real area everywhere else in the sidebar/grid.
+function matchesAreaFilter(sp, area) {
+    if (area === 'all') return true;
+    if (area === 'multi-area') return speciesAreaCountById.get(sp.species_id) > 1;
+    if (area === 'migrant') return !!sp.is_migrant;
+    return sp.area === area;
+}
+// Collections (dive-trip videos) aren't tied to one species, so "multiple areas" and
+// "migrant" don't apply to them -- neither pseudo-area ever matches a collection.
+function collectionMatchesArea(c, area) {
+    if (area === 'all') return true;
+    if (area === 'multi-area' || area === 'migrant') return false;
+    return c.area === area;
+}
+
 function optionsForArea(area) {
     // Dive site and year are narrowed by the currently selected dive region(s) (a site/year
     // only shows -- and is only counted -- when it belongs to one of the checked regions), the
@@ -80,7 +105,7 @@ function optionsForArea(area) {
     // want to combine across regions.
     const regionIds = new Set(), siteIds = new Set(), photographers = new Set(), trips = new Set(), years = new Set();
     for (const sp of speciesList) {
-        if (area !== 'all' && sp.area !== area) continue;
+        if (!matchesAreaFilter(sp, area)) continue;
         for (const sm of sp.samples) {
             regionIds.add(sm.region);
             const inSelectedRegions = !state.regions.size || state.regions.has(sm.region);
@@ -91,7 +116,7 @@ function optionsForArea(area) {
         }
     }
     for (const c of collectionsList) {
-        if (area !== 'all' && c.area !== area) continue;
+        if (!collectionMatchesArea(c, area)) continue;
         regionIds.add(c.region);
         if (c.photographer) photographers.add(c.photographer);
         if (c.trip_id != null) trips.add(String(c.trip_id));
@@ -129,11 +154,11 @@ function yearCount(area, year) {
 // an order and (maybe) a suborder, so it's scoped by those exactly like a real superfamily
 // value would be, and its "unclassified" count moves with the order/suborder selection.
 function taxonomyOptions(area, order, subOrder, superfamily, family) {
-    const orders = new Map(), subOrders = new Map(), superfamilies = new Map(), families = new Map(), genera = new Set();
+    const orders = new Map(), subOrders = new Map(), superfamilies = new Map(), families = new Map(), genera = new Map();
     let ordersUnclassified = 0, subOrdersUnclassified = 0, superfamiliesUnclassified = 0, familiesUnclassified = 0;
     const bump = (map, key) => map.set(key, (map.get(key) || 0) + 1);
     for (const sp of speciesList) {
-        if (area !== 'all' && sp.area !== area) continue;
+        if (!matchesAreaFilter(sp, area)) continue;
         if (sp.order) bump(orders, sp.order); else ordersUnclassified++;
         if (order !== 'all' && sp.order !== order) continue;
         if (sp.sub_order) bump(subOrders, sp.sub_order); else subOrdersUnclassified++;
@@ -142,7 +167,7 @@ function taxonomyOptions(area, order, subOrder, superfamily, family) {
         if (superfamily !== 'all' && sp.superfamily !== superfamily) continue;
         if (sp.family) bump(families, sp.family); else familiesUnclassified++;
         if (family !== 'all' && sp.family !== family) continue;
-        if (sp.genus) genera.add(sp.genus);
+        if (sp.genus) bump(genera, sp.genus);
     }
     return { orders, subOrders, superfamilies, families, genera, ordersUnclassified, subOrdersUnclassified, superfamiliesUnclassified, familiesUnclassified };
 }
@@ -150,12 +175,19 @@ function taxonomyOptions(area, order, subOrder, superfamily, family) {
 // ---- sidebar rendering ----
 
 function areaSpeciesCount(key) {
-    return key === 'all' ? speciesList.length : speciesList.filter(sp => sp.area === key).length;
+    return speciesList.filter(sp => matchesAreaFilter(sp, key)).length;
 }
 function renderAreaFilters() {
     const container = document.querySelector('#areaFilters');
     container.replaceChildren();
-    const entries = [['all', language === 'he' ? 'כל האזורים' : 'All areas'], ...Object.keys(areaLabelsData).map(k => [k, areaLabelFor(k)])];
+    // The two pseudo-area buttons (multi-area, migrant -- see matchesAreaFilter) sit
+    // above the real geographic areas, right after "All areas".
+    const entries = [
+        ['all', language === 'he' ? 'כל האזורים' : 'All areas'],
+        ['multi-area', language === 'he' ? 'מינים ממספר אזורים' : 'Species from multiple areas'],
+        ['migrant', language === 'he' ? 'מינים מהגרים' : 'Migrant species'],
+        ...Object.keys(areaLabelsData).map(k => [k, areaLabelFor(k)]),
+    ];
     for (const [key, label] of entries) {
         const b = document.createElement('button');
         b.type = 'button';
@@ -201,21 +233,6 @@ function renderCheckboxGroup(container, entries, selectedSet, afterChange = rend
         }
         container.append(row);
     }
-}
-function fillSelect(select, values, current, allLabel) {
-    select.replaceChildren();
-    const allOpt = document.createElement('option');
-    allOpt.value = 'all';
-    allOpt.textContent = allLabel;
-    select.append(allOpt);
-    const sorted = [...values].sort((a, b) => a.localeCompare(b));
-    for (const v of sorted) {
-        const opt = document.createElement('option');
-        opt.value = v;
-        opt.textContent = v;
-        select.append(opt);
-    }
-    select.value = sorted.includes(current) ? current : 'all';
 }
 function fillLabeledSelect(select, entries, current, allLabel) {
     select.replaceChildren();
@@ -298,7 +315,7 @@ function renderTaxonomySelects() {
     if (familySelect.value !== state.family) state.family = 'all';
     const t4 = taxonomyOptions(area, state.order, state.subOrder, state.superfamily, state.family);
     const genusSelect = document.querySelector('#genusSelect');
-    fillSelect(genusSelect, t4.genera, state.genus, language === 'he' ? 'כל הסוגים' : 'All genera');
+    fillTaxonSelect(genusSelect, t4.genera, 0, state.genus, language === 'he' ? 'כל הסוגים' : 'All genera', '');
     if (genusSelect.value !== state.genus) state.genus = 'all';
 }
 function renderSidebar() {
@@ -385,7 +402,7 @@ function speciesSearchText(sp) {
 }
 function speciesMatches(sp, q) {
     if (state.collection && !sp.samples.some(sm => String(sm.trip_id) === state.collection)) return false;
-    if (state.area !== 'all' && sp.area !== state.area) return false;
+    if (!matchesAreaFilter(sp, state.area)) return false;
     if (state.order !== 'all' && sp.order !== state.order) return false;
     if (state.subOrder !== 'all' && sp.sub_order !== state.subOrder) return false;
     if (state.superfamily !== 'all' && sp.superfamily !== state.superfamily) return false;
@@ -397,7 +414,7 @@ function speciesMatches(sp, q) {
 }
 function collectionMatches(c, q) {
     if (state.collection) return false;
-    if (state.area !== 'all' && c.area !== state.area) return false;
+    if (!collectionMatchesArea(c, state.area)) return false;
     if (state.regions.size && !state.regions.has(c.region)) return false;
     if (state.sites.size) return false;
     if (state.photographers.size && !state.photographers.has(c.photographer)) return false;
