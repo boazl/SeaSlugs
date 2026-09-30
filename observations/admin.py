@@ -28,9 +28,13 @@ class UserAdmin(BaseUserAdmin):
 
 @admin.register(Species)
 class SpeciesAdmin(admin.ModelAdmin):
-    list_display = ['phylogenetic_order','scientific_name','genus','species','author','family','order']
+    list_display = ['phylogenetic_order','scientific_name','genus','species','author','family','order','is_migrant']
+    # Migrant status is checked far more often than any other field is edited here, so it's
+    # editable straight from the changelist (a checkbox + one "Save" for the whole page) --
+    # no need to open a species' full change form just to flag it as migrant.
+    list_editable = ['is_migrant']
     search_fields = ['scientific_name','genus','species','author','family','name_he']
-    list_filter = ['order','family','genus']
+    list_filter = ['order','family','genus','is_migrant']
     fieldsets = [
         ('זיהוי מדעי', {'fields':['phylogenetic_order','scientific_name','genus','species','author','formatted_author','reference_author','full_species_name_with_order']}),
         ('סיווג טקסונומי', {'fields':['order','superfamily','family','accepted_genus','accepted_species']}),
