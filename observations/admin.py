@@ -1,4 +1,6 @@
+from django import forms
 from django.contrib import admin, messages
+from django.utils.html import escape as html_escape
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
 from django.core.cache import cache
@@ -26,13 +28,35 @@ admin.site.unregister(User)
 class UserAdmin(BaseUserAdmin):
     inlines = [ProfileInline]
 
+class DatalistTextInput(forms.TextInput):
+    """A plain single-line text input paired with an HTML5 <datalist> of suggested
+    values -- a dropdown-with-autocomplete UX for a free-text field, without constraining
+    it to a fixed choice list (existing values outside the list still save/display fine).
+    Species.order/family are plain TextFields, not ForeignKeys to TaxonOrder/TaxonFamily
+    (those curated tables are matched against this text elsewhere, e.g. build_taxonomy_
+    tables) -- turning them into a *real* ForeignKey-backed autocomplete like TaxonFamily.
+    order/TaxonGenus.family use would need a schema migration and touches everywhere this
+    text is read (templates, the catalog.js builder, management commands, tests), so this
+    keeps the storage and every other code path unchanged."""
+    def __init__(self, datalist_options=(), attrs=None):
+        super().__init__(attrs)
+        self.datalist_options = list(datalist_options)
+    def render(self, name, value, attrs=None, renderer=None):
+        attrs = dict(attrs or {})
+        list_id = f"{attrs.get('id', name)}__datalist"
+        attrs['list'] = list_id
+        input_html = super().render(name, value, attrs, renderer)
+        options_html = ''.join(f'<option value="{html_escape(opt)}">' for opt in self.datalist_options)
+        return input_html + f'<datalist id="{list_id}">{options_html}</datalist>'
+
+
 @admin.register(Species)
 class SpeciesAdmin(admin.ModelAdmin):
     list_display = ['phylogenetic_order','scientific_name','is_migrant','genus','species','author','family','order']
     # Migrant status is checked far more often than any other field is edited here, so it's
     # editable straight from the changelist (a checkbox + one "Save" for the whole page) --
     # no need to open a species' full change form just to flag it as migrant.
-    list_editable = ['is_migrant']
+    list_editable = ['is_migrant','author','family','order']
     search_fields = ['scientific_name','genus','species','author','family','name_he']
     list_filter = ['order','family','genus','is_migrant']
     fieldsets = [
@@ -41,6 +65,27 @@ class SpeciesAdmin(admin.ModelAdmin):
         ('שמות ותפוצה', {'fields':['name_he','name_en','common_name','transliteration','language','distribution']}),
         ('תוכן לעמוד המין', {'fields':['habitat','food','is_migrant','first_observed_year','last_observed_year','description_he','description_en','link','article_pdf']}),
     ]
+    def _order_options(self):
+        canonical = TaxonOrder.objects.exclude(name='').values_list('name', flat=True)
+        existing = Species.objects.exclude(order='').values_list('order', flat=True)
+        return sorted(set(canonical) | set(existing))
+    def _family_options(self):
+        canonical = TaxonFamily.objects.exclude(name='').values_list('name', flat=True)
+        existing = Species.objects.exclude(family='').values_list('family', flat=True)
+        return sorted(set(canonical) | set(existing))
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        # author/family/order are plain TextFields, which Django would otherwise render as
+        # a multi-line Textarea -- a single-line TextInput fits the changelist row (and the
+        # change-form field) far better than that. family/order additionally get a
+        # datalist of known values (see DatalistTextInput) so picking an existing
+        # order/family doesn't mean retyping it from memory.
+        if db_field.name == 'author':
+            kwargs['widget'] = forms.TextInput
+        elif db_field.name == 'order':
+            kwargs['widget'] = DatalistTextInput(datalist_options=self._order_options())
+        elif db_field.name == 'family':
+            kwargs['widget'] = DatalistTextInput(datalist_options=self._family_options())
+        return super().formfield_for_dbfield(db_field, request, **kwargs)
 
 @admin.register(TaxonOrder)
 class TaxonOrderAdmin(admin.ModelAdmin):
