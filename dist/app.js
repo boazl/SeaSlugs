@@ -749,8 +749,10 @@ function openFilterDrawer() {
 }
 function updateFilterToggleCount() {
     if (!filterToggleCount) return;
+    // state.area is excluded here: the area chips now live in their own always-visible
+    // bar above the gallery (see .area-filter-bar), not inside the collapsible drawer this
+    // toggle/badge refers to, so counting it here would over-count what's actually hidden.
     let n = state.regions.size + state.sites.size + state.photographers.size + state.years.size;
-    if (state.area !== 'all') n++;
     if (state.order !== 'all') n++;
     if (state.subOrder !== 'all') n++;
     if (state.superfamily !== 'all') n++;
