@@ -73,15 +73,21 @@ function updateCollectionStatus() {
 // ---- option scoping ----
 
 function optionsForArea(area) {
+    // Dive site and year are narrowed by the currently selected dive region(s) (a site/year
+    // only shows -- and is only counted -- when it belongs to one of the checked regions), the
+    // same way area narrows everything here; region/photographer/trip stay area-scoped only,
+    // since narrowing those wasn't asked for and would remove options the user might still
+    // want to combine across regions.
     const regionIds = new Set(), siteIds = new Set(), photographers = new Set(), trips = new Set(), years = new Set();
     for (const sp of speciesList) {
         if (area !== 'all' && sp.area !== area) continue;
         for (const sm of sp.samples) {
             regionIds.add(sm.region);
-            if (sm.site) siteIds.add(sm.site);
+            const inSelectedRegions = !state.regions.size || state.regions.has(sm.region);
+            if (sm.site && inSelectedRegions) siteIds.add(sm.site);
             if (sm.photographer) photographers.add(sm.photographer);
             if (sm.trip_id != null) trips.add(String(sm.trip_id));
-            if (sm.year != null) years.add(String(sm.year));
+            if (sm.year != null && inSelectedRegions) years.add(String(sm.year));
         }
     }
     for (const c of collectionsList) {
@@ -89,7 +95,7 @@ function optionsForArea(area) {
         regionIds.add(c.region);
         if (c.photographer) photographers.add(c.photographer);
         if (c.trip_id != null) trips.add(String(c.trip_id));
-        if (c.year != null) years.add(String(c.year));
+        if (c.year != null && (!state.regions.size || state.regions.has(c.region))) years.add(String(c.year));
     }
     return { regionIds, siteIds, photographers, trips, years };
 }
@@ -97,7 +103,7 @@ function regionCount(area, id) {
     return speciesList.filter(sp => (area === 'all' || sp.area === area) && sp.samples.some(sm => sm.region === id)).length;
 }
 function siteCount(area, id) {
-    return speciesList.filter(sp => (area === 'all' || sp.area === area) && sp.samples.some(sm => sm.site === id)).length;
+    return speciesList.filter(sp => (area === 'all' || sp.area === area) && sp.samples.some(sm => sm.site === id && (!state.regions.size || state.regions.has(sm.region)))).length;
 }
 function tripCount(area, id) {
     return speciesList.filter(sp => (area === 'all' || sp.area === area) && sp.samples.some(sm => String(sm.trip_id) === id)).length;
@@ -110,8 +116,8 @@ function photographerCount(area, name) {
 }
 function yearCount(area, year) {
     let n = 0;
-    for (const sp of speciesList) { if (area !== 'all' && sp.area !== area) continue; if (sp.samples.some(sm => String(sm.year) === year)) n++; }
-    for (const c of collectionsList) { if (area !== 'all' && c.area !== area) continue; if (String(c.year) === year) n++; }
+    for (const sp of speciesList) { if (area !== 'all' && sp.area !== area) continue; if (sp.samples.some(sm => String(sm.year) === year && (!state.regions.size || state.regions.has(sm.region)))) n++; }
+    for (const c of collectionsList) { if (area !== 'all' && c.area !== area) continue; if (String(c.year) === year && (!state.regions.size || state.regions.has(c.region))) n++; }
     return n;
 }
 function taxonomyOptions(area, order, subOrder, superfamily, family) {
@@ -162,7 +168,7 @@ function renderAreaFilters() {
         container.append(b);
     }
 }
-function renderCheckboxGroup(container, entries, selectedSet) {
+function renderCheckboxGroup(container, entries, selectedSet, afterChange = render) {
     container.replaceChildren();
     for (const [value, label, count] of entries) {
         const row = document.createElement('label');
@@ -173,7 +179,7 @@ function renderCheckboxGroup(container, entries, selectedSet) {
         input.checked = selectedSet.has(value);
         input.addEventListener('change', () => {
             if (input.checked) selectedSet.add(value); else selectedSet.delete(value);
-            render();
+            afterChange();
         });
         const text = document.createElement('span');
         text.textContent = label;
@@ -259,10 +265,16 @@ function renderSidebar() {
     renderAreaFilters();
     const area = state.area;
     const opts = optionsForArea(area);
+    // A site or year selected while a now-deselected region was in effect can fall outside
+    // the narrowed options below -- drop it rather than leaving an invisible, unclearable
+    // filter in effect (the same problem the taxonomy selects guard against just below, for
+    // a single dropdown value instead of a checkbox Set).
+    for (const v of [...state.sites]) if (!opts.siteIds.has(v)) state.sites.delete(v);
+    for (const v of [...state.years]) if (!opts.years.has(v)) state.years.delete(v);
     const regionEntries = [...opts.regionIds]
         .map(id => [id, labelFor(id, regionLabelsData), regionCount(area, id)])
         .sort((a, b) => a[1].localeCompare(b[1], language === 'he' ? 'he' : 'en'));
-    renderCheckboxGroup(document.querySelector('#regionOptions'), regionEntries, state.regions);
+    renderCheckboxGroup(document.querySelector('#regionOptions'), regionEntries, state.regions, () => { renderSidebar(); render(); });
     const siteEntries = [...opts.siteIds]
         .map(id => [id, labelFor(id, siteLabelsData), siteCount(area, id)])
         .sort((a, b) => a[1].localeCompare(b[1], language === 'he' ? 'he' : 'en'));
