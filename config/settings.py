@@ -163,3 +163,18 @@ LOGOUT_REDIRECT_URL = "/observations/"
 # Folder import accepts up to 500 images and one species selector per image.
 DATA_UPLOAD_MAX_NUMBER_FILES = 500
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 2000
+
+# Email -- Render's environment provides real SMTP credentials in production (see
+# RENDER.md); no secret ever lives in this file. Without EMAIL_HOST set (plain local
+# development), fall back to the console backend so a signup notification just prints to
+# the terminal instead of needing real credentials. NEW_USER_NOTIFICATION_EMAIL is the
+# address the signup notification (observations/notifications.py) is sent to; it's blank
+# by default, which that module treats as "don't send".
+EMAIL_HOST = os.environ.get('EMAIL_HOST', '')
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend' if EMAIL_HOST else 'django.core.mail.backends.console.EmailBackend'
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'true').strip().lower() not in ('false', '0', '')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL') or 'webmaster@localhost'
+NEW_USER_NOTIFICATION_EMAIL = os.environ.get('NEW_USER_NOTIFICATION_EMAIL', '')

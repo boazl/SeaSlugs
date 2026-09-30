@@ -11,6 +11,7 @@ from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from .models import Sample, Profile, Region, Site, DiveTrip, SiteImage, Species, Country, SpeciesArea, SampleKind, KIND_EN_NAMES, TaxonGenus
 from .forms import SignupForm, SampleForm, ProfileForm, DiveTripForm
+from .notifications import notify_new_user_registered
 from .gallery_data import TaxonResolver, taxon_media
 from .i18n import get_lang
 
@@ -277,6 +278,7 @@ def signup(request):
         user=form.save()
         user.groups.add(Group.objects.get_or_create(name='New user')[0])
         Profile.objects.create(user=user)
+        notify_new_user_registered(user)
         login(request,user)
         return redirect('profile')
     return render(request,'observations/form.html',{'form':form,'title':'הרשמה / Sign up'})
