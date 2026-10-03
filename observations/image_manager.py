@@ -1,4 +1,5 @@
 """Superuser-only, individual image transfer and deliberate storage cleanup."""
+import base64
 import hashlib
 import io
 import json
@@ -125,13 +126,19 @@ def image_file(request):
     if request.GET.get('download')=='1' and item:
         from .sample_transfer import sample_row
         from .table_transfer import TABLES
-        # A regular JPEG carries its observation metadata to match/create the target.
+        # A regular JPEG carries its observation metadata to match/create the target. EXIF's
+        # ImageDescription tag (270) is ASCII-only -- Pillow silently replaces every
+        # non-ASCII character with '?' on write, so a site/title/etc. containing Hebrew (or
+        # any other non-ASCII text) would otherwise come back unrecoverably mangled on the
+        # other end. Base64-encoding the UTF-8 JSON keeps the embedded string itself pure
+        # ASCII, immune to that.
         row=sample_row(item,TABLES['samples'][1]);row['image']=''
         metadata=json.dumps(row,ensure_ascii=False)
-        if len(metadata.encode())>60000:
+        encoded=base64.b64encode(metadata.encode('utf-8')).decode('ascii')
+        if len(encoded)>60000:
             source.close();raise Http404('נתוני התצפית גדולים מדי להעברה בתמונה.')
         with source, Image.open(path) as original:
-            output=io.BytesIO();exif=Image.Exif();exif[270]='SeaSlugs:'+metadata
+            output=io.BytesIO();exif=Image.Exif();exif[270]='SeaSlugsB64:'+encoded
             ImageOps.exif_transpose(original).convert('RGB').save(output,'JPEG',quality=90,exif=exif)
         output.seek(0);source=output
     response=FileResponse(source,as_attachment=request.GET.get('download')=='1',filename=filename)
@@ -177,8 +184,19 @@ def manager(request):
                 for upload in uploads:
                     try:
                         with Image.open(upload) as original: metadata=original.getexif().get(270,'')
-                        if not isinstance(metadata,str) or not metadata.startswith('SeaSlugs:'): raise ValueError()
-                        row=json.loads(metadata[len('SeaSlugs:'):])
+                        if not isinstance(metadata,str): raise ValueError()
+                        if metadata.startswith('SeaSlugsB64:'):
+                            row=json.loads(base64.b64decode(metadata[len('SeaSlugsB64:'):]).decode('utf-8'))
+                        elif metadata.startswith('SeaSlugs:'):
+                            # Older downloads, from before non-ASCII text (e.g. Hebrew site
+                            # or trip names) was base64-encoded to survive EXIF's ASCII-only
+                            # ImageDescription tag intact -- still readable here (and exact,
+                            # for the all-ASCII case), but any non-ASCII text in one of these
+                            # was already silently replaced with '?' at download time by
+                            # Pillow itself; that loss can't be recovered from the file alone,
+                            # only by re-downloading it now that the fix is in place.
+                            row=json.loads(metadata[len('SeaSlugs:'):])
+                        else: raise ValueError()
                         if not isinstance(row,dict): raise ValueError()
                     except (ValueError,OSError): raise ValidationError('בחרו תמונות שהורדו מכלי ניהול התמונות. קובץ ללא נתוני תצפית ניתן להעלות בעריכת התצפית.')
                     upload.seek(0)

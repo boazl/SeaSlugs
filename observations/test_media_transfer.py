@@ -1,3 +1,4 @@
+import base64
 import io
 import tempfile
 from pathlib import Path
@@ -245,7 +246,7 @@ class MediaTransferTests(TestCase):
             response=self.client.get('/admin/images/file/',{'file':row['token'],'download':'1'})
             raw=b''.join(response.streaming_content);response.close()
             with Image.open(io.BytesIO(raw)) as image:
-                metadata=json.loads(image.getexif()[270][len('SeaSlugs:'):])
+                metadata=json.loads(base64.b64decode(image.getexif()[270][len('SeaSlugsB64:'):]).decode('utf-8'))
                 metadata['transfer_id']=str(uuid.uuid4());metadata['video_url']=f'https://youtu.be/{video_id}'
                 output=io.BytesIO();exif=Image.Exif();exif[270]='SeaSlugs:'+json.dumps(metadata,ensure_ascii=False)
                 image.convert('RGB').save(output,'JPEG',exif=exif)
@@ -312,6 +313,55 @@ class MediaTransferTests(TestCase):
         self.sample.refresh_from_db();self.assertTrue(Path(self.sample.image.path).exists())
         deleted.refresh_from_db();self.assertIsNotNone(deleted.deleted_at)
         self.assertEqual(Sample.objects.filter(species=other_species).count(),1)  # no duplicate created
+
+    def test_image_manager_download_and_upload_preserves_hebrew_text(self):
+        # Regression: EXIF's ImageDescription tag (270) is ASCII-only -- Pillow silently
+        # replaces every non-ASCII character with '?' on write (confirmed directly against
+        # Pillow, not assumed). Before the embedded metadata was base64-encoded, downloading
+        # (and then re-uploading) any sample carrying Hebrew text -- a title, a site name,
+        # anything non-ASCII -- silently corrupted it into question marks with no error at
+        # all. Surfaced when a newly-added "missing site" error message came back reading
+        # the site's name as literal question marks instead of its real (Hebrew) name.
+        import base64,json as json_module
+        hebrew_title='חוף מכמורת'
+        source=Sample(owner=self.sample.owner,trip=self.sample.trip,kind=Sample.Kind.COLLECTION,
+            title=hebrew_title,video_url='https://youtu.be/33333333333')
+        output=io.BytesIO();Image.new('RGB',(60,40),'teal').save(output,'JPEG')
+        source.image.save('hebrew.jpg',ContentFile(output.getvalue()),save=False);source.save_reviewed()
+        self.client.force_login(source.owner)
+        from .image_manager import files
+        row=next(r for r in files() if source in r['refs'])
+        response=self.client.get('/admin/images/file/',{'file':row['token'],'download':'1'})
+        raw=b''.join(response.streaming_content);response.close()
+        with Image.open(io.BytesIO(raw)) as downloaded:
+            metadata=downloaded.getexif()[270]
+        self.assertTrue(metadata.startswith('SeaSlugsB64:'))
+        decoded=json_module.loads(base64.b64decode(metadata[len('SeaSlugsB64:'):]).decode('utf-8'))
+        self.assertEqual(decoded['title'],hebrew_title)  # not mangled into '?????' already at download time
+        response=self.client.post('/admin/images/',{'action':'upload','replace':'yes',
+            'images':SimpleUploadedFile('transfer.jpg',raw,content_type='image/jpeg')})
+        self.assertEqual(response.status_code,302,response.content)
+        source.refresh_from_db();self.assertEqual(source.title,hebrew_title)
+
+    def test_image_manager_upload_still_reads_the_older_unencoded_metadata_format(self):
+        # Backward compatibility: a file downloaded before the base64 switch (or one built
+        # directly the old way, as this test does) must still upload -- correctly, for the
+        # realistic all-ASCII case this covers (any non-ASCII text in one would already have
+        # been irrecoverably mangled into '?' at download time by Pillow itself, not by this
+        # parsing step).
+        import json as json_module
+        from .image_manager import files
+        self.client.force_login(self.sample.owner)
+        row=next(r for r in files() if self.sample in r['refs'])
+        response=self.client.get('/admin/images/file/',{'file':row['token'],'download':'1'})
+        raw=b''.join(response.streaming_content);response.close()
+        with Image.open(io.BytesIO(raw)) as image:
+            metadata=json_module.loads(base64.b64decode(image.getexif()[270][len('SeaSlugsB64:'):]).decode('utf-8'))
+            output=io.BytesIO();exif=Image.Exif();exif[270]='SeaSlugs:'+json_module.dumps(metadata,ensure_ascii=False)
+            image.convert('RGB').save(output,'JPEG',exif=exif)
+        response=self.client.post('/admin/images/',{'action':'upload','replace':'yes',
+            'images':SimpleUploadedFile('old-format.jpg',output.getvalue(),content_type='image/jpeg')})
+        self.assertEqual(response.status_code,302,response.content)
 
     def test_image_manager_upload_accepts_published_genus_kind_with_species_other(self):
         # Regression test: sample_plan() used to reject every published GENUS-kind sample
