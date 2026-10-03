@@ -106,6 +106,77 @@ class MediaTransferTests(TestCase):
         self.assertEqual(self.client.get('/admin/images/').status_code,302)
         self.client.force_login(User.objects.create_user('staff',is_staff=True))
         self.assertEqual(self.client.get('/admin/images/').status_code,403)
+
+    def test_files_flags_redundant_images(self):
+        # redundant: every referencing Sample is soft-deleted, or there are no referencing
+        # samples at all -- except a site image (the homepage photo), which is never
+        # redundant even with zero Sample refs, since it's referenced from SiteImage, not
+        # Sample.
+        from .image_manager import files
+        from .models import SiteImage
+        sample_row=next(r for r in files() if r['refs'] and r['refs'][0].pk==self.sample.pk)
+        self.assertFalse(sample_row['redundant'])
+        orphan_path=Path(self.temp.name)/'orphan.jpg'
+        Image.new('RGB',(10,10),'red').save(orphan_path,'JPEG')
+        orphan_row=next(r for r in files() if r['name']=='orphan.jpg')
+        self.assertTrue(orphan_row['redundant']);self.assertEqual(orphan_row['refs'],[])
+        site_image=SiteImage(key='intro_photo')
+        output=io.BytesIO();Image.new('RGB',(10,10),'blue').save(output,'JPEG')
+        site_image.image.save('site.jpg',ContentFile(output.getvalue()),save=True)
+        site_row=next(r for r in files() if r['name']==site_image.image.name)
+        self.assertFalse(site_row['redundant'])
+        self.sample.soft_delete(self.sample.owner)
+        sample_row=next(r for r in files() if r['refs'] and r['refs'][0].pk==self.sample.pk)
+        self.assertTrue(sample_row['redundant'])
+
+    def test_export_manifest_action_returns_valid_json(self):
+        # The export must be a small, image-bytes-free JSON (just hash/name/size/redundant
+        # per managed file) that another environment's compare_manifest can diff against.
+        import json
+        self.client.force_login(self.sample.owner)
+        response=self.client.post('/admin/images/',{'action':'export_manifest'})
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response['Content-Type'],'application/json; charset=utf-8')
+        self.assertIn('attachment; filename="seaslugs-images-',response['Content-Disposition'])
+        manifest=json.loads(response.content)
+        self.assertEqual(manifest['format'],'seaslugs-image-manifest-v1')
+        self.assertEqual(len(manifest['images']),1)
+        entry=manifest['images'][0]
+        self.assertEqual(entry['name'],self.sample.image.name)
+        self.assertEqual(entry['size'],Path(self.sample.image.path).stat().st_size)
+        self.assertFalse(entry['redundant'])
+        self.assertEqual(len(entry['hash']),64)
+
+    def test_compare_manifest_action_reports_missing_and_only_here(self):
+        # Diffing is by content hash, not name (the same photo can be stored under a
+        # different name in each environment) -- a hash this environment doesn't have is
+        # "missing here" (needs downloading from the other side); a hash only this
+        # environment has is "only here" (informational, not an automatic deletion).
+        import json
+        self.client.force_login(self.sample.owner)
+        other_manifest={'format':'seaslugs-image-manifest-v1','exported_at':'2026-01-01T00:00:00+00:00',
+                        'images':[{'name':'observations/elsewhere.jpg','hash':'a'*64,'size':123,'redundant':False}]}
+        upload=SimpleUploadedFile('manifest.json',json.dumps(other_manifest).encode(),content_type='application/json')
+        response=self.client.post('/admin/images/',{'action':'compare_manifest','manifest':upload})
+        self.assertEqual(response.status_code,200)
+        content=response.content.decode()
+        self.assertIn('observations/elsewhere.jpg',content)
+        self.assertIn(self.sample.image.name,content)
+
+    def test_compare_manifest_rejects_malformed_file(self):
+        self.client.force_login(self.sample.owner)
+        upload=SimpleUploadedFile('manifest.json',b'{"format": "wrong"}',content_type='application/json')
+        response=self.client.post('/admin/images/',{'action':'compare_manifest','manifest':upload})
+        self.assertContains(response,'קובץ השוואה לא תקין')
+
+    def test_images_page_shows_redundant_badge_and_select_button(self):
+        self.client.force_login(self.sample.owner)
+        content=self.client.get('/admin/images/').content.decode()
+        self.assertIn('select-redundant',content)
+        self.assertNotIn('תמונה מיותרת —',content)  # self.sample's image is still referenced
+        self.sample.soft_delete(self.sample.owner)
+        content=self.client.get('/admin/images/').content.decode()
+        self.assertIn('תמונה מיותרת —',content)
     def test_image_manager_upload_accepts_published_genus_kind_with_species_other(self):
         # Regression test: sample_plan() used to reject every published GENUS-kind sample
         # during transfer, because species_other holds the genus name itself -- the sample's

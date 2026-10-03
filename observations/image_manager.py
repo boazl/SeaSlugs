@@ -12,11 +12,14 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.core import signing
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from django.http import FileResponse, Http404
+from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import render, redirect
 from django.urls import reverse
+from django.utils import timezone
 from .models import Sample, SiteImage
 from .forms import SampleForm
+
+MANIFEST_FORMAT = 'seaslugs-image-manifest-v1'
 
 
 SORT_OPTIONS={'file':'לפי שם קובץ','alpha':'לפי סדר אלפביתי (סוג ומין)','taxonomy':'לפי סדר טקסונומי'}
@@ -56,12 +59,61 @@ def files(sort='file'):
         if not path.is_file() or path.is_symlink() or not path.resolve().is_relative_to(root): continue
         if path.suffix.lower() not in ('.jpg','.jpeg','.png','.webp'): continue
         name=path.relative_to(root).as_posix();refs=linked.get(name,[])
+        # redundant: this exact file is kept on disk for nothing -- either no sample ever
+        # referenced it, or every sample that did has since been soft-deleted. A site image
+        # (the homepage photo) is never redundant even with zero Sample refs, since it's
+        # referenced from SiteImage, not Sample.
+        redundant=name not in site_images and all(r.deleted_at for r in refs)
         rows.append({'name':name,'size':path.stat().st_size,'refs':refs,'token':signing.dumps(name,salt='image-file'),
-                     'blocked':any(not r.video_url and not r.deleted_at for r in refs) or name in site_images})
+                     'blocked':any(not r.video_url and not r.deleted_at for r in refs) or name in site_images,
+                     'redundant':redundant})
     if sort in ('alpha','taxonomy'):
         key_fn=_alpha_key if sort=='alpha' else _taxonomy_key
         rows.sort(key=lambda row:(1,row['name']) if not (species:=_row_species(row)) else (0,key_fn(species)))
     return rows
+
+
+def _file_hash(root, name):
+    with (root/name).open('rb') as f:
+        return hashlib.sha256(f.read()).hexdigest()
+
+
+def build_manifest(rows, root):
+    """A small, image-bytes-free JSON listing every managed file's content hash -- download
+    it from one environment and upload it to compare_manifest() in the other to find which
+    files need transferring in which direction, without transferring any image data itself
+    just to find that out."""
+    return {
+        'format': MANIFEST_FORMAT,
+        'exported_at': timezone.now().isoformat(),
+        'images': [
+            {'name': row['name'], 'hash': _file_hash(root, row['name']), 'size': row['size'],
+             'redundant': row['redundant']}
+            for row in rows
+        ],
+    }
+
+
+def compare_manifest(rows, root, manifest):
+    """Diff this environment's own files (by content hash, not name -- the same photo can
+    be stored under different names in each environment, e.g. a random upload-time UUID here
+    vs. a content-hash transfer name there) against an uploaded manifest from the other
+    environment. Returns what to download from there (present there, absent here) and what
+    exists only here (present here, absent there) -- the admin decides what, if anything, to
+    do with the second list; it's informational, not a deletion candidate on its own."""
+    if not isinstance(manifest, dict) or manifest.get('format') != MANIFEST_FORMAT or not isinstance(manifest.get('images'), list):
+        raise ValidationError('קובץ השוואה לא תקין או גרסה לא נתמכת.')
+    remote = {}
+    for item in manifest['images']:
+        if not isinstance(item, dict) or not isinstance(item.get('hash'), str) or not isinstance(item.get('name'), str):
+            raise ValidationError('קובץ השוואה לא תקין.')
+        remote.setdefault(item['hash'], item)
+    local = {}
+    for row in rows:
+        local.setdefault(_file_hash(root, row['name']), row)
+    missing_here = sorted((item for h, item in remote.items() if h not in local), key=lambda i: i['name'])
+    only_here = sorted((row for h, row in local.items() if h not in remote), key=lambda r: r['name'])
+    return {'missing_here': missing_here, 'only_here': only_here}
 
 
 def resolve(token):
@@ -172,6 +224,21 @@ def manager(request):
                 obj.image.save(content.name,content,save=True)
                 messages.success(request,'תמונת הבית עודכנה.')
                 return redirect(redirect_target)
+            elif action=='export_manifest':
+                root=Path(settings.MEDIA_ROOT).resolve()
+                manifest=build_manifest(files('file'),root)
+                body=json.dumps(manifest,ensure_ascii=False,indent=2)
+                env='local' if context['local'] else 'render'
+                response=HttpResponse(body,content_type='application/json; charset=utf-8')
+                response['Content-Disposition']=f'attachment; filename="seaslugs-images-{env}.json"'
+                return response
+            elif action=='compare_manifest':
+                upload=request.FILES.get('manifest')
+                if not upload: raise ValidationError('יש לבחור קובץ השוואה.')
+                try: manifest=json.loads(upload.read())
+                except (ValueError,UnicodeDecodeError): raise ValidationError('קובץ השוואה לא תקין.')
+                root=Path(settings.MEDIA_ROOT).resolve()
+                context['comparison']=compare_manifest(files('file'),root,manifest)
         except ValidationError as exc: context['error']='; '.join(exc.messages)
     context['images']=files(sort);context['total_bytes']=sum(r['size'] for r in context['images'])
     context['site_image']=SiteImage.objects.filter(key='intro_photo').exclude(image='').first()

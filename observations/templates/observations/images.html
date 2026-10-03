@@ -2,12 +2,22 @@
 <h1>ניהול תמונות</h1><p><a href="{% url 'folder-import' %}">ייבוא תיקיית תמונות לפי מסע צלילה</a></p><p class="notice">סביבה: <strong>{% if local %}המק המקומי{% else %}האתר ב־Render{% endif %}</strong> · {{images|length}} קבצים · {{total_bytes|filesizeformat}}</p>
 <p>מיון: {% for key,label in sort_options.items %}{% if key == sort %}<strong>{{label}}</strong>{% else %}<a href="?sort={{key}}">{{label}}</a>{% endif %}{% if not forloop.last %} · {% endif %}{% endfor %}</p>
 <p><a href="http://127.0.0.1:8000/admin/images/">תמונות במק</a> · <a href="https://seaslugs.onrender.com/admin/images/" target="_blank" rel="noopener">תמונות באתר</a></p>
+<h2>השוואת תמונות בין הסביבות</h2>
+<p>ייצוא מפיק קובץ JSON קטן (ללא תוכן התמונות עצמן) עם טביעת אצבע (Hash) לכל תמונה בסביבה זו. יש להעלות אותו בסביבה השנייה כדי לדעת אילו תמונות חסרות שם ואילו קיימות רק כאן.</p>
+<form method="post">{% csrf_token %}<input type="hidden" name="action" value="export_manifest"><button>ייצוא רשימת תמונות להשוואה</button></form>
+<form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="action" value="compare_manifest"><p><input type="file" name="manifest" accept="application/json" required></p><button>השוואה מול קובץ שיוצא בסביבה השנייה</button></form>
+{% if comparison %}<div class="comparison">
+<h3>חסרות כאן, קיימות בסביבה השנייה ({{comparison.missing_here|length}})</h3>
+{% if comparison.missing_here %}<ul>{% for item in comparison.missing_here %}<li>{{item.name}} · {{item.size|filesizeformat}}{% if item.redundant %} · מיותרת בסביבה השנייה{% endif %}</li>{% endfor %}</ul>{% else %}<p>אין תמונות חסרות כאן.</p>{% endif %}
+<h3>קיימות רק כאן, חסרות בסביבה השנייה ({{comparison.only_here|length}})</h3>
+{% if comparison.only_here %}<ul>{% for row in comparison.only_here %}<li>{{row.name}} · {{row.size|filesizeformat}}{% if row.redundant %} · מיותרת{% endif %}</li>{% endfor %}</ul>{% else %}<p>אין תמונות שקיימות רק כאן.</p>{% endif %}
+</div>{% endif %}
 <p>סמנו תמונות והורידו כקבצים רגילים. בסביבת היעד העלו את הקבצים ללא שינוי שמם. הדפדפן עשוי לבקש אישור להורדת כמה קבצים. הורדה מעתיקה את התמונה ואינה מוחקת את המקור. התמונות המשויכות נושאות את נתוני התצפית בקובץ. תצפית חסרה תתווסף ביעד; בתצפית קיימת תוחלף רק התמונה. יש להעביר תחילה משתמשים וטבלאות עזר. קובצי ההעברה כוללים פרטי תצפית ושם חשבון.</p>
 {% if error %}<p class="errorlist" role="alert">{{error}}</p>{% endif %}
 <form method="post" id="image-selection">{% csrf_token %}<input type="hidden" name="action" value="delete">
-<p><button type="button" id="select-all">בחירת הכול / ביטול</button> <button type="button" id="download-images">הורדת התמונות המסומנות למק</button></p>
-<div class="cards">{% for image in images %}<article><label><input type="checkbox" name="selected" value="{{image.token}}" data-download="{% url 'image-file' %}?download=1&amp;file={{image.token|urlencode}}"> {{image.size|filesizeformat}}</label><a href="{% url 'image-file' %}?file={{image.token|urlencode}}" target="_blank" rel="noopener"><img src="{% url 'image-file' %}?file={{image.token|urlencode}}" loading="lazy" alt="תמונה מנוהלת"></a>
-<p>תצפיות שמשתמשות בתמונה זו:</p><ul>{% for sample in image.refs %}<li><a href="{% url 'observation-edit' sample.pk %}">{{sample}}</a>{% if sample.trip.region %} · {{sample.trip.region.name}}{% endif %}{% if sample.deleted_at %} · תצפית מחוקה{% elif sample.status != 'published' %} · {{sample.get_status_display}}{% endif %}</li>{% empty %}<li>לא משויכת לתצפית — אפשר למחוק לפינוי מקום</li>{% endfor %}</ul>
+<p><button type="button" id="select-all">בחירת הכול / ביטול</button> <button type="button" id="select-redundant">בחירת תמונות מיותרות</button> <button type="button" id="download-images">הורדת התמונות המסומנות למק</button></p>
+<div class="cards">{% for image in images %}<article><label><input type="checkbox" name="selected" value="{{image.token}}" data-download="{% url 'image-file' %}?download=1&amp;file={{image.token|urlencode}}" data-redundant="{% if image.redundant %}1{% else %}0{% endif %}"> {{image.size|filesizeformat}}</label><a href="{% url 'image-file' %}?file={{image.token|urlencode}}" target="_blank" rel="noopener"><img src="{% url 'image-file' %}?file={{image.token|urlencode}}" loading="lazy" alt="תמונה מנוהלת"></a>
+<p>תצפיות שמשתמשות בתמונה זו:</p><ul>{% for sample in image.refs %}<li><a href="{% url 'observation-edit' sample.pk %}">{{sample}}</a>{% if sample.trip.region %} · {{sample.trip.region.name}}{% endif %}{% if sample.deleted_at %} · תצפית מחוקה{% elif sample.status != 'published' %} · {{sample.get_status_display}}{% endif %}</li>{% empty %}<li>לא משויכת לתצפית — אפשר למחוק לפינוי מקום</li>{% endfor %}</ul>{% if image.redundant %}<p class="errorlist">תמונה מיותרת — כל התצפיות המשויכות נמחקו או שאין תצפית כלל. אפשר למחוק לפינוי מקום.</p>{% endif %}
 {% if image.blocked %}<p class="errorlist">המדיה היחידה בתצפית פעילה — המחיקה חסומה</p>{% endif %}</article>{% empty %}<p>אין תמונות שהועלו בסביבה זו. תמונות YouTube אינן מאוחסנות כאן.</p>{% endfor %}</div>
 <p><label><input type="checkbox" name="confirm" value="yes"> אני מאשר מחיקה קבועה של התמונות המסומנות, ללא גיבוי תמונה</label></p><button>מחיקת התמונות המסומנות</button></form>
 <h2>תמונת הבית</h2>
@@ -19,5 +29,6 @@
 <script>
 const checks=()=>[...document.querySelectorAll('[name=selected]')];
 document.querySelector('#select-all').onclick=()=>{const checked=!checks().every(c=>c.checked);checks().forEach(c=>c.checked=checked)};
+document.querySelector('#select-redundant').onclick=()=>{checks().forEach(c=>c.checked=c.dataset.redundant==='1')};
 document.querySelector('#download-images').onclick=async()=>{for(const c of checks().filter(c=>c.checked)){const a=document.createElement('a');a.href=c.dataset.download;a.download='';document.body.append(a);a.click();a.remove();await new Promise(r=>setTimeout(r,500));}};
 </script>{% endblock %}
