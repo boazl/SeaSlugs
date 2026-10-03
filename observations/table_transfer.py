@@ -95,8 +95,14 @@ def related(field,value,required=True):
         if not isinstance(value,str): raise ValidationError('מפתח קשר לא תקין.')
         obj=unique(Species,scientific_name=value)
     elif field=='defining_sample':
+        # Returns early (skipping the generic "missing reference" hard-fail below): the
+        # sample this points at may simply not have reached this environment yet (its own
+        # image is still transferred separately, one at a time) -- that must not block the
+        # whole species+area from appearing over one photo that hasn't arrived. plan()
+        # recomputes a locally-available fallback for this field specifically when it comes
+        # back None, instead of treating None here as an error like every other reference.
         if not isinstance(value,str): raise ValidationError('מפתח קשר לא תקין.')
-        obj=unique(Sample,transfer_id=value)
+        return unique(Sample,transfer_id=value)
     else:
         if not isinstance(value,str): raise ValidationError('מפתח קשר לא תקין.')
         model={'country':Country,'sea':Sea,'photographer_fk':Photographer}[field]
@@ -147,6 +153,15 @@ def plan(document):
                 values[f] = v
             elif not isinstance(v,str): raise ValidationError(f'ערך לא תקין בשורה {number}.')
             else: values[f]=v.strip()
+        if model is SpeciesArea and values.get('defining_sample') is None:
+            # Either the source genuinely has no defining sample, or the one it pointed at
+            # (by transfer_id) hasn't reached this environment yet -- recompute the best
+            # sample this environment already has for this species+area, exactly like a
+            # plain samples-table transfer and a normal publish both already self-heal this
+            # (see apply()'s own 'samples' branch and Sample.save_reviewed()), rather than
+            # leaving the row with no photo at all.
+            values['defining_sample'] = SpeciesArea.pick_defining_sample(
+                values['species'].pk, values['country'].pk, values['sea'].pk, values['undetermined_variant'])
         if model is Species:
             source=unique(model,source_id=values['source_id']) if values['source_id'] else None
             named=unique(model,scientific_name=values['scientific_name'])

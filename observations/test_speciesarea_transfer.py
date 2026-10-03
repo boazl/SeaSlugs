@@ -72,11 +72,34 @@ class SpeciesAreaTransferTests(TestCase):
             apply(doc, fingerprint())
         self.assertTrue(SpeciesArea.objects.filter(species=new_species, country=self.country, sea=self.sea).exists())
 
-    def test_missing_defining_sample_names_the_sample_and_blocks_import(self):
+    def test_unresolvable_defining_sample_self_heals_instead_of_blocking_the_import(self):
+        # Regression: a real-world speciesareas transfer blocked on its very first
+        # unresolved row with "חסר ערך מקושר (defining_sample: ...)" -- the defining
+        # sample simply hadn't had its own image transferred yet (that happens separately,
+        # one photo at a time), which is routine mid-transfer, not a data error. The whole
+        # species+area must still come through, falling back to whatever sample this
+        # environment already has for it -- exactly like a plain samples-table transfer and
+        # a normal publish already self-heal a missing defining sample.
         doc = export_table('speciesareas')
         doc['rows'][0]['defining_sample'] = '00000000-0000-0000-0000-000000000000'
-        with self.assertRaises(ValidationError):
-            plan(doc)
+        items = plan(doc)  # must not raise
+        self.assertEqual(items[0]['object'].defining_sample_id, self.sample.pk)  # only local candidate
+
+    def test_unresolvable_defining_sample_does_not_block_other_rows_in_the_same_batch(self):
+        # The actual shape of the regression: one row's defining sample hasn't arrived yet,
+        # but every other row in the same batch must still go through.
+        new_species = Species.objects.create(scientific_name='Hypselodoris infucata', genus='Hypselodoris', species='infucata')
+        doc = export_table('speciesareas')
+        doc['rows'].append({'species': 'Hypselodoris infucata', 'country': 'Israel', 'sea': 'Mediterranean',
+                             'undetermined_variant': '', 'defining_sample': '00000000-0000-0000-0000-000000000000'})
+        items = plan(doc)  # must not raise even though neither row's defining_sample resolves as given
+        self.assertEqual(len(items), 2)
+        self.assertEqual(items[0]['action'], 'same')
+        self.assertEqual(items[1]['action'], 'new')
+        self.assertIsNone(items[1]['object'].defining_sample_id)  # no local sample at all for this one yet
+        with patch('observations.table_transfer.create_backup', return_value=Path('test.sqlite3')):
+            apply(doc, fingerprint())
+        self.assertTrue(SpeciesArea.objects.filter(species=new_species).exists())
 
     def test_missing_species_blocks_import(self):
         doc = export_table('speciesareas')
