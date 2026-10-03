@@ -1,3 +1,4 @@
+import hashlib
 import io
 import tempfile
 from pathlib import Path
@@ -218,7 +219,7 @@ class RenameImagesToCanonicalCommandTests(TestCase):
             call_command('rename_images_to_canonical', '--apply', stdout=io.StringIO())
             out = io.StringIO()
             call_command('rename_images_to_canonical', '--apply', stdout=out)
-            self.assertIn('0 to rename, 1 already canonical', out.getvalue())
+            self.assertIn('0 to rename, 0 recovered by content hash, 1 already canonical', out.getvalue())
 
     def test_missing_file_on_disk_is_reported_and_left_untouched(self):
         from django.core.management import call_command
@@ -230,4 +231,137 @@ class RenameImagesToCanonicalCommandTests(TestCase):
             call_command('rename_images_to_canonical', '--apply', stdout=out)
             sample.refresh_from_db()
             self.assertEqual(sample.image.name, old_name)  # left untouched, not renamed
+            self.assertIn('missing on disk', out.getvalue())
+
+
+class RenameImagesToCanonicalSharedImageTests(TestCase):
+    """Two Sample rows can legitimately point at the exact same stored image file -- most
+    often a species sample and that genus's own "defining sample" (see
+    assign_genus_defining_samples), which deliberately reuses one of its member species'
+    photo instead of its own upload. Each still gets its own distinct canonical name, so the
+    shared file must be copied to every sample that needs it before it is ever removed --
+    not moved away by whichever sample happens to be processed first (a real bug an earlier
+    version of this command had, caught against this project's own database: 19 genus-kind
+    defining samples were left pointing at a file a sibling species sample's rename had
+    already moved out from under them)."""
+    def setUp(self):
+        patcher = patch('observations.management.commands.rename_images_to_canonical.create_backup',
+                         return_value=Path('backup-stub.sqlite3'))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.user = User.objects.create_superuser('admin', password='testing')
+        self.country = Country.objects.create(name='Israel')
+        self.sea = Sea.objects.create(name='Red Sea')
+        self.trip = DiveTrip.objects.create(title='Eilat trip', year=2026, code='EI24',
+            country=self.country, region=Region.objects.create(name='Eilat', country=self.country, sea=self.sea))
+        self.species = Species.objects.create(scientific_name='Chromodoris quadricolor', genus='Chromodoris', species='quadricolor')
+
+    def _two_samples_sharing_one_image(self, folder):
+        # Sample.clean()'s duplicate-image check deliberately only fires when a sample's own
+        # image is actually changing (see the comment above it): it accepts that legacy rows
+        # already sharing one photo predate the check. A genus-kind "defining sample" row is
+        # exactly that -- Sample.save()'s own docstring notes it is saved with a plain
+        # .save(), never through save_reviewed() / full_clean() -- so this mirrors that real
+        # construction rather than going through validation that a real defining sample
+        # never does either.
+        from django.core.files.storage import default_storage
+        shared_name = 'observations/transfer/' + hashlib.sha256(b'shared-photo').hexdigest() + '.jpg'
+        default_storage.save(shared_name, ContentFile(b'shared-photo'))
+        species_sample = Sample(owner=self.user, trip=self.trip, kind=Sample.Kind.SPECIES, species=self.species)
+        species_sample.image.name = shared_name
+        species_sample.save_reviewed()
+        genus_sample = Sample(owner=self.user, trip=self.trip, kind=Sample.Kind.GENUS, species_other='Chromodoris',
+                               video_url='https://youtu.be/00000000001')
+        genus_sample.image.name = shared_name
+        genus_sample.save()
+        return species_sample, genus_sample, shared_name
+
+    def test_both_samples_get_their_own_independent_canonical_copy(self):
+        from django.core.management import call_command
+        with tempfile.TemporaryDirectory() as folder, override_settings(MEDIA_ROOT=folder):
+            species_sample, genus_sample, shared_name = self._two_samples_sharing_one_image(folder)
+            out = io.StringIO()
+            call_command('rename_images_to_canonical', '--apply', stdout=out)
+            species_sample.refresh_from_db(); genus_sample.refresh_from_db()
+            self.assertEqual(species_sample.image.name, 'observations/ei24-chromodoris-quadricolor.jpg')
+            self.assertEqual(genus_sample.image.name, 'observations/ei24-chromodoris.jpg')
+            # each sample's own file physically exists, with the shared content
+            self.assertEqual((Path(folder) / species_sample.image.name).read_bytes(), b'shared-photo')
+            self.assertEqual((Path(folder) / genus_sample.image.name).read_bytes(), b'shared-photo')
+            # the old shared source is gone -- nothing points at it by that name any more
+            self.assertFalse((Path(folder) / shared_name).exists())
+            self.assertIn('2 to rename', out.getvalue())
+
+    def test_dry_run_on_shared_image_does_not_touch_disk(self):
+        from django.core.management import call_command
+        with tempfile.TemporaryDirectory() as folder, override_settings(MEDIA_ROOT=folder):
+            species_sample, genus_sample, shared_name = self._two_samples_sharing_one_image(folder)
+            call_command('rename_images_to_canonical', stdout=io.StringIO())
+            self.assertTrue((Path(folder) / shared_name).is_file())  # shared source untouched
+            species_sample.refresh_from_db(); genus_sample.refresh_from_db()
+            self.assertEqual(species_sample.image.name, shared_name)
+            self.assertEqual(genus_sample.image.name, shared_name)
+
+
+class RenameImagesToCanonicalHashRecoveryTests(TestCase):
+    """Repairs the exact damage the move-based bug above already did to a live database: a
+    sample whose recorded image path is a legacy content-hash name that no longer exists on
+    disk (because an earlier, buggy run already moved that file away under a sibling sample),
+    recovered by finding today's copy of that same content elsewhere in the media folder."""
+    def setUp(self):
+        patcher = patch('observations.management.commands.rename_images_to_canonical.create_backup',
+                         return_value=Path('backup-stub.sqlite3'))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.user = User.objects.create_superuser('admin', password='testing')
+        self.country = Country.objects.create(name='Israel')
+        self.sea = Sea.objects.create(name='Red Sea')
+        self.trip = DiveTrip.objects.create(title='Eilat trip', year=2026, code='EI24',
+            country=self.country, region=Region.objects.create(name='Eilat', country=self.country, sea=self.sea))
+
+    def test_sample_with_a_vanished_legacy_name_is_recovered_by_content_hash(self):
+        from django.core.management import call_command
+        with tempfile.TemporaryDirectory() as folder, override_settings(MEDIA_ROOT=folder):
+            # The species sample already ran through a (correct) earlier rename -- its file
+            # sits at its own canonical name, content known.
+            species = Species.objects.create(scientific_name='Chromodoris quadricolor', genus='Chromodoris', species='quadricolor')
+            species_sample = Sample(owner=self.user, trip=self.trip, kind=Sample.Kind.SPECIES, species=species)
+            species_sample.image.save('observations/ei24-chromodoris-quadricolor.jpg', ContentFile(b'shared-photo'), save=False)
+            species_sample.save_reviewed()
+
+            # The genus sample is exactly the damage the old bug left behind: its database
+            # value is still the legacy hash name, and that file no longer exists anywhere
+            # except (now, under a different name) as the species sample's own copy above.
+            genus_sample = Sample(owner=self.user, trip=self.trip, kind=Sample.Kind.GENUS, species_other='Chromodoris',
+                                   video_url='https://youtu.be/00000000002')
+            vanished_name = 'observations/transfer/' + hashlib.sha256(b'shared-photo').hexdigest() + '.jpg'
+            genus_sample.image.name = vanished_name
+            genus_sample.save()  # a plain save(), matching how a real defining sample is created (no full_clean)
+            self.assertFalse((Path(folder) / vanished_name).exists())  # confirms the damage
+
+            out = io.StringIO()
+            call_command('rename_images_to_canonical', '--apply', stdout=out)
+
+            genus_sample.refresh_from_db()
+            self.assertEqual(genus_sample.image.name, 'observations/ei24-chromodoris.jpg')
+            self.assertEqual((Path(folder) / genus_sample.image.name).read_bytes(), b'shared-photo')
+            # the species sample's own file is untouched -- it's still legitimately needed there
+            species_sample.refresh_from_db()
+            self.assertTrue((Path(folder) / species_sample.image.name).is_file())
+            self.assertIn('1 recovered by content hash', out.getvalue())
+            self.assertNotIn('missing on disk', out.getvalue())
+
+    def test_a_truly_absent_file_with_no_match_anywhere_is_still_reported_missing(self):
+        from django.core.management import call_command
+        with tempfile.TemporaryDirectory() as folder, override_settings(MEDIA_ROOT=folder):
+            species = Species.objects.create(scientific_name='Chromodoris quadricolor', genus='Chromodoris', species='quadricolor')
+            sample = Sample(owner=self.user, trip=self.trip, kind=Sample.Kind.SPECIES, species=species)
+            vanished_name = 'observations/transfer/' + hashlib.sha256(b'never-existed').hexdigest() + '.jpg'
+            sample.image.name = vanished_name
+            sample.save_reviewed()
+
+            out = io.StringIO()
+            call_command('rename_images_to_canonical', '--apply', stdout=out)
+            sample.refresh_from_db()
+            self.assertEqual(sample.image.name, vanished_name)  # left untouched
             self.assertIn('missing on disk', out.getvalue())

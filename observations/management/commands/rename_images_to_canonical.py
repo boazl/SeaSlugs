@@ -11,16 +11,37 @@ is named this way, the image manager's cross-environment comparison tool (ניה
 rename itself safe to run independently in each environment -- it never needs to look at
 the other side.
 
-Run this once in EACH environment separately (the Mac, then production) after the code that
-writes this scheme has been deployed there. Processes samples in a stable order (by pk) so
-that, within a single run, a collision between two samples destined for the same base name
-is resolved deterministically and reproducibly (see the -2, -3, ... suffixing in
-canonical_image_name) -- running it a second time is a safe no-op: any sample whose image is
-already canonically named is left untouched.
+Two or more samples can legitimately reference the very same stored image file -- most often
+a species sample and that genus/family/order's own "defining sample" (see
+assign_genus_defining_samples), which is deliberately set to reuse one of its member species'
+own photo as a representative image, rather than being its own separate upload. Each sample
+still gets its own distinct canonical name (Sample.canonical_image_name depends on the
+sample's own kind and identity, not on which file it happens to share), so every sample
+sharing a source file is copied to its own destination before that shared source is ever
+removed -- it is deleted only once every sample that was pointing at it has its own
+independent copy, which is what makes the result correct regardless of processing order.
 
-Safe to re-run. Dry run by default -- pass --apply to actually rename files on disk and
-update the database.
+An earlier version of this command used a plain rename (move) per sample instead, which broke
+exactly that case: whichever sample happened to be processed first stole the file out from
+under every sibling still pointing at that same path, leaving their own Sample.image value
+referencing a file that no longer existed. A real run against this project's own database hit
+this: 19 genus-kind "defining sample" rows were left pointing at a file a sibling species
+sample's own rename had already moved away. If a sample's own current file is missing for that
+reason -- its current name follows the legacy content-hash scheme (sha256 of its own former
+content) -- this command recovers it by searching every file currently in the media folder for
+one whose content still matches that hash, before finally giving up and reporting it as
+missing.
+
+Run this once in EACH environment separately (the Mac, then production) after the code that
+writes this scheme has been deployed there. Safe to re-run: any sample whose image is already
+canonically named is left untouched.
+
+Dry run by default -- pass --apply to actually rename files on disk and update the database.
 """
+import hashlib
+import re
+import shutil
+from collections import defaultdict
 from pathlib import Path
 
 from django.conf import settings
@@ -29,6 +50,8 @@ from django.db import transaction
 
 from observations.models import Sample
 from observations.table_transfer import create_backup
+
+_LEGACY_HASH_RE = re.compile(r'observations/transfer/([0-9a-f]{64})\.jpg')
 
 
 class Command(BaseCommand):
@@ -40,47 +63,82 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         apply = options['apply']
         root = Path(settings.MEDIA_ROOT).resolve()
-        samples = Sample.objects.exclude(image='').filter(deleted_at__isnull=True).select_related('species', 'trip').order_by('pk')
+        samples = list(Sample.objects.exclude(image='').filter(deleted_at__isnull=True)
+                       .select_related('species', 'trip').order_by('pk'))
+
+        def content_hash_index():
+            # sha256 -> Path, for every file currently under the media root's observations
+            # folder. Built lazily, only the first time some sample's own file turns out to
+            # be missing -- the ordinary case never needs it.
+            index = {}
+            obs_root = root / 'observations'
+            if obs_root.is_dir():
+                for path in obs_root.rglob('*.jpg'):
+                    if path.is_file():
+                        index.setdefault(hashlib.sha256(path.read_bytes()).hexdigest(), path)
+            return index
 
         def run():
-            renamed = 0
-            already_canonical = 0
-            missing_files = []
+            groups = defaultdict(list)
             for sample in samples:
-                current = sample.image.name
-                # Processed in pk order, with the rename committed immediately below (inside
-                # the one shared transaction when --apply is given) -- so by the time a later
-                # sample's canonical_image_name() runs its own collision check, it already
-                # sees every earlier sample's NEW name, and resolves a shared base name to a
-                # -2, -3, ... suffix the same deterministic way canonical_image_name() always
-                # does for a brand-new upload.
-                desired = sample.canonical_image_name()
-                if current == desired:
-                    already_canonical += 1
-                    continue
-                old_path = root / current
-                new_path = root / desired
-                if not old_path.is_file():
-                    missing_files.append((sample.pk, current))
-                    continue
-                if apply:
-                    new_path.parent.mkdir(parents=True, exist_ok=True)
-                    old_path.rename(new_path)
-                    Sample.objects.filter(pk=sample.pk).update(image=desired)
-                self.stdout.write(f'#{sample.pk}: {current} -> {desired}')
-                renamed += 1
-            return renamed, already_canonical, missing_files
+                groups[sample.image.name].append(sample)
+
+            renamed = recovered = already_canonical = 0
+            missing_files = []
+            hash_index = None
+
+            for current, group in groups.items():
+                source_path = root / current
+                via_hash_recovery = False
+                if not source_path.is_file():
+                    legacy = _LEGACY_HASH_RE.fullmatch(current)
+                    found = None
+                    if legacy:
+                        if hash_index is None:
+                            hash_index = content_hash_index()
+                        found = hash_index.get(legacy.group(1))
+                    if found is None:
+                        missing_files.extend((sample.pk, current) for sample in group)
+                        continue
+                    source_path = found
+                    via_hash_recovery = True
+
+                keep_source = False
+                for sample in group:
+                    desired = sample.canonical_image_name()
+                    if current == desired and not via_hash_recovery:
+                        already_canonical += 1
+                        keep_source = True
+                        continue
+                    new_path = root / desired
+                    if apply:
+                        new_path.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(source_path, new_path)
+                        Sample.objects.filter(pk=sample.pk).update(image=desired)
+                    if via_hash_recovery:
+                        recovered += 1
+                        self.stdout.write(f'#{sample.pk}: {current} -> {desired}  (recovered by content hash; found at {source_path.relative_to(root)})')
+                    else:
+                        renamed += 1
+                        self.stdout.write(f'#{sample.pk}: {current} -> {desired}')
+
+                if apply and not via_hash_recovery and not keep_source:
+                    source_path.unlink(missing_ok=True)
+
+            return renamed, recovered, already_canonical, missing_files
 
         if apply:
             backup = create_backup()
             with transaction.atomic():
-                renamed, already_canonical, missing_files = run()
+                renamed, recovered, already_canonical, missing_files = run()
             self.stdout.write(f'Backup created: {backup.name}')
         else:
-            renamed, already_canonical, missing_files = run()
+            renamed, recovered, already_canonical, missing_files = run()
 
-        total = samples.count()
-        self.stdout.write(f'images: {renamed} to rename, {already_canonical} already canonical (of {total} active image-bearing samples)')
+        total = len(samples)
+        self.stdout.write(
+            f'images: {renamed} to rename, {recovered} recovered by content hash, '
+            f'{already_canonical} already canonical (of {total} active image-bearing samples)')
         if missing_files:
             self.stdout.write(self.style.WARNING(f'{len(missing_files)} samples reference a file that is missing on disk (left untouched):'))
             for pk, name in missing_files:
