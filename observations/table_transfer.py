@@ -17,7 +17,9 @@ from .account_transfer import ACCOUNT_TABLES, account_row, account_plan
 # Ordered to match the actual transfer dependency chain (see TABLE-TRANSFER.md): each table
 # only ever references ones earlier in this dict, so exporting/importing in this order (as
 # both the table-transfer page and the releases page now show it) never hits a missing
-# reference. Samples must always go last, since they depend on nearly everything else.
+# reference. Samples must go after everything they can reference, and speciesareas must go
+# last of all -- it references a Sample (defining_sample) on top of species/country/sea, so
+# it can only be imported once the environment's own Samples are already in place.
 TABLES = {'groups': ACCOUNT_TABLES['groups'], 'users': ACCOUNT_TABLES['users'],
           'countries': (Country,['name','name_en']), 'seas': (Sea,['name','name_en']),
           'regions': (Region,['name','name_en','country','sea']), 'sites': (Site,['name','name_en','region']),
@@ -25,13 +27,16 @@ TABLES = {'groups': ACCOUNT_TABLES['groups'], 'users': ACCOUNT_TABLES['users'],
           'profiles': ACCOUNT_TABLES['profiles'],
           'species': (Species, ['scientific_name','name_he','name_en','source_id','genus','species','author','order','family','superfamily','accepted_genus','accepted_species','common_name','transliteration','language','formatted_author','distribution','phylogenetic_order','full_species_name_with_order','reference_author','is_migrant','habitat','food','first_observed_year','last_observed_year','size_from','size_to','size_max','description_he','description_en','link']),
           'trips': (DiveTrip, ['code','title','source_sort','year','month','start_day','duration_days','country','region','sea','site','photographer_fk','country_name','region_name','reserve','sea_name','photographer','species_count','source_metadata','kind','description_he','description_en','link']),
-          'samples': (Sample, ['title','kind','trip','owner','species','site','species_other','undetermined_variant','site_other','day','depth','video_url','status','source_id','gallery_order','source_metadata','transfer_id','image'])}
+          'samples': (Sample, ['title','kind','trip','owner','species','site','species_other','undetermined_variant','site_other','day','depth','video_url','status','source_id','gallery_order','source_metadata','transfer_id','image']),
+          'speciesareas': (SpeciesArea, ['species','country','sea','undetermined_variant','defining_sample'])}
 
 
 def reference(obj):
     if obj is None: return None
     if isinstance(obj, Region): return {'name':obj.name,'country':obj.country.name}
     if isinstance(obj, Site): return {'name':obj.name,'region':obj.region.name,'country':obj.region.country.name}
+    if isinstance(obj, Species): return obj.scientific_name
+    if isinstance(obj, Sample): return str(obj.transfer_id)
     return obj.name
 
 
@@ -43,7 +48,9 @@ def row(obj, fields):
         return sample_row(obj, fields)
     result = {}
     for f in fields:
-        if f in ('country','sea','region','site','photographer_fk'):
+        if f in ('country','sea','region','site','photographer_fk') or (isinstance(obj, SpeciesArea) and f in ('species','defining_sample')):
+            # Species' OWN 'species' field (the epithet, a plain string) shares a name with
+            # SpeciesArea's 'species' FK -- only treat it as a reference on SpeciesArea itself.
             result[f] = reference(getattr(obj,f))
         else:
             value = getattr(obj,f)
@@ -84,6 +91,12 @@ def related(field,value,required=True):
     elif field=='site':
         if not isinstance(value,dict) or set(value)!= {'name','region','country'} or not all(isinstance(v,str) for v in value.values()): raise ValidationError('מפתח אתר לא תקין.')
         obj=unique(Site,name=value['name'],region__name=value['region'],region__country__name=value['country'])
+    elif field=='species':
+        if not isinstance(value,str): raise ValidationError('מפתח קשר לא תקין.')
+        obj=unique(Species,scientific_name=value)
+    elif field=='defining_sample':
+        if not isinstance(value,str): raise ValidationError('מפתח קשר לא תקין.')
+        obj=unique(Sample,transfer_id=value)
     else:
         if not isinstance(value,str): raise ValidationError('מפתח קשר לא תקין.')
         model={'country':Country,'sea':Sea,'photographer_fk':Photographer}[field]
@@ -109,6 +122,11 @@ def plan(document):
         values={}
         for f,v in incoming.items():
             if f in ('country','sea','region','site','photographer_fk'): values[f]=related(f,v,required=not (model is DiveTrip))
+            elif model is SpeciesArea and f in ('species','defining_sample'):
+                # Same name collision as in row() above -- only SpeciesArea's own 'species'
+                # and 'defining_sample' fields are references; Species.species (the
+                # epithet) is a plain string handled by the generic branch below.
+                values[f]=related(f,v,required=f!='defining_sample')
             elif model is DiveTrip and f in ('year','month','start_day','duration_days','species_count'):
                 if v is not None and type(v) is not int: raise ValidationError('נדרש מספר שלם: '+f)
                 values[f] = v
@@ -139,6 +157,11 @@ def plan(document):
         elif model is DiveTrip:
             obj=unique(model,code=values['code'])
             identity=values['code']
+        elif model is SpeciesArea:
+            lookup={'species':values['species'],'country':values['country'],'sea':values['sea'],'undetermined_variant':values['undetermined_variant']}
+            obj=unique(model,**lookup)
+            identity=json.dumps({'species':values['species'].scientific_name,'country':values['country'].name,
+                                  'sea':values['sea'].name,'undetermined_variant':values['undetermined_variant']},sort_keys=True)
         else:
             lookup={'name':values['name']}
             if model is Region:lookup['country']=values['country']
@@ -153,6 +176,12 @@ def plan(document):
         if model is Species and obj:
             for field in TABLES['species'][1]:
                 if field not in values: setattr(candidate,field,getattr(obj,field))
+        if model is SpeciesArea and obj:
+            # slug isn't a transferred field (it's generated once from species+country+sea
+            # and then deliberately left alone so a published species page's URL stays
+            # stable) -- carry the existing one over rather than letting a plain update
+            # reset it to '' and have save() mint a fresh one.
+            candidate.slug = obj.slug
         if obj: candidate._state.adding = False
         candidate.full_clean()
         after=row(candidate,fields)
