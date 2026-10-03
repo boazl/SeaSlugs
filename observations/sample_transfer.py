@@ -122,7 +122,7 @@ def sample_plan(document, fields):
                 # transfer, both of which land here) needs to act on: add that species to
                 # the target's species table first, or fix a typo, before transferring again.
                 if field == 'species': raise ValidationError(f'המין "{value}" אינו קיים בטבלת המינים ביעד. יש להוסיף אותו קודם (או להעביר את טבלת המינים), או לתקן את שם המין, ואז לייבא שוב.')
-                raise ValidationError('חסר ערך בטבלת עזר: ' + field)
+                raise ValidationError(f'האתר "{value["name"]}" ({value["region"]}, {value["country"]}) אינו קיים בטבלת האתרים ביעד. יש להוסיף אותו קודם (או להעביר את טבלת האתרים), או לתקן את הנתונים, ואז לייבא שוב.')
         for field in ('day','gallery_order'):
             if values[field] is not None and type(values[field]) is not int: raise ValidationError('נדרש מספר שלם: '+field)
         try: values['depth'] = Decimal(str(values['depth'])) if values['depth'] is not None else None

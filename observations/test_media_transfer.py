@@ -373,6 +373,29 @@ class MediaTransferTests(TestCase):
         self.assertContains(response,'Nonexistent species')
         self.assertContains(response,'אינו קיים בטבלת המינים')
         self.assertNotIn('token',response.context)
+    def test_sample_transfer_names_the_missing_site_instead_of_a_generic_message(self):
+        # Same treatment as the missing-species case just above -- a samples-table row
+        # referencing a site that doesn't exist in this environment's sites table must name
+        # it (and its region/country), not just say "site" the way the generic missing
+        # reference-value message would, so whoever is importing knows exactly what to add.
+        from .table_transfer import plan
+        doc=export_table('samples');doc['media_mode']='separate'
+        doc['rows'][0]['site']={'name':'Nonexistent site','region':'Eilat','country':'Israel'}
+        with self.assertRaises(ValidationError) as ctx:
+            plan(doc)
+        self.assertIn('Nonexistent site',str(ctx.exception))
+        self.assertIn('אינו קיים בטבלת האתרים',str(ctx.exception))
+    def test_table_transfer_preview_reports_the_missing_site_by_name(self):
+        import json
+        self.client.force_login(self.sample.owner)
+        response=self.client.post('/admin/table-transfer/',{'action':'export','table':'samples'})
+        doc=json.loads(response.content)
+        doc['rows'][0]['site']={'name':'Nonexistent site','region':'Eilat','country':'Israel'}
+        response=self.client.post('/admin/table-transfer/',{'action':'preview','file':SimpleUploadedFile('table.json',json.dumps(doc).encode())})
+        self.assertEqual(response.status_code,200)
+        self.assertContains(response,'Nonexistent site')
+        self.assertContains(response,'אינו קיים בטבלת האתרים')
+        self.assertNotIn('token',response.context)
     def test_deleted_target_with_no_live_replacement_skips_only_that_row(self):
         # When a video's only local representation is a deleted sample (no active
         # replacement exists for it), reviving it -- or silently creating a second,
