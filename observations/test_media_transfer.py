@@ -384,6 +384,42 @@ class MediaTransferTests(TestCase):
         genus_sample.refresh_from_db()
         self.assertEqual(genus_sample.status,'published');self.assertEqual(genus_sample.species_other,'Chelidonura')
 
+    def test_image_manager_upload_registers_a_newly_published_species_sample_in_speciesarea(self):
+        # Regression: the upload handler saved a newly transferred, already-published
+        # SPECIES-kind sample with a plain .save(), bypassing both
+        # Sample.save_reviewed()'s own side effect and table_transfer.apply()'s mirror of
+        # it for a plain table transfer -- so SpeciesArea (what actually drives the public
+        # gallery; see config/views.py's own catalog queryset, built from
+        # SpeciesArea.objects, not Sample directly) was never updated. The sample itself
+        # was stored correctly and published, but never appeared in the gallery at all.
+        import base64,json as json_module,uuid
+        from .image_manager import files
+        from .models import SpeciesArea
+        new_species=Species.objects.create(scientific_name='Newly transferred species')
+        source=Sample(owner=self.sample.owner,trip=self.sample.trip,kind=Sample.Kind.SPECIES,species=new_species,
+            video_url='https://youtu.be/44444444444')
+        output=io.BytesIO();Image.new('RGB',(60,40),'pink').save(output,'JPEG')
+        source.image.save('newspecies.jpg',ContentFile(output.getvalue()),save=False)
+        source.save_reviewed(actor=source.owner,approve=True)
+        self.assertEqual(source.status,'published')
+        self.assertTrue(SpeciesArea.objects.filter(species=new_species).exists())  # sanity: save_reviewed() itself registers it
+        SpeciesArea.objects.filter(species=new_species).delete()  # simulate a target that never had this species registered
+
+        self.client.force_login(source.owner)
+        row=next(r for r in files() if source in r['refs'])
+        response=self.client.get('/admin/images/file/',{'file':row['token'],'download':'1'})
+        raw=b''.join(response.streaming_content);response.close()
+        with Image.open(io.BytesIO(raw)) as image:
+            metadata=json_module.loads(base64.b64decode(image.getexif()[270][len('SeaSlugsB64:'):]).decode('utf-8'))
+            # A fresh transfer_id and video -- sample_plan() must treat this as a brand new
+            # sample on this end, not a match back to source (already saved locally above).
+            metadata['transfer_id']=str(uuid.uuid4());metadata['video_url']='https://youtu.be/55555555555'
+            output=io.BytesIO();exif=Image.Exif();exif[270]='SeaSlugsB64:'+base64.b64encode(json_module.dumps(metadata,ensure_ascii=False).encode('utf-8')).decode('ascii')
+            image.convert('RGB').save(output,'JPEG',exif=exif)
+        response=self.client.post('/admin/images/',{'action':'upload','images':SimpleUploadedFile('new.jpg',output.getvalue(),content_type='image/jpeg')})
+        self.assertEqual(response.status_code,302,response.content)
+        self.assertTrue(SpeciesArea.objects.filter(species=new_species).exists())
+
     def test_json_export_and_update_preserves_destination_image(self):
         import json
         self.client.force_login(self.sample.owner)

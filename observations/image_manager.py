@@ -204,7 +204,7 @@ def manager(request):
                     name='observations/transfer/'+hashlib.sha256(raw).hexdigest()+'.jpg'
                     row['image']=name;doc['rows'].append(row);doc['_media_names'].append(name);images[name]=raw
                 with transaction.atomic():
-                    from .models import Species
+                    from .models import Species, SpeciesArea
                     Species.objects.filter(pk=-1).update(scientific_name='')
                     items=sample_plan(doc,TABLES['samples'][1])
                     old_names=[];used_in_batch=set();skip_reasons=[]
@@ -241,7 +241,23 @@ def manager(request):
                         final.image=canonical;result['object']=final
                     save_images(images)
                     transferred=[result for result in items if result['object'] is not None]
-                    for result in transferred: result['object'].save()
+                    for result in transferred:
+                        sample=result['object'];sample.save()
+                        # Mirror Sample.save_reviewed()'s own side effect (also mirrored by
+                        # table_transfer.apply() for a plain table transfer) -- a sample
+                        # transferred here and already published must register itself in
+                        # SpeciesArea exactly like one saved through the site normally
+                        # would, otherwise it's stored correctly but never appears in the
+                        # public gallery, which is driven by SpeciesArea, not Sample directly.
+                        if (sample.status==Sample.Status.PUBLISHED and sample.kind==Sample.Kind.SPECIES
+                                and sample.species_id and sample.trip_id
+                                and sample.trip.country_id and sample.trip.resolved_sea_id):
+                            SpeciesArea.objects.update_or_create(
+                                species_id=sample.species_id,country_id=sample.trip.country_id,sea_id=sample.trip.resolved_sea_id,
+                                undetermined_variant=sample.undetermined_variant,
+                                defaults={'defining_sample':SpeciesArea.pick_defining_sample(
+                                    sample.species_id,sample.trip.country_id,sample.trip.resolved_sea_id,sample.undetermined_variant)},
+                            )
                 for old in set(old_names)-set(images):
                     if old and not Sample.objects.filter(image=old).exists():
                         root=Path(settings.MEDIA_ROOT).resolve();old_path=root/old
