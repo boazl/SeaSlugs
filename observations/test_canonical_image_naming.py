@@ -1,6 +1,7 @@
 import io
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 from PIL import Image
 from django.test import TestCase, override_settings
 from django.contrib.auth.models import User
@@ -155,3 +156,78 @@ class SampleAdminRenameTests(TestCase):
                 changed_data = ['image']
             SampleAdmin(Sample, None).save_model(request=None, obj=obj, form=FakeForm(), change=False)
             self.assertEqual(obj.image.name, 'observations/ei24-chromodoris-quadricolor.jpg')
+
+
+class RenameImagesToCanonicalCommandTests(TestCase):
+    """The one-off migration command (rename_images_to_canonical) is dry-run by default and
+    only touches disk + the database when given --apply; it must also leave an
+    already-canonical sample untouched and report (without crashing on) a sample whose file
+    is missing from disk. create_backup() is patched out in every test here -- same reasoning
+    as every other command test in this codebase (see test_assign_genus_defining_samples.py,
+    test_taxonomy.py): it does real sqlite file I/O via a second raw connection, which is both
+    irrelevant to what's under test and deadlocks against TestCase's own open transaction."""
+    def setUp(self):
+        patcher = patch('observations.management.commands.rename_images_to_canonical.create_backup',
+                         return_value=Path('backup-stub.sqlite3'))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.user = User.objects.create_superuser('admin', password='testing')
+        self.country = Country.objects.create(name='Israel')
+        self.sea = Sea.objects.create(name='Red Sea')
+        self.trip = DiveTrip.objects.create(title='Eilat trip', year=2026, code='EI24',
+            country=self.country, region=Region.objects.create(name='Eilat', country=self.country, sea=self.sea))
+        self.species = Species.objects.create(scientific_name='Chromodoris quadricolor', genus='Chromodoris', species='quadricolor')
+
+    def _sample_with_legacy_name(self):
+        sample = Sample(owner=self.user, trip=self.trip, kind=Sample.Kind.SPECIES, species=self.species)
+        sample.image.save('some-random-upload-name.jpg', ContentFile(_jpeg_bytes('blue')), save=False)
+        sample.save_reviewed()
+        return sample
+
+    def test_dry_run_reports_without_changing_anything(self):
+        from django.core.management import call_command
+        with tempfile.TemporaryDirectory() as folder, override_settings(MEDIA_ROOT=folder):
+            sample = self._sample_with_legacy_name()
+            old_name = sample.image.name
+            out = io.StringIO()
+            call_command('rename_images_to_canonical', stdout=out)
+            sample.refresh_from_db()
+            self.assertEqual(sample.image.name, old_name)  # untouched
+            self.assertTrue((Path(folder) / old_name).is_file())  # file not moved
+            self.assertFalse((Path(folder) / 'observations/ei24-chromodoris-quadricolor.jpg').exists())
+            self.assertIn('1 to rename', out.getvalue())
+            self.assertIn('Dry run only', out.getvalue())
+
+    def test_apply_renames_file_and_updates_database(self):
+        from django.core.management import call_command
+        with tempfile.TemporaryDirectory() as folder, override_settings(MEDIA_ROOT=folder):
+            sample = self._sample_with_legacy_name()
+            old_name = sample.image.name
+            out = io.StringIO()
+            call_command('rename_images_to_canonical', '--apply', stdout=out)
+            sample.refresh_from_db()
+            self.assertEqual(sample.image.name, 'observations/ei24-chromodoris-quadricolor.jpg')
+            self.assertFalse((Path(folder) / old_name).exists())  # old file gone
+            self.assertTrue((Path(folder) / sample.image.name).is_file())  # new file in place
+            self.assertIn('1 to rename', out.getvalue())
+
+    def test_rerunning_after_apply_is_a_no_op(self):
+        from django.core.management import call_command
+        with tempfile.TemporaryDirectory() as folder, override_settings(MEDIA_ROOT=folder):
+            self._sample_with_legacy_name()
+            call_command('rename_images_to_canonical', '--apply', stdout=io.StringIO())
+            out = io.StringIO()
+            call_command('rename_images_to_canonical', '--apply', stdout=out)
+            self.assertIn('0 to rename, 1 already canonical', out.getvalue())
+
+    def test_missing_file_on_disk_is_reported_and_left_untouched(self):
+        from django.core.management import call_command
+        with tempfile.TemporaryDirectory() as folder, override_settings(MEDIA_ROOT=folder):
+            sample = self._sample_with_legacy_name()
+            old_name = sample.image.name
+            (Path(folder) / old_name).unlink()  # simulate a file that vanished from disk
+            out = io.StringIO()
+            call_command('rename_images_to_canonical', '--apply', stdout=out)
+            sample.refresh_from_db()
+            self.assertEqual(sample.image.name, old_name)  # left untouched, not renamed
+            self.assertIn('missing on disk', out.getvalue())
