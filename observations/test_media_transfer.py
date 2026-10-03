@@ -314,6 +314,50 @@ class MediaTransferTests(TestCase):
         deleted.refresh_from_db();self.assertIsNotNone(deleted.deleted_at)
         self.assertEqual(Sample.objects.filter(species=other_species).count(),1)  # no duplicate created
 
+    def test_image_manager_upload_skips_only_rows_needing_replace_confirmation(self):
+        # Regression: a batch containing one row whose target sample already has an image
+        # (and so needs the admin to tick "replace") used to raise and abort the WHOLE
+        # batch when that box wasn't checked -- even rows for brand-new samples that have
+        # no existing image to protect at all, and so need no confirmation whatsoever.
+        # Only the row that actually needs confirmation should be skipped; every other row
+        # in the same upload must still go through.
+        import json,uuid
+        from .image_manager import files
+        self.client.force_login(self.sample.owner)
+        existing_row=next(r for r in files() if self.sample in r['refs'])
+        existing_response=self.client.get('/admin/images/file/',{'file':existing_row['token'],'download':'1'})
+        existing_raw=b''.join(existing_response.streaming_content);existing_response.close()
+
+        new_species=Species.objects.create(scientific_name='Brand new species')
+        source=Sample(owner=self.sample.owner,species=new_species,trip=self.sample.trip,kind=Sample.Kind.SPECIES,
+            video_url='https://youtu.be/22222222222')
+        output=io.BytesIO();Image.new('RGB',(60,40),'green').save(output,'JPEG')
+        source.image.save('new-source.jpg',ContentFile(output.getvalue()),save=False);source.save_reviewed()
+        new_row=next(r for r in files() if source in r['refs'])
+        new_response=self.client.get('/admin/images/file/',{'file':new_row['token'],'download':'1'})
+        new_raw=b''.join(new_response.streaming_content);new_response.close()
+        with Image.open(io.BytesIO(new_raw)) as image:
+            metadata=json.loads(base64.b64decode(image.getexif()[270][len('SeaSlugsB64:'):]).decode('utf-8'))
+            metadata['transfer_id']=str(uuid.uuid4());metadata['video_url']='https://youtu.be/33333333333'
+            encoded=base64.b64encode(json.dumps(metadata,ensure_ascii=False).encode('utf-8')).decode('ascii')
+            output=io.BytesIO();exif=Image.Exif();exif[270]='SeaSlugsB64:'+encoded
+            image.convert('RGB').save(output,'JPEG',exif=exif)
+        new_raw=output.getvalue()
+
+        old_image_path=Path(self.sample.image.path)
+        response=self.client.post('/admin/images/',{'action':'upload','images':[
+            SimpleUploadedFile('existing.jpg',existing_raw,content_type='image/jpeg'),
+            SimpleUploadedFile('new.jpg',new_raw,content_type='image/jpeg'),
+        ]},follow=True)
+        self.assertEqual(response.status_code,200)
+        content_str=response.content.decode()
+        self.assertIn('הועברו 1 תמונות',content_str)
+        self.assertIn(f'#{self.sample.pk}',content_str);self.assertIn('כבר כוללת תמונה',content_str)
+        self.sample.refresh_from_db();self.assertTrue(old_image_path.exists())  # untouched, no confirmation given
+        self.assertEqual(Sample.objects.filter(species=new_species).count(),2)  # source + the new transferred row
+        self.assertTrue(Sample.objects.filter(video_url__icontains='33333333333').exists())  # the new row's own transfer went through
+
+
     def test_image_manager_download_and_upload_preserves_hebrew_text(self):
         # Regression: EXIF's ImageDescription tag (270) is ASCII-only -- Pillow silently
         # replaces every non-ASCII character with '?' on write (confirmed directly against

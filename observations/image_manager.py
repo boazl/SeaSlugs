@@ -177,7 +177,7 @@ def manager(request):
                 uploads=request.FILES.getlist('images')
                 if not uploads or len(uploads)>50: raise ValidationError('בחרו בין תמונה אחת ל־50 תמונות.')
                 if sum(upload.size for upload in uploads)>100*1024*1024: raise ValidationError('עד 100MB בהעלאה אחת.')
-                from .sample_transfer import sample_plan
+                from .sample_transfer import sample_plan, _describe
                 from .table_transfer import TABLES
                 from .media_transfer import save_images
                 doc={'rows':[],'_media_names':[]};images={}
@@ -220,10 +220,19 @@ def manager(request):
                             # report why, instead of treating a None object as a sample.
                             images.pop(row['image'],None);skip_reasons.append(result['reason']);continue
                         existing=Sample.objects.filter(pk=candidate.pk).first() if candidate.pk else None
+                        if existing and existing.image and request.POST.get('replace')!='yes':
+                            # Skip only this row instead of aborting the whole batch: one
+                            # image whose target sample already has one (and so needs
+                            # explicit replace confirmation) must not block every other
+                            # image in the same upload -- including ones for brand-new
+                            # samples with no existing image to protect at all.
+                            images.pop(row['image'],None)
+                            skip_reasons.append(f'התצפית ביעד ({_describe(existing)}) כבר כוללת תמונה. '
+                                                 'יש לסמן את תיבת "לאשר החלפת תמונות קיימות" ולהעלות שוב כדי להחליף אותה.')
+                            result['object']=None;continue
                         final=existing or candidate
                         if existing:
                             # Image transfer preserves all existing observation fields.
-                            if existing.image and request.POST.get('replace')!='yes': raise ValidationError('יש לאשר החלפת תמונות קיימות ביעד.')
                             old_names.append(existing.image.name)
                             existing.image=candidate.image
                         # Rename from the temporary content-hash name (needed above so
