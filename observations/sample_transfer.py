@@ -57,15 +57,21 @@ def sample_plan(document, fields):
         # Deleted samples are excluded here on purpose: a soft-deleted sample and a later,
         # active replacement can legitimately share one video (the photographer re-entered
         # the observation under a new Sample after the old one was deleted) -- only the
-        # still-active one should ever be treated as a match for an incoming row. A target
-        # that transfer_id itself points at being deleted is still caught separately below.
+        # still-active one should ever be treated as a match for an incoming row.
         candidates = [x for x in Sample.objects.exclude(video_url='').filter(deleted_at__isnull=True) if video and youtube_id(x.video_url) == video]
         if len(candidates)>1:
             details = '; '.join(_describe(c) for c in candidates)
             raise ValidationError(f'לסרטון {video} כמה תצפיות ביעד: {details}. יש למזג או למחוק את הכפולות בניהול לפני ההעברה.')
-        if obj and candidates and obj.pk != candidates[0].pk:
+        if obj and obj.deleted_at and candidates:
+            # The transfer_id match itself is the now-superseded, deleted sample (it was
+            # transferred once before, kept its transfer_id, and has since been deleted
+            # locally in favour of a fresh active sample for the same video) -- the live
+            # candidate is the real target, not an unresolved conflict with it.
+            obj = candidates[0]
+        elif obj and candidates and obj.pk != candidates[0].pk:
             raise ValidationError(f'מזהה התצפית מצביע על {_describe(obj)}, אך הסרטון {video} מצביע על {_describe(candidates[0])} ביעד. יש לבדוק ולתקן את ההתאמה בניהול לפני ההעברה.')
-        obj = obj or (candidates[0] if candidates else None)
+        else:
+            obj = obj or (candidates[0] if candidates else None)
         if obj and obj.pk in targets:
             raise ValidationError(f'כמה רשומות בקובץ המועבר מצביעות על אותו יעד: {_describe(obj)}. יש לבדוק את הקובץ המועבר.')
         if obj: targets.add(obj.pk)

@@ -208,6 +208,34 @@ class MediaTransferTests(TestCase):
         self.assertEqual(matching[0]['object'].pk, active.pk)
         self.assertEqual(matching[0]['action'], 'update')
 
+    def test_sample_transfer_resolves_to_the_live_sample_when_transfer_id_points_at_a_deleted_one(self):
+        # Regression test: an observation gets transferred once (its transfer_id now matches
+        # that same video in every environment), then later deleted locally and re-entered
+        # under a brand-new Sample for the same video. The next transfer of that video still
+        # carries the ORIGINAL transfer_id (unchanged in the source environment) -- which now
+        # points, locally, at the deleted sample, while the video itself points at the live
+        # replacement. This must resolve to the live replacement, not raise a conflict: the
+        # deleted sample is history, not a competing match.
+        other_species = Species.objects.create(scientific_name='Other species 3')
+        video_url = 'https://youtu.be/dQw4w9WgXcQ'
+        original = Sample(owner=self.sample.owner, species=other_species, trip=self.sample.trip,
+                          title='Original', video_url=video_url)
+        original.save_reviewed(actor=original.owner, approve=True)
+        original_transfer_id = str(original.transfer_id)
+        original.soft_delete(original.owner)
+        replacement = Sample(owner=self.sample.owner, species=other_species, trip=self.sample.trip,
+                             title='Replacement', video_url=video_url)
+        replacement.save_reviewed(actor=replacement.owner, approve=True)
+        doc = export_table('samples'); doc['media_mode'] = 'separate'
+        row = next(r for r in doc['rows'] if r['video_url'] == video_url)
+        row['transfer_id'] = original_transfer_id  # as if re-exported from the source, unchanged
+        row['title'] = 'Updated from source'
+        items = plan(doc)  # must not raise
+        matching = [i for i in items if i['object'] and i['object'].video_url == video_url]
+        self.assertEqual(len(matching), 1)
+        self.assertEqual(matching[0]['object'].pk, replacement.pk)
+        self.assertEqual(matching[0]['action'], 'update')
+
     def test_sample_transfer_duplicate_video_error_names_the_conflicting_records(self):
         # A genuine duplicate (two ACTIVE samples sharing one video, an actual target-side
         # data problem the admin must fix) should still be rejected -- but the message must
