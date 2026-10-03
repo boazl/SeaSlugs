@@ -174,6 +174,69 @@ class MediaTransferTests(TestCase):
         items=plan(doc);self.assertEqual([i['action'] for i in items],['update','skipped'])
         with patch('observations.table_transfer.create_backup',return_value=Path('backup.sqlite3')):apply(doc,fingerprint())
         self.sample.refresh_from_db();self.assertEqual(self.sample.title,'Changed');self.assertEqual(Sample.objects.count(),1)
+    def test_sample_transfer_ignores_a_deleted_sample_sharing_the_same_video(self):
+        # Regression test: a soft-deleted sample and a later, active replacement can
+        # legitimately share the same YouTube video (the photographer re-entered the
+        # observation under a new Sample after the old one was deleted) -- but
+        # sample_plan()'s video-URL fallback match didn't exclude deleted samples from
+        # its "more than one candidate" check, so this ordinary, already-resolved
+        # situation blocked transfer of the ENTIRE samples table the moment any one such
+        # video came up, with "לסרטון כמה תצפיות ביעד" -- even though only the still-active sample
+        # should ever be considered a match for an incoming row.
+        import uuid
+        video_url = 'https://youtu.be/dQw4w9WgXcQ'
+        # A species distinct from self.sample's own, so this test's two samples are the
+        # only ones for this species+trip (self.sample sharing that pair too would trip
+        # the unrelated "same species already in this trip" guard once candidate.pk is set).
+        other_species = Species.objects.create(scientific_name='Other species')
+        deleted = Sample(owner=self.sample.owner, species=other_species, trip=self.sample.trip,
+                          video_url=video_url)
+        deleted.save_reviewed(actor=deleted.owner, approve=True)
+        deleted.soft_delete(deleted.owner)
+        active = Sample(owner=self.sample.owner, species=other_species, trip=self.sample.trip,
+                         video_url=video_url)
+        active.save_reviewed(actor=active.owner, approve=True)
+        doc = export_table('samples'); doc['media_mode'] = 'separate'
+        row = next(r for r in doc['rows'] if r['video_url'] == video_url)
+        # An incoming row for the same video from another environment, with a transfer_id
+        # that matches nothing locally (as if this video had never been transferred before).
+        row['transfer_id'] = str(uuid.uuid4())
+        row['title'] = 'Updated from source'
+        items = plan(doc)  # must not raise
+        matching = [i for i in items if i['object'] and i['object'].video_url == video_url]
+        self.assertEqual(len(matching), 1)
+        self.assertEqual(matching[0]['object'].pk, active.pk)
+        self.assertEqual(matching[0]['action'], 'update')
+
+    def test_sample_transfer_duplicate_video_error_names_the_conflicting_records(self):
+        # A genuine duplicate (two ACTIVE samples sharing one video, an actual target-side
+        # data problem the admin must fix) should still be rejected -- but the message must
+        # name the video and each conflicting sample (pk, title/species, trip), not just say
+        # generically that a conflict exists, so the admin knows exactly what to open and fix.
+        other_species = Species.objects.create(scientific_name='Other species 2')
+        video_url = 'https://youtu.be/dQw4w9WgXcQ'
+        # Two ACTIVE samples sharing a video can't normally arise through the app itself --
+        # Sample.clean() already blocks that -- but legacy data (a bulk import that bypassed
+        # full_clean, or a pre-validation-era row) can still reach this state, and the
+        # transfer tool must defend against it independently. Saving directly (bypassing
+        # full_clean) constructs that same state on purpose, to exercise that defense.
+        first = Sample(owner=self.sample.owner, species=other_species, trip=self.sample.trip,
+                       title='First copy', video_url=video_url)
+        first.save()
+        second = Sample(owner=self.sample.owner, species=other_species, trip=self.sample.trip,
+                        title='Second copy', video_url=video_url)
+        second.save()
+        doc = export_table('samples'); doc['media_mode'] = 'separate'
+        row = next(r for r in doc['rows'] if r['video_url'] == video_url)
+        import uuid
+        row['transfer_id'] = str(uuid.uuid4())
+        with self.assertRaises(ValidationError) as ctx:
+            plan(doc)
+        message = str(ctx.exception)
+        self.assertIn('dQw4w9WgXcQ', message)
+        self.assertIn(f'#{first.pk}', message); self.assertIn('First copy', message)
+        self.assertIn(f'#{second.pk}', message); self.assertIn('Second copy', message)
+
     def test_edit_view_stores_uploaded_image_by_content_hash(self):
         # The live per-observation upload must name files exactly like the bulk
         # folder importer and the image manager do (SHA256 of the content), so

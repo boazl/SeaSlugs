@@ -5,6 +5,14 @@ from django.core.exceptions import ValidationError
 from .models import Sample, Species, Country, Region, Site, DiveTrip, youtube_id
 
 
+def _describe(sample):
+    """Short, identifying text for a Sample in an error message -- an operator resolving a
+    transfer conflict in admin needs to know exactly which record(s) to open, not just that
+    a conflict exists."""
+    identity = sample.title or sample.species_other or (sample.species.scientific_name if sample.species_id else '') or 'ללא כותרת'
+    return f'#{sample.pk} ({identity}, מסע {sample.trip_id})'
+
+
 def sample_row(obj, fields):
     result = {}
     for field in fields:
@@ -46,13 +54,23 @@ def sample_plan(document, fields):
         seen.add(identity)
         obj = unique(Sample, transfer_id=identity)
         video = youtube_id(values['video_url']) if values['video_url'] else None
-        candidates = [x for x in Sample.objects.exclude(video_url='') if video and youtube_id(x.video_url) == video]
-        if len(candidates)>1: raise ValidationError('לסרטון כמה תצפיות ביעד. יש לפתור את הכפילות.')
-        if obj and candidates and obj.pk != candidates[0].pk: raise ValidationError('מזהה התצפית והסרטון מצביעים על רשומות שונות.')
+        # Deleted samples are excluded here on purpose: a soft-deleted sample and a later,
+        # active replacement can legitimately share one video (the photographer re-entered
+        # the observation under a new Sample after the old one was deleted) -- only the
+        # still-active one should ever be treated as a match for an incoming row. A target
+        # that transfer_id itself points at being deleted is still caught separately below.
+        candidates = [x for x in Sample.objects.exclude(video_url='').filter(deleted_at__isnull=True) if video and youtube_id(x.video_url) == video]
+        if len(candidates)>1:
+            details = '; '.join(_describe(c) for c in candidates)
+            raise ValidationError(f'לסרטון {video} כמה תצפיות ביעד: {details}. יש למזג או למחוק את הכפולות בניהול לפני ההעברה.')
+        if obj and candidates and obj.pk != candidates[0].pk:
+            raise ValidationError(f'מזהה התצפית מצביע על {_describe(obj)}, אך הסרטון {video} מצביע על {_describe(candidates[0])} ביעד. יש לבדוק ולתקן את ההתאמה בניהול לפני ההעברה.')
         obj = obj or (candidates[0] if candidates else None)
-        if obj and obj.pk in targets: raise ValidationError('כמה רשומות מצביעות על אותו יעד.')
+        if obj and obj.pk in targets:
+            raise ValidationError(f'כמה רשומות בקובץ המועבר מצביעות על אותו יעד: {_describe(obj)}. יש לבדוק את הקובץ המועבר.')
         if obj: targets.add(obj.pk)
-        if obj and obj.deleted_at: raise ValidationError('תצפית היעד מחוקה; יש לבדוק אותה בניהול לפני העברה.')
+        if obj and obj.deleted_at:
+            raise ValidationError(f'התצפית ביעד ({_describe(obj)}) מסומנת כמחוקה; יש לבדוק אותה בניהול לפני ההעברה.')
         if obj: values['transfer_id'] = str(obj.transfer_id)
         if document.get('media_mode')=='separate':
             # Plain table transfers never copy, remove, or replace target image references --
