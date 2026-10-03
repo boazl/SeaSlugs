@@ -214,6 +214,12 @@ def listing(request):
                             Q(kind=Sample.Kind.FAMILY, species_other__icontains=get['family']))
     if get.get('genus'):
         rows = rows.filter(Q(species__genus__icontains=get['genus']) |
+                            # A handful of species have a blank genus column even though
+                            # their scientific name clearly starts with one (e.g. "Cyerce
+                            # basi" with genus='') -- see the same fallback in config.views'
+                            # resolve_taxon_chain. Without it, a genus search would never
+                            # find that species' own sample at all.
+                            Q(species__genus='', species__scientific_name__istartswith=get['genus']) |
                             Q(kind=Sample.Kind.GENUS, species_other__icontains=get['genus']))
     if get.get('photographer'):
         rows = rows.filter(trip__photographer__icontains=get['photographer'])
