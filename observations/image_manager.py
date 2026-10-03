@@ -73,49 +73,33 @@ def files(sort='file'):
     return rows
 
 
-def _manifest_label(sample):
-    """A short, cross-environment-safe description of a sample for the manifest/comparison
-    report -- local pks and trip ids are only meaningful within one environment, so this
-    deliberately avoids them (unlike sample_transfer._describe, which is for same-environment
-    admin error messages and does use the local pk)."""
-    identity = sample.title or sample.species_other or (sample.species.scientific_name if sample.species_id else '') or 'ללא כותרת'
-    if sample.trip_id:
-        trip = f'{sample.trip.title} ({sample.trip.year})' if sample.trip.year else sample.trip.title
-        return f'{identity} · מסע: {trip}'
-    return identity
+def _active_image_names():
+    return set(Sample.objects.exclude(image='').filter(deleted_at__isnull=True).values_list('image', flat=True).distinct())
 
 
 def build_manifest():
-    """A small JSON listing every active, image-bearing sample's own transfer_id -- not a
-    hash of the stored file's bytes. The per-image transfer pipeline is lossy on both ends
-    (image_file's download re-encodes to embed EXIF metadata; SampleForm.clean_image
-    resizes/recompresses again on upload), so the same photo's stored bytes differ between
-    environments even once it has been fully, successfully transferred -- a content hash
-    would report it as missing forever. transfer_id is the one identity that survives that
-    round trip unchanged, so it's what this compares by."""
-    images = [{'transfer_id': str(sample.transfer_id), 'label': _manifest_label(sample)}
-              for sample in Sample.objects.exclude(image='').filter(deleted_at__isnull=True).select_related('species','trip')]
-    return {'format': MANIFEST_FORMAT, 'exported_at': timezone.now().isoformat(), 'images': images}
+    """A small JSON listing every active, image-bearing sample's own canonical filename
+    (see Sample.canonical_image_name) -- not a hash of the file's bytes and not an opaque
+    id. Once every image is stored under that scheme (trip code + kind-dependent identity,
+    kept in sync between environments by table-transfer), the exact same filename names the
+    exact same photo in both environments, so comparing the plain names is enough on its
+    own -- and the names themselves are what the admin needs anyway, to know which file to
+    go find."""
+    return {'format': MANIFEST_FORMAT, 'exported_at': timezone.now().isoformat(), 'images': sorted(_active_image_names())}
 
 
 def compare_manifest(manifest):
-    """Diff this environment's own active, image-bearing samples (by transfer_id, see
-    build_manifest) against an uploaded manifest from the other environment. Returns which
-    samples' photos need downloading from there (present there, absent here) and which need
-    sending there (present here, absent there) -- informational; the admin decides what, if
-    anything, to transfer."""
+    """Diff this environment's own active, image-bearing samples' filenames against an
+    uploaded manifest from the other environment. Returns which filenames need downloading
+    from there (present there, absent here) and which need sending there (present here,
+    absent there) -- informational; the admin decides what, if anything, to transfer."""
     if not isinstance(manifest, dict) or manifest.get('format') != MANIFEST_FORMAT or not isinstance(manifest.get('images'), list):
         raise ValidationError('קובץ השוואה לא תקין או גרסה לא נתמכת.')
-    remote = {}
-    for item in manifest['images']:
-        if not isinstance(item, dict) or not isinstance(item.get('transfer_id'), str):
-            raise ValidationError('קובץ השוואה לא תקין.')
-        remote.setdefault(item['transfer_id'], item)
-    local = {str(sample.transfer_id): sample
-             for sample in Sample.objects.exclude(image='').filter(deleted_at__isnull=True).select_related('species','trip')}
-    missing_here = sorted((item['label'] for tid, item in remote.items() if tid not in local), key=str)
-    only_here = sorted((_manifest_label(sample) for tid, sample in local.items() if tid not in remote), key=str)
-    return {'missing_here': missing_here, 'only_here': only_here}
+    if not all(isinstance(name, str) for name in manifest['images']):
+        raise ValidationError('קובץ השוואה לא תקין.')
+    remote = set(manifest['images'])
+    local = _active_image_names()
+    return {'missing_here': sorted(remote - local), 'only_here': sorted(local - remote)}
 
 
 def resolve(token):
@@ -200,15 +184,29 @@ def manager(request):
                     from .models import Species
                     Species.objects.filter(pk=-1).update(scientific_name='')
                     items=sample_plan(doc,TABLES['samples'][1])
-                    old_names=[]
+                    old_names=[];used_in_batch=set()
                     for result in items:
                         candidate=result['object']
                         existing=Sample.objects.filter(pk=candidate.pk).first() if candidate.pk else None
+                        final=existing or candidate
                         if existing:
                             # Image transfer preserves all existing observation fields.
                             if existing.image and request.POST.get('replace')!='yes': raise ValidationError('יש לאשר החלפת תמונות קיימות ביעד.')
                             old_names.append(existing.image.name)
-                            existing.image=candidate.image;result['object']=existing
+                            existing.image=candidate.image
+                        # Rename from the temporary content-hash name (needed above so
+                        # sample_plan's own full_clean() could validate each row before any
+                        # bytes were actually written to storage) to the canonical,
+                        # meaningful name -- see Sample.canonical_image_name. used_in_batch
+                        # keeps two new, not-yet-saved samples in this same upload from
+                        # landing on the same name -- a plain database query can't see each
+                        # other's pending name yet.
+                        temp_name=final.image.name
+                        canonical=final.canonical_image_name(extra_used_names=used_in_batch)
+                        used_in_batch.add(Path(canonical).stem)
+                        if canonical!=temp_name and temp_name in images:
+                            images[canonical]=images.pop(temp_name)
+                        final.image=canonical;result['object']=final
                     save_images(images)
                     for result in items: result['object'].save()
                 for old in set(old_names)-set(images):

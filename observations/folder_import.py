@@ -258,9 +258,15 @@ def folder_import(request):
                         if species_id is None:
                             species=Species(**proposal);species.full_clean();species.save();species_id=species.pk;created_species+=1
                         item,_=plan_row(trip,species_id,request.user,variant);old_names.append(item.image.name)
-                        name='observations/transfer/'+hashlib.sha256(image).hexdigest()+'.jpg'
-                        item.image=name;item.full_clean(validate_constraints=False)
+                        # Canonical, meaningful name (trip code + species -- see
+                        # Sample.canonical_image_name) rather than a content hash: the file
+                        # is written under it BEFORE full_clean() runs (unlike the batch
+                        # transfer flows in image_manager.py/sample_transfer.py, which
+                        # validate first and write after) so clean()'s own image-hash check
+                        # can read the real, already-committed file straight from storage.
+                        name=item.canonical_image_name()
                         save_images({name:image})
+                        item.image=name;item.full_clean(validate_constraints=False)
                         # Always re-run save_reviewed, not just for brand-new samples: adding
                         # an image can be exactly what completes a previously-pending sample
                         # (created via an earlier import or manually), and only save_reviewed

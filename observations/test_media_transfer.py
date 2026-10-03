@@ -130,9 +130,12 @@ class MediaTransferTests(TestCase):
         self.assertTrue(sample_row['redundant'])
 
     def test_export_manifest_action_returns_valid_json(self):
-        # The export must be a small JSON identifying each active, image-bearing sample by
-        # its own transfer_id -- not a hash of the stored file, which differs between
-        # environments even for a successfully transferred photo (see build_manifest).
+        # The export must be a small JSON listing each active, image-bearing sample's own
+        # canonical filename (see Sample.canonical_image_name) -- not a hash of the stored
+        # file's bytes, which differs between environments even for a successfully
+        # transferred photo (the per-image transfer pipeline re-encodes on both legs), and
+        # not an opaque id either: once every image is stored under the canonical scheme,
+        # the plain filename itself is the stable, meaningful, cross-environment identity.
         import json
         self.client.force_login(self.sample.owner)
         response=self.client.post('/admin/images/',{'action':'export_manifest'})
@@ -141,38 +144,35 @@ class MediaTransferTests(TestCase):
         self.assertIn('attachment; filename="seaslugs-images-',response['Content-Disposition'])
         manifest=json.loads(response.content)
         self.assertEqual(manifest['format'],'seaslugs-image-manifest-v1')
-        self.assertEqual(len(manifest['images']),1)
-        entry=manifest['images'][0]
-        self.assertEqual(entry['transfer_id'],str(self.sample.transfer_id))
-        self.assertIn('Test species',entry['label'])
+        self.assertEqual(manifest['images'],[self.sample.image.name])
 
     def test_compare_manifest_action_reports_missing_and_only_here(self):
-        # Diffing is by transfer_id, not file content or name -- a transfer_id this
-        # environment doesn't have an image for is "missing here" (needs downloading from
-        # the other side); one only this environment has is "only here" (informational,
-        # not an automatic deletion or transfer).
-        import json,uuid
+        # Diffing is by plain filename -- a name this environment doesn't have is "missing
+        # here" (needs downloading from the other side); one only this environment has is
+        # "only here" (informational, not an automatic deletion or transfer).
+        import json
         self.client.force_login(self.sample.owner)
         other_manifest={'format':'seaslugs-image-manifest-v1','exported_at':'2026-01-01T00:00:00+00:00',
-                        'images':[{'transfer_id':str(uuid.uuid4()),'label':'Elsewhere species · מסע: Other trip (2025)'}]}
+                        'images':['observations/elsewhere-species.jpg']}
         upload=SimpleUploadedFile('manifest.json',json.dumps(other_manifest).encode(),content_type='application/json')
         response=self.client.post('/admin/images/',{'action':'compare_manifest','manifest':upload})
         self.assertEqual(response.status_code,200)
         content=response.content.decode()
-        self.assertIn('Elsewhere species',content)
-        self.assertIn('Test species',content)  # self.sample's own image, reported as only-here
+        self.assertIn('observations/elsewhere-species.jpg',content)
+        self.assertIn(self.sample.image.name,content)  # self.sample's own image, reported as only-here
 
-    def test_compare_manifest_ignores_a_transfer_id_already_shared_by_both_sides(self):
+    def test_compare_manifest_treats_a_name_shared_by_both_sides_as_already_synced(self):
         # Regression: comparing by raw file content used to report a successfully
         # transferred photo as missing on both sides at once, because the transfer
         # pipeline re-encodes the image on both the download and the upload leg, so its
         # bytes never match across environments even once it's fully in sync. Comparing by
-        # the sample's own transfer_id (stable across that round trip) must treat this as
-        # already synced -- it shows up in neither list.
+        # the canonical filename itself (stable across that round trip, since it's built
+        # from the trip code + species/title identity rather than from the file's bytes)
+        # must treat this as already synced -- it shows up in neither list.
         import json
         self.client.force_login(self.sample.owner)
         other_manifest={'format':'seaslugs-image-manifest-v1','exported_at':'2026-01-01T00:00:00+00:00',
-                        'images':[{'transfer_id':str(self.sample.transfer_id),'label':'Test species, re-encoded elsewhere'}]}
+                        'images':[self.sample.image.name]}
         upload=SimpleUploadedFile('manifest.json',json.dumps(other_manifest).encode(),content_type='application/json')
         response=self.client.post('/admin/images/',{'action':'compare_manifest','manifest':upload})
         self.assertEqual(response.status_code,200)
@@ -194,6 +194,42 @@ class MediaTransferTests(TestCase):
         self.sample.soft_delete(self.sample.owner)
         content=self.client.get('/admin/images/').content.decode()
         self.assertIn('תמונה מיותרת —',content)
+    def test_image_manager_upload_names_colliding_new_samples_with_a_batch_local_suffix(self):
+        # Regression: two brand-new (never matched to anything locally) COLLECTION-kind
+        # rows in one upload batch, sharing a trip and a gallery title, would both compute
+        # the exact same canonical name (see Sample.canonical_image_name) -- a plain
+        # database query can't see the other one's pending name yet (neither is saved), so
+        # without extra_used_names they'd collide. Build a real sample just to get a
+        # validly EXIF-embedded download, then re-stamp a copy of it with a fresh
+        # transfer_id AND video_url (so sample_plan() can't match it back to anything that
+        # already exists, by either identity) before re-uploading two such copies together.
+        import json,uuid
+        from .image_manager import files
+        source=Sample(owner=self.sample.owner,trip=self.sample.trip,kind=Sample.Kind.COLLECTION,
+            title='Night dive highlights',video_url='https://youtu.be/11111111111')
+        output=io.BytesIO();Image.new('RGB',(60,40),'red').save(output,'JPEG')
+        source.image.save('source.jpg',ContentFile(output.getvalue()),save=False);source.save_reviewed()
+        self.client.force_login(self.sample.owner)
+        def restamped_copy(video_id):
+            row=next(r for r in files() if source in r['refs'])
+            response=self.client.get('/admin/images/file/',{'file':row['token'],'download':'1'})
+            raw=b''.join(response.streaming_content);response.close()
+            with Image.open(io.BytesIO(raw)) as image:
+                metadata=json.loads(image.getexif()[270][len('SeaSlugs:'):])
+                metadata['transfer_id']=str(uuid.uuid4());metadata['video_url']=f'https://youtu.be/{video_id}'
+                output=io.BytesIO();exif=Image.Exif();exif[270]='SeaSlugs:'+json.dumps(metadata,ensure_ascii=False)
+                image.convert('RGB').save(output,'JPEG',exif=exif)
+            return output.getvalue()
+        upload_a=SimpleUploadedFile('a.jpg',restamped_copy('aaaaaaaaaaa'),content_type='image/jpeg')
+        upload_b=SimpleUploadedFile('b.jpg',restamped_copy('bbbbbbbbbbb'),content_type='image/jpeg')
+        response=self.client.post('/admin/images/',{'action':'upload','images':[upload_a,upload_b]})
+        self.assertEqual(response.status_code,302,response.content)
+        names=set(Sample.objects.filter(title='Night dive highlights').values_list('image',flat=True))
+        self.assertEqual(len(names),3)  # source (its own non-canonical name) + the two new, canonical ones
+        trip_code=self.sample.trip.code
+        self.assertIn(f'observations/{trip_code}-night-dive-highlights.jpg',names)
+        self.assertIn(f'observations/{trip_code}-night-dive-highlights-2.jpg',names)
+
     def test_image_manager_upload_accepts_published_genus_kind_with_species_other(self):
         # Regression test: sample_plan() used to reject every published GENUS-kind sample
         # during transfer, because species_other holds the genus name itself -- the sample's
@@ -386,11 +422,12 @@ class MediaTransferTests(TestCase):
         self.assertIn(f'#{first.pk}', message); self.assertIn('First copy', message)
         self.assertIn(f'#{second.pk}', message); self.assertIn('Second copy', message)
 
-    def test_edit_view_stores_uploaded_image_by_content_hash(self):
-        # The live per-observation upload must name files exactly like the bulk
-        # folder importer and the image manager do (SHA256 of the content), so
-        # the same photo resolves to the same reference regardless of which of
-        # the two upload mechanisms created it, or in which environment.
+    def test_edit_view_stores_uploaded_image_by_canonical_name(self):
+        # The live per-observation upload must name files by trip code + species (see
+        # Sample.canonical_image_name) exactly like the bulk folder importer and the image
+        # manager do, so the same observation resolves to the same, human-meaningful
+        # filename regardless of which of those upload mechanisms created it, or in which
+        # environment.
         output=io.BytesIO();Image.new('RGB',(80,60),'green').save(output,'JPEG');raw=output.getvalue()
         species2=Species.objects.create(scientific_name='Second species')
         species3=Species.objects.create(scientific_name='Third species')
@@ -400,7 +437,7 @@ class MediaTransferTests(TestCase):
             image=SimpleUploadedFile('photo.jpg',raw,content_type='image/jpeg')))
         self.assertEqual(response.status_code,302)
         created=Sample.objects.get(species=species2)
-        self.assertRegex(created.image.name,r'^observations/transfer/[0-9a-f]{64}\.jpg$')
+        self.assertEqual(created.image.name,f'observations/{self.sample.trip.code}-second-species.jpg')
         # Regression: uploading the exact same bytes again, for a different sample, used to
         # silently reuse the same stored file -- now Sample.clean() blocks it outright (the
         # same photo may not be entered twice, full stop), so no second sample is created.
@@ -433,19 +470,29 @@ class DuplicateSpeciesInTripTests(TestCase):
         self.base={'kind':'species','species_other':'','site':'','site_other':'','day':'','depth':'','video_url':'','title':''}
 
     def test_new_observation_of_same_species_and_trip_updates_the_existing_image_instead_of_duplicating(self):
-        original_name=self.existing.image.name
+        # setUp saved self.existing's image directly as plain 'original.jpg', predating the
+        # canonical naming scheme -- the new upload must still land under the CANONICAL name
+        # for this trip+species (see Sample.canonical_image_name), not reuse that old name.
+        expected_name=self.existing.canonical_image_name()
         output=io.BytesIO();Image.new('RGB',(90,70),'red').save(output,'JPEG');raw=output.getvalue()
         response=self.client.post('/observations/new/',dict(self.base,species=self.species.scientific_name,trip=self.trip.pk,
             image=SimpleUploadedFile('new.jpg',raw,content_type='image/jpeg')))
         self.assertEqual(response.status_code,302)
         self.assertEqual(Sample.objects.filter(species=self.species,trip=self.trip).count(),1)
         self.existing.refresh_from_db()
-        # The uploaded image is re-encoded by SampleForm.clean_image (resized/re-saved as
-        # JPEG) before it's hashed, so its stored name won't match a hash of the raw upload
-        # bytes -- just confirm it's a real, freshly content-hashed file, distinct from the
-        # sample's original image.
-        self.assertRegex(self.existing.image.name,r'^observations/transfer/[0-9a-f]{64}\.jpg$')
-        self.assertNotEqual(self.existing.image.name,original_name)
+        self.assertEqual(self.existing.image.name,expected_name)
+        with Image.open(self.existing.image.path) as stored:
+            self.assertEqual(stored.size,(90,70))  # confirms the file content was actually replaced
+        # Replacing the photo a SECOND time must keep landing on that same canonical name
+        # (overwriting it), not collide with itself and get bumped to a "-2" suffix.
+        output2=io.BytesIO();Image.new('RGB',(50,40),'blue').save(output2,'JPEG')
+        response=self.client.post(f'/observations/{self.existing.pk}/edit/',dict(self.base,species=self.species.scientific_name,trip=self.trip.pk,
+            image=SimpleUploadedFile('newer.jpg',output2.getvalue(),content_type='image/jpeg')))
+        self.assertEqual(response.status_code,302)
+        self.existing.refresh_from_db()
+        self.assertEqual(self.existing.image.name,expected_name)
+        with Image.open(self.existing.image.path) as stored:
+            self.assertEqual(stored.size,(50,40))
 
     def test_new_observation_of_same_species_and_trip_updates_the_existing_video_instead_of_duplicating(self):
         response=self.client.post('/observations/new/',dict(self.base,species=self.species.scientific_name,trip=self.trip.pk,

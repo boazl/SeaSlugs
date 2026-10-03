@@ -210,7 +210,21 @@ class SampleAdmin(admin.ModelAdmin):
         numbers = ', '.join(str(mapping.get(r, '?')) for r in reasons)
         tooltip = ' | '.join(reasons)
         return format_html('<span style="color:#ba2121;font-weight:600" title="{}">{}</span>', tooltip, numbers)
-    def save_model(self,request,obj,form,change): obj.save_reviewed()
+    def save_model(self,request,obj,form,change):
+        # A freshly uploaded image here is still an uncommitted in-memory file (clean_image's
+        # own throwaway UUID name) -- write it under the canonical name (see
+        # Sample.canonical_image_name) explicitly, exactly like every other way of attaching
+        # an image already does (the public form, the bulk folder importer, the image
+        # manager's transfer upload; admin was the one path that didn't). This can't be done
+        # by just renaming obj.image.name and letting save() below write it normally: Django's
+        # own upload_to machinery re-joins that prefix onto whatever name an uncommitted file
+        # has at save time, which would double it, since canonical_image_name() already
+        # returns a path that includes the observations/ prefix.
+        if 'image' in form.changed_data and obj.image:
+            from .media_transfer import save_images
+            raw=obj.image.read();name=obj.canonical_image_name()
+            save_images({name:raw});obj.image=name
+        obj.save_reviewed()
     @admin.action(description='אישור פרסום לאחר השלמת הנתונים',permissions=['change'])
     def approve(self,request,queryset):
         # A soft-deleted sample keeps whatever status it had when it was deleted (deletion

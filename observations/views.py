@@ -389,13 +389,14 @@ def edit(request,pk=None):
     form=SampleForm(request.POST or None,request.FILES or None,instance=item,initial=initial)
     if request.method=='POST' and form.is_valid():
         item=form.save(commit=False)
-        def hashed_image_name(sample):
-            # Store by content hash, exactly like the bulk folder importer and the
-            # image manager, so the same photo always resolves to the same image
-            # reference whether it was uploaded here or arrived through a transfer.
-            import hashlib
+        def canonical_image_write(source_sample, target_sample=None):
+            # Store under the same stable, meaningful name the bulk folder importer and
+            # the image manager use (see Sample.canonical_image_name) -- target_sample's
+            # own fields decide the name (its own trip/species/kind/title), while
+            # source_sample is only where the just-uploaded bytes come from; they differ
+            # when a new submission is being folded into an EXISTING observation below.
             from .media_transfer import save_images
-            raw=sample.image.read();name='observations/transfer/'+hashlib.sha256(raw).hexdigest()+'.jpg'
+            raw=source_sample.image.read();name=(target_sample or source_sample).canonical_image_name()
             save_images({name:raw})
             return name
         # A brand-new SPECIES-kind observation (pk is None -- never one being edited) for a
@@ -412,13 +413,13 @@ def edit(request,pk=None):
             undetermined_variant=item.undetermined_variant,
         ).first() if (item.pk is None and item.kind==Sample.Kind.SPECIES and item.species_id and item.trip_id) else None
         if existing:
-            if item.image: existing.image = hashed_image_name(item)
+            if item.image: existing.image = canonical_image_write(item, existing)
             if item.video_url: existing.video_url = item.video_url
             existing.save_reviewed()
             messages.success(request,'תצפית של מין זה כבר קיימת במסע זה — התמונה/הסרטון עודכנו בתצפית הקיימת במקום יצירת כפילות.')
             return redirect(f'{next_url}#obs-{existing.pk}')
         if 'image' in form.changed_data and item.image:
-            item.image = hashed_image_name(item)
+            item.image = canonical_image_write(item)
         # A brand-new observation (never one being edited) is the message worth the reader's
         # eye first among the run-of-the-mill notices this page and others show (profile
         # saved, trip added, etc.) -- extra_tags carries that distinction through to

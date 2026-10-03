@@ -550,6 +550,36 @@ class Sample(models.Model):
     @property
     def thumbnail(self):
         return self.image.url if self.image else (f'https://i.ytimg.com/vi/{youtube_id(self.video_url)}/hqdefault.jpg' if self.video_url else '')
+    def canonical_image_name(self, extra_used_names=()):
+        """Human-meaningful, cross-environment-stable storage filename for this sample's
+        image: the trip's own code (an admin-managed, human-chosen string -- see
+        DiveTrip.code -- kept in sync between environments by table-transfer) plus an
+        identifying part that depends on kind -- the species' genus+species binomial for
+        an ordinary SPECIES-kind sample, the gallery title for a COLLECTION-kind one, and
+        the free-text species_other identification for every other kind (GENUS/FAMILY/
+        ORDER). Unlike an upload-time random UUID or a hash of the image's own bytes, this
+        stays legible when browsing the media folder directly, and -- because every part
+        of it is itself kept in sync across environments -- resolves to the very same name
+        in both environments once the sample itself has been transferred, which is also
+        what lets the image-manager's environment comparison work by filename alone.
+
+        extra_used_names: names already claimed by other rows in the same in-progress
+        batch (not yet saved, so a plain database query wouldn't see them) -- passed by
+        image_manager.py's bulk upload action to keep two new samples in one batch from
+        being assigned the same name."""
+        if self.kind == self.Kind.SPECIES and self.species_id:
+            identity = f'{self.species.genus} {self.species.species}'.strip() or self.species.scientific_name
+        elif self.kind == self.Kind.COLLECTION:
+            identity = self.title
+        else:
+            identity = self.species_other
+        trip_code = self.trip.code if self.trip_id else 'notrip'
+        base = slugify(f'{trip_code} {identity}', allow_unicode=True) or f'sample-{self.pk or "new"}'
+        candidate = base; n = 2
+        qs = Sample.objects.exclude(pk=self.pk) if self.pk else Sample.objects.all()
+        while candidate in extra_used_names or qs.filter(image=f'observations/{candidate}.jpg').exists():
+            candidate = f'{base}-{n}'; n += 1
+        return f'observations/{candidate}.jpg'
     def publication_reasons(self):
         reasons = []
         if self.deleted_at: reasons.append('התצפית מסומנת כמחוקה.')
