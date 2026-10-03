@@ -260,6 +260,59 @@ class MediaTransferTests(TestCase):
         self.assertIn(f'observations/{trip_code}-night-dive-highlights.jpg',names)
         self.assertIn(f'observations/{trip_code}-night-dive-highlights-2.jpg',names)
 
+    def test_image_manager_download_uses_the_samples_own_canonical_filename(self):
+        # The download used to be named 'seaslugs-<transfer_id>.jpg' -- an opaque
+        # identifier left over from before images had meaningful stored names at all. Now
+        # that every active sample's image is named canonically (trip code + identity, see
+        # Sample.canonical_image_name), the download should carry that same recognizable
+        # name, matching what the admin already sees everywhere else (the gallery, the
+        # comparison lists) instead of an unrelated UUID.
+        from .image_manager import files
+        self.client.force_login(self.sample.owner)
+        row=next(r for r in files() if self.sample in r['refs'])
+        response=self.client.get('/admin/images/file/',{'file':row['token'],'download':'1'})
+        self.assertIn(f'filename="{Path(self.sample.image.name).name}"',response['Content-Disposition'])
+
+    def test_image_manager_upload_skips_a_row_matching_a_locally_deleted_sample_without_crashing(self):
+        # Regression: a batch upload containing a row whose transfer_id matches a sample
+        # that exists here only as a soft-deleted record with no live replacement --
+        # sample_plan()'s own 'skipped' branch, which returns {'object': None, ...} rather
+        # than raising, exactly so the rest of a batch still transfers (see
+        # test_deleted_target_with_no_live_replacement_skips_only_that_row for the same
+        # behaviour via a plain table transfer) -- used to crash this handler outright with
+        # an unhandled AttributeError ('NoneType' object has no attribute 'pk'), because it
+        # assumed every planned row carried a real Sample. That shows up to an admin as a
+        # blank, message-less failure. The rest of the batch must still go through, and the
+        # admin must be told which row was skipped and why.
+        from .image_manager import files
+        other_species=Species.objects.create(scientific_name='Deleted-match species')
+        deleted=Sample(owner=self.sample.owner,species=other_species,trip=self.sample.trip,kind=Sample.Kind.SPECIES)
+        output=io.BytesIO();Image.new('RGB',(60,40),'purple').save(output,'JPEG')
+        deleted.image.save('deleted-source.jpg',ContentFile(output.getvalue()),save=False)
+        deleted.save_reviewed(actor=deleted.owner,approve=True)
+        deleted_pk=deleted.pk
+        deleted.soft_delete(deleted.owner)
+
+        self.client.force_login(self.sample.owner)
+        good_row=next(r for r in files() if self.sample in r['refs'])
+        good_response=self.client.get('/admin/images/file/',{'file':good_row['token'],'download':'1'})
+        good_raw=b''.join(good_response.streaming_content);good_response.close()
+        deleted_row=next(r for r in files() if deleted in r['refs'])
+        deleted_response=self.client.get('/admin/images/file/',{'file':deleted_row['token'],'download':'1'})
+        deleted_raw=b''.join(deleted_response.streaming_content);deleted_response.close()
+
+        response=self.client.post('/admin/images/',{'action':'upload','replace':'yes','images':[
+            SimpleUploadedFile('good.jpg',good_raw,content_type='image/jpeg'),
+            SimpleUploadedFile('deleted.jpg',deleted_raw,content_type='image/jpeg'),
+        ]},follow=True)
+        self.assertEqual(response.status_code,200)
+        content_str=response.content.decode()
+        self.assertIn('הועברו 1 תמונות',content_str)
+        self.assertIn(f'#{deleted_pk}',content_str);self.assertIn('מסומנת כמחוקה',content_str)
+        self.sample.refresh_from_db();self.assertTrue(Path(self.sample.image.path).exists())
+        deleted.refresh_from_db();self.assertIsNotNone(deleted.deleted_at)
+        self.assertEqual(Sample.objects.filter(species=other_species).count(),1)  # no duplicate created
+
     def test_image_manager_upload_accepts_published_genus_kind_with_species_other(self):
         # Regression test: sample_plan() used to reject every published GENUS-kind sample
         # during transfer, because species_other holds the genus name itself -- the sample's

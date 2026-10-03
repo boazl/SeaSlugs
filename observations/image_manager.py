@@ -115,7 +115,12 @@ def image_file(request):
     if not request.user.is_superuser: raise PermissionDenied
     name,path=resolve(request.GET.get('file',''))
     item=Sample.objects.filter(image=name).first()
-    filename=f'seaslugs-{item.transfer_id}.jpg' if item else path.name
+    # The file's own stored name -- after the canonical-naming migration (trip code +
+    # kind-dependent identity, see Sample.canonical_image_name) this is already the
+    # meaningful, human-readable name shown throughout the admin (the image comparison's
+    # own lists included), so a downloaded file can be matched back to it by eye instead of
+    # carrying an opaque, unrelated identifier.
+    filename=path.name
     source=path.open('rb')
     if request.GET.get('download')=='1' and item:
         from .sample_transfer import sample_row
@@ -184,9 +189,18 @@ def manager(request):
                     from .models import Species
                     Species.objects.filter(pk=-1).update(scientific_name='')
                     items=sample_plan(doc,TABLES['samples'][1])
-                    old_names=[];used_in_batch=set()
-                    for result in items:
+                    old_names=[];used_in_batch=set();skip_reasons=[]
+                    for row,result in zip(doc['rows'],items):
                         candidate=result['object']
+                        if candidate is None:
+                            # sample_plan() itself declined to resolve this one row (most
+                            # often: its transfer_id matches a sample that exists here only
+                            # as a soft-deleted record, with no live replacement -- see its
+                            # own 'skipped' branches) rather than raising, precisely so the
+                            # rest of a batch still transfers. Drop its not-yet-attached
+                            # content-hash bytes (never written to disk otherwise) and
+                            # report why, instead of treating a None object as a sample.
+                            images.pop(row['image'],None);skip_reasons.append(result['reason']);continue
                         existing=Sample.objects.filter(pk=candidate.pk).first() if candidate.pk else None
                         final=existing or candidate
                         if existing:
@@ -208,12 +222,16 @@ def manager(request):
                             images[canonical]=images.pop(temp_name)
                         final.image=canonical;result['object']=final
                     save_images(images)
-                    for result in items: result['object'].save()
+                    transferred=[result for result in items if result['object'] is not None]
+                    for result in transferred: result['object'].save()
                 for old in set(old_names)-set(images):
                     if old and not Sample.objects.filter(image=old).exists():
                         root=Path(settings.MEDIA_ROOT).resolve();old_path=root/old
                         if not old_path.is_symlink() and old_path.resolve().is_relative_to(root): old_path.unlink(missing_ok=True)
-                messages.success(request,f'הועברו {len(items)} תמונות. גרסאות קודמות שאינן בשימוש נמחקו ללא גיבוי.')
+                success_message=f'הועברו {len(transferred)} תמונות. גרסאות קודמות שאינן בשימוש נמחקו ללא גיבוי.'
+                if skip_reasons:
+                    success_message+=f' {len(skip_reasons)} לא הועברו: '+' '.join(skip_reasons)
+                messages.success(request,success_message)
                 return redirect(redirect_target)
             elif action=='site_image':
                 upload=request.FILES.get('site_image')
