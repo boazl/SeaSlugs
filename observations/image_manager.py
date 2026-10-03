@@ -73,46 +73,48 @@ def files(sort='file'):
     return rows
 
 
-def _file_hash(root, name):
-    with (root/name).open('rb') as f:
-        return hashlib.sha256(f.read()).hexdigest()
+def _manifest_label(sample):
+    """A short, cross-environment-safe description of a sample for the manifest/comparison
+    report -- local pks and trip ids are only meaningful within one environment, so this
+    deliberately avoids them (unlike sample_transfer._describe, which is for same-environment
+    admin error messages and does use the local pk)."""
+    identity = sample.title or sample.species_other or (sample.species.scientific_name if sample.species_id else '') or 'ללא כותרת'
+    if sample.trip_id:
+        trip = f'{sample.trip.title} ({sample.trip.year})' if sample.trip.year else sample.trip.title
+        return f'{identity} · מסע: {trip}'
+    return identity
 
 
-def build_manifest(rows, root):
-    """A small, image-bytes-free JSON listing every managed file's content hash -- download
-    it from one environment and upload it to compare_manifest() in the other to find which
-    files need transferring in which direction, without transferring any image data itself
-    just to find that out."""
-    return {
-        'format': MANIFEST_FORMAT,
-        'exported_at': timezone.now().isoformat(),
-        'images': [
-            {'name': row['name'], 'hash': _file_hash(root, row['name']), 'size': row['size'],
-             'redundant': row['redundant']}
-            for row in rows
-        ],
-    }
+def build_manifest():
+    """A small JSON listing every active, image-bearing sample's own transfer_id -- not a
+    hash of the stored file's bytes. The per-image transfer pipeline is lossy on both ends
+    (image_file's download re-encodes to embed EXIF metadata; SampleForm.clean_image
+    resizes/recompresses again on upload), so the same photo's stored bytes differ between
+    environments even once it has been fully, successfully transferred -- a content hash
+    would report it as missing forever. transfer_id is the one identity that survives that
+    round trip unchanged, so it's what this compares by."""
+    images = [{'transfer_id': str(sample.transfer_id), 'label': _manifest_label(sample)}
+              for sample in Sample.objects.exclude(image='').filter(deleted_at__isnull=True).select_related('species','trip')]
+    return {'format': MANIFEST_FORMAT, 'exported_at': timezone.now().isoformat(), 'images': images}
 
 
-def compare_manifest(rows, root, manifest):
-    """Diff this environment's own files (by content hash, not name -- the same photo can
-    be stored under different names in each environment, e.g. a random upload-time UUID here
-    vs. a content-hash transfer name there) against an uploaded manifest from the other
-    environment. Returns what to download from there (present there, absent here) and what
-    exists only here (present here, absent there) -- the admin decides what, if anything, to
-    do with the second list; it's informational, not a deletion candidate on its own."""
+def compare_manifest(manifest):
+    """Diff this environment's own active, image-bearing samples (by transfer_id, see
+    build_manifest) against an uploaded manifest from the other environment. Returns which
+    samples' photos need downloading from there (present there, absent here) and which need
+    sending there (present here, absent there) -- informational; the admin decides what, if
+    anything, to transfer."""
     if not isinstance(manifest, dict) or manifest.get('format') != MANIFEST_FORMAT or not isinstance(manifest.get('images'), list):
         raise ValidationError('קובץ השוואה לא תקין או גרסה לא נתמכת.')
     remote = {}
     for item in manifest['images']:
-        if not isinstance(item, dict) or not isinstance(item.get('hash'), str) or not isinstance(item.get('name'), str):
+        if not isinstance(item, dict) or not isinstance(item.get('transfer_id'), str):
             raise ValidationError('קובץ השוואה לא תקין.')
-        remote.setdefault(item['hash'], item)
-    local = {}
-    for row in rows:
-        local.setdefault(_file_hash(root, row['name']), row)
-    missing_here = sorted((item for h, item in remote.items() if h not in local), key=lambda i: i['name'])
-    only_here = sorted((row for h, row in local.items() if h not in remote), key=lambda r: r['name'])
+        remote.setdefault(item['transfer_id'], item)
+    local = {str(sample.transfer_id): sample
+             for sample in Sample.objects.exclude(image='').filter(deleted_at__isnull=True).select_related('species','trip')}
+    missing_here = sorted((item['label'] for tid, item in remote.items() if tid not in local), key=str)
+    only_here = sorted((_manifest_label(sample) for tid, sample in local.items() if tid not in remote), key=str)
     return {'missing_here': missing_here, 'only_here': only_here}
 
 
@@ -225,8 +227,7 @@ def manager(request):
                 messages.success(request,'תמונת הבית עודכנה.')
                 return redirect(redirect_target)
             elif action=='export_manifest':
-                root=Path(settings.MEDIA_ROOT).resolve()
-                manifest=build_manifest(files('file'),root)
+                manifest=build_manifest()
                 body=json.dumps(manifest,ensure_ascii=False,indent=2)
                 env='local' if context['local'] else 'render'
                 response=HttpResponse(body,content_type='application/json; charset=utf-8')
@@ -237,8 +238,7 @@ def manager(request):
                 if not upload: raise ValidationError('יש לבחור קובץ השוואה.')
                 try: manifest=json.loads(upload.read())
                 except (ValueError,UnicodeDecodeError): raise ValidationError('קובץ השוואה לא תקין.')
-                root=Path(settings.MEDIA_ROOT).resolve()
-                context['comparison']=compare_manifest(files('file'),root,manifest)
+                context['comparison']=compare_manifest(manifest)
         except ValidationError as exc: context['error']='; '.join(exc.messages)
     context['images']=files(sort);context['total_bytes']=sum(r['size'] for r in context['images'])
     context['site_image']=SiteImage.objects.filter(key='intro_photo').exclude(image='').first()

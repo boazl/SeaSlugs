@@ -8,9 +8,9 @@
 <form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="action" value="compare_manifest"><p><input type="file" name="manifest" accept="application/json" required></p><button>השוואה מול קובץ שיוצא בסביבה השנייה</button></form>
 {% if comparison %}<div class="comparison">
 <h3>חסרות כאן, קיימות בסביבה השנייה ({{comparison.missing_here|length}})</h3>
-{% if comparison.missing_here %}<ul>{% for item in comparison.missing_here %}<li>{{item.name}} · {{item.size|filesizeformat}}{% if item.redundant %} · מיותרת בסביבה השנייה{% endif %}</li>{% endfor %}</ul>{% else %}<p>אין תמונות חסרות כאן.</p>{% endif %}
+{% if comparison.missing_here %}<ul>{% for label in comparison.missing_here %}<li>{{label}}</li>{% endfor %}</ul>{% else %}<p>אין תמונות חסרות כאן.</p>{% endif %}
 <h3>קיימות רק כאן, חסרות בסביבה השנייה ({{comparison.only_here|length}})</h3>
-{% if comparison.only_here %}<ul>{% for row in comparison.only_here %}<li>{{row.name}} · {{row.size|filesizeformat}}{% if row.redundant %} · מיותרת{% endif %}</li>{% endfor %}</ul>{% else %}<p>אין תמונות שקיימות רק כאן.</p>{% endif %}
+{% if comparison.only_here %}<ul>{% for label in comparison.only_here %}<li>{{label}}</li>{% endfor %}</ul>{% else %}<p>אין תמונות שקיימות רק כאן.</p>{% endif %}
 </div>{% endif %}
 <p>סמנו תמונות והורידו כקבצים רגילים. בסביבת היעד העלו את הקבצים ללא שינוי שמם. הדפדפן עשוי לבקש אישור להורדת כמה קבצים. הורדה מעתיקה את התמונה ואינה מוחקת את המקור. התמונות המשויכות נושאות את נתוני התצפית בקובץ. תצפית חסרה תתווסף ביעד; בתצפית קיימת תוחלף רק התמונה. יש להעביר תחילה משתמשים וטבלאות עזר. קובצי ההעברה כוללים פרטי תצפית ושם חשבון.</p>
 {% if error %}<p class="errorlist" role="alert">{{error}}</p>{% endif %}

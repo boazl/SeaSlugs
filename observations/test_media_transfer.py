@@ -130,8 +130,9 @@ class MediaTransferTests(TestCase):
         self.assertTrue(sample_row['redundant'])
 
     def test_export_manifest_action_returns_valid_json(self):
-        # The export must be a small, image-bytes-free JSON (just hash/name/size/redundant
-        # per managed file) that another environment's compare_manifest can diff against.
+        # The export must be a small JSON identifying each active, image-bearing sample by
+        # its own transfer_id -- not a hash of the stored file, which differs between
+        # environments even for a successfully transferred photo (see build_manifest).
         import json
         self.client.force_login(self.sample.owner)
         response=self.client.post('/admin/images/',{'action':'export_manifest'})
@@ -142,26 +143,42 @@ class MediaTransferTests(TestCase):
         self.assertEqual(manifest['format'],'seaslugs-image-manifest-v1')
         self.assertEqual(len(manifest['images']),1)
         entry=manifest['images'][0]
-        self.assertEqual(entry['name'],self.sample.image.name)
-        self.assertEqual(entry['size'],Path(self.sample.image.path).stat().st_size)
-        self.assertFalse(entry['redundant'])
-        self.assertEqual(len(entry['hash']),64)
+        self.assertEqual(entry['transfer_id'],str(self.sample.transfer_id))
+        self.assertIn('Test species',entry['label'])
 
     def test_compare_manifest_action_reports_missing_and_only_here(self):
-        # Diffing is by content hash, not name (the same photo can be stored under a
-        # different name in each environment) -- a hash this environment doesn't have is
-        # "missing here" (needs downloading from the other side); a hash only this
-        # environment has is "only here" (informational, not an automatic deletion).
-        import json
+        # Diffing is by transfer_id, not file content or name -- a transfer_id this
+        # environment doesn't have an image for is "missing here" (needs downloading from
+        # the other side); one only this environment has is "only here" (informational,
+        # not an automatic deletion or transfer).
+        import json,uuid
         self.client.force_login(self.sample.owner)
         other_manifest={'format':'seaslugs-image-manifest-v1','exported_at':'2026-01-01T00:00:00+00:00',
-                        'images':[{'name':'observations/elsewhere.jpg','hash':'a'*64,'size':123,'redundant':False}]}
+                        'images':[{'transfer_id':str(uuid.uuid4()),'label':'Elsewhere species · מסע: Other trip (2025)'}]}
         upload=SimpleUploadedFile('manifest.json',json.dumps(other_manifest).encode(),content_type='application/json')
         response=self.client.post('/admin/images/',{'action':'compare_manifest','manifest':upload})
         self.assertEqual(response.status_code,200)
         content=response.content.decode()
-        self.assertIn('observations/elsewhere.jpg',content)
-        self.assertIn(self.sample.image.name,content)
+        self.assertIn('Elsewhere species',content)
+        self.assertIn('Test species',content)  # self.sample's own image, reported as only-here
+
+    def test_compare_manifest_ignores_a_transfer_id_already_shared_by_both_sides(self):
+        # Regression: comparing by raw file content used to report a successfully
+        # transferred photo as missing on both sides at once, because the transfer
+        # pipeline re-encodes the image on both the download and the upload leg, so its
+        # bytes never match across environments even once it's fully in sync. Comparing by
+        # the sample's own transfer_id (stable across that round trip) must treat this as
+        # already synced -- it shows up in neither list.
+        import json
+        self.client.force_login(self.sample.owner)
+        other_manifest={'format':'seaslugs-image-manifest-v1','exported_at':'2026-01-01T00:00:00+00:00',
+                        'images':[{'transfer_id':str(self.sample.transfer_id),'label':'Test species, re-encoded elsewhere'}]}
+        upload=SimpleUploadedFile('manifest.json',json.dumps(other_manifest).encode(),content_type='application/json')
+        response=self.client.post('/admin/images/',{'action':'compare_manifest','manifest':upload})
+        self.assertEqual(response.status_code,200)
+        content=response.content.decode()
+        self.assertIn('אין תמונות חסרות כאן',content)
+        self.assertIn('אין תמונות שקיימות רק כאן',content)
 
     def test_compare_manifest_rejects_malformed_file(self):
         self.client.force_login(self.sample.owner)
