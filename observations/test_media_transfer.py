@@ -186,6 +186,36 @@ class MediaTransferTests(TestCase):
         response=self.client.post('/admin/images/',{'action':'compare_manifest','manifest':upload})
         self.assertContains(response,'קובץ השוואה לא תקין')
 
+    def test_compare_manifest_marks_only_here_images_with_a_selectable_data_name(self):
+        # The comparison view's "only here" list is informational text, but every image
+        # actually sitting in this environment's own gallery below also carries the same
+        # plain filename as a data-name attribute on its checkbox, and the "only here"
+        # section renders a button plus the name list as JSON -- together these let the
+        # page's own script pre-check exactly those boxes (so the admin can select all of
+        # them for download in one click) without the view needing a dedicated endpoint.
+        import json
+        self.client.force_login(self.sample.owner)
+        other_manifest={'format':'seaslugs-image-manifest-v1','exported_at':'2026-01-01T00:00:00+00:00','images':[]}
+        upload=SimpleUploadedFile('manifest.json',json.dumps(other_manifest).encode(),content_type='application/json')
+        response=self.client.post('/admin/images/',{'action':'compare_manifest','manifest':upload})
+        content_str=response.content.decode()
+        self.assertIn('id="select-only-here"',content_str)
+        self.assertIn('id="only-here-names"',content_str)
+        self.assertIn(f'data-name="{self.sample.image.name}"',content_str)
+        names=json.loads(content_str.split('id="only-here-names" type="application/json">',1)[1].split('</script>',1)[0])
+        self.assertEqual(names,[self.sample.image.name])
+
+    def test_compare_manifest_omits_the_select_button_when_nothing_is_only_here(self):
+        import json
+        self.client.force_login(self.sample.owner)
+        other_manifest={'format':'seaslugs-image-manifest-v1','exported_at':'2026-01-01T00:00:00+00:00',
+                        'images':[self.sample.image.name]}
+        upload=SimpleUploadedFile('manifest.json',json.dumps(other_manifest).encode(),content_type='application/json')
+        response=self.client.post('/admin/images/',{'action':'compare_manifest','manifest':upload})
+        content_str=response.content.decode()
+        self.assertNotIn('id="select-only-here"',content_str)
+        self.assertNotIn('id="only-here-names"',content_str)
+
     def test_images_page_shows_redundant_badge_and_select_button(self):
         self.client.force_login(self.sample.owner)
         content=self.client.get('/admin/images/').content.decode()
