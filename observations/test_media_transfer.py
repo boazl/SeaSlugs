@@ -166,6 +166,39 @@ class MediaTransferTests(TestCase):
         self.assertContains(response,'Nonexistent species')
         self.assertContains(response,'אינו קיים בטבלת המינים')
         self.assertNotIn('token',response.context)
+    def test_deleted_target_with_no_live_replacement_skips_only_that_row(self):
+        # When a video's only local representation is a deleted sample (no active
+        # replacement exists for it), reviving it -- or silently creating a second,
+        # competing sample for the same video -- is an admin judgment call the transfer
+        # tool must not make on its own. That row is skipped, with a reason naming the
+        # deleted record, but the rest of the file (here, self.sample's own row) still
+        # transfers normally -- it must not block the whole table the way a hard error would.
+        other_species = Species.objects.create(scientific_name='Other species 4')
+        deleted = Sample(owner=self.sample.owner, species=other_species, trip=self.sample.trip,
+                         title='Gone', video_url='https://youtu.be/dQw4w9WgXcQ')
+        deleted.save_reviewed(actor=deleted.owner, approve=True)
+        deleted_pk = deleted.pk
+        deleted.soft_delete(deleted.owner)
+        doc = export_table('samples'); doc['media_mode'] = 'separate'
+        # export_table excludes deleted samples -- reconstruct the row as if it had been
+        # exported BEFORE deletion and is only now being re-imported (the realistic shape:
+        # the source environment hasn't changed, the target deleted its own copy since).
+        deleted_row = dict(doc['rows'][0], transfer_id=str(deleted.transfer_id), video_url=deleted.video_url,
+                           title=deleted.title, species=other_species.scientific_name, image='')
+        doc['rows'][0]['title'] = 'Updated title'  # self.sample's own row, unrelated
+        doc['rows'].append(deleted_row)
+        items = plan(doc)  # must not raise
+        self.assertEqual(len(items), 2)
+        updated = next(i for i in items if i['action'] == 'update')
+        self.assertEqual(updated['object'].pk, self.sample.pk)
+        skipped = next(i for i in items if i['action'] == 'skipped')
+        self.assertIn(f'#{deleted_pk}', skipped['reason'])
+        self.assertIn('מסומנת כמחוקה', skipped['reason'])
+        with patch('observations.table_transfer.create_backup', return_value=Path('test.sqlite3')):
+            apply(doc, fingerprint())
+        self.sample.refresh_from_db(); self.assertEqual(self.sample.title, 'Updated title')
+        deleted.refresh_from_db(); self.assertIsNotNone(deleted.deleted_at)  # left untouched
+
     def test_missing_photo_skips_only_that_row(self):
         import uuid
         doc=export_table('samples');doc['media_mode']='separate'

@@ -34,13 +34,23 @@ class ReleaseTests(TestCase):
         self.assertEqual(self.sample.created_at, created)
         self.assertEqual(plan(doc)[0]['action'], 'same')
 
-    def test_missing_user_and_deleted_target_block(self):
+    def test_missing_user_blocks(self):
         doc = export_table('samples')
         doc['rows'][0]['owner'] = 'missing-user'
         with self.assertRaises(ValidationError): plan(doc)
-        doc['rows'][0]['owner'] = self.user.username
+
+    def test_deleted_target_with_no_live_replacement_is_skipped_not_blocked(self):
+        # A deleted target with nothing to fall back to (no other active sample shares its
+        # video) can't be auto-resolved -- reviving it is an admin call, not the transfer
+        # tool's -- but it must only skip THIS row, not abort the whole batch the way a
+        # raised ValidationError would (see observations/test_media_transfer.py for the
+        # fuller regression coverage of this and the related "deleted sample superseded by
+        # an active replacement" cases).
+        doc = export_table('samples')
         self.sample.soft_delete(self.user)
-        with self.assertRaises(ValidationError): plan(doc)
+        items = plan(doc)  # must not raise
+        self.assertEqual(items[0]['action'], 'skipped')
+        self.assertIn('מסומנת כמחוקה', items[0]['reason'])
 
     def test_incomplete_draft_can_transfer_but_not_publish(self):
         doc = export_table('samples')

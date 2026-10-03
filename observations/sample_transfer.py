@@ -76,7 +76,15 @@ def sample_plan(document, fields):
             raise ValidationError(f'כמה רשומות בקובץ המועבר מצביעות על אותו יעד: {_describe(obj)}. יש לבדוק את הקובץ המועבר.')
         if obj: targets.add(obj.pk)
         if obj and obj.deleted_at:
-            raise ValidationError(f'התצפית ביעד ({_describe(obj)}) מסומנת כמחוקה; יש לבדוק אותה בניהול לפני ההעברה.')
+            # Unlike the rescue above, there is no live sample to fall back to here -- this
+            # video's only local representation is a deleted one, and reviving it (or
+            # silently creating a second, competing sample for the same video) is an admin
+            # judgment call, not something a batch transfer should decide on its own. Skip
+            # only this row (matching the missing-image skip below) so the rest of the file
+            # still transfers.
+            result.append({'object':None,'label':_describe(obj),'action':'skipped','changes':[],
+                           'reason':f'התצפית ביעד ({_describe(obj)}) מסומנת כמחוקה. אם יש להחזיר אותה יש לעשות זאת בניהול ואז לייבא שוב; אחרת השורה הזו לא תועבר.'})
+            continue
         if obj: values['transfer_id'] = str(obj.transfer_id)
         if document.get('media_mode')=='separate':
             # Plain table transfers never copy, remove, or replace target image references --
