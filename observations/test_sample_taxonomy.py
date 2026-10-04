@@ -730,3 +730,85 @@ class Migration0049Tests(TransactionTestCase):
         self.assertEqual(author(blank), 'Rudman, 1981')
         self.assertEqual(author(kept), 'mine')
         self.assertEqual((author(no_authority), author(unknown)), ('', ''))
+
+
+class Migration0050Tests(TransactionTestCase):
+    before = [('observations', '0049_species_authors_from_worms_match')]
+    after = [('observations', '0050_accepted_names_for_four_species')]
+
+    def tearDown(self):
+        executor = MigrationExecutor(connection)
+        executor.loader.build_graph()
+        executor.migrate(executor.loader.graph.leaf_nodes())
+        super().tearDown()
+
+    def setup_rows(self):
+        executor = MigrationExecutor(connection)
+        executor.migrate(self.before)
+        old = executor.loader.project_state(self.before).apps
+        g = lambda n: old.get_model('observations', n)
+        owner = old.get_model('auth', 'User').objects.create(username='o')
+        trip = g('DiveTrip').objects.create(title='t')
+        country, sea = g('Country').objects.create(name='PH'), g('Sea').objects.create(name='SCS')
+        order = g('TaxonOrder').objects.create(name='Nudibranchia')
+        trin = g('TaxonFamily').objects.create(name='Trinchesiidae', order=order)
+        g('TaxonGenus').objects.create(name='Phestilla', family=trin)
+        mk = lambda genus, epithet, **kw: g('Species').objects.create(genus=genus, species=epithet, scientific_name=f'{genus} {epithet}', **kw)
+        n = iter(range(10, 99))
+        sample = lambda sp, **kw: g('Sample').objects.create(owner=owner, trip=trip, species=sp, kind='species',
+                                                           video_url=f'https://youtu.be/123456789{next(n)}', **kw)
+        rows = {}
+        rows['old'] = mk('Tenellia', 'minor', author='(Rudman, 1981)', phylogenetic_order='713')
+        rows['new'] = mk('Phestilla', 'minor', author='Rudman, 1981')
+        rows['sample'] = sample(rows['old'], genus='Tenellia', family='StaleFamily', order='')
+        rows['area'] = g('SpeciesArea').objects.create(species=rows['old'], country=country, sea=sea,
+                                                       defining_sample=rows['sample'], slug='tenellia-minor')
+        rows['dup_old'] = mk('Okenia', 'brunneomaculata', author='Gosliner, 2004', link='https://example.org/x')
+        rows['dup_new'] = mk('Bermudella', 'brunneomaculata', author='(Gosliner, 2004)')
+        rows['dup_sample'] = sample(rows['dup_new'], genus='Bermudella', family='Goniodorididae', order='Nudibranchia')
+        rows['dup_area'] = g('SpeciesArea').objects.create(species=rows['dup_new'], country=country, sea=sea,
+                                                           defining_sample=rows['dup_sample'], slug='bermudella')
+        rows['dup_old_area'] = g('SpeciesArea').objects.create(species=rows['dup_old'], country=country, sea=sea,
+                                                               defining_sample=rows['dup_sample'], slug='okenia-redundant')
+        rows['ren'] = mk('Eubranchus', 'mandapamensis', author='(K. P. Rao, 1968)', full_species_name_with_order='709-Eubranchus mandapamensis (K. P. Rao, 1968)')
+        rows['ren_sample'] = sample(rows['ren'], genus='Eubranchus', family='Eubranchidae', order='Nudibranchia')
+        return rows
+
+    def migrate_after(self):
+        executor = MigrationExecutor(connection)
+        executor.migrate(self.after)
+        return executor.loader.project_state(self.after).apps
+
+    def test_fold_moves_sample_and_area_and_refreshes_the_sample_text(self):
+        r = self.setup_rows()
+        new = self.migrate_after()
+        Sp, S, A = (new.get_model('observations', n) for n in ('Species', 'Sample', 'SpeciesArea'))
+        self.assertFalse(Sp.objects.filter(pk=r['old'].pk).exists())
+        s = S.objects.get(pk=r['sample'].pk)
+        self.assertEqual((s.species_id, s.genus, s.family, s.order), (r['new'].pk, 'Phestilla', 'Trinchesiidae', 'Nudibranchia'))
+        self.assertEqual(A.objects.get(pk=r['area'].pk).species_id, r['new'].pk)       # slug kept
+        self.assertEqual(A.objects.get(pk=r['area'].pk).slug, 'tenellia-minor')
+        merged = Sp.objects.get(pk=r['new'].pk)
+        self.assertEqual((merged.author, merged.phylogenetic_order), ('Rudman, 1981', '713'))
+        self.assertEqual(merged.full_species_name_with_order, '713-Phestilla minor Rudman, 1981')
+
+    def test_redundant_area_is_dropped_and_missing_fields_copied(self):
+        r = self.setup_rows()
+        new = self.migrate_after()
+        Sp, A = new.get_model('observations', 'Species'), new.get_model('observations', 'SpeciesArea')
+        self.assertFalse(Sp.objects.filter(pk=r['dup_old'].pk).exists())
+        self.assertFalse(A.objects.filter(pk=r['dup_old_area'].pk).exists())
+        self.assertTrue(A.objects.filter(pk=r['dup_area'].pk).exists())
+        twin = Sp.objects.get(pk=r['dup_new'].pk)
+        self.assertEqual((twin.author, twin.link), ('(Gosliner, 2004)', 'https://example.org/x'))   # existing author kept, blank link copied
+
+    def test_without_an_accepted_row_the_old_one_is_renamed_with_the_given_author(self):
+        r = self.setup_rows()
+        new = self.migrate_after()
+        Sp, S = new.get_model('observations', 'Species'), new.get_model('observations', 'Sample')
+        sp = Sp.objects.get(pk=r['ren'].pk)
+        self.assertEqual((sp.genus, sp.species, sp.scientific_name, sp.author),
+                         ('Annulorhina', 'mandapamensis', 'Annulorhina mandapamensis', 'K. P. Rao, 1968'))
+        self.assertEqual(sp.full_species_name_with_order, '709-Annulorhina mandapamensis (K. P. Rao, 1968)')
+        s = S.objects.get(pk=r['ren_sample'].pk)
+        self.assertEqual((s.genus, s.family, s.order), ('Annulorhina', 'Eubranchidae', 'Nudibranchia'))   # no TaxonGenus: family kept
