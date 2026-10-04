@@ -5,7 +5,7 @@ from pathlib import Path
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
-from observations.models import DiveTrip, Sample, user_for_name
+from observations.models import DiveTrip, Sample
 from observations.table_transfer import create_backup
 
 
@@ -30,7 +30,7 @@ class Command(BaseCommand):
                 trip = DiveTrip(code=code, title=title, source_sort=row['מיון'] or '', year=row['שנה'], month=row['חודש'],
                     start_day=row['יום_התחלה'], duration_days=row['מספר ימים'], country_name=row['מדינה'] or '',
                     region_name=row['אזור'] or '', reserve=(row['שמורה'] or '').strip(), sea_name=row['ים'] or '',
-                    photographer=user_for_name(row['צלם']), species_count=int(count[1]) if count else None,
+                    species_count=int(count[1]) if count else None,
                     source_metadata={'sheet':'Observations', 'row':row['source_row'], 'original':row})
                 trip.full_clean(); trip.save(); added += 1
             for sample in Sample.objects.filter(trip__isnull=True):

@@ -87,35 +87,30 @@ class GalleryTests(TestCase):
         collection.save_reviewed(actor=self.owner, approve=True)
         self.assertEqual(self.catalog()['trips'][str(collection_trip.pk)]['species_count'], 0)
 
-    def test_catalog_exposes_hebrew_and_english_photographer_credit_for_the_trip_photographer(self):
-        # The credit is the trip's photographer user, shown in whichever language the page
-        # is in (see Sample.photographer_display_name).
+    def test_catalog_credits_the_observation_owner_in_hebrew_and_english(self):
+        # The photographer of an observation is its creator, shown in whichever language
+        # the page is in (see Sample.photographer_display_name).
         from .models import Profile
-        photographer = User.objects.create_user('boaz', first_name='בעז', last_name='ליבס')
-        Profile.objects.create(user=photographer, first_name_en='Boaz', last_name_en='Liebes')
-        self.trip.photographer = photographer; self.trip.save()
+        self.owner.first_name = 'בעז'; self.owner.last_name = 'ליבס'; self.owner.save()
+        Profile.objects.create(user=self.owner, first_name_en='Boaz', last_name_en='Liebes')
         entry = self.catalog()['species'][0]['samples'][0]
         self.assertEqual(entry['photographer'], 'בעז ליבס')  # language-invariant filter/identity value
         self.assertEqual(entry['photographer_he'], 'בעז ליבס')
         self.assertEqual(entry['photographer_en'], 'Boaz Liebes')
 
-    def test_catalog_credits_the_owner_when_the_trip_has_no_photographer(self):
+    def test_catalog_credit_falls_back_to_the_hebrew_name_without_an_english_profile(self):
         self.owner.first_name = 'דנה'; self.owner.last_name = 'כהן'; self.owner.save()
         entry = self.catalog()['species'][0]['samples'][0]
         self.assertEqual(entry['photographer_he'], 'דנה כהן')
-        self.assertEqual(entry['photographer_en'], 'דנה כהן')  # no English profile name -> falls back
+        self.assertEqual(entry['photographer_en'], 'דנה כהן')
 
-    def test_catalog_exposes_photographer_credit_for_collections_too(self):
-        from .models import Profile
-        photographer = User.objects.create_user('boaz', first_name='בעז', last_name='ליבס')
-        Profile.objects.create(user=photographer, first_name_en='Boaz', last_name_en='Liebes')
-        self.trip.photographer = photographer; self.trip.save()
-        collection = Sample(owner=self.owner, kind='collection', trip=self.trip, title='Trip collection',
-                             video_url='https://youtu.be/33333333333')
-        collection.save_reviewed(actor=self.owner, approve=True)
-        entry = self.catalog()['collections'][0]
-        self.assertEqual(entry['photographer_he'], 'בעז ליבס')
-        self.assertEqual(entry['photographer_en'], 'Boaz Liebes')
+    def test_catalog_credits_a_guest_photographers_own_observations_to_that_inactive_user(self):
+        # Photos by someone without an account are uploaded under an inactive user of theirs.
+        guest = User.objects.create_user('bart.adams', first_name='בארט', last_name='אדמס', is_active=False)
+        item = Sample(owner=guest, kind='collection', trip=self.trip, title='Bart trip', video_url='https://youtu.be/55555555555')
+        item.save_reviewed(actor=self.owner, approve=True)
+        entry = next(c for c in self.catalog()['collections'] if c['title'] == 'Bart trip')
+        self.assertEqual(entry['photographer_he'], 'בארט אדמס')
 
     def test_species_hidden_when_area_has_no_defining_sample(self):
         from .models import SpeciesArea

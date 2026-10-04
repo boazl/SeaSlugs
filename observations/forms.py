@@ -3,10 +3,9 @@ from uuid import uuid4
 from PIL import Image, ImageOps, UnidentifiedImageError
 from django import forms
 from django.core.files.base import ContentFile
-from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
-from .models import Sample, Profile, Species, Country, Region, Site, DiveTrip, split_undetermined_variant, user_choice_label
+from .models import Sample, Profile, Species, Country, Region, Site, DiveTrip, split_undetermined_variant
 
 
 class SignupForm(UserCreationForm):
@@ -180,15 +179,10 @@ class DiveTripForm(forms.ModelForm):
     region = forms.ChoiceField(label='אזור')
     class Meta:
         model = DiveTrip
-        fields = ['title','country','region','year','month','start_day','duration_days','photographer','reserve']
+        fields = ['title','country','region','year','month','start_day','duration_days','reserve']
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['region'].help_text = 'רשימת האזורים מסוננת לפי המדינה שנבחרה.'
-        # The photographer is a user account (a guest photographer is an inactive user);
-        # left empty, each observation is credited to its own owner.
-        self.fields['photographer'].queryset = get_user_model().objects.order_by('first_name', 'last_name', 'username')
-        self.fields['photographer'].label_from_instance = user_choice_label
-        self.fields['photographer'].help_text = 'אם לא נבחר צלם, כל תצפית במסע תיוחס ליוצר שלה.'
         for name, model in [('country',Country),('region',Region)]:
             self.fields[name].choices = [('', 'בחרו…')] + [(str(x.pk), str(x)) for x in model.objects.all()]
             if self.instance.pk:

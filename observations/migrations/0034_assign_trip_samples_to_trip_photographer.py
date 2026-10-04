@@ -1,11 +1,13 @@
-# Step 2 of 3: data. Point every trip's photographer at a user account.
+# Step 1 of 2 replacing the Photographer table with the Users table.
 #
-# Each trip is resolved from what it already says about its photographer: the free-text
-# credit first (that is what the site has always displayed), otherwise the Photographer
-# lookup row. The name is matched against existing users by Hebrew full name, English
-# (Profile) full name or username; a photographer nobody matches gets a new INACTIVE
-# user (no usable password, cannot log in) so no credit is ever lost. Nothing is deleted
-# here -- the old columns and table go in the next migration.
+# The model is now: the photographer of an observation is always its creator (Sample.owner).
+# A trip no longer has a photographer of its own. So that no credit changes, every
+# observation of a trip that named a photographer is handed to that photographer's user
+# account. The name is matched against existing users by Hebrew full name, English (Profile)
+# full name or username; someone nobody matches gets a new INACTIVE user (no usable password,
+# cannot log in). Nothing is deleted here -- the old columns and table go in the next
+# migration. (Data and schema are split because PostgreSQL refuses to mix them in one
+# transaction.)
 
 import re
 
@@ -75,31 +77,39 @@ class _Users:
         return user
 
 
-def photographers_to_users(apps, schema_editor):
+def trip_photographers_become_sample_owners(apps, schema_editor):
     DiveTrip = apps.get_model('observations', 'DiveTrip')
     Photographer = apps.get_model('observations', 'Photographer')
+    Sample = apps.get_model('observations', 'Sample')
     users = _Users(apps)
     by_row = {}
-    for row in Photographer.objects.order_by('pk'):
-        by_row[row.pk] = users.find(row.name, row.name_en) or users.create_guest(row.name, row.name_en)
     for trip in DiveTrip.objects.order_by('pk'):
         text = (trip.photographer or '').strip()
         user = users.find(text) if text else None
         if user is None and trip.photographer_fk_id:
+            if trip.photographer_fk_id not in by_row:
+                row = Photographer.objects.get(pk=trip.photographer_fk_id)
+                by_row[row.pk] = users.find(row.name, row.name_en) or users.create_guest(row.name, row.name_en)
             user = by_row[trip.photographer_fk_id]
         if user is None and text:
             user = users.create_guest(text)
         if user is not None:
-            DiveTrip.objects.filter(pk=trip.pk).update(photographer_user=user)
+            Sample.objects.filter(trip_id=trip.pk).exclude(owner_id=user.pk).update(owner_id=user.pk)
 
 
-def users_to_photographers(apps, schema_editor):
-    """Reverse: rebuild the lookup rows and the free-text credit from the users."""
+def sample_owners_back_to_trip_photographers(apps, schema_editor):
+    """Reverse (best effort): a trip whose observations all belong to one user gets that
+    user back as its photographer (free text and lookup row). Earlier owners are not
+    restored -- they were overwritten by the forward step."""
     DiveTrip = apps.get_model('observations', 'DiveTrip')
     Photographer = apps.get_model('observations', 'Photographer')
+    Sample = apps.get_model('observations', 'Sample')
     Profile = apps.get_model('observations', 'Profile')
-    for trip in DiveTrip.objects.exclude(photographer_user=None).select_related('photographer_user'):
-        user = trip.photographer_user
+    User = apps.get_model(*settings.AUTH_USER_MODEL.split('.'))
+    for trip in DiveTrip.objects.all():
+        owner_ids = set(Sample.objects.filter(trip_id=trip.pk).values_list('owner_id', flat=True))
+        if len(owner_ids) != 1: continue
+        user = User.objects.get(pk=owner_ids.pop())
         profile = Profile.objects.filter(user=user).first()
         he = f'{user.first_name} {user.last_name}'.strip() or user.username
         en = f'{profile.first_name_en} {profile.last_name_en}'.strip() if profile else ''
@@ -110,9 +120,9 @@ def users_to_photographers(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('observations', '0034_divetrip_photographer_user'),
+        ('observations', '0033_species_size_from_species_size_max_species_size_to'),
     ]
 
     operations = [
-        migrations.RunPython(photographers_to_users, users_to_photographers),
+        migrations.RunPython(trip_photographers_become_sample_owners, sample_owners_back_to_trip_photographers),
     ]

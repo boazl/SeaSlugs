@@ -152,7 +152,7 @@ class SpeciesAreaTests(TestCase):
 
 class DiveTripSeaReserveFieldsTests(TestCase):
     """DiveTrip.resolved_sea (region.sea wins when there is a region, otherwise the sea
-    picked directly on the trip) and the new site/photographer lookup fields added
+    picked directly on the trip) and the new site lookup field added
     alongside the existing free-text reserve field."""
 
     def setUp(self):
@@ -202,18 +202,15 @@ class DiveTripSeaReserveFieldsTests(TestCase):
         area = SpeciesArea.objects.get(species=self.species, country=self.country, sea=self.red)
         self.assertEqual(area.defining_sample_id, sample.pk)
 
-    def test_site_and_photographer_lookup_fields_are_independent_of_free_text_reserve(self):
+    def test_site_lookup_field_is_independent_of_free_text_reserve(self):
         # site reuses the existing Site table (region-scoped) instead of a separate
         # reserve table -- the free-text reserve field is unaffected by it either way.
         site = Site.objects.create(name='Akhziv reef', region=self.region)
-        photographer = User.objects.create_user('jane.diver', first_name='Jane', last_name='Diver')
         trip = DiveTrip.objects.create(title='Lookup fields', year=2026, country=self.country,
-                                        reserve='Ras Mohammed (as typed)', site=site,
-                                        photographer=photographer)
+                                        reserve='Ras Mohammed (as typed)', site=site)
         trip.refresh_from_db()
         self.assertEqual(trip.reserve, 'Ras Mohammed (as typed)')
         self.assertEqual(trip.site, site)
-        self.assertEqual(trip.photographer, photographer)
 
     def test_divetrip_locations_endpoint_returns_region_and_site_mappings(self):
         site = Site.objects.create(name='Akhziv reef', region=self.region)

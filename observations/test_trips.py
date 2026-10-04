@@ -100,19 +100,17 @@ class DiveTripTests(TestCase):
         self.assertEqual(self.trip.display_species_count,1)
 
     def test_catalog_trip_membership_and_credit(self):
-        trip_photographer=User.objects.create_user('trip.photographer',first_name='Trip',last_name='Photographer')
-        self.trip.photographer=trip_photographer;self.trip.save()
+        self.user.first_name='Trip';self.user.last_name='Photographer';self.user.save()
         collection=self.collection();collection.save_reviewed(actor=self.user,approve=True)
         sample=Sample(owner=self.user,species=self.species,trip=self.trip,video_url='https://youtu.be/zyxwvutsrqp')
         sample.save_reviewed()
         data=json.loads(self.client.get('/catalog.js').content.decode().split('=',1)[1].strip().removesuffix(';'))
         self.assertEqual(data['species'][0]['samples'][0]['trip_id'],data['collections'][0]['trip_id'])
         self.assertEqual(data['species'][0]['samples'][0]['photographer'],'Trip Photographer')
-        # a sample whose trip has no photographer is credited to its own owner
-        self.trip.photographer=None;self.trip.save()
+        # the credit follows the owner, not the trip
         sample=Sample.objects.get(pk=sample.pk)
         self.user.first_name='Dana';self.user.save()
-        self.assertEqual(sample.photographer_name,'Dana')
+        self.assertEqual(sample.photographer_name,'Dana Photographer')
 
     def test_profile_form_saves_hebrew_first_and_last_name(self):
         # first_name/last_name are not real Profile fields -- the form piggybacks
@@ -152,32 +150,22 @@ class DiveTripTests(TestCase):
         self.assertContains(self.client.get('/'),'>יציאה<')
         self.assertContains(self.client.get('/?lang=en'),'>Logout<')
 
-    def test_photographer_credit_resolves_the_trip_photographer_by_language(self):
-        # The trip's photographer is a user account -- the credit reads in the page's
+    def test_photographer_credit_is_the_owner_in_the_pages_language(self):
+        # The photographer is the observation's creator -- the credit reads in the page's
         # language through that user's profile, the same way the nav greeting does.
         from .models import Profile
-        photographer=User.objects.create_user('boaz',first_name='בעז',last_name='ליבס')
-        Profile.objects.create(user=photographer,first_name_en='Boaz',last_name_en='Liebes')
-        self.trip.photographer=photographer;self.trip.save()
+        self.user.first_name='בעז';self.user.last_name='ליבס';self.user.save()
+        Profile.objects.create(user=self.user,first_name_en='Boaz',last_name_en='Liebes')
         sample=Sample(owner=self.user,species=self.species,trip=self.trip,video_url='https://youtu.be/zyxwvutsrqp')
-        self.assertEqual(sample.photographer_user,photographer)
         self.assertEqual(sample.photographer_display_name('he'),'בעז ליבס')
         self.assertEqual(sample.photographer_display_name('en'),'Boaz Liebes')
 
-    def test_photographer_credit_falls_back_to_the_owner_when_the_trip_has_none(self):
-        from .models import Profile
-        self.user.first_name='דנה';self.user.last_name='כהן';self.user.save()
-        Profile.objects.create(user=self.user,first_name_en='Dana',last_name_en='Cohen')
-        self.assertIsNone(self.trip.photographer)
-        sample=Sample(owner=self.user,species=self.species,trip=self.trip,video_url='https://youtu.be/zyxwvutsrqp')
-        self.assertEqual(sample.photographer_user,self.user)
-        self.assertEqual(sample.photographer_display_name('he'),'דנה כהן')
-        self.assertEqual(sample.photographer_display_name('en'),'Dana Cohen')
+    def test_a_trip_has_no_photographer_of_its_own(self):
+        self.assertFalse([f.name for f in DiveTrip._meta.get_fields() if 'photographer' in f.name])
 
     def test_guest_photographer_is_an_inactive_user_and_cannot_log_in(self):
         guest=User.objects.create_user('bart.adams',first_name='בארט',last_name='אדמס',is_active=False)
-        self.trip.photographer=guest;self.trip.save()
-        sample=Sample(owner=self.user,species=self.species,trip=self.trip,video_url='https://youtu.be/zyxwvutsrqp')
+        sample=Sample(owner=guest,species=self.species,trip=self.trip,video_url='https://youtu.be/zyxwvutsrqp')
         self.assertEqual(sample.photographer_name,'בארט אדמס')
         self.assertFalse(self.client.login(username='bart.adams',password='anything'))
 

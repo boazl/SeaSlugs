@@ -29,7 +29,7 @@ def gallery_file(request, filename='index.html'):
             return {
                 'sample_id': s.pk, 'trip_id': s.trip_id,
                 'region': str(region.pk), 'site': str(s.site_id) if s.site_id else None,
-                # 'photographer' is the credited user's Hebrew full name -- language-invariant, so it is the
+                # 'photographer' is the observation owner's Hebrew full name -- language-invariant, so it is the
                 # filter/identity value (see photographerCount and the photographer checkbox
                 # filter in app.js). 'photographer_he'/'photographer_en' are only for display,
                 # so a registered user's credit shows in the page's own language (see
@@ -136,7 +136,7 @@ def gallery_file(request, filename='index.html'):
                 kind='species', species_id=area.species_id, status='published', deleted_at__isnull=True,
                 trip__country_id=area.country_id, trip__region__sea_id=area.sea_id, trip__year__isnull=False,
                 species_other='', site_other='', undetermined_variant=area.undetermined_variant,
-            ).select_related('trip', 'trip__region', 'site', 'owner', 'owner__profile', 'trip__photographer', 'trip__photographer__profile').order_by('created_at', 'pk')
+            ).select_related('trip', 'trip__region', 'site', 'owner', 'owner__profile').order_by('created_at', 'pk')
             samples = []
             for s in samples_qs:
                 region = s.trip.region
@@ -217,7 +217,7 @@ def gallery_file(request, filename='index.html'):
             status='published', deleted_at__isnull=True, kind='collection', species__isnull=True,
             trip__isnull=False, trip__country__isnull=False, trip__region__isnull=False, trip__year__isnull=False,
             species_other='', site_other='',
-        ).select_related('trip', 'trip__region', 'trip__country', 'owner', 'owner__profile', 'trip__photographer', 'trip__photographer__profile').order_by('gallery_order', 'pk')
+        ).select_related('trip', 'trip__region', 'trip__country', 'owner', 'owner__profile').order_by('gallery_order', 'pk')
         collections_out = []
         for item in collection_rows:
             region = item.trip.region
