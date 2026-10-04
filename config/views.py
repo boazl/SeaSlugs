@@ -160,6 +160,7 @@ def gallery_file(request, filename='index.html'):
                 'title': f'{area.species.scientific_name} {area.undetermined_variant}'.strip(),
                 'name_he': area.species.name_he, 'name_en': area.species.name_en,
                 'epithet': area.species.species,
+                'author': (area.species.author or '').strip(),
                 # Species.is_migrant, straight through -- drives the "migrant species" area
                 # filter button in app.js (a species-level flag, not species+area-specific,
                 # so it's the same for every area entry of the same species).

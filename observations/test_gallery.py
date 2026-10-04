@@ -41,6 +41,11 @@ class GalleryTests(TestCase):
         self.assertEqual(entry['genus'], 'Testus')
         self.assertEqual(entry['epithet'], 'exemplaris')
 
+    def test_catalog_exposes_the_species_author_for_the_card_heading(self):
+        self.item.species.author = ' (Bergh, 1877) '
+        self.item.species.save()
+        self.assertEqual(self.catalog()['species'][0]['author'], '(Bergh, 1877)')
+
     def test_catalog_exposes_is_migrant_for_the_area_filter(self):
         # The gallery's "migrant species" area-filter button (app.js) is driven entirely by
         # this field, straight from Species.is_migrant -- default False must reach catalog.js

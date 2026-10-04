@@ -30,3 +30,18 @@ class GalleryScriptTests(SimpleTestCase):
         self.assertIn('function setLatinName(', js)
         self.assertIn('setLatinName(h3, sp.title)', js)
         self.assertIn("setLatinName(document.querySelector('#playerTitle'), species.title)", js)
+
+    def test_gallery_card_shows_the_author_small_and_the_photographer_filter_splits_species_and_collections(self):
+        from pathlib import Path
+        root = Path(__file__).resolve().parent.parent / 'dist'
+        js, css = (root / 'app.js').read_text(encoding='utf-8'), (root / 'styles.css').read_text(encoding='utf-8')
+        self.assertIn("author.className = 'card-author'", js)
+        self.assertIn('if (sp.author)', js)
+        self.assertIn('function photographerSpeciesCount(', js)
+        self.assertIn('function photographerCollectionCount(', js)
+        self.assertIn("'מינים'", js)
+        self.assertIn("'אוספים'", js)
+        self.assertIn('.card h3 .card-author{font-size:12px', css)
+        self.assertEqual(css.count('.card h3{'), 2)        # the later override must not bring the old 24px back
+        for rule in css.split('}'):
+            if rule.strip().startswith('.card h3{'): self.assertIn('font-size:18px', rule + '}')

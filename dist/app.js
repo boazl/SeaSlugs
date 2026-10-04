@@ -133,9 +133,13 @@ function siteCount(area, id) {
 function tripCount(area, id) {
     return speciesList.filter(sp => (area === 'all' || sp.area === area) && sp.samples.some(sm => String(sm.trip_id) === id)).length;
 }
-function photographerCount(area, name) {
+function photographerSpeciesCount(area, name) {
     let n = 0;
     for (const sp of speciesList) { if (area !== 'all' && sp.area !== area) continue; if (sp.samples.some(sm => sm.photographer === name)) n++; }
+    return n;
+}
+function photographerCollectionCount(area, name) {
+    let n = 0;
     for (const c of collectionsList) { if (area !== 'all' && c.area !== area) continue; if (c.photographer === name) n++; }
     return n;
 }
@@ -336,10 +340,31 @@ function renderSidebar() {
         .map(id => [id, labelFor(id, siteLabelsData), siteCount(area, id)])
         .sort((a, b) => a[1].localeCompare(b[1], language === 'he' ? 'he' : 'en'));
     renderCheckboxGroup(document.querySelector('#siteOptions'), siteEntries, state.sites);
+    // Each photographer gets two count lines under the checkbox: species cards, then collections.
     const photographerEntries = [...opts.photographers]
-        .map(name => [name, name, photographerCount(area, name)])
+        .map(name => [name, name, null])
         .sort((a, b) => a[1].localeCompare(b[1]));
-    renderCheckboxGroup(document.querySelector('#photographerOptions'), photographerEntries, state.photographers);
+    const photographerBox = document.querySelector('#photographerOptions');
+    renderCheckboxGroup(photographerBox, photographerEntries, state.photographers);
+    for (const row of [...photographerBox.querySelectorAll('.filter-check')]) {
+        const name = row.querySelector('input').value;
+        const rows = [
+            [language === 'he' ? 'מינים' : 'Species', photographerSpeciesCount(area, name)],
+            [language === 'he' ? 'אוספים' : 'Collections', photographerCollectionCount(area, name)],
+        ];
+        let anchor = row;
+        for (const [label, count] of rows) {
+            const sub = document.createElement('div');
+            sub.className = 'filter-sub';
+            const text = document.createElement('span');
+            text.textContent = label;
+            const small = document.createElement('small');
+            small.textContent = count;
+            sub.append(text, small);
+            anchor.after(sub);
+            anchor = sub;
+        }
+    }
     const yearEntries = [...opts.years]
         .map(year => [year, year, yearCount(area, year)])
         .sort((a, b) => Number(b[0]) - Number(a[0]));
@@ -644,6 +669,12 @@ function buildSpeciesCard(sp, index) {
     info.className = 'card-info';
     const h3 = document.createElement('h3');
     setLatinName(h3, sp.title);
+    if (sp.author) {
+        const author = document.createElement('span');
+        author.className = 'card-author';
+        author.textContent = sp.author;
+        h3.append(' ', author);
+    }
     const sub = document.createElement('span');
     sub.className = 'common-name';
     if (common) sub.textContent = common;
