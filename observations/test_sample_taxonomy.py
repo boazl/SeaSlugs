@@ -620,3 +620,29 @@ class Migration0046Tests(TransactionTestCase):
         new = self.migrate(self.after)
         renamed = new.get_model('observations', 'Species').objects.get(pk=wrong.pk)
         self.assertEqual((renamed.species, renamed.scientific_name), ('pinnata', 'Fiona pinnata'))
+
+
+class Migration0047Tests(TransactionTestCase):
+    before = [('observations', '0046_fold_fiona_pinnata_case_duplicate')]
+    after = [('observations', '0047_species_authors_from_worms')]
+
+    def tearDown(self):
+        executor = MigrationExecutor(connection)
+        executor.loader.build_graph()
+        executor.migrate(executor.loader.graph.leaf_nodes())
+        super().tearDown()
+
+    def test_blank_authors_are_filled_and_existing_ones_kept(self):
+        executor = MigrationExecutor(connection)
+        executor.migrate(self.before)
+        old = executor.loader.project_state(self.before).apps
+        Sp = old.get_model('observations', 'Species')
+        blank = Sp.objects.create(genus='Thecacera', species='picta', scientific_name='Thecacera picta')
+        kept = Sp.objects.create(genus='Tambja', species='kava', scientific_name='Tambja kava', author='my own')
+        other = Sp.objects.create(genus='Thecacera', species='sp.', scientific_name='Thecacera sp.')
+        executor = MigrationExecutor(connection)
+        executor.migrate(self.after)
+        Sp = executor.loader.project_state(self.after).apps.get_model('observations', 'Species')
+        self.assertEqual(Sp.objects.get(pk=blank.pk).author, 'Baba, 1972')
+        self.assertEqual(Sp.objects.get(pk=kept.pk).author, 'my own')
+        self.assertEqual(Sp.objects.get(pk=other.pk).author, '')
