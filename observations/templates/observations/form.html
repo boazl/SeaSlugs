@@ -8,7 +8,7 @@
 <form method="post" action="{% url 'observation-action' form.instance.pk %}"><input type="hidden" name="action" value="delete_video">{% csrf_token %}<button type="submit" id="delete-video-btn" data-has-video="{% if form.instance.video_url %}1{% endif %}" {% if not form.instance.video_url %}disabled{% endif %}>מחיקת קישור הסרטון</button></form>
 </div>{% endif %}
 {% if observation_form and trip_new_url %}<p><a href="{{ trip_new_url }}?next={{ request.path|urlencode }}">מסע הצלילה לא ברשימה? הוספת מסע חדש</a></p>{% endif %}
-{% if observation_form %}<datalist id="species-options">{% for s in species_options %}<option value="{{ s }}">{% endfor %}</datalist>{{ locations|json_script:'locations' }}<script>
+{% if observation_form %}{{ locations|json_script:'locations' }}<script>
 const locations=JSON.parse(document.getElementById('locations').textContent);
 const otherFields=['site'];
 function updateOther(){for(const name of otherFields){const other=document.querySelector('[data-other-for="'+name+'"]');if(!other)continue;const el=document.getElementById('id_'+name);const enabled=el.value==='other';other.closest('p').hidden=!enabled;other.disabled=!enabled;other.required=enabled;}}
@@ -81,116 +81,7 @@ if(speciesEl)speciesEl.addEventListener('change',updateDefiningStatus);
 if(tripEl)tripEl.addEventListener('change',updateDefiningStatus);
 updateDefiningStatus();
 </script>
-<datalist id="order-options"></datalist><datalist id="family-options"></datalist><datalist id="genus-options"></datalist>
-{{ taxonomy|json_script:'taxonomy' }}<script>
-// Taxonomic cascade: order -> family -> genus -> species. Which levels are available depends on
-// the sample kind (order: just the order; family: order+family; genus: +genus; species: all
-// four), a lower level narrows the lists above/below it and fills in the levels above it, and
-// the full name (genus, qualifier, epithet, author, life stage) is shown read-only. The server
-// (Sample.sync_taxonomy) enforces the same rules, so this script is only the live convenience.
-(function(){
-  const tax=JSON.parse(document.getElementById('taxonomy').textContent);
-  const $=id=>document.getElementById('id_'+id);
-  const kindEl=$('kind'),orderEl=$('order'),familyEl=$('family'),genusEl=$('genus'),speciesEl=$('species'),
-        qualEl=$('identification_qualifier'),lifeEl=$('life_stage'),otherEl=$('species_other'),fullEl=$('full_name');
-  if(!kindEl||!orderEl||!familyEl||!genusEl||!speciesEl)return;
-  const speciesNames=Array.from(document.querySelectorAll('#species-options option')).map(o=>o.value);
-  const speciesByLower=new Map(speciesNames.map(n=>[n.toLowerCase(),n]));
-  const genusOf=name=>name.split(' ')[0];
-  const genusInfo=name=>tax.genera.find(g=>g[0]===name);
-  const ordersOfFamily=name=>[...new Set(tax.families.filter(f=>f[0]===name&&f[1]).map(f=>f[1]))];
-  const familyKnown=name=>tax.families.some(f=>f[0]===name);
-  const fillList=(id,values)=>{const dl=document.getElementById(id);dl.replaceChildren(...values.map(v=>{const o=document.createElement('option');o.value=v;return o;}));};
-  const uniq=a=>[...new Set(a)].sort();
-  const LEVEL={collection:0,order:1,family:2,genus:3,species:4};
-  function kind(){return kindEl.value||'species';}
-  function toggle(el,on){if(!el)return;el.disabled=!on;const p=el.closest('p');if(p)p.style.opacity=on?'':'0.45';}
-  function applyKind(){
-    const level=LEVEL[kind()]??4;
-    toggle(orderEl,level>=1);toggle(familyEl,level>=2);toggle(genusEl,level>=3);toggle(speciesEl,level>=4);
-    toggle(qualEl,level>=4);toggle(otherEl,level>=4);toggle(lifeEl,level>=1);
-  }
-  function refreshLists(){
-    const order=orderEl.value.trim(),family=familyEl.value.trim(),genus=genusEl.value.trim();
-    fillList('order-options',tax.orders);
-    fillList('family-options',uniq(tax.families.filter(f=>!order||f[1]===order||!f[1]).map(f=>f[0])));
-    fillList('genus-options',uniq(tax.genera.filter(g=>(!family||g[1]===family)&&(!order||g[2]===order||!g[2])).map(g=>g[0])));
-    // The species field holds the epithet only: with a genus chosen the suggestions are that
-    // genus' epithets, without one they are full names (picking one fills in the genus too).
-    const sp=document.getElementById('species-options');
-    const names=genus?speciesNames.filter(n=>n.startsWith(genus+' ')).map(n=>n.slice(genus.length+1)):speciesNames;
-    sp.replaceChildren(...names.map(v=>{const o=document.createElement('option');o.value=v;return o;}));
-  }
-  // Drop lower-level values that no longer fit the levels above them.
-  function prune(from){
-    if(from<2&&familyEl.value.trim()){
-      const fam=familyEl.value.trim(),order=orderEl.value.trim();
-      if(familyKnown(fam)&&order){const os=ordersOfFamily(fam);if(os.length&&!os.includes(order))familyEl.value='';}
-    }
-    if(from<3&&genusEl.value.trim()){
-      const g=genusInfo(genusEl.value.trim()),fam=familyEl.value.trim(),order=orderEl.value.trim();
-      if(g&&((fam&&g[1]&&g[1]!==fam)||(order&&g[2]&&g[2]!==order)))genusEl.value='';
-    }
-    if(from<4&&speciesEl.value.trim()){
-      // a full name left in the species field that belongs to another genus no longer fits
-      const genus=genusEl.value.trim(),name=speciesEl.value.trim();
-      if(genus&&speciesByLower.has(name.toLowerCase())&&genusOf(speciesByLower.get(name.toLowerCase()))!==genus)speciesEl.value='';
-    }
-  }
-  function fromGenus(){
-    const g=genusInfo(genusEl.value.trim());
-    if(g){if(g[1])familyEl.value=g[1];if(g[2])orderEl.value=g[2];}
-  }
-  function fromFamily(){
-    const os=ordersOfFamily(familyEl.value.trim());
-    if(os.length===1)orderEl.value=os[0];
-  }
-  const typedSpecies=()=>{const g=genusEl.value.trim(),t=speciesEl.value.trim();return g&&t?g+' '+t:t;};
-  window.fullSpeciesText=typedSpecies;
-  function matchedSpecies(){
-    const g=genusEl.value.trim(),t=speciesEl.value.trim();
-    return (g&&speciesByLower.get((g+' '+t).toLowerCase()))||speciesByLower.get(t.toLowerCase());
-  }
-  function updateFullName(){
-    if(!fullEl)return;
-    const k=kind(),life=lifeEl&&!lifeEl.disabled?lifeEl.value:'';
-    let parts=[];
-    if(k==='collection')parts=[];
-    else if(k==='order')parts=[orderEl.value.trim(),life];
-    else if(k==='family')parts=[familyEl.value.trim(),life];
-    else if(k==='genus')parts=[genusEl.value.trim(),life];
-    else{
-      const sp=matchedSpecies();
-      if(sp){const g=genusOf(sp),epithet=sp.slice(g.length+1);
-        parts=[g,qualEl?qualEl.value:'',epithet,tax.authors[sp]||'',life];}
-      else parts=[otherEl?otherEl.value.trim():'',life];
-    }
-    fullEl.value=parts.filter(Boolean).join(' ');
-  }
-  function changed(level){
-    if(level===4){
-      const sp=matchedSpecies();
-      if(sp){
-        const g=genusOf(sp);genusEl.value=g;fromGenus();
-        // a full name picked from the list becomes just the epithet
-        if(speciesEl.value.trim().toLowerCase()===sp.toLowerCase())speciesEl.value=sp.slice(g.length+1);
-      }
-    }
-    if(level===3)fromGenus();
-    if(level===2)fromFamily();
-    prune(level);refreshLists();updateFullName();
-    clearTimeout(window.__statusTimer);window.__statusTimer=setTimeout(()=>{if(window.updateDefiningStatus)updateDefiningStatus();},300);
-  }
-  orderEl.addEventListener('input',()=>changed(1));
-  familyEl.addEventListener('input',()=>changed(2));
-  genusEl.addEventListener('input',()=>changed(3));
-  speciesEl.addEventListener('input',()=>changed(4));
-  for(const e of [qualEl,lifeEl,otherEl])if(e)e.addEventListener('input',updateFullName);
-  kindEl.addEventListener('change',()=>{applyKind();updateFullName();});
-  applyKind();refreshLists();updateFullName();
-  if(window.updateDefiningStatus)updateDefiningStatus();
-})();
-</script>{% endif %}
+{% include 'observations/_taxonomy_cascade.html' %}{% endif %}
 {% if trip_form %}{{ locations|json_script:'divetrip-locations' }}<script>
 const tripLocations=JSON.parse(document.getElementById('divetrip-locations').textContent);
 function updateRegions(reset){

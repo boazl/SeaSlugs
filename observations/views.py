@@ -10,7 +10,7 @@ from django.views.decorators.http import require_POST
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from .models import Sample, Profile, Region, Site, DiveTrip, SiteImage, Species, Country, SpeciesArea, SampleKind, KIND_EN_NAMES, TaxonGenus, TaxonFamily, TaxonOrder, full_name_for
-from .forms import SignupForm, SampleForm, ProfileForm, DiveTripForm
+from .forms import SignupForm, SampleForm, ProfileForm, DiveTripForm, taxonomy_for_form, species_name_options
 from .notifications import notify_new_user_registered
 from .gallery_data import TaxonResolver, taxon_media
 from .i18n import get_lang
@@ -380,20 +380,6 @@ def divetrip_locations(request):
     })
 
 
-def taxonomy_for_form():
-    """The order -> family -> genus chain (from the taxonomy tables) and each catalogued
-    species' author, for the observation form's cascading fields. Species themselves are
-    already listed in the species datalist; a species' genus is the first word of its name."""
-    families = TaxonFamily.objects.select_related('order')
-    return {
-        'orders': sorted({o.name for o in TaxonOrder.objects.all()}),
-        'families': sorted({(f.name, f.order.name if f.order_id else '') for f in families}),
-        'genera': sorted({(g.name, g.family.name if g.family_id else '', g.family.order.name if g.family_id and g.family.order_id else '')
-                          for g in TaxonGenus.objects.select_related('family__order')}),
-        'authors': {s.scientific_name: s.author.strip() for s in Species.objects.exclude(author='').only('scientific_name', 'author')},
-    }
-
-
 @login_required
 def edit(request,pk=None):
     if pk:
@@ -461,7 +447,7 @@ def edit(request,pk=None):
         return redirect(f'{next_url}#obs-{item.pk}')
     return render(request,'observations/form.html',{'form':form,'title':'תצפית / Sample','observation_form':True,
         'trip_new_url':reverse('trip-new'),'next':next_url,
-        'species_options':[str(item) for item in Species.objects.order_by('scientific_name')],
+        'species_options':species_name_options(),
         'taxonomy':taxonomy_for_form(),
         'locations':{'trips':list(DiveTrip.objects.values('id','region_id')),'sites':list(Site.objects.values('id','region_id'))}})
 

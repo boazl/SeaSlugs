@@ -338,8 +338,11 @@ class SampleAdminListTests(TaxonomyBase):
         self.assertEqual(response.status_code, 200)
         for name in ('order', 'family', 'genus', 'species', 'identification_qualifier', 'life_stage'):
             self.assertContains(response, f'name="form-0-{name}"')
-        # order/family suggest the known names, like the species list does
-        self.assertContains(response, 'id="id_form-0-order__datalist"')
+        # order/family/genus/species suggest the known names through one shared list each
+        for column in ('order', 'family', 'genus', 'species'):
+            self.assertContains(response, f'<datalist id="sample-{column}-options">')
+            self.assertContains(response, f'list="sample-{column}-options"')
+        self.assertContains(response, '<option value="Chromodorididae">')
         # the species column holds the epithet only
         self.assertContains(response, 'value="strigata"')
         # long filters are dropdowns, and the panel is kept narrow
@@ -370,7 +373,22 @@ class SampleAdminListTests(TaxonomyBase):
         response = self.client.get('/admin/observations/sample/')
         self.assertNotContains(response, '>' + 'T' * 120)            # the visible option text is cut...
         self.assertContains(response, 'title="' + 'T' * 120)         # ...and the full text stays in the tooltip
-    def test_change_form_still_opens_with_taxonomy_suggestions(self):
+    def test_change_form_has_working_dropdown_fields(self):
         response = self.client.get(f'/admin/observations/sample/{self.s.pk}/change/')
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Chromodorididae')
+        # regression: the inputs were escaped and shown as literal HTML text
+        self.assertNotContains(response, '&lt;input'); self.assertNotContains(response, '&lt;datalist')
+        for name in ('order', 'family', 'genus', 'species'):
+            self.assertContains(response, f'<input type="text" name="{name}"')
+        # suggestion lists for every level, filled by the shared cascade script
+        for listing in ('order-options', 'family-options', 'genus-options', 'species-options'):
+            self.assertContains(response, f'<datalist id="{listing}">')
+        self.assertContains(response, 'list="genus-options"'); self.assertContains(response, 'list="species-options"')
+        self.assertContains(response, '<option value="Chromodoris strigata">')
+        self.assertContains(response, 'id="taxonomy"')
+        self.assertContains(response, 'Taxonomic cascade')
+
+    def test_datalist_widget_output_is_marked_safe(self):
+        from django.utils.safestring import SafeString
+        from .admin import DatalistTextInput
+        self.assertIsInstance(DatalistTextInput(['a']).render('x', 'v'), SafeString)

@@ -8,3 +8,8 @@
 #changelist .changelist-form-container { min-width: 0; }
 #result_list input[type="text"] { max-width: 11em; }
 </style>{% endblock %}
+{% block content %}{{ block.super }}{% if sample_datalists %}{# one shared suggestion list per column, used by the editable inputs #}
+<datalist id="sample-order-options">{% for v in sample_datalists.order %}<option value="{{ v }}">{% endfor %}</datalist>
+<datalist id="sample-family-options">{% for v in sample_datalists.family %}<option value="{{ v }}">{% endfor %}</datalist>
+<datalist id="sample-genus-options">{% for v in sample_datalists.genus %}<option value="{{ v }}">{% endfor %}</datalist>
+<datalist id="sample-species-options">{% for v in sample_datalists.species %}<option value="{{ v }}">{% endfor %}</datalist>{% endif %}{% endblock %}

@@ -6,8 +6,9 @@ from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 from django.urls import reverse
-from .forms import SampleForm, SampleChangelistForm
+from .forms import SampleForm, SampleChangelistForm, taxonomy_for_form, species_name_options
 from .models import Country, Sea, Region, Site, Species, Profile, Sample, DiveTrip, SiteImage, SpeciesArea, TaxonOrder, TaxonFamily, TaxonGenus, SampleKind
 
 for model in [Country,Sea,Region,Site,Profile,SiteImage,SampleKind]: admin.site.register(model)
@@ -47,7 +48,8 @@ class DatalistTextInput(forms.TextInput):
         attrs['list'] = list_id
         input_html = super().render(name, value, attrs, renderer)
         options_html = ''.join(f'<option value="{html_escape(opt)}">' for opt in self.datalist_options)
-        return input_html + f'<datalist id="{list_id}">{options_html}</datalist>'
+        # mark_safe: SafeString + str is a plain str, which the admin's change form would escape
+        return mark_safe(input_html + f'<datalist id="{list_id}">{options_html}</datalist>')
 
 
 class SpeciesAdminForm(forms.ModelForm):
@@ -228,20 +230,30 @@ class SampleAdmin(admin.ModelAdmin):
     list_filter=['status','kind',('order',DropdownAllValuesFilter),('family',DropdownAllValuesFilter),('genus',DropdownAllValuesFilter),TripCodeListFilter,PublicationReasonListFilter,'deleted_at']
     list_per_page=100
     def get_changelist_form(self,request,**kwargs):
-        orders=sorted(set(TaxonOrder.objects.exclude(name='').values_list('name',flat=True))|set(Sample.objects.exclude(order='').values_list('order',flat=True)))
-        families=sorted(set(TaxonFamily.objects.exclude(name='').values_list('name',flat=True))|set(Sample.objects.exclude(family='').values_list('family',flat=True)))
+        # order/family/genus/species are plain inputs bound to ONE shared <datalist> each (rendered
+        # once by the list template) rather than a datalist per row -- 100 rows x hundreds of
+        # genera would make the page heavy.
         class Form(SampleChangelistForm):
             class Meta(SampleChangelistForm.Meta):
-                widgets={'order':DatalistTextInput(datalist_options=orders),'family':DatalistTextInput(datalist_options=families),
-                         'genus':forms.TextInput(attrs={'size':14})}
+                widgets={'order':forms.TextInput(attrs={'list':'sample-order-options','size':14,'autocomplete':'off'}),
+                         'family':forms.TextInput(attrs={'list':'sample-family-options','size':16,'autocomplete':'off'}),
+                         'genus':forms.TextInput(attrs={'list':'sample-genus-options','size':14,'autocomplete':'off'})}
         return Form
-    def get_form(self,request,obj=None,change=False,**kwargs):
-        # The change form's order/family/genus get suggestion lists, like the species admin.
-        form=super().get_form(request,obj,change=change,**kwargs)
-        form.base_fields['order'].widget=DatalistTextInput(datalist_options=sorted(set(TaxonOrder.objects.exclude(name='').values_list('name',flat=True))))
-        form.base_fields['family'].widget=DatalistTextInput(datalist_options=sorted(set(TaxonFamily.objects.exclude(name='').values_list('name',flat=True))))
-        form.base_fields['genus'].widget=DatalistTextInput(datalist_options=sorted(set(TaxonGenus.objects.exclude(name='').values_list('name',flat=True))))
-        return form
+    def changelist_view(self,request,extra_context=None):
+        extra_context=dict(extra_context or {})
+        extra_context['sample_datalists']={
+            'order':sorted(set(TaxonOrder.objects.exclude(name='').values_list('name',flat=True))|set(Sample.objects.exclude(order='').values_list('order',flat=True))),
+            'family':sorted(set(TaxonFamily.objects.exclude(name='').values_list('name',flat=True))|set(Sample.objects.exclude(family='').values_list('family',flat=True))),
+            'genus':sorted(set(TaxonGenus.objects.exclude(name='').values_list('name',flat=True))),
+            'species':sorted(set(Species.objects.exclude(species='').values_list('species',flat=True))),
+        }
+        return super().changelist_view(request,extra_context)
+    def render_change_form(self,request,context,*args,**kwargs):
+        # The same cascading order -> family -> genus -> species fields as the observation form
+        # (templates/observations/_taxonomy_cascade.html, included by this model's change_form).
+        context['taxonomy']=taxonomy_for_form()
+        context['species_options']=species_name_options()
+        return super().render_change_form(request,context,*args,**kwargs)
     search_fields=['title','species__scientific_name','species_other','order','family','genus','owner__username','source_id','trip__title']
     readonly_fields=['publication_warning','source_metadata','source_id','status','created_at','updated_at','deleted_at','deleted_by','approved_at','approved_by']
     actions=['approve','soft_remove','restore']

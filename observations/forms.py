@@ -5,7 +5,7 @@ from django import forms
 from django.core.files.base import ContentFile
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
-from .models import Sample, Profile, Species, Country, Region, Site, DiveTrip, split_undetermined_variant
+from .models import Sample, Profile, Species, Country, Region, Site, DiveTrip, TaxonOrder, TaxonFamily, TaxonGenus, split_undetermined_variant
 
 
 class SignupForm(UserCreationForm):
@@ -70,6 +70,25 @@ class SampleImageInput(forms.ClearableFileInput):
     access-controlled view is guaranteed to actually show the image."""
     template_name = 'observations/widgets/sample_image_input.html'
 
+
+
+def taxonomy_for_form():
+    """The order -> family -> genus chain (from the taxonomy tables) and each catalogued
+    species' author, for the cascading taxonomy fields (observation form and Samples admin,
+    see observations/_taxonomy_cascade.html). Species themselves are listed separately (see
+    species_name_options); a species' genus is the first word of its name."""
+    families = TaxonFamily.objects.select_related('order')
+    return {
+        'orders': sorted({o.name for o in TaxonOrder.objects.all()}),
+        'families': sorted({(f.name, f.order.name if f.order_id else '') for f in families}),
+        'genera': sorted({(g.name, g.family.name if g.family_id else '', g.family.order.name if g.family_id and g.family.order_id else '')
+                          for g in TaxonGenus.objects.select_related('family__order')}),
+        'authors': {s.scientific_name: s.author.strip() for s in Species.objects.exclude(author='').only('scientific_name', 'author')},
+    }
+
+
+def species_name_options():
+    return [str(item) for item in Species.objects.order_by('scientific_name')]
 
 
 def resolve_species(genus, text):
@@ -221,7 +240,7 @@ class SampleChangelistForm(forms.ModelForm):
     family, genus and species (epithet only) plus the cf./aff. and juv. markers. The species
     column is looked up through genus + epithet exactly like the observation form does; only a
     SPECIES-kind sample has one."""
-    species = forms.CharField(label='מין', required=False, widget=forms.TextInput(attrs={'size': 14}))
+    species = forms.CharField(label='מין', required=False, widget=forms.TextInput(attrs={'size': 12, 'list': 'sample-species-options', 'autocomplete': 'off'}))
     class Meta:
         model = Sample
         fields = ['order', 'family', 'genus', 'species', 'identification_qualifier', 'life_stage']
