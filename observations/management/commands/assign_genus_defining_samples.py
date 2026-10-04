@@ -1,5 +1,5 @@
 """Point each TaxonGenus.defining_sample at its own dedicated genus-kind Sample
-(kind=Sample.Kind.GENUS, species_other=<genus name>), whenever a published one exists --
+(kind=Sample.Kind.GENUS, genus=<genus name>), whenever a published one exists --
 overriding whatever species-level photo may currently be set there. A purpose-built genus
 reference photo is a better representative of the whole genus in the gallery's genus panel
 than a photo of one particular species standing in for it.
@@ -26,7 +26,7 @@ class Command(BaseCommand):
         apply = options['apply']
 
         def genus_samples(name):
-            return Sample.objects.filter(kind=Sample.Kind.GENUS, species_other=name,
+            return Sample.objects.filter(kind=Sample.Kind.GENUS, genus=name,
                                           status='published', deleted_at__isnull=True)
 
         def run():
@@ -53,7 +53,7 @@ class Command(BaseCommand):
 
         genera_with_sample = Sample.objects.filter(
             kind=Sample.Kind.GENUS, status='published', deleted_at__isnull=True,
-        ).values('species_other').distinct().count()
+        ).values('genus').distinct().count()
         self.stdout.write(
             f'genus defining_sample: {updated} to update, {unchanged} already correct or no genus-kind sample '
             f'(of {TaxonGenus.objects.count()} genera; {genera_with_sample} distinct genera have a published genus-kind sample)'

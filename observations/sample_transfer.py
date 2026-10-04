@@ -5,11 +5,15 @@ from django.core.exceptions import ValidationError
 from .models import Sample, Species, Country, Region, Site, DiveTrip, youtube_id
 
 
+# Fields added after the first transfer format: older rows lack them (defaulted to '').
+TAXONOMY_FIELDS = ('order', 'family', 'genus', 'identification_qualifier', 'life_stage')
+
+
 def _describe(sample):
     """Short, identifying text for a Sample in an error message -- an operator resolving a
     transfer conflict in admin needs to know exactly which record(s) to open, not just that
     a conflict exists."""
-    identity = sample.title or sample.species_other or (sample.species.scientific_name if sample.species_id else '') or 'ללא כותרת'
+    identity = sample.title or sample.taxon_name or 'ללא כותרת'
     return f'#{sample.pk} ({identity}, מסע {sample.trip_id})'
 
 
@@ -33,9 +37,19 @@ def sample_plan(document, fields):
     from .table_transfer import unique
     result = []; seen = set(); targets = set()
     for incoming in document['rows']:
-        if isinstance(incoming, dict) and set(incoming) == set(fields)-{'transfer_id','image'}:
+        missing = set(fields) - set(incoming) if isinstance(incoming, dict) else None
+        if missing and set(incoming) <= set(fields) and missing - set(TAXONOMY_FIELDS) in (set(), {'transfer_id','image'}):
+            # A row from an older environment/file: no order/family/genus/qualifier/life stage
+            # (a taxon-level sample then carried its name in species_other), and possibly no
+            # transfer_id/image either (the oldest EXIF rows).
             import uuid
-            incoming = dict(incoming, transfer_id=str(uuid.uuid5(uuid.NAMESPACE_URL,incoming.get('video_url',''))), image='')
+            incoming = dict(incoming)
+            if 'transfer_id' not in incoming:
+                incoming = dict(incoming, transfer_id=str(uuid.uuid5(uuid.NAMESPACE_URL,incoming.get('video_url',''))), image='')
+            for field in TAXONOMY_FIELDS: incoming.setdefault(field, '')
+            legacy_field = {'order': 'order', 'family': 'family', 'genus': 'genus'}.get(incoming.get('kind'))
+            if legacy_field and not incoming[legacy_field] and isinstance(incoming.get('species_other'), str):
+                incoming[legacy_field] = incoming['species_other']; incoming['species_other'] = ''
         if not isinstance(incoming, dict) or set(incoming) != set(fields):
             raise ValidationError('שדות Samples אינם תואמים. יש לעדכן קוד בשתי הסביבות.')
         values = dict(incoming)
@@ -138,12 +152,10 @@ def sample_plan(document, fields):
             # Incomplete legacy drafts may transfer, but cannot become public.
             errors = dict(exc.message_dict)
             if candidate.status == 'pending':
-                for field in ('species','trip'):
+                for field in ('species','trip','order','family','genus'):
                     errors.pop(field, None)
             if errors: raise ValidationError(errors)
-        # Same exception as Sample.publication_reasons()/save_reviewed(): species_other on a
-        # GENUS-kind sample is the genus identification itself, not an incomplete "other" value.
-        other = (candidate.species_other and candidate.kind != Sample.Kind.GENUS) or candidate.site_other
+        other = candidate.species_other or candidate.site_other
         if candidate.status == 'published' and other:
             raise ValidationError('אין לפרסם רשומה עם ערכי אחר.')
         before = sample_row(obj, fields) if obj else {}

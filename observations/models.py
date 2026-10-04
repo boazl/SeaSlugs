@@ -299,7 +299,7 @@ class TaxonGenus(models.Model):
         py's note on this codebase's convention of small local copies over cross-module
         coupling for this kind of picking logic)."""
         candidates = list(Sample.objects.filter(
-            kind=Sample.Kind.GENUS, species_other=name, status=Sample.Status.PUBLISHED, deleted_at__isnull=True,
+            kind=Sample.Kind.GENUS, genus=name, status=Sample.Status.PUBLISHED, deleted_at__isnull=True,
         ).order_by('created_at', 'pk'))
         candidates = [c for c in candidates if c.image or c.video_url]
         if not candidates:
@@ -473,8 +473,28 @@ class Sample(models.Model):
         PENDING = 'pending', 'ממתינה לאישור'
         PUBLISHED = 'published', 'מפורסמת'
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='observations', verbose_name='יוצר')
+    # The observation's taxonomic identification, one field per level. Which of them apply
+    # depends on `kind` (see Sample.sync_taxonomy): an ORDER sample has only an order, a FAMILY
+    # sample an order+family, a GENUS sample also a genus, a SPECIES sample all four. Higher
+    # levels always agree with the lower ones (a genus fixes its family, a family its order).
+    # Names are stored as text -- like Species.order/family/genus -- because order and family
+    # names are not unique in the taxonomy tables (sub-orders / sub-families).
+    order = models.CharField('סדרה', max_length=150, blank=True)
+    family = models.CharField('משפחה', max_length=150, blank=True)
+    genus = models.CharField('סוג', max_length=150, blank=True)
     species = models.ForeignKey(Species, null=True, blank=True, on_delete=models.PROTECT, verbose_name='מין')
+    class Qualifier(models.TextChoices):
+        CF = 'cf.', 'cf. — דומה ל…'
+        AFF = 'aff.', 'aff. — קרוב ל…'
+    class LifeStage(models.TextChoices):
+        JUVENILE = 'juv.', 'juv. — צעיר'
+    # Open-nomenclature qualifier shown between genus and species ("Genus cf. species") and a
+    # life-stage note shown after the name ("Genus species juv.") -- facts about THIS
+    # observation, so they live on the sample rather than on the catalog species.
+    identification_qualifier = models.CharField('סימון זהות לא ודאית', max_length=8, blank=True, choices=Qualifier.choices)
+    life_stage = models.CharField('שלב חיים', max_length=8, blank=True, choices=LifeStage.choices)
     site = models.ForeignKey(Site, null=True, blank=True, on_delete=models.PROTECT, verbose_name='אתר צלילה')
+    # Only for a SPECIES-kind sample whose species is not (yet) in the species table.
     species_other = models.CharField('מין אחר', max_length=200, blank=True)
     # A genuinely distinct, undescribed species is sometimes only recorded as "Genus sp."
     # in the species catalog (Species), with no way to tell two visibly distinct "sp."
@@ -512,7 +532,39 @@ class Sample(models.Model):
         ordering = ['-created_at']
         db_table = 'samples'
         verbose_name = 'דגימה / תצפית'; verbose_name_plural = 'Samples — דגימות ותצפיות'
-    def __str__(self): return f'{self.title if self.kind == self.Kind.COLLECTION else self.species or self.species_other} · {self.trip.year if self.trip_id and self.trip.year else ""}'
+    def __str__(self): return f'{self.taxon_name} · {self.trip.year if self.trip_id and self.trip.year else ""}'
+    @property
+    def taxon_name(self):
+        """The name that identifies this observation, taken from the field that matches its
+        kind: the title of a collection, the order / family / genus of a taxon-level sample, the
+        species (or the not-yet-catalogued 'other' species) of a species sample. This is also
+        the identifying part of the image's file name."""
+        if self.kind == self.Kind.COLLECTION: return self.title
+        if self.kind == self.Kind.ORDER: return self.order
+        if self.kind == self.Kind.FAMILY: return self.family
+        if self.kind == self.Kind.GENUS: return self.genus
+        return str(self.species) if self.species_id else self.species_other
+    def _taxon_text(self, with_author):
+        if self.kind == self.Kind.SPECIES and self.species_id:
+            sp = self.species
+            if self.identification_qualifier and sp.genus and sp.species:
+                name = f'{sp.genus} {self.identification_qualifier} {sp.species}'
+            else:
+                name = sp.scientific_name
+            parts = [name, (sp.author or '').strip() if with_author else '', self.life_stage]
+        else:
+            parts = [self.taxon_name, self.life_stage if self.kind != self.Kind.COLLECTION else '']
+        return ' '.join(p for p in parts if p)
+    @property
+    def taxon_full_name(self):
+        """Read-only full name for display: genus, the open-nomenclature qualifier, the epithet,
+        the author and the life stage -- e.g. "Chromodoris cf. strigata Rudman, 1982 juv.".
+        Taxon-level samples show just their taxon name."""
+        return self._taxon_text(True)
+    @property
+    def taxon_label(self):
+        """taxon_full_name without the author -- the heading used in lists."""
+        return self._taxon_text(False)
     @property
     def photographer_name(self):
         """The photographer of an observation is always its creator (owner) -- a trip has no
@@ -548,10 +600,11 @@ class Sample(models.Model):
         being assigned the same name."""
         if self.kind == self.Kind.SPECIES and self.species_id:
             identity = f'{self.species.genus} {self.species.species}'.strip() or self.species.scientific_name
-        elif self.kind == self.Kind.COLLECTION:
-            identity = self.title
         else:
-            identity = self.species_other
+            # taxon_name already picks the field that matches the kind: the collection's
+            # title, the order / family / genus of a taxon-level sample, or the free-text
+            # not-yet-catalogued species.
+            identity = self.taxon_name
         trip_code = self.trip.code if self.trip_id else 'notrip'
         base = slugify(f'{trip_code} {identity}', allow_unicode=True) or f'sample-{self.pk or "new"}'
         candidate = base; n = 2
@@ -559,15 +612,73 @@ class Sample(models.Model):
         while candidate in extra_used_names or qs.filter(image=f'observations/{candidate}.jpg').exists():
             candidate = f'{base}-{n}'; n += 1
         return f'observations/{candidate}.jpg'
+    def sync_taxonomy(self, strict=False):
+        """Make order/family/genus/species consistent with the sample's kind and with each other.
+
+        Which fields apply depends on `kind`: ORDER keeps only the order; FAMILY the family (and
+        its order); GENUS also the genus; SPECIES the species too (a catalogued species fixes its
+        genus, family and order); COLLECTION none of them. Fields that do not apply are cleared;
+        higher levels that are blank are filled in from the lower ones through the taxonomy
+        tables (a genus knows its family, a family its order).
+
+        Returns {field: message} for what is inconsistent or missing. strict=False (used by
+        save()) only normalises and fills in; strict=True (used by clean()) also reports
+        conflicts -- e.g. a family that does not belong to the chosen order -- and a missing
+        identification for the kind. Names that are not in the taxonomy tables are accepted as
+        typed (there is nothing to check them against)."""
+        errors = {}
+        K = self.Kind
+        for field in ('order', 'family', 'genus', 'species_other'):
+            setattr(self, field, ' '.join((getattr(self, field) or '').split()))
+        if self.kind == K.COLLECTION:
+            self.order = self.family = self.genus = ''
+            self.identification_qualifier = self.life_stage = ''
+            return errors
+        if self.kind != K.SPECIES:
+            self.species = None; self.species_other = ''; self.identification_qualifier = ''
+        if self.kind in (K.ORDER, K.FAMILY): self.genus = ''
+        if self.kind == K.ORDER: self.family = ''
+        if self.kind == K.SPECIES and self.species_id:
+            sp = self.species
+            self.species_other = ''
+            # The catalogued species gives the genus; family and order come from the taxonomy
+            # tables through that genus (below) -- the species' own free-text family/order are
+            # only a fallback, since its `order` can be a different classification level
+            # ("Doridida") than TaxonOrder's names ("Nudibranchia").
+            self.genus, self.family, self.order = sp.genus or '', '', ''
+        if self.genus and self.kind in (K.GENUS, K.SPECIES):
+            tg = TaxonGenus.objects.select_related('family__order').filter(name=self.genus).first()
+            if tg and tg.family_id:
+                if not self.family: self.family = tg.family.name
+                elif self.family != tg.family.name and self.kind == K.GENUS:
+                    errors['family'] = f'הסוג {self.genus} שייך למשפחה {tg.family.name}, לא ל{self.family}.'
+                if tg.family.order_id and self.family == tg.family.name:
+                    if not self.order: self.order = tg.family.order.name
+                    elif self.order != tg.family.order.name and self.kind == K.GENUS:
+                        errors['order'] = f'הסוג {self.genus} שייך לסדרה {tg.family.order.name}, לא ל{self.order}.'
+        if self.kind == K.SPECIES and self.species_id:
+            self.family = self.family or self.species.family or ''
+            self.order = self.order or self.species.order or ''
+        if self.family and self.kind != K.COLLECTION:
+            orders = {f.order.name for f in TaxonFamily.objects.select_related('order').filter(name=self.family) if f.order_id}
+            if orders:
+                if not self.order and len(orders) == 1: self.order = next(iter(orders))
+                elif self.order and self.order not in orders and self.kind in (K.FAMILY, K.GENUS):
+                    errors['order'] = f'המשפחה {self.family} שייכת לסדרה {" / ".join(sorted(orders))}, לא ל{self.order}.'
+        if strict:
+            if self.kind == K.ORDER and not self.order: errors['order'] = 'יש לבחור סדרה.'
+            if self.kind == K.FAMILY and not self.family: errors['family'] = 'יש לבחור משפחה.'
+            if self.kind == K.GENUS and not self.genus: errors['genus'] = 'יש לבחור סוג.'
+            if self.kind == K.SPECIES and not self.species_id and not self.species_other: errors['species'] = 'יש לבחור מין או לפרט אחר.'
+        return errors
     def publication_reasons(self):
         reasons = []
         if self.deleted_at: reasons.append('התצפית מסומנת כמחוקה.')
         try: self.full_clean(validate_constraints=False)
         except ValidationError as exc: reasons.extend(exc.messages)
-        # A GENUS-kind sample uses species_other as its actual, permanent identification
-        # (the genus name) rather than an unresolved placeholder awaiting a specific
-        # species match -- only SPECIES/COLLECTION-kind samples need this nudge.
-        if self.species_other and self.kind != self.Kind.GENUS: reasons.append('יש להחליף את ערך המין ״אחר״ בערך מטבלת המינים לפני פרסום (או להוסיף מין חדש דרך הפעולה הייעודית).')
+        # species_other only ever holds a SPECIES-kind sample's not-yet-catalogued species
+        # (taxon-level samples keep their identification in order/family/genus).
+        if self.species_other: reasons.append('יש להחליף את ערך המין ״אחר״ בערך מטבלת המינים לפני פרסום (או להוסיף מין חדש דרך הפעולה הייעודית).')
         if self.site_other: reasons.append('יש להחליף את ערך אתר הצלילה ״אחר״ בערך מטבלת אתרי הצלילה לפני פרסום.')
         if not reasons and self.status == self.Status.PENDING: reasons.append('הנתונים הושלמו; נדרש אישור מנהל.')
         return reasons
@@ -587,10 +698,12 @@ class Sample(models.Model):
             if not self.title.strip(): errors['title'] = 'יש להזין כותרת לסרטון האוסף.'
         if not self.trip_id: errors['trip'] = 'יש לבחור מסע צלילה.'
         elif not self.trip.year: errors['trip'] = 'למסע הנבחר אין שנה מוגדרת. יש להשלים שנה במסע הצלילה לפני פרסום.'
-        self.species_other = self.species_other.strip()
         self.site_other = self.site_other.strip()
-        if self.species_id and self.species_other: errors['species_other'] = 'יש לבחור מין מהרשימה או לפרט אחר, לא את שניהם.'
-        if self.kind != self.Kind.COLLECTION and not self.species_id and not self.species_other: errors['species'] = 'יש לבחור מין או לפרט אחר.'
+        if self.kind == self.Kind.SPECIES and self.species_id and (self.species_other or '').strip():
+            errors['species_other'] = 'יש לבחור מין מהרשימה או לפרט אחר, לא את שניהם.'
+        # Normalise the taxonomy fields to the sample's kind (fields that don't apply are
+        # cleared, higher levels are filled in from the lower ones) and report conflicts.
+        for field, message in self.sync_taxonomy(strict=True).items(): errors.setdefault(field, message)
         # A single trip may not carry two non-deleted SPECIES-kind samples for the exact same
         # catalogued species -- species_other (an unresolved, free-text identification) is
         # deliberately excluded, since matching that reliably would mean fuzzy text comparison
@@ -657,6 +770,7 @@ class Sample(models.Model):
                     if duplicate: errors['video_url'] = f'הסרטון הזה כבר קיים בתצפית אחרת ({duplicate}). לא ניתן להשתמש באותו סרטון פעמיים.'
         if errors: raise ValidationError(errors)
     def save(self, *args, **kwargs):
+        if kwargs.get('update_fields') is None: self.sync_taxonomy()
         super().save(*args, **kwargs)
         # A GENUS-kind sample is a purpose-built photo/video for its whole genus -- keep the
         # genus it identifies pointed at the current best genus-kind sample for it on every
@@ -665,18 +779,16 @@ class Sample(models.Model):
         # through save_reviewed() at all, and soft_delete() below is itself just a save()
         # call that sets deleted_at -- both need this to stay in sync, so it belongs here
         # rather than duplicated in each caller.
-        if self.kind == self.Kind.GENUS and self.species_other:
-            TaxonGenus.objects.filter(name=self.species_other).update(
-                defining_sample=TaxonGenus.pick_defining_sample(self.species_other))
+        if self.kind == self.Kind.GENUS and self.genus:
+            TaxonGenus.objects.filter(name=self.genus).update(
+                defining_sample=TaxonGenus.pick_defining_sample(self.genus))
     def save_reviewed(self, actor=None, approve=False):
         self.full_clean(validate_constraints=False)
         with transaction.atomic():
             # Acquire SQLite's write lock before checking first occurrence.
             if self.species_id:
                 Species.objects.filter(pk=self.species_id).update(scientific_name=models.F('scientific_name'))
-            # Same exception as publication_reasons() above: species_other on a GENUS-kind
-            # sample is the genus identification itself, not an incomplete "other" value.
-            other = (bool(self.species_other) and self.kind != self.Kind.GENUS) or bool(self.site_other)
+            other = bool(self.species_other) or bool(self.site_other)
             complete = bool(self.trip_id and self.trip.year and (self.species_id if self.kind == self.Kind.SPECIES else True) and not other)
             if approve and not complete:
                 raise ValidationError('לפני אישור יש להשלים את שנת המסע ולהחליף ערכי ״אחר״ בערכים מטבלאות העזר.')

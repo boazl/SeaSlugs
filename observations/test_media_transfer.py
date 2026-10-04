@@ -414,7 +414,7 @@ class MediaTransferTests(TestCase):
         # match -- and the 'אין לפרסם רשומה עם ערכי אחר' check didn't carve out the same GENUS
         # exception that Sample.publication_reasons()/save_reviewed() already do.
         from .image_manager import files
-        genus_sample=Sample(owner=self.sample.owner,kind=Sample.Kind.GENUS,species_other='Chelidonura',trip=self.sample.trip)
+        genus_sample=Sample(owner=self.sample.owner,kind=Sample.Kind.GENUS,genus='Chelidonura',trip=self.sample.trip)
         output=io.BytesIO();Image.new('RGB',(60,40),'yellow').save(output,'JPEG')
         genus_sample.image.save('genus.jpg',ContentFile(output.getvalue()),save=False)
         genus_sample.save_reviewed(actor=genus_sample.owner,approve=True)
@@ -426,7 +426,7 @@ class MediaTransferTests(TestCase):
         response=self.client.post('/admin/images/',{'action':'upload','replace':'yes','images':SimpleUploadedFile('transfer.jpg',raw,content_type='image/jpeg')})
         self.assertEqual(response.status_code,302)
         genus_sample.refresh_from_db()
-        self.assertEqual(genus_sample.status,'published');self.assertEqual(genus_sample.species_other,'Chelidonura')
+        self.assertEqual(genus_sample.status,'published');self.assertEqual(genus_sample.genus,'Chelidonura')
 
     def test_image_manager_upload_registers_a_newly_published_species_sample_in_speciesarea(self):
         # Regression: the upload handler saved a newly transferred, already-published

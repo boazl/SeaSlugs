@@ -83,15 +83,29 @@ class SampleForm(forms.ModelForm):
     # "unidentified species" record.
     species = forms.CharField(label='מין', required=False, widget=forms.TextInput(attrs={
         'list': 'species-options', 'autocomplete': 'off', 'placeholder': 'הקלידו לחיפוש…'}))
+    # The taxonomic cascade: order -> family -> genus -> species. Which of them is available
+    # depends on the kind (form.html's script enables/disables them live, and
+    # Sample.sync_taxonomy() normalises on the server). Each is a text input with a <datalist>
+    # that the script narrows by the level above it.
+    full_name = forms.CharField(label='השם המלא (כולל מחבר)', required=False, disabled=True,
+        help_text='מתעדכן אוטומטית לפי הסדרה/המשפחה/הסוג/המין שנבחרו, סימון הזהות ושלב החיים.')
     site = forms.ChoiceField(label='אתר צלילה',required=False)
     trip = TripChoiceField(label='מסע צלילה', queryset=DiveTrip.objects.all(), help_text='לא מוצא/ת את המסע? אפשר להוסיף מסע חדש ולחזור לכאן.')
     class Meta:
         model = Sample
-        fields = ['title','kind','species','species_other','trip','site','site_other','day','depth','video_url','image']
-        widgets = {'image': SampleImageInput}
+        fields = ['title','kind','order','family','genus','species','identification_qualifier','life_stage','full_name','species_other','trip','site','site_other','day','depth','video_url','image']
+        widgets = {'image': SampleImageInput,
+                   'order': forms.TextInput(attrs={'list': 'order-options', 'autocomplete': 'off', 'placeholder': 'הקלידו לחיפוש…'}),
+                   'family': forms.TextInput(attrs={'list': 'family-options', 'autocomplete': 'off', 'placeholder': 'הקלידו לחיפוש…'}),
+                   'genus': forms.TextInput(attrs={'list': 'genus-options', 'autocomplete': 'off', 'placeholder': 'הקלידו לחיפוש…'})}
     def __init__(self,*args,**kwargs):
         super().__init__(*args,**kwargs)
         self.fields['kind'].required = False
+        for name in ('identification_qualifier', 'life_stage'):
+            self.fields[name].choices = [('', 'ללא')] + [c for c in self.fields[name].choices if c[0]]
+        self.fields['identification_qualifier'].help_text = 'cf. = דומה ל…, aff. = קרוב ל… — מוצג בין הסוג למין. רק בדגימה מסוג ״מין״.'
+        self.fields['life_stage'].help_text = 'juv. = פרט צעיר — מוצג אחרי השם.'
+        self.initial['full_name'] = self.instance.taxon_full_name if self.instance.pk else ''
         self.fields['video_url'].help_text = 'אפשר להשאיר ריק כאשר מעלים תמונה. ניתן להוסיף סרטון בהמשך.'
         if self.instance.pk:
             # The undetermined_variant letter (if any) lives on the Sample, not the Species
@@ -119,6 +133,11 @@ class SampleForm(forms.ModelForm):
         # "unidentified species" record.
         species_text = (data.get('species') or '').strip()
         other_text = (data.get('species_other') or '').strip()
+        if data['kind'] in (Sample.Kind.ORDER, Sample.Kind.FAMILY, Sample.Kind.GENUS):
+            # A taxon-level sample is identified by its order / family / genus field; a species
+            # (or "other species") left over from switching kinds does not apply.
+            species_text = other_text = ''
+            data['species_other'] = ''
         # instance.undetermined_variant only ever comes from the catalog-match branch
         # below -- reset it up front so a switch to species_other, or clearing the
         # field, drops any letter left over from a previous edit of this instance.

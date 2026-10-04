@@ -16,7 +16,7 @@ class CanonicalImageNameTests(TestCase):
     """Sample.canonical_image_name() builds the storage filename the whole project now
     agrees on: trip code + a kind-dependent identity (see the method's own docstring for
     the exact rule, which mirrors what the user asked for: species' genus+species for a
-    SPECIES-kind sample, the gallery title for COLLECTION, species_other for everything
+    SPECIES-kind sample, the gallery title for COLLECTION, the order / family / genus field for everything
     else), slugified, with a numeric suffix only when that exact name is already taken."""
     def setUp(self):
         self.user = User.objects.create_superuser('admin', password='testing')
@@ -43,14 +43,17 @@ class CanonicalImageNameTests(TestCase):
         sample = Sample(owner=self.user, trip=self.trip, kind=Sample.Kind.COLLECTION, title='צלילת לילה')
         self.assertEqual(sample.canonical_image_name(), 'observations/ei24-צלילת-לילה.jpg')
 
-    def test_genus_kind_uses_species_other(self):
-        sample = Sample(owner=self.user, trip=self.trip, kind=Sample.Kind.GENUS, species_other='Chelidonura')
+    def test_genus_kind_uses_the_genus_field(self):
+        sample = Sample(owner=self.user, trip=self.trip, kind=Sample.Kind.GENUS, genus='Chelidonura')
         self.assertEqual(sample.canonical_image_name(), 'observations/ei24-chelidonura.jpg')
 
-    def test_family_and_order_kinds_use_species_other_too(self):
-        for kind in (Sample.Kind.FAMILY, Sample.Kind.ORDER):
-            sample = Sample(owner=self.user, trip=self.trip, kind=kind, species_other='Some taxon')
+    def test_family_and_order_kinds_use_their_own_field(self):
+        for kind, field in ((Sample.Kind.FAMILY, 'family'), (Sample.Kind.ORDER, 'order')):
+            sample = Sample(owner=self.user, trip=self.trip, kind=kind, **{field: 'Some taxon'})
             self.assertEqual(sample.canonical_image_name(), 'observations/ei24-some-taxon.jpg')
+        # ...and a field that does not belong to the kind is ignored.
+        sample = Sample(owner=self.user, trip=self.trip, kind=Sample.Kind.FAMILY, family='Fam', genus='Gen', order='Ord')
+        self.assertEqual(sample.canonical_image_name(), 'observations/ei24-fam.jpg')
 
     def test_colliding_name_gets_a_numeric_suffix(self):
         with tempfile.TemporaryDirectory() as folder, override_settings(MEDIA_ROOT=folder):
@@ -270,7 +273,7 @@ class RenameImagesToCanonicalSharedImageTests(TestCase):
         species_sample = Sample(owner=self.user, trip=self.trip, kind=Sample.Kind.SPECIES, species=self.species)
         species_sample.image.name = shared_name
         species_sample.save_reviewed()
-        genus_sample = Sample(owner=self.user, trip=self.trip, kind=Sample.Kind.GENUS, species_other='Chromodoris',
+        genus_sample = Sample(owner=self.user, trip=self.trip, kind=Sample.Kind.GENUS, genus='Chromodoris',
                                video_url='https://youtu.be/00000000001')
         genus_sample.image.name = shared_name
         genus_sample.save()
@@ -332,7 +335,7 @@ class RenameImagesToCanonicalHashRecoveryTests(TestCase):
             # The genus sample is exactly the damage the old bug left behind: its database
             # value is still the legacy hash name, and that file no longer exists anywhere
             # except (now, under a different name) as the species sample's own copy above.
-            genus_sample = Sample(owner=self.user, trip=self.trip, kind=Sample.Kind.GENUS, species_other='Chromodoris',
+            genus_sample = Sample(owner=self.user, trip=self.trip, kind=Sample.Kind.GENUS, genus='Chromodoris',
                                    video_url='https://youtu.be/00000000002')
             vanished_name = 'observations/transfer/' + hashlib.sha256(b'shared-photo').hexdigest() + '.jpg'
             genus_sample.image.name = vanished_name

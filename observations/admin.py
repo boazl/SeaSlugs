@@ -216,7 +216,7 @@ class SampleAdmin(admin.ModelAdmin):
     form = SampleForm
     list_display=['id','title','kind','species','trip_code','owner','status','publication_warning','deleted_at']
     list_filter=['status','kind',TripCodeListFilter,PublicationReasonListFilter,'deleted_at']
-    search_fields=['title','species__scientific_name','species_other','owner__username','source_id','trip__title']
+    search_fields=['title','species__scientific_name','species_other','order','family','genus','owner__username','source_id','trip__title']
     readonly_fields=['publication_warning','source_metadata','source_id','status','created_at','updated_at','deleted_at','deleted_by','approved_at','approved_by']
     actions=['approve','soft_remove','restore']
     def has_delete_permission(self,request,obj=None): return False

@@ -1,5 +1,5 @@
 {% extends 'observations/base.html' %}{% load seaslugs_i18n %}{% block content %}<h1>{{ title }}</h1>
-{% if observation_form %}<p>בחרו מין יחיד או אוסף מינים. דגימת מין מחייבת מין; אוסף מחייב כותרת, ללא בחירת מין. בשניהם נדרש מסע צלילה (הכולל מדינה, אזור ושנה) ותמונה או סרטון (אפשר גם שניהם). אוספים מתפרסמים במסעות הצלילה לאחר אישור מנהל. ללא העלאת תמונה תוצג התמונה המקדימה של YouTube. מין חדש לאזור מתפרסם מיד אם כל הנתונים מזוהים; אחרת התצפית ממתינה לבדיקה.</p>{% endif %}
+{% if observation_form %}<p>בחרו את סוג הדגימה: מין יחיד, סוג, משפחה, סדרה או אוסף מינים. הסדרה, המשפחה, הסוג והמין משפיעים זה על זה, ורק השדות שמתאימים לסוג הדגימה זמינים. דגימת מין מחייבת מין; אוסף מחייב כותרת, ללא בחירת מין. בשניהם נדרש מסע צלילה (הכולל מדינה, אזור ושנה) ותמונה או סרטון (אפשר גם שניהם). אוספים מתפרסמים במסעות הצלילה לאחר אישור מנהל. ללא העלאת תמונה תוצג התמונה המקדימה של YouTube. מין חדש לאזור מתפרסם מיד אם כל הנתונים מזוהים; אחרת התצפית ממתינה לבדיקה.</p>{% endif %}
 {% if trip_form %}<p>מסע צלילה מייצג ביקור אחד באתר בתאריך מסוים. לאחר השמירה תחזרו לטופס התצפית עם המסע החדש נבחר.</p>{% endif %}
 <form method="post" enctype="multipart/form-data">{% csrf_token %}{% if trip_form or observation_form %}<input type="hidden" name="next" value="{{ next }}">{% endif %}{% if trip_form or observation_form %}{{ form.as_p }}{% else %}{{ form.non_field_errors }}{% for field in form %}<p>{{ field.errors }}<label for="{{ field.id_for_label }}">{{ field.label|t:lang }}:</label> {{ field }}{% if field.help_text %}<span class="helptext">{{ field.help_text|t:lang|safe }}</span>{% endif %}</p>{% endfor %}{% endif %}{% if observation_form %}<p id="defining-status" class="notice" hidden></p>{% endif %}<button type="submit">שמירה / Save</button></form>
 {% if observation_form and form.instance.pk %}<div class="actions">
@@ -79,6 +79,99 @@ if(speciesEl)speciesEl.addEventListener('input',()=>{clearTimeout(definingDeboun
 if(speciesEl)speciesEl.addEventListener('change',updateDefiningStatus);
 if(tripEl)tripEl.addEventListener('change',updateDefiningStatus);
 updateDefiningStatus();
+</script>
+<datalist id="order-options"></datalist><datalist id="family-options"></datalist><datalist id="genus-options"></datalist>
+{{ taxonomy|json_script:'taxonomy' }}<script>
+// Taxonomic cascade: order -> family -> genus -> species. Which levels are available depends on
+// the sample kind (order: just the order; family: order+family; genus: +genus; species: all
+// four), a lower level narrows the lists above/below it and fills in the levels above it, and
+// the full name (genus, qualifier, epithet, author, life stage) is shown read-only. The server
+// (Sample.sync_taxonomy) enforces the same rules, so this script is only the live convenience.
+(function(){
+  const tax=JSON.parse(document.getElementById('taxonomy').textContent);
+  const $=id=>document.getElementById('id_'+id);
+  const kindEl=$('kind'),orderEl=$('order'),familyEl=$('family'),genusEl=$('genus'),speciesEl=$('species'),
+        qualEl=$('identification_qualifier'),lifeEl=$('life_stage'),otherEl=$('species_other'),fullEl=$('full_name');
+  if(!kindEl||!orderEl||!familyEl||!genusEl||!speciesEl)return;
+  const speciesNames=Array.from(document.querySelectorAll('#species-options option')).map(o=>o.value);
+  const speciesByLower=new Map(speciesNames.map(n=>[n.toLowerCase(),n]));
+  const genusOf=name=>name.split(' ')[0];
+  const genusInfo=name=>tax.genera.find(g=>g[0]===name);
+  const ordersOfFamily=name=>[...new Set(tax.families.filter(f=>f[0]===name&&f[1]).map(f=>f[1]))];
+  const familyKnown=name=>tax.families.some(f=>f[0]===name);
+  const fillList=(id,values)=>{const dl=document.getElementById(id);dl.replaceChildren(...values.map(v=>{const o=document.createElement('option');o.value=v;return o;}));};
+  const uniq=a=>[...new Set(a)].sort();
+  const LEVEL={collection:0,order:1,family:2,genus:3,species:4};
+  function kind(){return kindEl.value||'species';}
+  function toggle(el,on){if(!el)return;el.disabled=!on;const p=el.closest('p');if(p)p.style.opacity=on?'':'0.45';}
+  function applyKind(){
+    const level=LEVEL[kind()]??4;
+    toggle(orderEl,level>=1);toggle(familyEl,level>=2);toggle(genusEl,level>=3);toggle(speciesEl,level>=4);
+    toggle(qualEl,level>=4);toggle(otherEl,level>=4);toggle(lifeEl,level>=1);
+  }
+  function refreshLists(){
+    const order=orderEl.value.trim(),family=familyEl.value.trim(),genus=genusEl.value.trim();
+    fillList('order-options',tax.orders);
+    fillList('family-options',uniq(tax.families.filter(f=>!order||f[1]===order||!f[1]).map(f=>f[0])));
+    fillList('genus-options',uniq(tax.genera.filter(g=>(!family||g[1]===family)&&(!order||g[2]===order||!g[2])).map(g=>g[0])));
+    const sp=document.getElementById('species-options');
+    const names=genus?speciesNames.filter(n=>n.startsWith(genus+' ')):speciesNames;
+    sp.replaceChildren(...names.map(v=>{const o=document.createElement('option');o.value=v;return o;}));
+  }
+  // Drop lower-level values that no longer fit the levels above them.
+  function prune(from){
+    if(from<2&&familyEl.value.trim()){
+      const fam=familyEl.value.trim(),order=orderEl.value.trim();
+      if(familyKnown(fam)&&order){const os=ordersOfFamily(fam);if(os.length&&!os.includes(order))familyEl.value='';}
+    }
+    if(from<3&&genusEl.value.trim()){
+      const g=genusInfo(genusEl.value.trim()),fam=familyEl.value.trim(),order=orderEl.value.trim();
+      if(g&&((fam&&g[1]&&g[1]!==fam)||(order&&g[2]&&g[2]!==order)))genusEl.value='';
+    }
+    if(from<4&&speciesEl.value.trim()){
+      const genus=genusEl.value.trim(),name=speciesEl.value.trim();
+      if(genus&&speciesByLower.has(name.toLowerCase())&&genusOf(speciesByLower.get(name.toLowerCase()))!==genus)speciesEl.value='';
+    }
+  }
+  function fromGenus(){
+    const g=genusInfo(genusEl.value.trim());
+    if(g){if(g[1])familyEl.value=g[1];if(g[2])orderEl.value=g[2];}
+  }
+  function fromFamily(){
+    const os=ordersOfFamily(familyEl.value.trim());
+    if(os.length===1)orderEl.value=os[0];
+  }
+  function matchedSpecies(){return speciesByLower.get(speciesEl.value.trim().toLowerCase());}
+  function updateFullName(){
+    if(!fullEl)return;
+    const k=kind(),life=lifeEl&&!lifeEl.disabled?lifeEl.value:'';
+    let parts=[];
+    if(k==='collection')parts=[];
+    else if(k==='order')parts=[orderEl.value.trim(),life];
+    else if(k==='family')parts=[familyEl.value.trim(),life];
+    else if(k==='genus')parts=[genusEl.value.trim(),life];
+    else{
+      const sp=matchedSpecies();
+      if(sp){const g=genusOf(sp),epithet=sp.slice(g.length+1);
+        parts=[g,qualEl?qualEl.value:'',epithet,tax.authors[sp]||'',life];}
+      else parts=[otherEl?otherEl.value.trim():'',life];
+    }
+    fullEl.value=parts.filter(Boolean).join(' ');
+  }
+  function changed(level){
+    if(level===4){const sp=matchedSpecies();if(sp){genusEl.value=genusOf(sp);fromGenus();}}
+    if(level===3)fromGenus();
+    if(level===2)fromFamily();
+    prune(level);refreshLists();updateFullName();
+  }
+  orderEl.addEventListener('input',()=>changed(1));
+  familyEl.addEventListener('input',()=>changed(2));
+  genusEl.addEventListener('input',()=>changed(3));
+  speciesEl.addEventListener('input',()=>changed(4));
+  for(const e of [qualEl,lifeEl,otherEl])if(e)e.addEventListener('input',updateFullName);
+  kindEl.addEventListener('change',()=>{applyKind();updateFullName();});
+  applyKind();refreshLists();updateFullName();
+})();
 </script>{% endif %}
 {% if trip_form %}{{ locations|json_script:'divetrip-locations' }}<script>
 const tripLocations=JSON.parse(document.getElementById('divetrip-locations').textContent);

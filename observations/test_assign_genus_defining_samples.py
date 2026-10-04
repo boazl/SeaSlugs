@@ -24,7 +24,7 @@ class AssignGenusDefiningSamplesTests(TestCase):
         if 'video_url' not in kwargs:
             self._video_counter = getattr(self, '_video_counter', 0) + 1
             kwargs = dict(kwargs, video_url=f'https://youtu.be/{str(self._video_counter).zfill(11)}')
-        data = dict(owner=self.user, kind=Sample.Kind.GENUS, species_other='Chromodoris', trip=self.trip)
+        data = dict(owner=self.user, kind=Sample.Kind.GENUS, genus='Chromodoris', trip=self.trip)
         data.update(kwargs)
         item = Sample(**data)
         item.save_reviewed(actor=self.user, approve=True)
@@ -110,7 +110,7 @@ class AssignGenusDefiningSamplesTests(TestCase):
 
     def test_unpublished_genus_sample_is_not_used(self):
         # A pending (unapproved) genus-kind sample must not become the genus's public photo.
-        pending = Sample.objects.create(owner=self.user, kind=Sample.Kind.GENUS, species_other='Chromodoris',
+        pending = Sample.objects.create(owner=self.user, kind=Sample.Kind.GENUS, genus='Chromodoris',
                                          trip=self.trip, video_url='https://youtu.be/abcdefghijk')
         self.assertEqual(pending.status, 'pending')
         call_command('assign_genus_defining_samples', '--apply')
@@ -129,7 +129,7 @@ class TaxonGenusAdminActionTests(TestCase):
         self.genus = TaxonGenus.objects.create(name='Chromodoris')
 
     def test_refresh_action_runs_regardless_of_selection(self):
-        sample = Sample(owner=self.manager, kind=Sample.Kind.GENUS, species_other='Chromodoris',
+        sample = Sample(owner=self.manager, kind=Sample.Kind.GENUS, genus='Chromodoris',
                          trip=self.trip, video_url='https://youtu.be/abcdefghijk')
         sample.save_reviewed(actor=self.manager, approve=True)
         # corrupt it first, to prove the action truly recomputes rather than trusting the row

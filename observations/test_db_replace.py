@@ -160,6 +160,25 @@ class DbReplaceTests(TestCase):
         response = self.client.get('/admin/db-replace/')
         self.assertEqual(response.context['missing_count'], 1)
 
+    def test_missing_image_labels_use_the_taxon_columns_or_the_old_species_other(self):
+        # A taxon-level sample's name is in genus/family/order in a current database and in
+        # species_other in an older one -- the label of a missing image must show it either way.
+        maintenance.lock(); self.client.force_login(self.user)
+        names = ['observations/transfer/' + c * 64 + '.jpg' for c in 'ab']
+        for with_columns, expected in ((False, 'Chromodoris'), (True, 'Chromodoris')):
+            path = Path(self.temp.name) / f'db-{with_columns}.sqlite3'
+            build_fixture(path, images=names[:1])
+            conn = sqlite3.connect(str(path))
+            if with_columns:
+                for column in ('genus', 'family', 'order'): conn.execute(f'ALTER TABLE samples ADD COLUMN "{column}" TEXT')
+                conn.execute('UPDATE samples SET genus = ?, species_other = ?', ('Chromodoris', ''))
+            else:
+                conn.execute('UPDATE samples SET species_other = ?', ('Chromodoris',))
+            conn.commit(); conn.close()
+            self.client.post('/admin/db-replace/', {'action': 'preview', 'database': SimpleUploadedFile('db.sqlite3', path.read_bytes())})
+            response = self.client.get('/admin/db-replace/')
+            self.assertEqual(response.context['missing_list'][0]['labels'], [expected], with_columns)
+
     def test_upload_images_with_target_saves_legacy_non_hash_names(self):
         # Samples whose image predates content-hash naming keep names like
         # observations/<uuid>.jpg -- there's no hash in that name to verify a re-upload

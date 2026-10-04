@@ -9,7 +9,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
-from .models import Sample, Profile, Region, Site, DiveTrip, SiteImage, Species, Country, SpeciesArea, SampleKind, KIND_EN_NAMES, TaxonGenus, full_name_for
+from .models import Sample, Profile, Region, Site, DiveTrip, SiteImage, Species, Country, SpeciesArea, SampleKind, KIND_EN_NAMES, TaxonGenus, TaxonFamily, TaxonOrder, full_name_for
 from .forms import SignupForm, SampleForm, ProfileForm, DiveTripForm
 from .notifications import notify_new_user_registered
 from .gallery_data import TaxonResolver, taxon_media
@@ -202,16 +202,15 @@ def listing(request):
     # order/family/genus/photographer/owner are typed into free-text autocomplete fields
     # (some have hundreds of possible values, so a <select> isn't practical) -- icontains
     # keeps a partial or not-quite-exact typed value still useful as a search. A SPECIES-kind
-    # sample carries its order/family/genus through the linked Species row -- but an
-    # ORDER/FAMILY/GENUS-kind sample IS the taxon itself, identified by species_other rather
-    # than a linked Species (see Sample.clean()), so each search also has to match that, or
-    # the one sample defining the searched-for taxon would never show up in its own search.
+    # sample carries its order/family/genus both through the linked Species row and in its own
+    # order/family/genus fields (see Sample.sync_taxonomy); an ORDER/FAMILY/GENUS-kind sample
+    # IS the taxon itself and has no linked Species, only those own fields -- so each search
+    # matches both, or the sample defining the searched-for taxon would never show up in its
+    # own search.
     if get.get('order'):
-        rows = rows.filter(Q(species__order__icontains=get['order']) |
-                            Q(kind=Sample.Kind.ORDER, species_other__icontains=get['order']))
+        rows = rows.filter(Q(species__order__icontains=get['order']) | Q(order__icontains=get['order']))
     if get.get('family'):
-        rows = rows.filter(Q(species__family__icontains=get['family']) |
-                            Q(kind=Sample.Kind.FAMILY, species_other__icontains=get['family']))
+        rows = rows.filter(Q(species__family__icontains=get['family']) | Q(family__icontains=get['family']))
     if get.get('genus'):
         rows = rows.filter(Q(species__genus__icontains=get['genus']) |
                             # A handful of species have a blank genus column even though
@@ -220,7 +219,7 @@ def listing(request):
                             # resolve_taxon_chain. Without it, a genus search would never
                             # find that species' own sample at all.
                             Q(species__genus='', species__scientific_name__istartswith=get['genus']) |
-                            Q(kind=Sample.Kind.GENUS, species_other__icontains=get['genus']))
+                            Q(genus__icontains=get['genus']))
     if get.get('photographer'):
         # The photographer of an observation is its owner (see Sample.photographer_name).
         # Match the typed text against owners' Hebrew name, English name or username.
@@ -279,9 +278,9 @@ def listing(request):
         'countries': Country.objects.filter(dive_trips__samples__in=visible).distinct().order_by('name'),
         'regions': Region.objects.filter(dive_trips__samples__in=visible).distinct().order_by('name'),
         'years': sorted((v for v in visible.exclude(trip__year__isnull=True).order_by().values_list('trip__year', flat=True).distinct() if v), reverse=True),
-        'orders': options('species__order'),
-        'families': options('species__family'),
-        'genera': options('species__genus'),
+        'orders': options('order'),
+        'families': options('family'),
+        'genera': options('genus'),
         'photographers': photographer_options(lang),
     }
     if manager:
@@ -381,6 +380,20 @@ def divetrip_locations(request):
     })
 
 
+def taxonomy_for_form():
+    """The order -> family -> genus chain (from the taxonomy tables) and each catalogued
+    species' author, for the observation form's cascading fields. Species themselves are
+    already listed in the species datalist; a species' genus is the first word of its name."""
+    families = TaxonFamily.objects.select_related('order')
+    return {
+        'orders': sorted({o.name for o in TaxonOrder.objects.all()}),
+        'families': sorted({(f.name, f.order.name if f.order_id else '') for f in families}),
+        'genera': sorted({(g.name, g.family.name if g.family_id else '', g.family.order.name if g.family_id and g.family.order_id else '')
+                          for g in TaxonGenus.objects.select_related('family__order')}),
+        'authors': {s.scientific_name: s.author.strip() for s in Species.objects.exclude(author='').only('scientific_name', 'author')},
+    }
+
+
 @login_required
 def edit(request,pk=None):
     if pk:
@@ -449,6 +462,7 @@ def edit(request,pk=None):
     return render(request,'observations/form.html',{'form':form,'title':'תצפית / Sample','observation_form':True,
         'trip_new_url':reverse('trip-new'),'next':next_url,
         'species_options':[str(item) for item in Species.objects.order_by('scientific_name')],
+        'taxonomy':taxonomy_for_form(),
         'locations':{'trips':list(DiveTrip.objects.values('id','region_id')),'sites':list(Site.objects.values('id','region_id'))}})
 
 

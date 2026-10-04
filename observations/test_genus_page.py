@@ -19,7 +19,7 @@ class GenusPageTests(TestCase):
         species_sample = Sample(owner=self.owner, trip=self.trip, species=self.species, video_url='https://youtu.be/abcdefghijk')
         species_sample.save_reviewed()  # kind=species auto-publishes -- see Sample.save_reviewed
         self.area = SpeciesArea.objects.get(species=self.species)
-        self.genus_sample = Sample(owner=self.owner, kind=Sample.Kind.GENUS, species_other='Chromodoris',
+        self.genus_sample = Sample(owner=self.owner, kind=Sample.Kind.GENUS, genus='Chromodoris',
                                     trip=self.trip, video_url='https://youtu.be/11111111111')
         self.genus_sample.save_reviewed(actor=self.owner, approve=True)
 
@@ -38,7 +38,7 @@ class GenusPageTests(TestCase):
 
     def test_genus_page_404s_when_no_species_resolve_to_it(self):
         empty_genus = TaxonGenus.objects.create(name='Hypselodoris')
-        sample = Sample(owner=self.owner, kind=Sample.Kind.GENUS, species_other='Hypselodoris',
+        sample = Sample(owner=self.owner, kind=Sample.Kind.GENUS, genus='Hypselodoris',
                          trip=self.trip, video_url='https://youtu.be/22222222222')
         sample.save_reviewed(actor=self.owner, approve=True)
         response = self.client.get(f'/genus/{empty_genus.name}/')

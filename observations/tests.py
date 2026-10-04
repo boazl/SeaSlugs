@@ -50,14 +50,15 @@ class WorkflowTests(TestCase):
         # never a specific species -- unlike a SPECIES-kind sample's "other" escape hatch, this
         # is a deliberate, permanent identification, not an unresolved placeholder, so approval
         # must succeed even though species_other is set and species stays unlinked.
-        genus_sample = Sample(owner=self.user, kind=Sample.Kind.GENUS, species_other='Chromodoris',
+        genus_sample = Sample(owner=self.user, kind=Sample.Kind.GENUS, genus='Chromodoris',
                                trip=self.trip, video_url='https://youtu.be/abcdefghijk')
         genus_sample.save_reviewed(actor=self.user, approve=True)
         self.assertEqual(genus_sample.status, 'published')
-        self.assertEqual(genus_sample.species_other, 'Chromodoris')
+        self.assertEqual(genus_sample.genus, 'Chromodoris')
+        self.assertEqual(genus_sample.species_other, '')
         self.assertIsNone(genus_sample.species_id)
     def test_genus_kind_sample_publication_reasons_omit_the_species_other_warning(self):
-        genus_sample = Sample.objects.create(owner=self.user, kind=Sample.Kind.GENUS, species_other='Chromodoris',
+        genus_sample = Sample.objects.create(owner=self.user, kind=Sample.Kind.GENUS, genus='Chromodoris',
                                               trip=self.trip, video_url='https://youtu.be/abcdefghijk')
         reasons = genus_sample.publication_reasons()
         self.assertFalse(any('להחליף את ערך המין' in reason for reason in reasons))
@@ -473,7 +474,7 @@ class WorkflowTests(TestCase):
         self.client.force_login(self.user)
         genus_species = Species.objects.create(scientific_name='Chelidonura varians', genus='Chelidonura')
         species_sample = self.record(species=genus_species, video_url='https://youtu.be/aaaaaaaaaaa')
-        genus_sample = Sample(owner=self.user, kind=Sample.Kind.GENUS, species=None, species_other='Chelidonura',
+        genus_sample = Sample(owner=self.user, kind=Sample.Kind.GENUS, species=None, genus='Chelidonura',
                                trip=self.trip, video_url='https://youtu.be/bbbbbbbbbbb')
         genus_sample.save_reviewed(actor=self.user, approve=True)
         response = self.client.get('/observations/?kind=genus')
@@ -490,7 +491,7 @@ class WorkflowTests(TestCase):
         self.client.force_login(self.user)
         genus_species = Species.objects.create(scientific_name='Chelidonura varians', genus='Chelidonura')
         species_sample = self.record(species=genus_species, video_url='https://youtu.be/ccccccccccc')
-        genus_sample = Sample(owner=self.user, kind=Sample.Kind.GENUS, species=None, species_other='Chelidonura',
+        genus_sample = Sample(owner=self.user, kind=Sample.Kind.GENUS, species=None, genus='Chelidonura',
                                trip=self.trip, video_url='https://youtu.be/ddddddddddd')
         genus_sample.save_reviewed(actor=self.user, approve=True)
         response = self.client.get('/observations/?genus=Chelidonura')
@@ -504,10 +505,10 @@ class WorkflowTests(TestCase):
         # approval is a separate, unrelated concern from this listing-filter fix.
         self.client.force_login(self.user)
         family_sample = Sample.objects.create(owner=self.user, kind=Sample.Kind.FAMILY, species=None,
-            species_other='Chromodorididae', trip=self.trip, video_url='https://youtu.be/eeeeeeeeeee',
+            family='Chromodorididae', trip=self.trip, video_url='https://youtu.be/eeeeeeeeeee',
             status=Sample.Status.PUBLISHED)
         order_sample = Sample.objects.create(owner=self.user, kind=Sample.Kind.ORDER, species=None,
-            species_other='Nudibranchia', trip=self.trip, video_url='https://youtu.be/fffffffffff',
+            order='Nudibranchia', trip=self.trip, video_url='https://youtu.be/fffffffffff',
             status=Sample.Status.PUBLISHED)
         response = self.client.get('/observations/?family=Chromodorididae&kind=family')
         self.assertEqual([item.pk for item in response.context['observations']], [family_sample.pk])
@@ -748,7 +749,7 @@ class WorkflowTests(TestCase):
 
     def test_observations_listing_translates_filter_labels_when_lang_en(self):
         self.record()
-        self.record(kind=Sample.Kind.GENUS, species=None, species_other='Some genus')
+        self.record(kind=Sample.Kind.GENUS, species=None, genus='Some genus')
         self.client.login(username='owner', password='a-valid-password-927')
         response = self.client.get('/observations/?lang=en')
         self.assertContains(response, 'Record type')

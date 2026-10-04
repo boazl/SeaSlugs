@@ -100,12 +100,18 @@ def missing_image_details(path, missing):
     conn = sqlite3.connect(f'file:{path}?mode=ro', uri=True)
     try:
         placeholders = ','.join('?' for _ in shown)
-        query = ('SELECT s.image, sp.scientific_name, s.species_other, t.title, t.year '
-                 'FROM samples s '
-                 'LEFT JOIN observations_species sp ON s.species_id = sp.id '
-                 'LEFT JOIN dive_trips t ON s.trip_id = t.id '
-                 'WHERE s.image IN (' + placeholders + ') AND s.deleted_at IS NULL')
-        rows = conn.execute(query, shown).fetchall()
+        # The other environment's database may predate the order/family/genus columns (a
+        # taxon-level sample then kept its name in species_other) -- fall back to the old shape.
+        tail = ('FROM samples s '
+                'LEFT JOIN observations_species sp ON s.species_id = sp.id '
+                'LEFT JOIN dive_trips t ON s.trip_id = t.id '
+                'WHERE s.image IN (' + placeholders + ') AND s.deleted_at IS NULL')
+        try:
+            rows = conn.execute("SELECT s.image, sp.scientific_name, "
+                                "COALESCE(NULLIF(s.species_other, ''), NULLIF(s.genus, ''), NULLIF(s.family, ''), s.\"order\"), "
+                                "t.title, t.year " + tail, shown).fetchall()
+        except sqlite3.OperationalError:
+            rows = conn.execute('SELECT s.image, sp.scientific_name, s.species_other, t.title, t.year ' + tail, shown).fetchall()
     finally:
         conn.close()
     by_image = {}

@@ -1,0 +1,286 @@
+"""Sample taxonomy: order / family / genus / species fields that depend on the sample's kind,
+the open-nomenclature qualifier and life stage, the full name, the image file name, the form,
+the transfer format (old rows still accepted) and migration 0041."""
+import json
+from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
+from django.db import connection
+from django.db.migrations.executor import MigrationExecutor
+from django.test import TestCase, TransactionTestCase
+from .forms import SampleForm
+from .models import Country, Sea, Region, DiveTrip, Species, Sample, TaxonOrder, TaxonFamily, TaxonGenus
+from .table_transfer import TABLES, export_table, plan
+
+
+class TaxonomyBase(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user('owner', password='a-valid-password-927')
+        self.country = Country.objects.create(name='Israel'); self.sea = Sea.objects.create(name='Med')
+        self.region = Region.objects.create(name='Akhziv', country=self.country, sea=self.sea)
+        self.trip = DiveTrip.objects.create(title='t', code='ak24', year=2024, country=self.country, region=self.region)
+        self.order = TaxonOrder.objects.create(name='Nudibranchia')
+        self.other_order = TaxonOrder.objects.create(name='Cephalaspidea')
+        self.family = TaxonFamily.objects.create(name='Chromodorididae', order=self.order)
+        self.other_family = TaxonFamily.objects.create(name='Aglajidae', order=self.other_order)
+        self.genus = TaxonGenus.objects.create(name='Chromodoris', family=self.family)
+        self.other_genus = TaxonGenus.objects.create(name='Chelidonura', family=self.other_family)
+        self.species = Species.objects.create(genus='Chromodoris', species='strigata', author='Rudman, 1982')
+        self._n = 0
+    def sample(self, **kw):
+        self._n += 1
+        kw.setdefault('video_url', f'https://youtu.be/{str(self._n).zfill(11)}')
+        return Sample(owner=self.user, trip=self.trip, **kw)
+
+
+class KindFieldsTests(TaxonomyBase):
+    def test_order_kind_keeps_only_the_order(self):
+        s = self.sample(kind=Sample.Kind.ORDER, order='Nudibranchia', family='Chromodorididae', genus='Chromodoris',
+                        species=self.species, species_other='x', identification_qualifier='cf.')
+        s.full_clean(); s.save()
+        s.refresh_from_db()
+        self.assertEqual((s.order, s.family, s.genus, s.species_id, s.species_other, s.identification_qualifier), ('Nudibranchia', '', '', None, '', ''))
+
+    def test_family_kind_fills_its_order_and_clears_genus_and_species(self):
+        s = self.sample(kind=Sample.Kind.FAMILY, family='Chromodorididae', genus='Chromodoris', species=self.species)
+        s.full_clean(); s.save(); s.refresh_from_db()
+        self.assertEqual((s.order, s.family, s.genus, s.species_id), ('Nudibranchia', 'Chromodorididae', '', None))
+
+    def test_genus_kind_fills_family_and_order_from_the_tables(self):
+        s = self.sample(kind=Sample.Kind.GENUS, genus='Chromodoris')
+        s.full_clean(); s.save(); s.refresh_from_db()
+        self.assertEqual((s.order, s.family, s.genus, s.species_id), ('Nudibranchia', 'Chromodorididae', 'Chromodoris', None))
+
+    def test_species_kind_takes_genus_family_and_order_from_the_species_and_tables(self):
+        s = self.sample(species=self.species, order='Wrong', genus='Wrong')
+        s.full_clean(); s.save(); s.refresh_from_db()
+        self.assertEqual((s.order, s.family, s.genus), ('Nudibranchia', 'Chromodorididae', 'Chromodoris'))
+
+    def test_species_outside_the_tables_falls_back_to_its_own_family_and_order(self):
+        sp = Species.objects.create(genus='Newgenus', species='novus', family='Newfamily', order='Neworder')
+        s = self.sample(species=sp); s.full_clean()
+        self.assertEqual((s.order, s.family, s.genus), ('Neworder', 'Newfamily', 'Newgenus'))
+
+    def test_plain_save_without_clean_also_normalises(self):
+        # transfers and scripts save without full_clean(): the stored row must still be consistent
+        s = self.sample(kind=Sample.Kind.GENUS, genus='Chromodoris', species_other='stale', species=self.species)
+        s.save(); s.refresh_from_db()
+        self.assertEqual((s.order, s.family, s.genus, s.species_id, s.species_other), ('Nudibranchia', 'Chromodorididae', 'Chromodoris', None, ''))
+        sp = self.sample(species=self.species); sp.save(); sp.refresh_from_db()
+        self.assertEqual((sp.order, sp.family, sp.genus), ('Nudibranchia', 'Chromodorididae', 'Chromodoris'))
+
+    def test_collection_kind_clears_the_taxonomy_fields(self):
+        s = self.sample(kind=Sample.Kind.COLLECTION, title='Night dive', order='Nudibranchia', family='x', genus='y',
+                        life_stage='juv.')
+        s.full_clean()
+        self.assertEqual((s.order, s.family, s.genus, s.life_stage), ('', '', '', ''))
+
+    def test_each_kind_requires_its_own_field(self):
+        for kind, field in ((Sample.Kind.ORDER, 'order'), (Sample.Kind.FAMILY, 'family'), (Sample.Kind.GENUS, 'genus'), (Sample.Kind.SPECIES, 'species')):
+            with self.assertRaises(ValidationError) as ctx:
+                self.sample(kind=kind).full_clean()
+            self.assertIn(field, ctx.exception.message_dict, kind)
+        # a genus name in the wrong field does not satisfy a FAMILY sample
+        with self.assertRaises(ValidationError) as ctx:
+            self.sample(kind=Sample.Kind.FAMILY, genus='Chromodoris').full_clean()
+        self.assertIn('family', ctx.exception.message_dict)
+
+    def test_conflicting_levels_are_rejected(self):
+        with self.assertRaises(ValidationError) as ctx:
+            self.sample(kind=Sample.Kind.GENUS, genus='Chromodoris', family='Aglajidae').full_clean()
+        self.assertIn('family', ctx.exception.message_dict)
+        with self.assertRaises(ValidationError) as ctx:
+            self.sample(kind=Sample.Kind.FAMILY, family='Chromodorididae', order='Cephalaspidea').full_clean()
+        self.assertIn('order', ctx.exception.message_dict)
+
+    def test_unknown_names_are_accepted_as_typed(self):
+        s = self.sample(kind=Sample.Kind.GENUS, genus='Brandnewgenus'); s.full_clean()
+        self.assertEqual((s.genus, s.family, s.order), ('Brandnewgenus', '', ''))
+
+    def test_species_other_is_only_for_species_kind_and_not_with_a_species(self):
+        with self.assertRaises(ValidationError) as ctx:
+            self.sample(species=self.species, species_other='x').full_clean()
+        self.assertIn('species_other', ctx.exception.message_dict)
+        s = self.sample(species=None, species_other='Chromodoris sp. new'); s.full_clean()
+        self.assertEqual(s.species_other, 'Chromodoris sp. new')
+        self.assertTrue(s.publication_reasons())
+
+    def test_genus_kind_samples_publish_without_an_other_warning(self):
+        s = self.sample(kind=Sample.Kind.GENUS, genus='Chromodoris')
+        s.save_reviewed(actor=self.user, approve=True)
+        self.assertEqual(s.status, 'published')
+        self.assertFalse(any('להחליף את ערך המין' in r for r in s.publication_reasons()))
+
+    def test_saving_a_genus_sample_points_the_genus_at_it(self):
+        s = self.sample(kind=Sample.Kind.GENUS, genus='Chromodoris')
+        s.save_reviewed(actor=self.user, approve=True)
+        self.genus.refresh_from_db()
+        self.assertEqual(self.genus.defining_sample_id, s.pk)
+
+
+class NameTests(TaxonomyBase):
+    def test_name_comes_from_the_field_that_matches_the_kind(self):
+        self.assertEqual(self.sample(kind=Sample.Kind.ORDER, order='Nudibranchia').taxon_name, 'Nudibranchia')
+        self.assertEqual(self.sample(kind=Sample.Kind.FAMILY, family='Chromodorididae').taxon_name, 'Chromodorididae')
+        self.assertEqual(self.sample(kind=Sample.Kind.GENUS, genus='Chromodoris').taxon_name, 'Chromodoris')
+        self.assertEqual(self.sample(species=self.species).taxon_name, 'Chromodoris strigata')
+        self.assertEqual(self.sample(kind=Sample.Kind.COLLECTION, title='Trip').taxon_name, 'Trip')
+
+    def test_full_name_has_qualifier_author_and_life_stage(self):
+        s = self.sample(species=self.species)
+        self.assertEqual(s.taxon_full_name, 'Chromodoris strigata Rudman, 1982')
+        s.identification_qualifier = 'cf.'; s.life_stage = 'juv.'
+        self.assertEqual(s.taxon_full_name, 'Chromodoris cf. strigata Rudman, 1982 juv.')
+        self.assertEqual(s.taxon_label, 'Chromodoris cf. strigata juv.')
+        s.identification_qualifier = 'aff.'
+        self.assertEqual(s.taxon_label, 'Chromodoris aff. strigata juv.')
+
+    def test_image_name_ignores_the_qualifier_and_uses_the_kind_field(self):
+        s = self.sample(species=self.species, identification_qualifier='cf.')
+        self.assertEqual(s.canonical_image_name(), 'observations/ak24-chromodoris-strigata.jpg')
+        g = self.sample(kind=Sample.Kind.GENUS, genus='Chromodoris', family='Chromodorididae')
+        self.assertEqual(g.canonical_image_name(), 'observations/ak24-chromodoris.jpg')
+        f = self.sample(kind=Sample.Kind.FAMILY, family='Chromodorididae', genus='Chromodoris')
+        f.sync_taxonomy()
+        self.assertEqual(f.canonical_image_name(), 'observations/ak24-chromodorididae.jpg')
+
+
+class FormTests(TaxonomyBase):
+    def data(self, **kw):
+        d = dict(kind='species', title='', order='', family='', genus='', species='', identification_qualifier='', life_stage='',
+                 species_other='', trip=str(self.trip.pk), site='', site_other='', day='', depth='', video_url='https://youtu.be/abcdefghijk')
+        d.update(kw); return d
+    def test_genus_sample_is_saved_from_the_genus_field(self):
+        form = SampleForm(self.data(kind='genus', genus='Chromodoris', species='stale text'))
+        self.assertTrue(form.is_valid(), form.errors)
+        s = form.save(commit=False); s.owner = self.user; s.save()
+        self.assertEqual((s.kind, s.genus, s.family, s.order, s.species_id, s.species_other),
+                         ('genus', 'Chromodoris', 'Chromodorididae', 'Nudibranchia', None, ''))
+    def test_species_sample_with_qualifier_and_life_stage(self):
+        form = SampleForm(self.data(species='Chromodoris strigata', identification_qualifier='cf.', life_stage='juv.'))
+        self.assertTrue(form.is_valid(), form.errors)
+        s = form.save(commit=False); s.owner = self.user; s.save()
+        self.assertEqual((s.species_id, s.identification_qualifier, s.life_stage, s.genus), (self.species.pk, 'cf.', 'juv.', 'Chromodoris'))
+    def test_missing_taxon_for_the_kind_is_a_form_error(self):
+        form = SampleForm(self.data(kind='family'))
+        self.assertFalse(form.is_valid()); self.assertIn('family', form.errors)
+    def test_invalid_qualifier_is_rejected(self):
+        form = SampleForm(self.data(species='Chromodoris strigata', identification_qualifier='sp.'))
+        self.assertFalse(form.is_valid()); self.assertIn('identification_qualifier', form.errors)
+    def test_full_name_is_read_only_and_shown_on_edit(self):
+        s = self.sample(species=self.species, identification_qualifier='cf.'); s.save()
+        form = SampleForm(instance=s)
+        self.assertTrue(form.fields['full_name'].disabled)
+        self.assertEqual(form.initial['full_name'], 'Chromodoris cf. strigata Rudman, 1982')
+        # a posted value for it is ignored
+        form = SampleForm(self.data(species='Chromodoris strigata', full_name='tampered'))
+        self.assertTrue(form.is_valid(), form.errors); self.assertNotIn('tampered', str(form.cleaned_data.values()))
+    def test_page_ships_the_cascade_data(self):
+        self.client.force_login(self.user)
+        response = self.client.get('/observations/new/')
+        self.assertContains(response, 'name="order"'); self.assertContains(response, 'name="family"'); self.assertContains(response, 'name="genus"')
+        self.assertContains(response, 'name="identification_qualifier"'); self.assertContains(response, 'name="life_stage"')
+        self.assertContains(response, 'id="order-options"')
+        taxonomy = response.context['taxonomy']
+        self.assertIn('Nudibranchia', taxonomy['orders'])
+        self.assertIn(('Chromodoris', 'Chromodorididae', 'Nudibranchia'), taxonomy['genera'])
+        self.assertIn(('Chromodorididae', 'Nudibranchia'), taxonomy['families'])
+        self.assertEqual(taxonomy['authors']['Chromodoris strigata'], 'Rudman, 1982')
+
+
+class ListingTests(TaxonomyBase):
+    def test_listing_heading_shows_the_qualifier(self):
+        self.client.force_login(self.user)
+        s = self.sample(species=self.species, identification_qualifier='cf.'); s.save_reviewed(actor=self.user, approve=True)
+        response = self.client.get('/observations/')
+        self.assertContains(response, 'Chromodoris cf. strigata')
+    def test_order_family_genus_filters_use_the_sample_fields(self):
+        self.client.force_login(self.user)
+        sp = self.sample(species=self.species); sp.save_reviewed(actor=self.user, approve=True)
+        fam = self.sample(kind=Sample.Kind.FAMILY, family='Aglajidae'); fam.save_reviewed(actor=self.user, approve=True)
+        response = self.client.get('/observations/?order=Cephalaspidea')
+        self.assertEqual([i.pk for i in response.context['observations']], [fam.pk])
+        response = self.client.get('/observations/?genus=Chromodoris')
+        self.assertEqual([i.pk for i in response.context['observations']], [sp.pk])
+        self.assertIn('Aglajidae', response.context['families'])
+
+
+class TransferTests(TaxonomyBase):
+    def export(self):
+        s = self.sample(kind=Sample.Kind.GENUS, genus='Chromodoris'); s.save_reviewed(actor=self.user, approve=True)
+        return s, export_table('samples')
+    def test_new_fields_are_exported_and_roundtrip(self):
+        s, doc = self.export()
+        row = doc['rows'][0]
+        self.assertEqual((row['order'], row['family'], row['genus'], row['identification_qualifier'], row['life_stage']),
+                         ('Nudibranchia', 'Chromodorididae', 'Chromodoris', '', ''))
+        self.assertEqual(plan(json.loads(json.dumps(doc)))[0]['action'], 'same')
+    def test_rows_from_before_the_taxonomy_fields_are_still_accepted(self):
+        s, doc = self.export()
+        old = {k: v for k, v in doc['rows'][0].items() if k not in ('order', 'family', 'genus', 'identification_qualifier', 'life_stage')}
+        old['species_other'] = 'Chromodoris'     # how a genus-kind sample used to carry its name
+        doc['rows'] = [old]
+        result = plan(doc)[0]
+        self.assertEqual(result['action'], 'same')
+        self.assertEqual((result['object'].genus, result['object'].species_other), ('Chromodoris', ''))
+    def test_oldest_rows_without_transfer_id_and_image_are_still_accepted(self):
+        s, doc = self.export()
+        skip = ('order', 'family', 'genus', 'identification_qualifier', 'life_stage', 'transfer_id', 'image')
+        old = {k: v for k, v in doc['rows'][0].items() if k not in skip}
+        old['species_other'] = 'Chromodoris'
+        doc['rows'] = [old]
+        self.assertEqual(plan(doc)[0]['object'].genus, 'Chromodoris')
+    def test_a_row_with_unknown_extra_fields_is_still_rejected(self):
+        s, doc = self.export()
+        doc['rows'][0]['bogus'] = 'x'
+        with self.assertRaises(ValidationError): plan(doc)
+
+
+class Migration0041Tests(TransactionTestCase):
+    before = [('observations', '0040_sample_taxonomy_fields')]
+    after = [('observations', '0041_sample_taxonomy_data')]
+    prior = [('observations', '0039_species_scientific_name_not_editable')]
+
+    def migrate(self, targets):
+        executor = MigrationExecutor(connection)
+        executor.migrate(targets)
+        return executor.loader.project_state(targets).apps
+
+    def tearDown(self):
+        executor = MigrationExecutor(connection)
+        executor.loader.build_graph()
+        executor.migrate(executor.loader.graph.leaf_nodes())
+        super().tearDown()
+
+    def test_taxon_names_move_out_of_species_other_and_back(self):
+        old = self.migrate(self.before)
+        g = lambda n: old.get_model('observations', n)
+        owner = old.get_model('auth', 'User').objects.create(username='o')
+        trip = g('DiveTrip').objects.create(title='t')
+        order = g('TaxonOrder').objects.create(name='Nudibranchia')
+        family = g('TaxonFamily').objects.create(name='Chromodorididae', order=order)
+        g('TaxonGenus').objects.create(name='Chromodoris', family=family)
+        sp = g('Species').objects.create(scientific_name='Chromodoris annae', genus='Chromodoris', species='annae', order='Doridida')
+        mk = lambda **kw: g('Sample').objects.create(owner=owner, trip=trip, video_url='https://youtu.be/x', **kw)
+        genus = mk(kind='genus', species_other='Chromodoris')
+        fam = mk(kind='family', species_other='Chromodorididae')
+        order_s = mk(kind='order', species_other='Nudibranchia')
+        species = mk(kind='species', species=sp)
+        other = mk(kind='species', species_other='Undescribed')
+        coll = mk(kind='collection', title='c')
+
+        new = self.migrate(self.after)
+        S = new.get_model('observations', 'Sample')
+        f = lambda s: S.objects.values_list('order', 'family', 'genus', 'species_other', 'species_id').get(pk=s.pk)
+        self.assertEqual(f(genus), ('Nudibranchia', 'Chromodorididae', 'Chromodoris', '', None))
+        self.assertEqual(f(fam), ('Nudibranchia', 'Chromodorididae', '', '', None))
+        self.assertEqual(f(order_s), ('Nudibranchia', '', '', '', None))
+        self.assertEqual(f(species), ('Nudibranchia', 'Chromodorididae', 'Chromodoris', '', sp.pk))   # via the genus, not species.order
+        self.assertEqual(f(other), ('', '', '', 'Undescribed', None))
+        self.assertEqual(f(coll), ('', '', '', '', None))
+
+        back = self.migrate(self.before)
+        Sb = back.get_model('observations', 'Sample')
+        self.assertEqual(Sb.objects.get(pk=genus.pk).species_other, 'Chromodoris')
+        self.assertEqual(Sb.objects.get(pk=fam.pk).species_other, 'Chromodorididae')
+        self.assertEqual(Sb.objects.get(pk=order_s.pk).species_other, 'Nudibranchia')
+        self.assertEqual(Sb.objects.get(pk=other.pk).species_other, 'Undescribed')
