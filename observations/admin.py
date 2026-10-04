@@ -7,7 +7,7 @@ from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.utils.html import format_html
 from django.urls import reverse
-from .forms import SampleForm
+from .forms import SampleForm, SampleChangelistForm
 from .models import Country, Sea, Region, Site, Species, Profile, Sample, DiveTrip, SiteImage, SpeciesArea, TaxonOrder, TaxonFamily, TaxonGenus, SampleKind
 
 for model in [Country,Sea,Region,Site,Profile,SiteImage,SampleKind]: admin.site.register(model)
@@ -187,6 +187,12 @@ def reason_number_map():
         cache.set('sample_reason_number_map', mapping, 30)
     return mapping
 
+class DropdownAllValuesFilter(admin.AllValuesFieldListFilter):
+    """Filter by a text column's existing values as a compact <select> (instead of one link
+    per value -- a column like genus has hundreds of them)."""
+    template = 'admin/dropdown_filter.html'
+
+
 class TripCodeListFilter(admin.SimpleListFilter):
     title = 'מסע צלילה'
     parameter_name = 'trip'
@@ -214,8 +220,28 @@ class PublicationReasonListFilter(admin.SimpleListFilter):
 @admin.register(Sample)
 class SampleAdmin(admin.ModelAdmin):
     form = SampleForm
-    list_display=['id','title','kind','species','trip_code','owner','status','publication_warning','deleted_at']
-    list_filter=['status','kind',TripCodeListFilter,PublicationReasonListFilter,'deleted_at']
+    list_display=['id','title','kind','order','family','genus','species','identification_qualifier','life_stage','trip_code','owner','status','publication_warning','deleted_at']
+    # Like the Species list, the identification columns are editable straight from the list.
+    list_editable=['order','family','genus','species','identification_qualifier','life_stage']
+    # Long lists of values (genera, publication reasons...) are compact dropdowns, not one link
+    # per value, so the filter panel stays narrow (see templates/admin/observations/sample/change_list.html).
+    list_filter=['status','kind',('order',DropdownAllValuesFilter),('family',DropdownAllValuesFilter),('genus',DropdownAllValuesFilter),TripCodeListFilter,PublicationReasonListFilter,'deleted_at']
+    list_per_page=100
+    def get_changelist_form(self,request,**kwargs):
+        orders=sorted(set(TaxonOrder.objects.exclude(name='').values_list('name',flat=True))|set(Sample.objects.exclude(order='').values_list('order',flat=True)))
+        families=sorted(set(TaxonFamily.objects.exclude(name='').values_list('name',flat=True))|set(Sample.objects.exclude(family='').values_list('family',flat=True)))
+        class Form(SampleChangelistForm):
+            class Meta(SampleChangelistForm.Meta):
+                widgets={'order':DatalistTextInput(datalist_options=orders),'family':DatalistTextInput(datalist_options=families),
+                         'genus':forms.TextInput(attrs={'size':14})}
+        return Form
+    def get_form(self,request,obj=None,change=False,**kwargs):
+        # The change form's order/family/genus get suggestion lists, like the species admin.
+        form=super().get_form(request,obj,change=change,**kwargs)
+        form.base_fields['order'].widget=DatalistTextInput(datalist_options=sorted(set(TaxonOrder.objects.exclude(name='').values_list('name',flat=True))))
+        form.base_fields['family'].widget=DatalistTextInput(datalist_options=sorted(set(TaxonFamily.objects.exclude(name='').values_list('name',flat=True))))
+        form.base_fields['genus'].widget=DatalistTextInput(datalist_options=sorted(set(TaxonGenus.objects.exclude(name='').values_list('name',flat=True))))
+        return form
     search_fields=['title','species__scientific_name','species_other','order','family','genus','owner__username','source_id','trip__title']
     readonly_fields=['publication_warning','source_metadata','source_id','status','created_at','updated_at','deleted_at','deleted_by','approved_at','approved_by']
     actions=['approve','soft_remove','restore']

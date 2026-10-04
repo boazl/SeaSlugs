@@ -72,6 +72,29 @@ class SampleImageInput(forms.ClearableFileInput):
 
 
 
+def resolve_species(genus, text):
+    """Find the catalogued species for the genus + species (epithet) fields.
+
+    `text` is the epithet only ("strigata", "cf. strigata", "sp. 7", "sp. A" -- a trailing
+    letter after "sp." is the photographer's own undetermined-variant marker, split off here);
+    a full "Genus epithet" name typed (or posted by older clients) in it is accepted too.
+    Returns (species_or_None, variant)."""
+    genus, text = (genus or '').strip(), (text or '').strip()
+    if not text: return None, ''
+    candidates = [f'{genus} {text}', text] if genus else [text]
+    for candidate in candidates:
+        base, variant = split_undetermined_variant(candidate)
+        match = Species.find_by_name(base)
+        if match: return match, variant
+    return None, ''
+
+
+def species_epithet_with_variant(sample):
+    """What the species field shows when editing: the epithet only (the genus has its own
+    field), plus the photographer's undetermined-variant letter if the sample has one."""
+    return f'{sample.species.species} {sample.undetermined_variant}'.strip() if sample.species_id else ''
+
+
 class SampleForm(forms.ModelForm):
     # A native text input backed by a <datalist> (rendered in form.html from
     # species_options) rather than a <select> -- there can be hundreds of species, and
@@ -82,7 +105,8 @@ class SampleForm(forms.ModelForm):
     # for a species that isn't catalogued yet, so a typo here can't silently turn into an
     # "unidentified species" record.
     species = forms.CharField(label='מין', required=False, widget=forms.TextInput(attrs={
-        'list': 'species-options', 'autocomplete': 'off', 'placeholder': 'הקלידו לחיפוש…'}))
+        'list': 'species-options', 'autocomplete': 'off', 'placeholder': 'הקלידו לחיפוש…'}),
+        help_text='שם המין בלבד, בלי הסוג (הסוג בשדה שלמעלה). אפשר לכלול cf. / sp. 7 וכד׳ כפי שהם רשומים ברשימת המינים.')
     # The taxonomic cascade: order -> family -> genus -> species. Which of them is available
     # depends on the kind (form.html's script enables/disables them live, and
     # Sample.sync_taxonomy() normalises on the server). Each is a text input with a <datalist>
@@ -112,7 +136,7 @@ class SampleForm(forms.ModelForm):
             # it points to (see Sample.undetermined_variant) -- append it back onto the
             # displayed text so re-editing shows exactly what was typed, and clean() below
             # round-trips it the same way it does on first entry.
-            self.initial['species'] = f'{self.instance.species} {self.instance.undetermined_variant}'.strip() if self.instance.species_id else ''
+            self.initial['species'] = species_epithet_with_variant(self.instance)
         self.fields['species_other'].help_text = 'אם המין לא נמצא ברשימה שלמעלה, אפשר לפרט כאן במקום לבחור מהרשימה.'
         self.fields['site'].choices = [('', 'בחרו…')] + [(str(x.pk), str(x)) for x in Site.objects.all()] + [('other','אחר — פירוט')]
         if self.instance.pk:
@@ -146,14 +170,13 @@ class SampleForm(forms.ModelForm):
             data['species'] = None
             data['species_other'] = other_text
         elif species_text:
-            base_text, variant = split_undetermined_variant(species_text)
-            match = Species.find_by_name(base_text)
+            match, variant = resolve_species(data.get('genus'), species_text)
             if match:
                 data['species'] = match
                 data['species_other'] = ''
                 self.instance.undetermined_variant = variant
             else:
-                self.add_error('species', 'לא נמצא מין תואם ברשימה. יש לבחור מין קיים, או למלא "מין אחר".')
+                self.add_error('species', 'לא נמצא מין תואם ברשימה (ביחד עם הסוג שנבחר). יש לבחור מין קיים, או למלא "מין אחר".')
                 data['species'] = None
         else:
             data['species'] = None
@@ -191,6 +214,40 @@ class SampleForm(forms.ModelForm):
             return ContentFile(output.getvalue(),name=f'{uuid4().hex}.jpg')
         except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError):
             raise forms.ValidationError('יש להעלות תמונת JPEG, PNG או WebP תקינה, עד 25 מיליון פיקסלים.')
+
+
+class SampleChangelistForm(forms.ModelForm):
+    """The inline-editable columns of the Samples admin list (like the Species list): order,
+    family, genus and species (epithet only) plus the cf./aff. and juv. markers. The species
+    column is looked up through genus + epithet exactly like the observation form does; only a
+    SPECIES-kind sample has one."""
+    species = forms.CharField(label='מין', required=False, widget=forms.TextInput(attrs={'size': 14}))
+    class Meta:
+        model = Sample
+        fields = ['order', 'family', 'genus', 'species', 'identification_qualifier', 'life_stage']
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk: self.initial['species'] = species_epithet_with_variant(self.instance)
+        for name in ('identification_qualifier', 'life_stage'):
+            self.fields[name].choices = [('', '—')] + [c for c in self.fields[name].choices if c[0]]
+    def clean(self):
+        data = super().clean()
+        if self.instance.kind != Sample.Kind.SPECIES:
+            data['species'] = None
+            return data
+        text = (data.get('species') or '').strip()
+        if text:
+            match, variant = resolve_species(data.get('genus'), text)
+            if match:
+                data['species'] = match
+                self.instance.undetermined_variant = variant
+            else:
+                self.add_error('species', 'לא נמצא מין תואם ברשימה (ביחד עם הסוג).')
+                data['species'] = None
+        else:
+            data['species'] = None
+            self.instance.undetermined_variant = ''
+        return data
 
 
 class DiveTripForm(forms.ModelForm):

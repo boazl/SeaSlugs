@@ -1,0 +1,10 @@
+{% extends "admin/change_list.html" %}
+{% block extrastyle %}{{ block.super }}<style>
+/* Samples admin: keep the filter panel narrow however long a filter's values are (publication
+   reasons are whole sentences, trip titles and genera are long lists). Each long list is a
+   <select> (admin/dropdown_filter.html) that shrinks to the panel width and truncates its text. */
+#changelist-filter { flex: 0 0 210px; width: 210px; min-width: 0; max-width: 210px; overflow: hidden; }
+#changelist-filter .dropdown-filter select { width: 100%; min-width: 0; max-width: 100%; text-overflow: ellipsis; }
+#changelist .changelist-form-container { min-width: 0; }
+#result_list input[type="text"] { max-width: 11em; }
+</style>{% endblock %}

@@ -272,13 +272,15 @@ class WorkflowTests(TestCase):
         result = SpeciesArea.next_candidate(self.species.pk, self.country.pk, self.sea, first.pk)
         self.assertEqual(result, {'kind': 'with_media', 'sample': fourth})
 
-    def test_species_field_matches_case_insensitively_and_edit_prefills_scientific_name(self):
+    def test_species_field_matches_case_insensitively_and_edit_prefills_the_epithet(self):
         d=self.data();d.update(species=self.species.scientific_name.upper())
         form=SampleForm(d,instance=Sample(owner=self.user));self.assertTrue(form.is_valid(),form.errors)
         self.assertEqual(form.cleaned_data['species'],self.species)
         item=form.save(commit=False);item.save_reviewed()
-        # editing an existing item must show its scientific name in the field, not its pk
-        self.assertEqual(SampleForm(instance=item).initial['species'],self.species.scientific_name)
+        # editing an existing item must show the species (epithet only -- the genus has its own
+        # field), not its pk
+        self.assertEqual(SampleForm(instance=item).initial['species'],self.species.species)
+        self.assertEqual(SampleForm(instance=item).initial['genus'],self.species.genus)
 
     def test_species_field_matches_regardless_of_sp_qualifier_spacing(self):
         # A photographer may type "Tenellia sp.18" (no space) or paste it from a filename,

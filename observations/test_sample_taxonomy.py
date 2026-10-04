@@ -284,3 +284,93 @@ class Migration0041Tests(TransactionTestCase):
         self.assertEqual(Sb.objects.get(pk=fam.pk).species_other, 'Chromodorididae')
         self.assertEqual(Sb.objects.get(pk=order_s.pk).species_other, 'Nudibranchia')
         self.assertEqual(Sb.objects.get(pk=other.pk).species_other, 'Undescribed')
+
+
+class EpithetFieldTests(TaxonomyBase):
+    """The species field of a sample holds the epithet only; the genus has its own field."""
+    def data(self, **kw):
+        d = dict(kind='species', title='', order='', family='', genus='', species='', identification_qualifier='', life_stage='',
+                 species_other='', trip=str(self.trip.pk), site='', site_other='', day='', depth='', video_url='https://youtu.be/abcdefghijk')
+        d.update(kw); return d
+    def test_genus_plus_epithet_finds_the_species(self):
+        form = SampleForm(self.data(genus='Chromodoris', species='strigata'))
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data['species'], self.species)
+    def test_epithet_is_looked_up_within_the_genus(self):
+        other = Species.objects.create(genus='Hypselodoris', species='strigata')
+        form = SampleForm(self.data(genus='Hypselodoris', species='strigata'))
+        self.assertTrue(form.is_valid(), form.errors); self.assertEqual(form.cleaned_data['species'], other)
+    def test_epithet_that_does_not_exist_in_the_genus_is_an_error(self):
+        form = SampleForm(self.data(genus='Chelidonura', species='strigata'))
+        self.assertFalse(form.is_valid()); self.assertIn('species', form.errors)
+    def test_open_nomenclature_epithets_and_variant_letter(self):
+        sp = Species.objects.create(genus='Coryphellina', species='sp.')
+        form = SampleForm(self.data(genus='Coryphellina', species='sp. A'))
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data['species'], sp); self.assertEqual(form.instance.undetermined_variant, 'A')
+        s = form.save(commit=False); s.owner = self.user; s.save()
+        self.assertEqual(SampleForm(instance=s).initial['species'], 'sp. A')
+    def test_a_full_name_in_the_species_field_is_still_accepted(self):
+        for genus in ('', 'Chromodoris'):
+            form = SampleForm(self.data(genus=genus, species='Chromodoris strigata'))
+            self.assertTrue(form.is_valid(), form.errors); self.assertEqual(form.cleaned_data['species'], self.species)
+
+
+class SampleAdminListTests(TaxonomyBase):
+    def setUp(self):
+        super().setUp()
+        self.admin = User.objects.create_superuser('boss', password='pw-for-tests-1')
+        self.client.force_login(self.admin)
+        self.s = self.sample(species=self.species); self.s.save_reviewed(actor=self.admin)
+        self.g = self.sample(kind=Sample.Kind.GENUS, genus='Chromodoris'); self.g.save_reviewed(actor=self.admin, approve=True)
+    def post(self, **overrides):
+        rows = [self.s, self.g]
+        data = {'form-TOTAL_FORMS': '2', 'form-INITIAL_FORMS': '2', 'form-MIN_NUM_FORMS': '0', 'form-MAX_NUM_FORMS': '1000', '_save': 'Save'}
+        for i, row in enumerate(rows):
+            row.refresh_from_db()
+            epithet = row.species.species if row.species_id else ''
+            data.update({f'form-{i}-id': str(row.pk), f'form-{i}-order': row.order, f'form-{i}-family': row.family, f'form-{i}-genus': row.genus,
+                         f'form-{i}-species': epithet, f'form-{i}-identification_qualifier': row.identification_qualifier, f'form-{i}-life_stage': row.life_stage})
+        data.update(overrides)
+        return self.client.post('/admin/observations/sample/', data, follow=True)
+    def test_list_has_editable_taxonomy_columns_and_compact_filters(self):
+        response = self.client.get('/admin/observations/sample/')
+        self.assertEqual(response.status_code, 200)
+        for name in ('order', 'family', 'genus', 'species', 'identification_qualifier', 'life_stage'):
+            self.assertContains(response, f'name="form-0-{name}"')
+        # order/family suggest the known names, like the species list does
+        self.assertContains(response, 'id="id_form-0-order__datalist"')
+        # the species column holds the epithet only
+        self.assertContains(response, 'value="strigata"')
+        # long filters are dropdowns, and the panel is kept narrow
+        self.assertContains(response, 'dropdown-filter'); self.assertContains(response, 'max-width: 210px')
+    def test_unchanged_save_keeps_every_row(self):
+        response = self.post()
+        self.assertEqual(response.status_code, 200)
+        self.s.refresh_from_db(); self.g.refresh_from_db()
+        self.assertEqual((self.s.species_id, self.s.genus, self.g.genus, self.g.species_id), (self.species.pk, 'Chromodoris', 'Chromodoris', None))
+    def test_editing_the_species_and_qualifier_from_the_list(self):
+        other = Species.objects.create(genus='Chromodoris', species='annae')
+        response = self.post(**{'form-0-species': 'annae', 'form-0-identification_qualifier': 'cf.', 'form-0-life_stage': 'juv.'})
+        self.assertEqual(response.status_code, 200)
+        self.s.refresh_from_db()
+        self.assertEqual((self.s.species_id, self.s.identification_qualifier, self.s.life_stage), (other.pk, 'cf.', 'juv.'))
+    def test_an_unknown_species_in_the_list_is_rejected(self):
+        response = self.post(**{'form-0-species': 'nonexistent'})
+        self.assertContains(response, 'לא נמצא מין תואם')
+        self.s.refresh_from_db(); self.assertEqual(self.s.species_id, self.species.pk)
+    def test_a_genus_sample_row_can_change_its_genus(self):
+        response = self.post(**{'form-1-genus': 'Chelidonura', 'form-1-family': '', 'form-1-order': ''})
+        self.assertEqual(response.status_code, 200)
+        self.g.refresh_from_db()
+        self.assertEqual((self.g.genus, self.g.family, self.g.order), ('Chelidonura', 'Aglajidae', 'Cephalaspidea'))
+    def test_long_filter_values_are_truncated_in_the_dropdown(self):
+        trip = DiveTrip.objects.create(title='T' * 120, code='x' * 40, year=2024, country=self.country, region=self.region)
+        Sample(owner=self.user, trip=trip, species=self.species, video_url='https://youtu.be/zzzzzzzzzzz').save()
+        response = self.client.get('/admin/observations/sample/')
+        self.assertNotContains(response, '>' + 'T' * 120)            # the visible option text is cut...
+        self.assertContains(response, 'title="' + 'T' * 120)         # ...and the full text stays in the tooltip
+    def test_change_form_still_opens_with_taxonomy_suggestions(self):
+        response = self.client.get(f'/admin/observations/sample/{self.s.pk}/change/')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Chromodorididae')
