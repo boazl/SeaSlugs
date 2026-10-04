@@ -46,7 +46,7 @@ class GenusPageTests(TestCase):
                     video_url='https://youtu.be/44444444444')
         cf.save_reviewed()
         html = self.client.get(f'/species/{self.area.slug}/').content.decode()
-        self.assertEqual(html.count('class="sample-name"'), 2)
+        self.assertEqual(html.count('class="sample-name"'), 1)           # the plain observation would only repeat the h1
         self.assertIn('<i>Chromodoris</i> cf. <i>annae</i>', html)       # the qualifier is visible on that observation only
         self.assertEqual(html.count('cf. <i>annae</i>'), 1)
 
@@ -65,7 +65,14 @@ class GenusPageTests(TestCase):
                video_url='https://youtu.be/55555555555').save_reviewed()
         html = self.client.get(f'/species/{self.area.slug}/').content.decode()
         self.assertIn('<i>Chromodoris</i> cf. <i>annae</i> Bergh, 1877', html)
-        self.assertIn('<i>Chromodoris annae</i> Bergh, 1877', html)
+        self.assertEqual(html.count('class="sample-name"'), 1)
+        self.assertNotIn('<i>Chromodoris annae</i> Bergh, 1877', html)   # a plain name is not repeated above its photo
+
+    def test_species_page_heading_is_one_colour_and_small(self):
+        html = self.client.get(f'/species/{self.area.slug}/').content.decode()
+        self.assertIn('.species-summary h1 .species-author{font-style:normal;color:inherit}', html)   # base.css paints every h1 span teal
+        self.assertIn('font-size:24px', html.split('.species-summary h1{')[1].split('}')[0])
+        self.assertIn('font-size:12px', html.split('.sample-name{')[1].split('}')[0])
 
     def test_genus_page_cards_show_the_species_name_in_italics(self):
         self.species.species = 'annae'; self.species.save()

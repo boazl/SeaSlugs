@@ -56,6 +56,10 @@ def species_page(request, slug):
     # Sample.undetermined_variant / SpeciesArea.undetermined_variant) -- the page's title
     # and headings show that letter too, so the two pages are distinguishable.
     species_label = f'{species.scientific_name} {area.undetermined_variant}'.strip()
+    # An observation's own heading only appears when it adds something to the page title
+    # (cf./aff./life stage); a plain one would just repeat the h1.
+    for s in samples:
+        s.show_name = s.taxon_label != species.scientific_name
     common_name = (species.name_en or species.name_he) if lang == 'en' else (species.name_he or species.name_en)
     description = (species.description_en or species.description_he) if lang == 'en' else (species.description_he or species.description_en)
     return render(request, 'observations/species_page.html', {
