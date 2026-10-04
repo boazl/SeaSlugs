@@ -192,7 +192,7 @@ class ListingTests(TaxonomyBase):
         self.client.force_login(self.user)
         s = self.sample(species=self.species, identification_qualifier='cf.'); s.save_reviewed(actor=self.user, approve=True)
         response = self.client.get('/observations/')
-        self.assertContains(response, 'Chromodoris cf. strigata')
+        self.assertContains(response, '<h2><i>Chromodoris</i> cf. <i>strigata</i></h2>')   # italic names, roman qualifier
     def test_order_family_genus_filters_use_the_sample_fields(self):
         self.client.force_login(self.user)
         sp = self.sample(species=self.species); sp.save_reviewed(actor=self.user, approve=True)

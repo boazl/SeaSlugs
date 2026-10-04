@@ -47,8 +47,29 @@ class GenusPageTests(TestCase):
         cf.save_reviewed()
         html = self.client.get(f'/species/{self.area.slug}/').content.decode()
         self.assertEqual(html.count('class="sample-name"'), 2)
-        self.assertIn('>Chromodoris cf. annae', html)       # the qualifier is visible on that observation only
-        self.assertEqual(html.count('Chromodoris cf. annae'), 1)
+        self.assertIn('<i>Chromodoris</i> cf. <i>annae</i>', html)       # the qualifier is visible on that observation only
+        self.assertEqual(html.count('cf. <i>annae</i>'), 1)
+
+    def test_species_page_heading_is_italic_with_the_author_in_roman_and_no_name_in_the_breadcrumb(self):
+        self.species.species = 'annae'; self.species.author = 'Bergh, 1877'; self.species.save()
+        html = self.client.get(f'/species/{self.area.slug}/').content.decode()
+        self.assertIn('<h1 dir="ltr"><i>Chromodoris annae</i> <span class="species-author">Bergh, 1877</span></h1>', html)
+        start = html.index('class="breadcrumb"'); crumb = html[start:html.index('</nav>', start)]
+        self.assertIn('Chromodoris</a>', crumb)               # the genus link stays
+        self.assertNotIn('aria-current', crumb)               # the species name is not repeated there
+        self.assertNotIn('annae', crumb)
+
+    def test_observation_names_above_the_photos_are_italic_except_the_qualifier(self):
+        self.species.species = 'annae'; self.species.author = 'Bergh, 1877'; self.species.save()
+        Sample(owner=self.owner, trip=self.trip, species=self.species, identification_qualifier='cf.',
+               video_url='https://youtu.be/55555555555').save_reviewed()
+        html = self.client.get(f'/species/{self.area.slug}/').content.decode()
+        self.assertIn('<i>Chromodoris</i> cf. <i>annae</i> Bergh, 1877', html)
+        self.assertIn('<i>Chromodoris annae</i> Bergh, 1877', html)
+
+    def test_genus_page_cards_show_the_species_name_in_italics(self):
+        self.species.species = 'annae'; self.species.save()
+        self.assertContains(self.client.get(f'/genus/{self.genus.name}/'), '<i>Chromodoris annae</i>')
 
     def test_genus_page_404s_without_a_defining_sample(self):
         self.genus_sample.soft_delete(self.owner)  # only genus-kind sample -- see Sample.save

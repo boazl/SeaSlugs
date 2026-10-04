@@ -493,7 +493,7 @@ function openSpeciesDialog(species, button) {
         playSampleOf(species, samples[0], button);
         return;
     }
-    document.querySelector('#playerTitle').textContent = species.title;
+    setLatinName(document.querySelector('#playerTitle'), species.title);
     document.querySelector('#playerRegion').textContent = language === 'he' ? `${samples.length} תצפיות — לבחירה מהרשימה` : `${samples.length} observations — choose from the list`;
     document.querySelector('#frame').hidden = true;
     document.querySelector('.player-bottom').hidden = true;
@@ -571,6 +571,37 @@ function buildCollectionCard(c, index) {
     article.append(button);
     return article;
 }
+// Scientific names are shown with the genus and the species epithet in italics and everything
+// else (cf./aff., "sp. 7", the variant letter, the author) in roman -- the same rule as
+// observations/names.py (name_html), which renders the server-side pages.
+function setLatinName(el, text) {
+    el.textContent = '';
+    const tokens = String(text || '').split(/\s+/).filter(Boolean);
+    const italic = tokens.map(() => false);
+    if (tokens.length && /^[A-Z][a-z]+$/.test(tokens[0])) {
+        italic[0] = true;
+        let i = 1;
+        if (tokens.length > 1 && /^(cf|aff)\.?$/i.test(tokens[1])) i = 2;
+        if (i < tokens.length && /^[a-z][a-z-]+$/.test(tokens[i]) && !/^spp?$/.test(tokens[i])) italic[i] = true;
+    }
+    let run = [];
+    const flush = () => {
+        if (!run.length) return;
+        const i = document.createElement('i');
+        i.textContent = run.join(' ');
+        if (el.childNodes.length) el.append(' ');
+        el.append(i);
+        run = [];
+    };
+    for (let k = 0; k < tokens.length; k++) {
+        if (italic[k]) { run.push(tokens[k]); continue; }
+        flush();
+        if (el.childNodes.length) el.append(' ');
+        el.append(tokens[k]);
+    }
+    flush();
+}
+
 function buildSpeciesCard(sp, index) {
     const article = document.createElement('article');
     article.className = 'card';
@@ -612,7 +643,7 @@ function buildSpeciesCard(sp, index) {
     const info = document.createElement('span');
     info.className = 'card-info';
     const h3 = document.createElement('h3');
-    h3.textContent = sp.title;
+    setLatinName(h3, sp.title);
     const sub = document.createElement('span');
     sub.className = 'common-name';
     if (common) sub.textContent = common;

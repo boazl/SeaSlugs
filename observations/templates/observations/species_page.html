@@ -36,7 +36,8 @@ gtag('config', 'G-CPGTC09P2P');</script>
         .species-badges{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
         .badge{display:inline-block;padding:4px 12px;border-radius:20px;background:var(--panel);border:1px solid var(--line);font-size:13px;color:var(--muted)}
         .badge-migrant{color:var(--accent);border-color:var(--accent)}
-        .sample-name{margin:0 0 8px;font-family:Georgia,"Times New Roman",serif;font-weight:400;font-size:17px;line-height:1.35;color:var(--ink);overflow-wrap:anywhere}
+        .sample-name{margin:0 0 6px;font-family:Georgia,"Times New Roman",serif;font-weight:400;font-size:14px;line-height:1.35;color:var(--ink);overflow-wrap:anywhere}
+        .species-summary h1 .species-author{font-style:normal}
         .species-links{display:flex;flex-wrap:wrap;gap:14px}
         .species-links a{color:var(--accent);text-decoration:none;font-size:15px}
         .species-links a:hover{text-decoration:underline}
@@ -61,7 +62,6 @@ gtag('config', 'G-CPGTC09P2P');</script>
             {% if taxon_order_label %}<span>›</span><span>{{ taxon_order_label }}</span>{% endif %}
             {% if taxon_family_label %}<span>›</span><span>{{ taxon_family_label }}</span>{% endif %}
             {% if taxon_genus_label %}<span>›</span>{% if taxon_genus.defining_sample_id %}<a href="{% url 'genus-page' taxon_genus.name %}">{{ taxon_genus_label }}</a>{% else %}<span>{{ taxon_genus_label }}</span>{% endif %}{% endif %}
-            <span>›</span><span aria-current="page">{{ species_label }}</span>
         </nav>
 
         <article class="species-hero">
@@ -73,7 +73,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
                 {% endif %}
             </div>
             <div class="species-summary">
-                <h1 dir="ltr">{{ species_label }}</h1>
+                <h1 dir="ltr">{{ species_label|name_html }}{% if species.author %} <span class="species-author">{{ species.author }}</span>{% endif %}</h1>
                 {% if common_name %}<p class="species-common">{{ common_name }}</p>{% endif %}
                 <p class="species-area">{{ area.country|loc:lang }} · {{ area.sea|loc:lang }}</p>
                 <div class="species-badges">
@@ -108,7 +108,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
             <div class="grid">
                 {% for s in samples %}
                 <article class="card">
-                    <h3 class="sample-name" dir="ltr">{{ s.taxon_full_name }}</h3>
+                    <h3 class="sample-name" dir="ltr">{{ s.taxon_full_name|name_html }}</h3>
                     <a class="video-button" href="{% if s.video_url %}{{ s.video_url }}{% else %}{% url 'observation-photo' s.pk %}{% endif %}" target="_blank" rel="noopener">
                         <span class="image-wrap"><img src="{% if s.image %}{% url 'observation-photo' s.pk %}{% else %}{{ s.thumbnail }}{% endif %}" alt="" width="640" height="360" loading="lazy"><span class="play" aria-hidden="true">{% if s.video_url %}▶{% else %}⤢{% endif %}</span></span>
                         <span class="card-info">

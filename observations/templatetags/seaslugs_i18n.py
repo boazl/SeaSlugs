@@ -102,6 +102,13 @@ def t(value, lang):
 
 
 @register.filter
+def name_html(text):
+    """A scientific name with genus and epithet in italics (see observations/names.py)."""
+    from ..names import name_html as render
+    return render(text)
+
+
+@register.filter
 def loc(obj, lang):
     """Localized name of a Country/Region/Site/etc. (anything with name/name_en)."""
     if not obj:
