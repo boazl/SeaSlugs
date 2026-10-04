@@ -29,6 +29,17 @@ class GenusPageTests(TestCase):
         self.assertContains(response, 'Chromodoris annae')
         self.assertContains(response, f'/species/{self.area.slug}/')
 
+    def test_card_shows_the_observation_count_when_the_species_has_several(self):
+        url = f'/genus/{self.genus.name}/'
+        self.assertNotContains(self.client.get(url), 'count-badge" aria-hidden')      # one observation: no badge
+        second = Sample(owner=self.owner, trip=self.trip, species=self.species, video_url='https://youtu.be/22222222222')
+        second.save_reviewed()
+        gone = Sample(owner=self.owner, trip=self.trip, species=self.species, video_url='https://youtu.be/33333333333')
+        gone.save_reviewed(); gone.soft_delete(self.owner)                            # a deleted one is not counted
+        response = self.client.get(url)
+        self.assertContains(response, '<span class="count-badge" aria-hidden="true">2</span>')
+        self.assertContains(response, '<span>2 תצפיות</span>')
+
     def test_genus_page_404s_without_a_defining_sample(self):
         self.genus_sample.soft_delete(self.owner)  # only genus-kind sample -- see Sample.save
         self.genus.refresh_from_db()

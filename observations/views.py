@@ -12,7 +12,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from .models import Sample, Profile, Region, Site, DiveTrip, SiteImage, Species, Country, SpeciesArea, SampleKind, KIND_EN_NAMES, TaxonGenus, TaxonFamily, TaxonOrder, full_name_for
 from .forms import SignupForm, SampleForm, ProfileForm, DiveTripForm, taxonomy_for_form, species_name_options
 from .notifications import notify_new_user_registered
-from .gallery_data import TaxonResolver, taxon_media
+from .gallery_data import TaxonResolver, taxon_media, area_samples
 from .i18n import get_lang
 
 
@@ -39,11 +39,7 @@ def species_page(request, slug):
     thumbnail, image_url, video_id = taxon_media(area.defining_sample)
     if not (image_url or video_id):
         raise Http404
-    samples = list(Sample.objects.filter(
-        kind=Sample.Kind.SPECIES, species_id=area.species_id, status='published', deleted_at__isnull=True,
-        trip__country_id=area.country_id, trip__region__sea_id=area.sea_id, trip__year__isnull=False,
-        species_other='', site_other='', undetermined_variant=area.undetermined_variant,
-    ).select_related('trip', 'trip__region', 'site', 'owner', 'owner__profile').order_by('created_at', 'pk'))
+    samples = list(area_samples(area).select_related('trip', 'trip__region', 'site', 'owner', 'owner__profile').order_by('created_at', 'pk'))
     if not samples:
         raise Http404
     order_obj, family_obj, genus_obj = TaxonResolver().resolve(area.species)
@@ -110,6 +106,7 @@ def genus_page(request, name):
             continue  # same gate species_page/catalog.js use -- an area only counts once it can actually show something
         _, _, genus_obj = resolver.resolve(area.species)
         if genus_obj and genus_obj.pk == genus.pk:
+            area.observation_count = area_samples(area).count()   # same count the gallery card shows
             areas.append(area)
     if not areas:
         raise Http404

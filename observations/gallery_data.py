@@ -9,7 +9,17 @@ already-working, already-tested code path while the new per-entity pages are bei
 entity type at a time. Once all entity types have pages, that inline copy should be replaced
 with calls into this module too.
 """
-from .models import TaxonGenus, TaxonFamily, TaxonOrder, youtube_id
+from .models import Sample, TaxonGenus, TaxonFamily, TaxonOrder, youtube_id
+
+
+def area_samples(area):
+    """The published observations that make up one gallery card / species page: the species'
+    samples in the area's country + sea (and with its undetermined-variant letter). The same
+    rule the catalog.js builder applies inline, so every page counts observations alike."""
+    return Sample.objects.filter(
+        kind=Sample.Kind.SPECIES, species_id=area.species_id, status='published', deleted_at__isnull=True,
+        trip__country_id=area.country_id, trip__region__sea_id=area.sea_id, trip__year__isnull=False,
+        species_other='', site_other='', undetermined_variant=area.undetermined_variant)
 
 
 def taxon_media(defining_sample):
