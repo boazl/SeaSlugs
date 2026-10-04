@@ -42,7 +42,7 @@ class GalleryScriptTests(SimpleTestCase):
         self.assertIn("'מינים'", js)
         self.assertIn("'אוספים'", js)
         self.assertIn('font-size:12px;color:var(--muted)', css.split('.card h3 .card-author{')[1].split('}')[0])
-        self.assertIn('.card h3 .card-author{display:inline-block;', css)    # a too-long author moves to the next line whole
+        self.assertIn('.card h3 .card-author{display:block;', css)    # the author always sits on the line below the name
         self.assertIn('direction:ltr;text-align:left;font-weight:400;font-size:18px', css)   # names align left in Hebrew too
         self.assertIn('.card-meta>span:last-child{color:var(--accent)}', css)   # the photographer inside card-where is not teal
         self.assertIn("where.className = 'card-where'", js)

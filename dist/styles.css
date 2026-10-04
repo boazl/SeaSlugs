@@ -36,7 +36,7 @@ html[dir="ltr"] .card h3.hebrew{direction:ltr;text-align:left}
 .filter-group select{width:100%;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:9px 10px;min-height:40px}
 .gallery-main{min-width:0}
 .count-badge{position:absolute;z-index:1;top:12px;right:12px;background:var(--accent);color:#09222a;font-size:12px;font-weight:700;border-radius:14px;min-width:24px;height:24px;padding:0 7px;display:grid;place-items:center}
-.card h3 .card-author{display:inline-block;font-size:12px;color:var(--muted)}
+.card h3 .card-author{display:block;margin-top:2px;font-size:12px;color:var(--muted)}
 .filter-sub{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted);padding:2px 6px 2px 32px}
 .filter-sub span{flex:1}
 .common-name{display:block;font-size:14px;color:var(--muted);margin-top:2px}
