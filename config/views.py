@@ -22,27 +22,21 @@ def gallery_file(request, filename='index.html'):
         return response
     if filename == 'catalog.js':
         import json
-        from django.contrib.auth import get_user_model
         from django.http import HttpResponse
         from observations.models import Sample, SpeciesArea, TaxonOrder, TaxonFamily, TaxonGenus, youtube_id
-
-        # Fetched once and reused for every sample/collection below, rather than each
-        # photographer_display_name() call re-querying every registered user on its own --
-        # see _resolve_registered_photographer's docstring in observations/models.py.
-        registered_users = list(get_user_model().objects.select_related('profile').all())
 
         def sample_out(s, region):
             return {
                 'sample_id': s.pk, 'trip_id': s.trip_id,
                 'region': str(region.pk), 'site': str(s.site_id) if s.site_id else None,
-                # 'photographer' stays the raw, language-invariant credit text -- it is the
+                # 'photographer' is the credited user's Hebrew full name -- language-invariant, so it is the
                 # filter/identity value (see photographerCount and the photographer checkbox
                 # filter in app.js). 'photographer_he'/'photographer_en' are only for display,
                 # so a registered user's credit shows in the page's own language (see
                 # sampleSubtitle/collectionSubtitle/buildSpeciesCard in app.js).
                 'photographer': s.photographer_name,
-                'photographer_he': s.photographer_display_name('he', registered_users=registered_users),
-                'photographer_en': s.photographer_display_name('en', registered_users=registered_users),
+                'photographer_he': s.photographer_display_name('he'),
+                'photographer_en': s.photographer_display_name('en'),
                 'year': s.trip.year, 'month': s.trip.month,
                 'video_id': youtube_id(s.video_url) if s.video_url else None,
                 'image_url': f'/observations/{s.pk}/photo/' if s.image else None,
@@ -142,7 +136,7 @@ def gallery_file(request, filename='index.html'):
                 kind='species', species_id=area.species_id, status='published', deleted_at__isnull=True,
                 trip__country_id=area.country_id, trip__region__sea_id=area.sea_id, trip__year__isnull=False,
                 species_other='', site_other='', undetermined_variant=area.undetermined_variant,
-            ).select_related('trip', 'trip__region', 'site', 'owner', 'owner__profile').order_by('created_at', 'pk')
+            ).select_related('trip', 'trip__region', 'site', 'owner', 'owner__profile', 'trip__photographer', 'trip__photographer__profile').order_by('created_at', 'pk')
             samples = []
             for s in samples_qs:
                 region = s.trip.region
@@ -223,7 +217,7 @@ def gallery_file(request, filename='index.html'):
             status='published', deleted_at__isnull=True, kind='collection', species__isnull=True,
             trip__isnull=False, trip__country__isnull=False, trip__region__isnull=False, trip__year__isnull=False,
             species_other='', site_other='',
-        ).select_related('trip', 'trip__region', 'trip__country', 'owner', 'owner__profile').order_by('gallery_order', 'pk')
+        ).select_related('trip', 'trip__region', 'trip__country', 'owner', 'owner__profile', 'trip__photographer', 'trip__photographer__profile').order_by('gallery_order', 'pk')
         collections_out = []
         for item in collection_rows:
             region = item.trip.region
@@ -234,8 +228,8 @@ def gallery_file(request, filename='index.html'):
             collections_out.append({
                 'sample_id': item.pk, 'trip_id': item.trip_id, 'title': item.title,
                 'photographer': item.photographer_name,
-                'photographer_he': item.photographer_display_name('he', registered_users=registered_users),
-                'photographer_en': item.photographer_display_name('en', registered_users=registered_users),
+                'photographer_he': item.photographer_display_name('he'),
+                'photographer_en': item.photographer_display_name('en'),
                 'area': area_key,
                 'region': str(region.pk), 'year': item.trip.year, 'month': item.trip.month,
                 'video_id': youtube_id(item.video_url) if item.video_url else None,

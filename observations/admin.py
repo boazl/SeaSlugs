@@ -8,9 +8,9 @@ from django.core.exceptions import ValidationError
 from django.utils.html import format_html
 from django.urls import reverse
 from .forms import SampleForm
-from .models import Country, Sea, Region, Site, Species, Profile, Sample, DiveTrip, SiteImage, SpeciesArea, TaxonOrder, TaxonFamily, TaxonGenus, SampleKind, Photographer
+from .models import Country, Sea, Region, Site, Species, Profile, Sample, DiveTrip, SiteImage, SpeciesArea, TaxonOrder, TaxonFamily, TaxonGenus, SampleKind, user_choice_label
 
-for model in [Country,Sea,Region,Site,Profile,SiteImage,SampleKind,Photographer]: admin.site.register(model)
+for model in [Country,Sea,Region,Site,Profile,SiteImage,SampleKind]: admin.site.register(model)
 
 
 class ProfileInline(admin.StackedInline):
@@ -119,10 +119,22 @@ class TaxonGenusAdmin(admin.ModelAdmin):
 
 @admin.register(DiveTrip)
 class DiveTripAdmin(admin.ModelAdmin):
-    list_display = ['code','title','kind','year','month','country','region','sea','site','photographer_fk','species_count']
-    list_filter = ['kind','year','country','region','site','photographer_fk']
-    search_fields = ['code','title','region_name','reserve','site__name','photographer','photographer_fk__name']
+    list_display = ['code','title','kind','year','month','country','region','sea','site','photographer_label','species_count']
+    list_filter = ['kind','year','country','region','site','photographer']
+    search_fields = ['code','title','region_name','reserve','site__name','photographer__username','photographer__first_name','photographer__last_name']
     readonly_fields = ['source_metadata']
+
+    @admin.display(description='צלם', ordering='photographer__last_name')
+    def photographer_label(self, obj):
+        return user_choice_label(obj.photographer) if obj.photographer_id else '—'
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        field = super().formfield_for_foreignkey(db_field, request, **kwargs)
+        if db_field.name == 'photographer':
+            field.queryset = field.queryset.order_by('first_name', 'last_name', 'username')
+            field.label_from_instance = user_choice_label
+        return field
+
     # Hides the "sea" field's row while a region is selected (it only matters for a trip
     # with no region -- see DiveTrip.resolved_sea), and narrows the "region" options to the
     # selected country/sea and the "site" options to the selected region, fetched from

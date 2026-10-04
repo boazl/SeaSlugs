@@ -10,7 +10,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
-from .models import Country, Sea, Region, Site, Species, Sample, DiveTrip, SpeciesArea, Photographer, youtube_id
+from .models import Country, Sea, Region, Site, Species, Sample, DiveTrip, SpeciesArea, youtube_id
 from django.contrib.auth import get_user_model
 from .account_transfer import ACCOUNT_TABLES, account_row, account_plan
 
@@ -23,10 +23,9 @@ from .account_transfer import ACCOUNT_TABLES, account_row, account_plan
 TABLES = {'groups': ACCOUNT_TABLES['groups'], 'users': ACCOUNT_TABLES['users'],
           'countries': (Country,['name','name_en']), 'seas': (Sea,['name','name_en']),
           'regions': (Region,['name','name_en','country','sea']), 'sites': (Site,['name','name_en','region']),
-          'photographers': (Photographer,['name','name_en']),
           'profiles': ACCOUNT_TABLES['profiles'],
           'species': (Species, ['scientific_name','name_he','name_en','source_id','genus','species','author','order','family','superfamily','accepted_genus','accepted_species','common_name','transliteration','language','formatted_author','distribution','phylogenetic_order','full_species_name_with_order','reference_author','is_migrant','habitat','food','first_observed_year','last_observed_year','size_from','size_to','size_max','description_he','description_en','link']),
-          'trips': (DiveTrip, ['code','title','source_sort','year','month','start_day','duration_days','country','region','sea','site','photographer_fk','country_name','region_name','reserve','sea_name','photographer','species_count','source_metadata','kind','description_he','description_en','link']),
+          'trips': (DiveTrip, ['code','title','source_sort','year','month','start_day','duration_days','country','region','sea','site','photographer','country_name','region_name','reserve','sea_name','species_count','source_metadata','kind','description_he','description_en','link']),
           'samples': (Sample, ['title','kind','trip','owner','species','site','species_other','undetermined_variant','site_other','day','depth','video_url','status','source_id','gallery_order','source_metadata','transfer_id','image']),
           'speciesareas': (SpeciesArea, ['species','country','sea','undetermined_variant','defining_sample'])}
 
@@ -37,6 +36,7 @@ def reference(obj):
     if isinstance(obj, Site): return {'name':obj.name,'region':obj.region.name,'country':obj.region.country.name}
     if isinstance(obj, Species): return obj.scientific_name
     if isinstance(obj, Sample): return str(obj.transfer_id)
+    if isinstance(obj, get_user_model()): return obj.get_username()
     return obj.name
 
 
@@ -48,7 +48,7 @@ def row(obj, fields):
         return sample_row(obj, fields)
     result = {}
     for f in fields:
-        if f in ('country','sea','region','site','photographer_fk') or (isinstance(obj, SpeciesArea) and f in ('species','defining_sample')):
+        if f in ('country','sea','region','site') or (isinstance(obj, DiveTrip) and f == 'photographer') or (isinstance(obj, SpeciesArea) and f in ('species','defining_sample')):
             # Species' OWN 'species' field (the epithet, a plain string) shares a name with
             # SpeciesArea's 'species' FK -- only treat it as a reference on SpeciesArea itself.
             result[f] = reference(getattr(obj,f))
@@ -105,8 +105,12 @@ def related(field,value,required=True):
         return unique(Sample,transfer_id=value)
     else:
         if not isinstance(value,str): raise ValidationError('מפתח קשר לא תקין.')
-        model={'country':Country,'sea':Sea,'photographer_fk':Photographer}[field]
-        obj=unique(model,name=value)
+        if field=='photographer':
+            # a trip's photographer is a user account, identified by username (users are
+            # transferred first, through the users table -- see account_transfer)
+            obj=unique(get_user_model(),username=value)
+        else:
+            obj=unique({'country':Country,'sea':Sea}[field],name=value)
     if obj is None: raise ValidationError(f'חסר ערך מקושר ({field}: {value}). יש להעביר קודם את טבלת העזר שלו.')
     return obj
 
@@ -127,7 +131,7 @@ def plan(document):
         if not isinstance(incoming,dict) or set(incoming)!=set(fields): raise ValidationError(f'שדות לא תואמים בשורה {number}; יש לעדכן את הקוד בשתי הסביבות.')
         values={}
         for f,v in incoming.items():
-            if f in ('country','sea','region','site','photographer_fk'): values[f]=related(f,v,required=not (model is DiveTrip))
+            if f in ('country','sea','region','site') or (model is DiveTrip and f=='photographer'): values[f]=related(f,v,required=not (model is DiveTrip))
             elif model is SpeciesArea and f in ('species','defining_sample'):
                 # Same name collision as in row() above -- only SpeciesArea's own 'species'
                 # and 'defining_sample' fields are references; Species.species (the

@@ -100,14 +100,18 @@ class DiveTripTests(TestCase):
         self.assertEqual(self.trip.display_species_count,1)
 
     def test_catalog_trip_membership_and_credit(self):
-        self.trip.photographer='Trip photographer';self.trip.save()
+        trip_photographer=User.objects.create_user('trip.photographer',first_name='Trip',last_name='Photographer')
+        self.trip.photographer=trip_photographer;self.trip.save()
         collection=self.collection();collection.save_reviewed(actor=self.user,approve=True)
         sample=Sample(owner=self.user,species=self.species,trip=self.trip,video_url='https://youtu.be/zyxwvutsrqp')
         sample.save_reviewed()
         data=json.loads(self.client.get('/catalog.js').content.decode().split('=',1)[1].strip().removesuffix(';'))
         self.assertEqual(data['species'][0]['samples'][0]['trip_id'],data['collections'][0]['trip_id'])
-        self.assertEqual(data['species'][0]['samples'][0]['photographer'],'Trip photographer')
-        sample.trip=None;self.user.first_name='Dana';self.user.save()
+        self.assertEqual(data['species'][0]['samples'][0]['photographer'],'Trip Photographer')
+        # a sample whose trip has no photographer is credited to its own owner
+        self.trip.photographer=None;self.trip.save()
+        sample=Sample.objects.get(pk=sample.pk)
+        self.user.first_name='Dana';self.user.save()
         self.assertEqual(sample.photographer_name,'Dana')
 
     def test_profile_form_saves_hebrew_first_and_last_name(self):
@@ -148,26 +152,34 @@ class DiveTripTests(TestCase):
         self.assertContains(self.client.get('/'),'>יציאה<')
         self.assertContains(self.client.get('/?lang=en'),'>Logout<')
 
-    def test_photographer_credit_resolves_registered_user_by_language(self):
-        # DiveTrip.photographer is free text (an admin can credit a guest photographer
-        # with no account here) -- but when it matches a registered user's full name,
-        # the credit should resolve through that user's profile the same way the nav
-        # greeting does, so it too has an English form.
+    def test_photographer_credit_resolves_the_trip_photographer_by_language(self):
+        # The trip's photographer is a user account -- the credit reads in the page's
+        # language through that user's profile, the same way the nav greeting does.
         from .models import Profile
-        self.user.first_name='בעז';self.user.last_name='ליבס';self.user.save()
-        Profile.objects.create(user=self.user,first_name_en='Boaz',last_name_en='Liebes')
-        self.trip.photographer='בעז ליבס';self.trip.save()
+        photographer=User.objects.create_user('boaz',first_name='בעז',last_name='ליבס')
+        Profile.objects.create(user=photographer,first_name_en='Boaz',last_name_en='Liebes')
+        self.trip.photographer=photographer;self.trip.save()
         sample=Sample(owner=self.user,species=self.species,trip=self.trip,video_url='https://youtu.be/zyxwvutsrqp')
+        self.assertEqual(sample.photographer_user,photographer)
         self.assertEqual(sample.photographer_display_name('he'),'בעז ליבס')
         self.assertEqual(sample.photographer_display_name('en'),'Boaz Liebes')
 
-    def test_photographer_credit_leaves_unregistered_name_unchanged(self):
-        # A guest photographer with no account has no profile to resolve against, so
-        # the free text is shown as-is regardless of language.
-        self.trip.photographer='Bart Adams';self.trip.save()
+    def test_photographer_credit_falls_back_to_the_owner_when_the_trip_has_none(self):
+        from .models import Profile
+        self.user.first_name='דנה';self.user.last_name='כהן';self.user.save()
+        Profile.objects.create(user=self.user,first_name_en='Dana',last_name_en='Cohen')
+        self.assertIsNone(self.trip.photographer)
         sample=Sample(owner=self.user,species=self.species,trip=self.trip,video_url='https://youtu.be/zyxwvutsrqp')
-        self.assertEqual(sample.photographer_display_name('he'),'Bart Adams')
-        self.assertEqual(sample.photographer_display_name('en'),'Bart Adams')
+        self.assertEqual(sample.photographer_user,self.user)
+        self.assertEqual(sample.photographer_display_name('he'),'דנה כהן')
+        self.assertEqual(sample.photographer_display_name('en'),'Dana Cohen')
+
+    def test_guest_photographer_is_an_inactive_user_and_cannot_log_in(self):
+        guest=User.objects.create_user('bart.adams',first_name='בארט',last_name='אדמס',is_active=False)
+        self.trip.photographer=guest;self.trip.save()
+        sample=Sample(owner=self.user,species=self.species,trip=self.trip,video_url='https://youtu.be/zyxwvutsrqp')
+        self.assertEqual(sample.photographer_name,'בארט אדמס')
+        self.assertFalse(self.client.login(username='bart.adams',password='anything'))
 
     def test_profile_english_names_and_phone_are_saved(self):
         from .models import Profile

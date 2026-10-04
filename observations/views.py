@@ -1,5 +1,5 @@
 from django.contrib import messages
-from django.contrib.auth import login
+from django.contrib.auth import get_user_model, login
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group
@@ -9,7 +9,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
-from .models import Sample, Profile, Region, Site, DiveTrip, SiteImage, Species, Country, SpeciesArea, SampleKind, KIND_EN_NAMES, TaxonGenus
+from .models import Sample, Profile, Region, Site, DiveTrip, SiteImage, Species, Country, SpeciesArea, SampleKind, KIND_EN_NAMES, TaxonGenus, full_name_for
 from .forms import SignupForm, SampleForm, ProfileForm, DiveTripForm
 from .notifications import notify_new_user_registered
 from .gallery_data import TaxonResolver, taxon_media
@@ -24,7 +24,7 @@ def trips(request):
     published = Sample.objects.filter(status='published', deleted_at__isnull=True, trip__isnull=False,
         trip__country__isnull=False, trip__region__isnull=False, trip__year__isnull=False,
         species_other='', site_other='').filter(Q(kind='collection', species__isnull=True) | Q(kind='species',species__isnull=False)).select_related('species','trip')
-    rows = DiveTrip.objects.filter(samples__in=published).distinct().prefetch_related(Prefetch('samples',queryset=published,to_attr='public_samples'))
+    rows = DiveTrip.objects.filter(samples__in=published).distinct().select_related('photographer','photographer__profile').prefetch_related(Prefetch('samples',queryset=published,to_attr='public_samples'))
     return render(request, 'observations/trips.html', {'trips':rows})
 
 
@@ -43,7 +43,7 @@ def species_page(request, slug):
         kind=Sample.Kind.SPECIES, species_id=area.species_id, status='published', deleted_at__isnull=True,
         trip__country_id=area.country_id, trip__region__sea_id=area.sea_id, trip__year__isnull=False,
         species_other='', site_other='', undetermined_variant=area.undetermined_variant,
-    ).select_related('trip', 'trip__region', 'site', 'owner', 'owner__profile').order_by('created_at', 'pk'))
+    ).select_related('trip', 'trip__region', 'site', 'owner', 'owner__profile', 'trip__photographer', 'trip__photographer__profile').order_by('created_at', 'pk'))
     if not samples:
         raise Http404
     order_obj, family_obj, genus_obj = TaxonResolver().resolve(area.species)
@@ -182,7 +182,7 @@ def listing(request):
 
     manager = is_manager(request.user)
     visible = Sample.objects.all() if manager else Sample.objects.filter(deleted_at__isnull=True, owner=request.user)
-    rows = visible.select_related('species', 'trip', 'trip__country', 'trip__region', 'site', 'owner')
+    rows = visible.select_related('species', 'trip', 'trip__country', 'trip__region', 'site', 'owner', 'owner__profile', 'trip__photographer', 'trip__photographer__profile')
     if request.GET.get('mine') and request.user.is_authenticated:
         rows = rows.filter(owner=request.user)
     get = request.GET
@@ -222,7 +222,14 @@ def listing(request):
                             Q(species__genus='', species__scientific_name__istartswith=get['genus']) |
                             Q(kind=Sample.Kind.GENUS, species_other__icontains=get['genus']))
     if get.get('photographer'):
-        rows = rows.filter(trip__photographer__icontains=get['photographer'])
+        # The credited photographer is a user: the trip's photographer, or -- on a trip with
+        # none -- the observation's own owner (see Sample.photographer_user). Match the typed
+        # text against those users' Hebrew name, English name or username.
+        term = get['photographer'].strip().casefold()
+        matching = [u.pk for u in get_user_model().objects.select_related('profile')
+                    if term in full_name_for(u, 'he').casefold() or term in full_name_for(u, 'en').casefold()
+                    or term in u.get_username().casefold()]
+        rows = rows.filter(Q(trip__photographer__in=matching) | Q(trip__photographer__isnull=True, owner__in=matching))
     if manager and get.get('owner'):
         rows = rows.filter(owner__username__icontains=get['owner'])
     sort = get.get('sort') if get.get('sort') in SORT_OPTIONS else 'species'
@@ -234,6 +241,12 @@ def listing(request):
         # SELECT DISTINCT columns (needed to support the implicit ORDER BY), which
         # defeats distinct() and produces duplicate option values in the dropdowns.
         return sorted(v for v in visible.filter(**extra).exclude(**{field: ''}).order_by().values_list(field, flat=True).distinct() if v)
+
+    def photographer_options(page_lang):
+        credited = set(visible.filter(trip__photographer__isnull=False).order_by().values_list('trip__photographer', flat=True))
+        credited |= set(visible.filter(trip__photographer__isnull=True).order_by().values_list('owner', flat=True))
+        users = get_user_model().objects.select_related('profile').filter(pk__in=credited)
+        return sorted({name for name in (full_name_for(u, page_lang) for u in users) if name})
 
     present_kinds = set(visible.order_by().values_list('kind', flat=True).distinct())
     present_statuses = set(visible.order_by().values_list('status', flat=True).distinct())
@@ -271,7 +284,7 @@ def listing(request):
         'orders': options('species__order'),
         'families': options('species__family'),
         'genera': options('species__genus'),
-        'photographers': options('trip__photographer'),
+        'photographers': photographer_options(lang),
     }
     if manager:
         context['owners'] = list(get_user_model().objects.filter(observations__in=visible).distinct().order_by('username').values_list('username', flat=True))

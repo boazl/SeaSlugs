@@ -82,18 +82,6 @@ class Site(Named):
     class Meta(Named.Meta): verbose_name = 'אתר צלילה'; verbose_name_plural = 'אתרי צלילה'
 
 
-# Lookup table for DiveTrip.photographer_fk -- so a photographer can be picked from a
-# dropdown "just like country", instead of retyped as free text every time.
-# DiveTrip.photographer stays around as a free-text field for the raw value as originally
-# recorded / a one-off note, exactly like country_name/region_name do alongside
-# country/region. A guest photographer with no user account here is added straight into
-# this table via the admin's own "+" popup, same as adding a new region.
-# (There is no separate Reserve table: DiveTrip.site below reuses the existing Site table,
-# which already has the full country/region/sea hierarchy a reserve needs.)
-class Photographer(Named):
-    class Meta(Named.Meta): verbose_name = 'צלם'; verbose_name_plural = 'צלמים'
-
-
 class Species(models.Model):
     scientific_name = models.CharField('שם מדעי', max_length=200, db_index=True)
     name_he = models.CharField('שם בעברית', max_length=200, blank=True)
@@ -343,6 +331,28 @@ def full_name_for(user, lang):
     return (en_full or he_full) if lang == 'en' else (he_full or en_full)
 
 
+def user_for_name(raw_name, users=None):
+    """The registered user whose Hebrew full name, English (Profile) full name or username
+    equals raw_name (case-insensitive), or None when nobody -- or more than one person --
+    matches. For importers that meet a photographer as plain text."""
+    wanted = ' '.join((raw_name or '').split()).casefold()
+    if not wanted: return None
+    if users is None:
+        from django.contrib.auth import get_user_model
+        users = get_user_model().objects.select_related('profile')
+    found = [u for u in users if wanted in {' '.join(full_name_for(u, 'he').split()).casefold(),
+                                            ' '.join(full_name_for(u, 'en').split()).casefold(), u.get_username().casefold()}]
+    return found[0] if len(found) == 1 else None
+
+
+def user_choice_label(user):
+    """How a user is shown in a dropdown (e.g. choosing a trip's photographer): Hebrew
+    name, with the English one beside it when it differs, else the username."""
+    he, en = full_name_for(user, 'he'), full_name_for(user, 'en')
+    if he and en and he != en: return f'{he} ({en})'
+    return he or user.get_username()
+
+
 class DiveTrip(models.Model):
     class Kind(models.TextChoices):
         DIVE = 'dive', 'מסע צלילה'
@@ -368,8 +378,11 @@ class DiveTrip(models.Model):
     # instead of a separate Reserve lookup table. The admin's cascading filter only lets you
     # pick a site that belongs to the trip's own region -- see divetrip_admin.js.
     site = models.ForeignKey(Site, null=True, blank=True, on_delete=models.PROTECT, verbose_name='שמורה / אתר', related_name='dive_trips')
-    photographer = models.CharField('צלם (טקסט חופשי)', max_length=180, blank=True)
-    photographer_fk = models.ForeignKey(Photographer, null=True, blank=True, on_delete=models.PROTECT, verbose_name='צלם', related_name='dive_trips')
+    # The photographer credited for the whole trip is a real user account (a guest photographer
+    # with no login is simply an inactive user -- same as the Users table already holds for
+    # every other contributor), so there is a single place a person's name lives: the user and
+    # its Profile. Left empty, the credit falls back to each observation's own owner.
+    photographer = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, verbose_name='צלם', related_name='photographed_trips')
     species_count = models.PositiveIntegerField('מספר מינים שנצפו במסע', null=True, blank=True, help_text='מספר מדווח לכל המסע; אינו מספר הסרטונים באתר. השאר ריק אם אינו ידוע.')
     source_metadata = models.JSONField(default=dict, blank=True)
     description_he = models.TextField('תיאור בעברית', blank=True)
@@ -384,6 +397,10 @@ class DiveTrip(models.Model):
         verbose_name_plural = 'מסעות צלילה'
 
     def __str__(self): return f'{self.title} [{self.code}]'
+
+    @property
+    def photographer_label(self):
+        return full_name_for(self.photographer, 'he') if self.photographer_id else ''
 
     @property
     def display_species_count(self):
@@ -442,33 +459,6 @@ KIND_EN_NAMES = {
     'order': 'Order',
 }
 
-
-def _resolve_registered_photographer(raw_name, lang, users=None):
-    """DiveTrip.photographer is free text (an admin can credit anyone, including a
-    guest photographer with no account here), so it has no language dimension of its
-    own. When that text happens to match a registered user -- by full name (Hebrew or
-    English) or username -- resolve it through that user's profile for a language-aware
-    name instead, via full_name_for. Text that matches no one (e.g. a guest
-    photographer) is returned unchanged, since there is nothing to translate it against.
-
-    `users` lets a caller that resolves many samples at once (e.g. the gallery's
-    catalog.js builder in config/views.py) pass in one pre-fetched, select_related('profile')
-    list instead of this function re-querying every registered user on every single call."""
-    raw_name = raw_name.strip()
-    if not raw_name:
-        return None
-    if users is None:
-        from django.contrib.auth import get_user_model
-        users = get_user_model().objects.select_related('profile').all()
-    for user in users:
-        profile = getattr(user, 'profile', None)
-        candidates = {user.get_full_name().strip(), user.username.strip()}
-        if profile:
-            candidates.add(f'{profile.first_name_en} {profile.last_name_en}'.strip())
-        candidates.discard('')
-        if raw_name in candidates:
-            return full_name_for(user, lang)
-    return None
 
 
 class Sample(models.Model):
@@ -529,24 +519,22 @@ class Sample(models.Model):
         verbose_name = 'דגימה / תצפית'; verbose_name_plural = 'Samples — דגימות ותצפיות'
     def __str__(self): return f'{self.title if self.kind == self.Kind.COLLECTION else self.species or self.species_other} · {self.trip.year if self.trip_id and self.trip.year else ""}'
     @property
+    def photographer_user(self):
+        """The user credited for this observation: the trip's photographer when the trip
+        has one, otherwise the observation's own owner."""
+        if self.trip_id and self.trip.photographer_id:
+            return self.trip.photographer
+        return self.owner
+    @property
     def photographer_name(self):
-        if self.trip_id and self.trip.photographer.strip():
-            return self.trip.photographer.strip()
-        return self.owner.get_full_name().strip() or 'שם הצלם לא צוין'
+        return full_name_for(self.photographer_user, 'he') or 'שם הצלם לא צוין'
     def photographer_display_name(self, lang='he', registered_users=None):
         """Language-aware version of photographer_name (see seaslugs_i18n.photographer_name,
-        the template filter that calls this): when the credited photographer -- from the
-        trip's free-text field, or the observation owner's own profile as a fallback --
-        matches a registered user, prefer that user's English name in English mode, the
-        same way the nav greeting does. Free text matching no registered user (a guest
-        photographer with no account) is shown as-is in every language.
-
-        `registered_users` is passed straight through to _resolve_registered_photographer
-        for a caller resolving many samples at once -- see that function's docstring."""
-        if self.trip_id and self.trip.photographer.strip():
-            raw = self.trip.photographer.strip()
-            return _resolve_registered_photographer(raw, lang, users=registered_users) or raw
-        return full_name_for(self.owner, lang) or 'שם הצלם לא צוין'
+        the template filter that calls this): the credited user's full name in the page's
+        language, preferring the Profile's English name in English mode -- the same way the
+        nav greeting does (see full_name_for). `registered_users` is accepted only so older
+        callers keep working; the credit is now read straight off the user."""
+        return full_name_for(self.photographer_user, lang) or 'שם הצלם לא צוין'
     @property
     def thumbnail(self):
         return self.image.url if self.image else (f'https://i.ytimg.com/vi/{youtube_id(self.video_url)}/hqdefault.jpg' if self.video_url else '')
