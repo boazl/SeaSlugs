@@ -60,6 +60,7 @@ def species_page(request, slug):
     # (cf./aff./life stage); a plain one would just repeat the h1.
     for s in samples:
         s.show_name = s.taxon_label != species.scientific_name
+        s.name_main, s.name_author, s.name_stage = s.taxon_parts()
     common_name = (species.name_en or species.name_he) if lang == 'en' else (species.name_he or species.name_en)
     description = (species.description_en or species.description_he) if lang == 'en' else (species.description_he or species.description_en)
     return render(request, 'observations/species_page.html', {

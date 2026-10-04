@@ -40,7 +40,7 @@ class GenusPageTests(TestCase):
         self.assertContains(response, '<span class="count-badge" aria-hidden="true">2</span>')
         self.assertContains(response, '<span>2 תצפיות</span>')
 
-    def test_species_page_shows_the_full_name_above_each_observation(self):
+    def test_species_page_shows_the_full_name_on_each_observation_that_differs(self):
         self.species.species = 'annae'; self.species.author = 'Bergh, 1877'; self.species.save()
         cf = Sample(owner=self.owner, trip=self.trip, species=self.species, identification_qualifier='cf.',
                     video_url='https://youtu.be/44444444444')
@@ -64,7 +64,7 @@ class GenusPageTests(TestCase):
         Sample(owner=self.owner, trip=self.trip, species=self.species, identification_qualifier='cf.',
                video_url='https://youtu.be/55555555555').save_reviewed()
         html = self.client.get(f'/species/{self.area.slug}/').content.decode()
-        self.assertIn('<i>Chromodoris</i> cf. <i>annae</i> Bergh, 1877', html)
+        self.assertIn('<i>Chromodoris</i> cf. <i>annae</i> <span class="sample-author">Bergh, 1877</span>', html)
         self.assertEqual(html.count('class="sample-name"'), 1)
         self.assertNotIn('<i>Chromodoris annae</i> Bergh, 1877', html)   # a plain name is not repeated above its photo
 
@@ -72,7 +72,18 @@ class GenusPageTests(TestCase):
         html = self.client.get(f'/species/{self.area.slug}/').content.decode()
         self.assertIn('.species-summary h1 .species-author{font-style:normal;color:inherit}', html)   # base.css paints every h1 span teal
         self.assertIn('font-size:24px', html.split('.species-summary h1{')[1].split('}')[0])
-        self.assertIn('font-size:12px', html.split('.sample-name{')[1].split('}')[0])
+        # `.card h3{font-size:24px}` in styles.css would win over a bare `.sample-name`, so the rule carries the card
+        self.assertIn('font-size:16px', html.split('.card h3.sample-name{')[1].split('}')[0])
+        self.assertIn('font-size:11px', html.split('.card h3.sample-name .sample-author{')[1].split('}')[0])
+
+    def test_observation_name_sits_below_the_photo_with_a_small_author(self):
+        self.species.species = 'annae'; self.species.author = 'Bergh, 1877'; self.species.save()
+        Sample(owner=self.owner, trip=self.trip, species=self.species, identification_qualifier='cf.', life_stage='juv.',
+               video_url='https://youtu.be/66666666666').save_reviewed()
+        html = self.client.get(f'/species/{self.area.slug}/').content.decode()
+        self.assertLess(html.index('<img src', html.index('class="grid"')), html.index('class="sample-name"'))
+        self.assertIn('<h3 class="sample-name" dir="ltr"><i>Chromodoris</i> cf. <i>annae</i> '
+                      '<span class="sample-author">Bergh, 1877</span> juv.</h3>', html)
 
     def test_genus_page_cards_show_the_species_name_in_italics(self):
         self.species.species = 'annae'; self.species.save()

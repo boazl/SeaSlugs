@@ -569,17 +569,20 @@ class Sample(models.Model):
         if self.kind == self.Kind.FAMILY: return self.family
         if self.kind == self.Kind.GENUS: return self.genus
         return str(self.species) if self.species_id else self.species_other
-    def _taxon_text(self, with_author):
+    def taxon_parts(self):
+        """(name, author, life stage) -- the three pieces taxon_full_name joins; the author is
+        only ever non-empty for a catalogued species."""
         if self.kind == self.Kind.SPECIES and self.species_id:
             sp = self.species
             if self.identification_qualifier and sp.genus and sp.species:
                 name = f'{sp.genus} {self.identification_qualifier} {sp.species}'
             else:
                 name = sp.scientific_name
-            parts = [name, (sp.author or '').strip() if with_author else '', self.life_stage]
-        else:
-            parts = [self.taxon_name, self.life_stage if self.kind != self.Kind.COLLECTION else '']
-        return ' '.join(p for p in parts if p)
+            return name, (sp.author or '').strip(), self.life_stage
+        return self.taxon_name, '', self.life_stage if self.kind != self.Kind.COLLECTION else ''
+    def _taxon_text(self, with_author):
+        name, author, stage = self.taxon_parts()
+        return ' '.join(p for p in (name, author if with_author else '', stage) if p)
     @property
     def taxon_full_name(self):
         """Read-only full name for display: genus, the open-nomenclature qualifier, the epithet,
