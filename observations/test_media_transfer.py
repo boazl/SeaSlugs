@@ -49,8 +49,8 @@ class MediaTransferTests(TestCase):
         # self.sample's species ("Test species") has no genus or phylogenetic_order set,
         # so it should sort after any species that does specify them.
         from .image_manager import files
-        zebra=Species.objects.create(scientific_name='Zzz species',genus='Zebra',species='stripey',phylogenetic_order='50')
-        aardvark=Species.objects.create(scientific_name='Aaa species',genus='Aardvark',species='snouty',phylogenetic_order='10')
+        zebra=Species.objects.create(genus='Zebra',species='stripey',phylogenetic_order='50')
+        aardvark=Species.objects.create(genus='Aardvark',species='snouty',phylogenetic_order='10')
         def add_sample(species,filename,color):
             # A distinct color per call -- Sample.clean() now blocks two active samples
             # from sharing the exact same image, and two identically-sized same-color
@@ -64,10 +64,10 @@ class MediaTransferTests(TestCase):
         def names(sort):
             return [row['refs'][0].species.scientific_name for row in files(sort)]
 
-        self.assertEqual(names('alpha'),['Aaa species','Test species','Zzz species'])
-        self.assertEqual(names('taxonomy'),['Aaa species','Zzz species','Test species'])
+        self.assertEqual(names('alpha'),['Aardvark snouty','Test species','Zebra stripey'])
+        self.assertEqual(names('taxonomy'),['Aardvark snouty','Zebra stripey','Test species'])
         # file order (the default) is unaffected -- unrelated to species entirely
-        self.assertEqual(set(names('file')),{'Aaa species','Test species','Zzz species'})
+        self.assertEqual(set(names('file')),{'Aardvark snouty','Test species','Zebra stripey'})
 
     def test_image_manager_sort_view_and_redirect(self):
         self.client.force_login(self.sample.owner)

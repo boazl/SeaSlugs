@@ -43,7 +43,9 @@ class Command(BaseCommand):
             formatted_author = row.get('FormattedAuthor', '')
             if formatted_author:
                 fields['formatted_author'] = formatted_author
-            to_create.append(Species(**fields))
+            species = Species(**fields)
+            species.sync_scientific_name()  # bulk_create bypasses save()
+            to_create.append(species)
         self.stdout.write(f'{len(to_create)} species to add (checklist has {len(data["rows"])} rows).')
         if not options['apply']:
             for item in to_create[:20]:

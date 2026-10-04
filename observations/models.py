@@ -83,7 +83,11 @@ class Site(Named):
 
 
 class Species(models.Model):
-    scientific_name = models.CharField('שם מדעי', max_length=200, db_index=True)
+    # DERIVED -- never typed: always "<genus> <species>" (see sync_scientific_name). genus,
+    # species (the epithet, which may also carry an open-nomenclature qualifier such as
+    # "cf. strigata" or "sp. 7") and author are the authoritative fields. Kept as a stored,
+    # indexed column because it is the natural key for lookups, transfers and filenames.
+    scientific_name = models.CharField('שם מדעי (נגזר מסוג + מין)', max_length=200, db_index=True, editable=False)
     name_he = models.CharField('שם בעברית', max_length=200, blank=True)
     name_en = models.CharField('שם באנגלית', max_length=200, blank=True)
     source_id = models.CharField('מזהה מקור לייבוא', max_length=200, blank=True, editable=False)
@@ -123,6 +127,30 @@ class Species(models.Model):
         ordering = [models.functions.NullIf('phylogenetic_order', models.Value('')).asc(nulls_last=True), 'scientific_name']
         verbose_name = 'מין'; verbose_name_plural = 'מינים'
     def __str__(self): return self.scientific_name
+    def sync_scientific_name(self):
+        """genus + species are authoritative: when both are set the scientific name is exactly
+        "<genus> <species>". Compatibility for callers that only know a full name (importers
+        reading filenames, the species catalog): when genus AND species are both blank they are
+        split out of scientific_name (first word = genus, the rest = species); a name given
+        with only one of the two is kept as typed."""
+        genus, epithet = (self.genus or '').strip(), (self.species or '').strip()
+        name = ' '.join((self.scientific_name or '').split())
+        if not genus and not epithet and name:
+            genus, _, epithet = name.partition(' ')
+        if genus and epithet or not name:
+            name = f'{genus} {epithet}'.strip()
+        self.genus, self.species, self.scientific_name = genus, epithet, name
+    @property
+    def full_name(self):
+        """The scientific name followed by its author and year, e.g.
+        "Chromodoris strigata Rudman, 1982" -- read-only, built from the authoritative fields."""
+        return f'{self.scientific_name} {(self.author or "").strip()}'.strip()
+    def save(self, *args, **kwargs):
+        self.sync_scientific_name()
+        update_fields = kwargs.get('update_fields')
+        if update_fields is not None and ({'genus', 'species'} & set(update_fields)):
+            kwargs['update_fields'] = set(update_fields) | {'scientific_name'}
+        super().save(*args, **kwargs)
     @classmethod
     def find_by_name(cls, text):
         """Match `text` (typed into the observation form, or extracted from a bulk-import
@@ -142,6 +170,7 @@ class Species(models.Model):
         return next((item for item in cls.objects.all() if normalize_sp_spacing(item.scientific_name).casefold() == key), None)
     def clean(self):
         super().clean()
+        self.sync_scientific_name()
         errors = {}
         if self.first_observed_year and self.first_observed_year > date.today().year:
             errors['first_observed_year'] = 'שנת תצפית ראשונה אינה יכולה להיות בעתיד.'

@@ -50,8 +50,29 @@ class DatalistTextInput(forms.TextInput):
         return input_html + f'<datalist id="{list_id}">{options_html}</datalist>'
 
 
+class SpeciesAdminForm(forms.ModelForm):
+    """genus + species are what a species IS (the scientific name is derived from them), so
+    the admin insists on both -- the model itself stays lenient for importers that only know
+    a full name (see Species.sync_scientific_name)."""
+    class Meta:
+        model = Species
+        fields = '__all__'
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['genus'].required = True
+        self.fields['species'].required = True
+        self.fields['genus'].widget = forms.TextInput()
+        self.fields['species'].widget = forms.TextInput()
+        self.fields['species'].help_text = 'אפשר לכלול סימון זהות פתוחה, למשל "cf. strigata" או "sp. 7".'
+
+
 @admin.register(Species)
 class SpeciesAdmin(admin.ModelAdmin):
+    form = SpeciesAdminForm
+    readonly_fields = ['scientific_name', 'full_name_display']
+    @admin.display(description='שם מלא כולל מחבר (נגזר)')
+    def full_name_display(self, obj):
+        return obj.full_name if obj and obj.pk else '—'
     list_display = ['phylogenetic_order','scientific_name','is_migrant','name_he','name_en','genus','species','author','family','order']
     # Migrant status is checked far more often than any other field is edited here, so it's
     # editable straight from the changelist (a checkbox + one "Save" for the whole page) --
@@ -60,7 +81,7 @@ class SpeciesAdmin(admin.ModelAdmin):
     search_fields = ['scientific_name','genus','species','author','family','name_he']
     list_filter = ['order','family','genus','is_migrant']
     fieldsets = [
-        ('זיהוי מדעי', {'fields':['phylogenetic_order','scientific_name','genus','species','author','formatted_author','reference_author','full_species_name_with_order']}),
+        ('זיהוי מדעי', {'fields':['phylogenetic_order','genus','species','author','scientific_name','full_name_display','formatted_author','reference_author','full_species_name_with_order']}),
         ('סיווג טקסונומי', {'fields':['order','superfamily','family','accepted_genus','accepted_species']}),
         ('שמות ותפוצה', {'fields':['name_he','name_en','common_name','transliteration','language','distribution']}),
         ('תוכן לעמוד המין', {'fields':['habitat','food','is_migrant','first_observed_year','last_observed_year','size_from','size_to','size_max','description_he','description_en','link','article_pdf']}),

@@ -116,3 +116,39 @@ class SpeciesAdminMigrantColumnTests(TestCase):
         # ...as is a curated TaxonFamily/TaxonOrder name no species uses yet.
         self.assertIn('<option value="Aeolidiidae">', html)
         self.assertIn('<option value="Cephalaspidea">', html)
+
+
+class SpeciesNameDerivedFromGenusAndSpeciesTests(TestCase):
+    """genus + species (+ author) are authoritative; scientific_name is derived and read-only."""
+
+    def test_scientific_name_is_genus_and_species_and_follows_edits(self):
+        from .models import Species
+        s = Species.objects.create(genus='Chromodoris', species='strigata', author='Rudman, 1982')
+        self.assertEqual(s.scientific_name, 'Chromodoris strigata')
+        self.assertEqual(s.full_name, 'Chromodoris strigata Rudman, 1982')
+        s.species = 'cf. strigata'; s.save(); s.refresh_from_db()
+        self.assertEqual(s.scientific_name, 'Chromodoris cf. strigata')
+        s.genus = 'Goniobranchus'; s.save(update_fields=['genus']); s.refresh_from_db()
+        self.assertEqual(s.scientific_name, 'Goniobranchus cf. strigata')
+
+    def test_genus_and_species_win_over_a_conflicting_scientific_name(self):
+        from .models import Species
+        s = Species.objects.create(scientific_name='Wrong name', genus='Aegires', species='sp. 7')
+        self.assertEqual(s.scientific_name, 'Aegires sp. 7')
+
+    def test_a_name_alone_is_split_into_genus_and_species(self):
+        from .models import Species
+        s = Species.objects.create(scientific_name='Cyerce basi')
+        self.assertEqual((s.genus, s.species), ('Cyerce', 'basi'))
+
+    def test_admin_requires_genus_and_species_and_shows_derived_fields_read_only(self):
+        from django.contrib.auth.models import User
+        from .models import Species
+        s = Species.objects.create(genus='Aegires', species='villosus', author='Farran, 1905')
+        admin_user = User.objects.create_superuser('sp-admin', password='test-password')
+        self.client.force_login(admin_user)
+        page = self.client.get(f'/admin/observations/species/{s.pk}/change/')
+        self.assertContains(page, 'Aegires villosus Farran, 1905')   # read-only full name with author
+        self.assertNotContains(page, 'name="scientific_name"')
+        post = self.client.post(f'/admin/observations/species/{s.pk}/change/', {'genus': '', 'species': '', 'author': 'x'})
+        self.assertContains(post, 'errorlist')
