@@ -119,15 +119,14 @@ class TaxonGenusAdmin(admin.ModelAdmin):
 
 @admin.register(DiveTrip)
 class DiveTripAdmin(admin.ModelAdmin):
-    list_display = ['code','title','kind','year','month','country','region','sea','site','species_count']
+    list_display = ['code','title','kind','year','month','country','region','site','species_count']
     list_filter = ['kind','year','country','region','site']
     search_fields = ['code','title','region_name','reserve','site__name']
     readonly_fields = ['source_metadata']
 
-    # Hides the "sea" field's row while a region is selected (it only matters for a trip
-    # with no region -- see DiveTrip.resolved_sea), and narrows the "region" options to the
-    # selected country/sea and the "site" options to the selected region, fetched from
-    # views.divetrip_locations. See divetrip_admin.js.
+    # Narrows the "region" options to the selected country and the "site" options to the
+    # selected region, fetched from views.divetrip_locations. See divetrip_admin.js. (A trip's
+    # sea is its region's sea -- there is no sea field on the trip.)
     class Media:
         js = ['observations/js/divetrip_admin.js']
 

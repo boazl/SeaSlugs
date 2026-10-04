@@ -36,7 +36,7 @@ class SitemapTests(TestCase):
                           video_url='https://youtu.be/22222222222')
         pending.save()  # plain .save(), not save_reviewed() -- stays pending, no auto-publish
         area = SpeciesArea.objects.create(species=other_species, country=self.trip.country,
-                                           sea=self.trip.resolved_sea, defining_sample=pending)
+                                           sea=self.trip.sea, defining_sample=pending)
         content = self.client.get('/sitemap.xml').content.decode()
         self.assertNotIn(area.slug, content)
 
@@ -49,7 +49,7 @@ class SitemapTests(TestCase):
         other_country = Country.objects.create(name='פיליפינים', name_en='Philippines')
         other_species = Species.objects.create(scientific_name='Drifted species')
         area = SpeciesArea.objects.create(species=other_species, country=other_country,
-                                           sea=self.trip.resolved_sea, defining_sample=None)
+                                           sea=self.trip.sea, defining_sample=None)
         # Give it a defining_sample that's published but belongs to a DIFFERENT country's trip
         # than the area itself claims -- exactly the mismatch that made species_page() 404.
         sample = Sample(owner=self.owner, trip=self.trip, species=other_species,

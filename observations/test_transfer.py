@@ -183,24 +183,25 @@ class TransferTests(TestCase):
         self.assertContains(response,'name="genus"');self.assertContains(response,'name="author"')
         self.assertNotContains(response,'name="source_id"')
 
-    def test_trip_transfer_roundtrips_sea_and_site(self):
-        # sea/site were added after the original trips transfer -- this
-        # covers each one's natural-key shape end to end (export -> plan -> apply).
+    def test_trip_transfer_roundtrips_site_and_has_no_sea_column(self):
+        # a trip's sea is its region's sea, so only the site travels as its own natural key
+        # (export -> plan -> apply).
         country=Country.objects.create(name='Israel');sea=Sea.objects.create(name='Mediterranean')
         region=Region.objects.create(name='Akhziv',country=country,sea=sea)
         site=Site.objects.create(name='Akhziv reef',region=region)
-        trip=DiveTrip.objects.create(title='Sea only',year=2026,country=country,sea=sea,
+        trip=DiveTrip.objects.create(title='With site',year=2026,country=country,region=region,
                                       site=site)
         doc=export_table('trips')
         row=next(r for r in doc['rows'] if r['code']==str(trip.code))
-        self.assertEqual(row['sea'],'Mediterranean')
+        self.assertNotIn('sea',row)
+        self.assertEqual(row['region'],{'name':'Akhziv','country':'Israel'})
         self.assertEqual(row['site'],{'name':'Akhziv reef','region':'Akhziv','country':'Israel'})
         self.assertEqual(plan(doc)[0]['action'],'same')
         # Import into a fresh target: only the reference rows exist, not the trip itself.
         DiveTrip.objects.all().delete()
         planned=[p for p in plan(doc) if p['object'].code==str(trip.code)][0]
         self.assertEqual(planned['action'],'new')
-        self.assertEqual(planned['object'].sea_id,sea.pk)
+        self.assertEqual(planned['object'].sea_id,sea.pk)  # derived from the region
         self.assertEqual(planned['object'].site_id,site.pk)
 
     def test_trip_transfer_requires_site_transferred_first(self):

@@ -151,9 +151,8 @@ class SpeciesAreaTests(TestCase):
 
 
 class DiveTripSeaReserveFieldsTests(TestCase):
-    """DiveTrip.resolved_sea (region.sea wins when there is a region, otherwise the sea
-    picked directly on the trip) and the new site lookup field added
-    alongside the existing free-text reserve field."""
+    """DiveTrip.sea (always the region's sea -- a trip has no sea field of its own) and the
+    site lookup field added alongside the existing free-text reserve field."""
 
     def setUp(self):
         self.user = User.objects.create_superuser('manager', password='test-password')
@@ -163,43 +162,34 @@ class DiveTripSeaReserveFieldsTests(TestCase):
         self.region = Region.objects.create(name='Akhziv', country=self.country, sea=self.med)
         self.species = Species.objects.create(scientific_name='Resolved sea species')
 
-    def test_resolved_sea_prefers_region_sea_over_own_sea_field(self):
-        trip = DiveTrip.objects.create(title='With region', year=2026, country=self.country,
-                                        region=self.region, sea=self.red)
-        self.assertEqual(trip.resolved_sea, self.med)
-        self.assertEqual(trip.resolved_sea_id, self.med.pk)
+    def test_trip_sea_is_its_regions_sea(self):
+        trip = DiveTrip.objects.create(title='With region', year=2026, country=self.country, region=self.region)
+        self.assertEqual(trip.sea, self.med)
+        self.assertEqual(trip.sea_id, self.med.pk)
 
-    def test_resolved_sea_falls_back_to_own_sea_field_without_region(self):
-        trip = DiveTrip.objects.create(title='No region', year=2026, country=self.country, sea=self.red)
-        self.assertEqual(trip.resolved_sea, self.red)
-        self.assertEqual(trip.resolved_sea_id, self.red.pk)
+    def test_trip_has_no_sea_field_of_its_own(self):
+        self.assertNotIn('sea', [f.name for f in DiveTrip._meta.concrete_fields])
+        with self.assertRaises((TypeError, AttributeError)):
+            DiveTrip.objects.create(title='Direct sea', year=2026, country=self.country, sea=self.red)
 
-    def test_resolved_sea_is_none_without_region_or_sea(self):
+    def test_trip_sea_is_none_without_a_region(self):
         trip = DiveTrip.objects.create(title='Neither', year=2026, country=self.country)
-        self.assertIsNone(trip.resolved_sea)
-        self.assertIsNone(trip.resolved_sea_id)
+        self.assertIsNone(trip.sea)
+        self.assertIsNone(trip.sea_id)
 
-    def test_publishing_a_sample_on_a_region_less_trip_still_creates_a_species_area(self):
-        # Before resolved_sea existed, the SpeciesArea side effect in Sample.save_reviewed
-        # was gated on trip.region_id, so a trip with no region (only a directly-chosen sea)
-        # never got its species into the public gallery at all.
-        trip = DiveTrip.objects.create(title='No region', year=2026, country=self.country, sea=self.red)
-        sample = Sample(owner=self.user, species=self.species, trip=trip,
-                         video_url='https://youtu.be/abcdefghijk')
-        sample.save_reviewed()
-        area = SpeciesArea.objects.get(species=self.species, country=self.country, sea=self.red)
-        self.assertEqual(area.defining_sample_id, sample.pk)
+    def test_a_region_less_trip_contributes_no_species_area(self):
+        trip = DiveTrip.objects.create(title='No region', year=2026, country=self.country)
+        Sample(owner=self.user, species=self.species, trip=trip, video_url='https://youtu.be/abcdefghijk').save_reviewed()
+        self.assertFalse(SpeciesArea.objects.filter(species=self.species).exists())
+        self.assertEqual(SpeciesArea.rebuild(), 0)
 
-    def test_rebuild_also_covers_region_less_trips(self):
-        # SpeciesArea.rebuild() regenerates the whole table from scratch (used by an admin
-        # action); it used to only look at samples whose trip had a region.
-        trip = DiveTrip.objects.create(title='No region', year=2026, country=self.country, sea=self.red)
-        sample = Sample(owner=self.user, species=self.species, trip=trip,
-                         video_url='https://youtu.be/abcdefghijk')
+    def test_rebuild_uses_each_trips_region_sea(self):
+        trip = DiveTrip.objects.create(title='With region', year=2026, country=self.country, region=self.region)
+        sample = Sample(owner=self.user, species=self.species, trip=trip, video_url='https://youtu.be/abcdefghijk')
         sample.save_reviewed()
         SpeciesArea.objects.all().delete()
-        SpeciesArea.rebuild()
-        area = SpeciesArea.objects.get(species=self.species, country=self.country, sea=self.red)
+        self.assertEqual(SpeciesArea.rebuild(), 1)
+        area = SpeciesArea.objects.get(species=self.species, country=self.country, sea=self.med)
         self.assertEqual(area.defining_sample_id, sample.pk)
 
     def test_site_lookup_field_is_independent_of_free_text_reserve(self):
@@ -229,29 +219,6 @@ class DiveTripSeaReserveFieldsTests(TestCase):
         self.client.force_login(outsider)
         response = self.client.get('/admin/observations/divetrip-locations/')
         self.assertNotEqual(response.status_code, 200)
-
-    def test_applying_a_samples_transfer_on_a_region_less_trip_still_creates_a_species_area(self):
-        # table_transfer.apply() has its own copy of the SpeciesArea side effect (it applies
-        # with a plain .save(), never save_reviewed()) -- it must also use resolved_sea, or a
-        # trip with no region (only a directly-chosen sea) imported this way would silently
-        # never get its species into the public gallery. The side effect only fires for
-        # new/updated rows (see apply()), so -- like the equivalent pre-existing test for a
-        # trip WITH a region -- this imports a new species observation rather than
-        # re-transferring the unchanged one.
-        trip = DiveTrip.objects.create(title='No region', year=2026, country=self.country, sea=self.red)
-        sample = Sample(owner=self.user, species=self.species, trip=trip,
-                         video_url='https://youtu.be/abcdefghijk')
-        sample.save_reviewed()
-        imported_species = Species.objects.create(scientific_name='Imported region-less species')
-        doc = export_table('samples')
-        row = next(r for r in doc['rows'] if r['status'] == 'published')
-        import uuid
-        doc['rows'] = [dict(row, species=imported_species.scientific_name,
-                             transfer_id=str(uuid.uuid4()), video_url='https://youtu.be/zzzzzzzzzzz')]
-        with patch('observations.table_transfer.create_backup', return_value=Path('test.sqlite3')):
-            apply(doc, fingerprint())
-        area = SpeciesArea.objects.get(species=imported_species, country=self.country, sea=self.red)
-        self.assertEqual(area.defining_sample.species_id, imported_species.pk)
 
 
 class RegionCountryMismatchDataFixTests(TestCase):

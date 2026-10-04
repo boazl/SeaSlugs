@@ -260,12 +260,12 @@ def manager(request):
                         # public gallery, which is driven by SpeciesArea, not Sample directly.
                         if (sample.status==Sample.Status.PUBLISHED and sample.kind==Sample.Kind.SPECIES
                                 and sample.species_id and sample.trip_id
-                                and sample.trip.country_id and sample.trip.resolved_sea_id):
+                                and sample.trip.country_id and sample.trip.sea_id):
                             SpeciesArea.objects.update_or_create(
-                                species_id=sample.species_id,country_id=sample.trip.country_id,sea_id=sample.trip.resolved_sea_id,
+                                species_id=sample.species_id,country_id=sample.trip.country_id,sea_id=sample.trip.sea_id,
                                 undetermined_variant=sample.undetermined_variant,
                                 defaults={'defining_sample':SpeciesArea.pick_defining_sample(
-                                    sample.species_id,sample.trip.country_id,sample.trip.resolved_sea_id,sample.undetermined_variant)},
+                                    sample.species_id,sample.trip.country_id,sample.trip.sea_id,sample.undetermined_variant)},
                             )
                 for old in set(old_names)-set(images):
                     if old and not Sample.objects.filter(image=old).exists():

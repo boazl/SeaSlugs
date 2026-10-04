@@ -25,7 +25,7 @@ TABLES = {'groups': ACCOUNT_TABLES['groups'], 'users': ACCOUNT_TABLES['users'],
           'regions': (Region,['name','name_en','country','sea']), 'sites': (Site,['name','name_en','region']),
           'profiles': ACCOUNT_TABLES['profiles'],
           'species': (Species, ['scientific_name','name_he','name_en','source_id','genus','species','author','order','family','superfamily','accepted_genus','accepted_species','common_name','transliteration','language','formatted_author','distribution','phylogenetic_order','full_species_name_with_order','reference_author','is_migrant','habitat','food','first_observed_year','last_observed_year','size_from','size_to','size_max','description_he','description_en','link']),
-          'trips': (DiveTrip, ['code','title','source_sort','year','month','start_day','duration_days','country','region','sea','site','country_name','region_name','reserve','sea_name','species_count','source_metadata','kind','description_he','description_en','link']),
+          'trips': (DiveTrip, ['code','title','source_sort','year','month','start_day','duration_days','country','region','site','country_name','region_name','reserve','sea_name','species_count','source_metadata','kind','description_he','description_en','link']),
           'samples': (Sample, ['title','kind','trip','owner','species','site','species_other','undetermined_variant','site_other','day','depth','video_url','status','source_id','gallery_order','source_metadata','transfer_id','image']),
           'speciesareas': (SpeciesArea, ['species','country','sea','undetermined_variant','defining_sample'])}
 
@@ -243,11 +243,11 @@ def apply(document, expected, actor=None):
                 sample = item['object']
                 if (sample.status == Sample.Status.PUBLISHED and sample.kind == Sample.Kind.SPECIES
                         and sample.species_id and sample.trip_id
-                        and sample.trip.country_id and sample.trip.resolved_sea_id):
+                        and sample.trip.country_id and sample.trip.sea_id):
                     SpeciesArea.objects.update_or_create(
-                        species_id=sample.species_id, country_id=sample.trip.country_id, sea_id=sample.trip.resolved_sea_id,
+                        species_id=sample.species_id, country_id=sample.trip.country_id, sea_id=sample.trip.sea_id,
                         undetermined_variant=sample.undetermined_variant,
                         defaults={'defining_sample': SpeciesArea.pick_defining_sample(
-                            sample.species_id, sample.trip.country_id, sample.trip.resolved_sea_id, sample.undetermined_variant)},
+                            sample.species_id, sample.trip.country_id, sample.trip.sea_id, sample.undetermined_variant)},
                     )
     return items,backup.name
