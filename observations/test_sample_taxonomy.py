@@ -574,3 +574,49 @@ class Migration0045Tests(TransactionTestCase):
         new = self.migrate(self.after)
         renamed = new.get_model('observations', 'Species').objects.get(pk=wrong.pk)
         self.assertEqual((renamed.species, renamed.scientific_name, renamed.author), ('ocellatus', 'Plakobranchus ocellatus', 'van Hasselt, 1824'))
+
+
+class Migration0046Tests(TransactionTestCase):
+    before = [('observations', '0045_fold_ocellatus_van_into_ocellatus')]
+    after = [('observations', '0046_fold_fiona_pinnata_case_duplicate')]
+
+    def migrate(self, targets):
+        executor = MigrationExecutor(connection)
+        executor.migrate(targets)
+        return executor.loader.project_state(targets).apps
+
+    def tearDown(self):
+        executor = MigrationExecutor(connection)
+        executor.loader.build_graph()
+        executor.migrate(executor.loader.graph.leaf_nodes())
+        super().tearDown()
+
+    def setup_rows(self, with_twin):
+        old = self.migrate(self.before)
+        g = lambda n: old.get_model('observations', n)
+        owner = old.get_model('auth', 'User').objects.create(username='o')
+        trip = g('DiveTrip').objects.create(title='t')
+        country, sea = g('Country').objects.create(name='IL'), g('Sea').objects.create(name='Med')
+        mk = lambda epithet, **kw: g('Species').objects.create(genus='Fiona', species=epithet, scientific_name=f'Fiona {epithet}', **kw)
+        wrong = mk('Pinnata', phylogenetic_order='C5', author='typo author')
+        twin = mk('pinnata', author='(Eschscholtz, 1831)') if with_twin else None
+        sample = g('Sample').objects.create(owner=owner, trip=trip, species=wrong, video_url='https://youtu.be/12345678902')
+        area = g('SpeciesArea').objects.create(species=wrong, country=country, sea=sea, defining_sample=sample, slug='fiona-slug')
+        return wrong, twin, sample, area
+
+    def test_case_duplicate_is_folded_into_the_proper_species(self):
+        wrong, twin, sample, area = self.setup_rows(True)
+        new = self.migrate(self.after)
+        Sp, S, A = (new.get_model('observations', n) for n in ('Species', 'Sample', 'SpeciesArea'))
+        self.assertFalse(Sp.objects.filter(pk=wrong.pk).exists())
+        merged = Sp.objects.get(pk=twin.pk)
+        self.assertEqual((merged.author, merged.phylogenetic_order), ('(Eschscholtz, 1831)', 'C5'))   # own author kept, gap filled
+        self.assertEqual(S.objects.get(pk=sample.pk).species_id, twin.pk)
+        moved = A.objects.get(pk=area.pk)
+        self.assertEqual((moved.species_id, moved.slug), (twin.pk, 'fiona-slug'))
+
+    def test_without_a_proper_twin_the_row_is_renamed(self):
+        wrong, _, _, _ = self.setup_rows(False)
+        new = self.migrate(self.after)
+        renamed = new.get_model('observations', 'Species').objects.get(pk=wrong.pk)
+        self.assertEqual((renamed.species, renamed.scientific_name), ('pinnata', 'Fiona pinnata'))
