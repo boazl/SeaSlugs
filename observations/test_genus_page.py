@@ -89,6 +89,14 @@ class GenusPageTests(TestCase):
         self.species.species = 'annae'; self.species.save()
         self.assertContains(self.client.get(f'/genus/{self.genus.name}/'), '<i>Chromodoris annae</i>')
 
+    def test_genus_page_cards_put_the_author_in_a_small_span_after_the_name(self):
+        self.species.species = 'annae'; self.species.author = 'Bergh, 1877'; self.species.save()
+        html = self.client.get(f'/genus/{self.genus.name}/').content.decode()
+        self.assertIn('<i>Chromodoris annae</i> <span class="card-author">Bergh, 1877</span></h3>', html)   # styled block by styles.css
+        self.species.author = ''; self.species.save()
+        html = self.client.get(f'/genus/{self.genus.name}/').content.decode()
+        self.assertNotIn('card-author', html)
+
     def test_genus_page_404s_without_a_defining_sample(self):
         self.genus_sample.soft_delete(self.owner)  # only genus-kind sample -- see Sample.save
         self.genus.refresh_from_db()
