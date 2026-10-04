@@ -1,3 +1,11 @@
+<style>
+/* The read-only full scientific name: a disabled input is dimmed by the browser, which made it
+   unreadable on the dark backgrounds -- light blue text instead. The admin's light theme is the
+   only place a dark blue is needed (the public site is always dark). */
+#id_full_name{color:#8fd3ff;-webkit-text-fill-color:#8fd3ff;opacity:1;font-weight:600}
+html[data-theme="light"] body.change-form #id_full_name{color:#0b5fa5;-webkit-text-fill-color:#0b5fa5}
+@media (prefers-color-scheme:light){html:not([data-theme="dark"]) body.change-form #id_full_name{color:#0b5fa5;-webkit-text-fill-color:#0b5fa5}}
+</style>
 <datalist id="species-options">{% for s in species_options %}<option value="{{ s }}">{% endfor %}</datalist>
 <datalist id="order-options"></datalist><datalist id="family-options"></datalist><datalist id="genus-options"></datalist>
 {{ taxonomy|json_script:'taxonomy' }}<script>

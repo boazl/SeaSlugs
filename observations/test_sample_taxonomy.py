@@ -467,3 +467,65 @@ class ReferenceTableTests(TaxonomyBase):
         self.assertEqual(plan(doc)[0]['action'], 'same')
         IdentificationQualifier.objects.filter(code='cf.').delete()      # target environment without the table row
         with self.assertRaises(ValidationError): plan(doc)
+
+
+class FullNameColourTests(TaxonomyBase):
+    def test_full_name_is_light_blue_on_the_public_form_and_the_admin(self):
+        self.client.force_login(User.objects.create_superuser('boss4', password='pw-for-tests-6'))
+        s = self.sample(species=self.species); s.save()
+        for url in ('/observations/new/', f'/admin/observations/sample/{s.pk}/change/'):
+            html = self.client.get(url).content.decode()
+            self.assertIn('#id_full_name{color:#8fd3ff;-webkit-text-fill-color:#8fd3ff', html, url)
+
+
+class Migration0044Tests(TransactionTestCase):
+    before = [('observations', '0043_seed_qualifier_and_life_stage')]
+    after = [('observations', '0044_fold_cf_species_into_catalog_species')]
+
+    def migrate(self, targets):
+        executor = MigrationExecutor(connection)
+        executor.migrate(targets)
+        return executor.loader.project_state(targets).apps
+
+    def tearDown(self):
+        executor = MigrationExecutor(connection)
+        executor.loader.build_graph()
+        executor.migrate(executor.loader.graph.leaf_nodes())
+        super().tearDown()
+
+    def test_cf_species_are_folded_into_the_plain_species(self):
+        old = self.migrate(self.before)
+        g = lambda n: old.get_model('observations', n)
+        owner = old.get_model('auth', 'User').objects.create(username='o')
+        trip = g('DiveTrip').objects.create(title='t')
+        country, sea = g('Country').objects.create(name='PH'), g('Sea').objects.create(name='SCS')
+        mk = lambda genus, epithet, **kw: g('Species').objects.create(genus=genus, species=epithet, scientific_name=f'{genus} {epithet}', **kw)
+        plain = mk('Chromodoris', 'strigata', formatted_author='(Rudman, 1982)', source_id='5YHD6')
+        cf = mk('Chromodoris', 'cf. strigata', phylogenetic_order='313')
+        lone = mk('Elysia', 'aff. pusilla', phylogenetic_order='C16')          # no plain twin
+        keep = mk('Glossodoris', 'cincta')
+        cf_keep = mk('Glossodoris', 'cf. cincta')
+        sample = lambda sp, **kw: g('Sample').objects.create(owner=owner, trip=trip, species=sp, video_url=f'https://youtu.be/{sp.pk:011d}', **kw)
+        s_cf, s_plain, s_lone, s_cf_keep = sample(cf), sample(plain), sample(lone), sample(cf_keep)
+        area = lambda sp, smp, slug: g('SpeciesArea').objects.create(species=sp, country=country, sea=sea, defining_sample=smp, slug=slug)
+        a_plain, a_cf = area(plain, s_plain, 'plain-slug'), area(cf, s_cf, 'cf-slug')
+        a_cf_keep = area(cf_keep, s_cf_keep, 'cincta-cf-slug')                 # twin has no area: the row moves
+
+        new = self.migrate(self.after)
+        Sp, S, A = (new.get_model('observations', n) for n in ('Species', 'Sample', 'SpeciesArea'))
+        self.assertFalse(Sp.objects.filter(species__regex=r'^(cf|aff)\.').exists())
+        self.assertFalse(Sp.objects.filter(pk=cf.pk).exists())
+        self.assertEqual(S.objects.get(pk=s_cf.pk).species_id, plain.pk)
+        self.assertEqual(S.objects.get(pk=s_cf.pk).identification_qualifier, 'cf.')
+        self.assertEqual(S.objects.get(pk=s_plain.pk).identification_qualifier, '')
+        merged = Sp.objects.get(pk=plain.pk)
+        self.assertEqual((merged.phylogenetic_order, merged.source_id), ('313', '5YHD6'))        # gap filled, own data kept
+        self.assertEqual(merged.full_species_name_with_order, '313-Chromodoris strigata (Rudman, 1982)')
+        self.assertEqual(list(A.objects.filter(species_id=plain.pk).values_list('slug', flat=True)), ['plain-slug'])
+        moved = A.objects.get(pk=a_cf_keep.pk)
+        self.assertEqual((moved.species_id, moved.slug), (keep.pk, 'cincta-cf-slug'))
+        self.assertFalse(A.objects.filter(pk=a_cf.pk).exists())
+        renamed = Sp.objects.get(pk=lone.pk)
+        self.assertEqual((renamed.species, renamed.scientific_name), ('pusilla', 'Elysia pusilla'))
+        self.assertEqual(S.objects.get(pk=s_lone.pk).identification_qualifier, 'aff.')
+        self.assertEqual(S.objects.get(pk=s_cf_keep.pk).species_id, keep.pk)
