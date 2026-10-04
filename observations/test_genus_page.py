@@ -74,7 +74,7 @@ class GenusPageTests(TestCase):
         self.assertIn('font-size:24px', html.split('.species-summary h1{')[1].split('}')[0])
         # `.card h3{font-size:24px}` in styles.css would win over a bare `.sample-name`, so the rule carries the card
         self.assertIn('font-size:16px', html.split('.card h3.sample-name{')[1].split('}')[0])
-        self.assertIn('font-size:11px', html.split('.card h3.sample-name .sample-author{')[1].split('}')[0])
+        self.assertIn('display:inline-block;font-size:11px', html.split('.card h3.sample-name .sample-author{')[1].split('}')[0])
 
     def test_observation_name_sits_below_the_photo_with_a_small_author(self):
         self.species.species = 'annae'; self.species.author = 'Bergh, 1877'; self.species.save()

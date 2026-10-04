@@ -698,10 +698,16 @@ function buildSpeciesCard(sp, index) {
     label.textContent = displayCount > 1 && !cardSample
         ? (language === 'he' ? `${displayCount} תצפיות` : `${displayCount} observations`)
         : (language === 'he' ? 'לצפייה' : 'Watch');
-    meta.append(area, label);
+    // Place/year and the photographer share one line ("אנילאו, 2023 · צילום: ..."); the
+    // "watch" / "N observations" label stays on the other side and wraps below if it must.
+    const where = document.createElement('span');
+    where.className = 'card-where';
+    where.append(area);
+    if (credit.textContent) where.append(' · ', credit);
+    meta.append(where, label);
     info.append(h3);
     if (common) info.append(sub);
-    info.append(credit, meta);
+    info.append(meta);
     button.append(wrap, info);
     if (!sp.slug) button.addEventListener('click', () => openSpeciesDialog(sp, button));
     article.append(button);
