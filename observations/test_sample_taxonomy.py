@@ -704,3 +704,29 @@ class Migration0048Tests(TransactionTestCase):
         type(ret).objects.filter(pk=ret.pk).update(author='already there')
         new = self.migrate_after()
         self.assertEqual(new.get_model('observations', 'Species').objects.get(pk=ret.pk).author, 'already there')
+
+
+class Migration0049Tests(TransactionTestCase):
+    before = [('observations', '0048_nakamotoensis_and_reticulatus')]
+    after = [('observations', '0049_species_authors_from_worms_match')]
+
+    def tearDown(self):
+        executor = MigrationExecutor(connection)
+        executor.loader.build_graph()
+        executor.migrate(executor.loader.graph.leaf_nodes())
+        super().tearDown()
+
+    def test_blank_authors_filled_existing_kept_and_unknown_left_alone(self):
+        executor = MigrationExecutor(connection)
+        executor.migrate(self.before)
+        Sp = executor.loader.project_state(self.before).apps.get_model('observations', 'Species')
+        mk = lambda g, e, **kw: Sp.objects.create(genus=g, species=e, scientific_name=f'{g} {e}', **kw)
+        blank, kept = mk('Phyllodesmium', 'crypticum'), mk('Samla', 'bilas', author='mine')
+        no_authority, unknown = mk('Triopa', 'principis-walliae'), mk('Genus', 'unlisted')
+        executor = MigrationExecutor(connection)
+        executor.migrate(self.after)
+        Sp = executor.loader.project_state(self.after).apps.get_model('observations', 'Species')
+        author = lambda s: Sp.objects.get(pk=s.pk).author
+        self.assertEqual(author(blank), 'Rudman, 1981')
+        self.assertEqual(author(kept), 'mine')
+        self.assertEqual((author(no_authority), author(unknown)), ('', ''))
