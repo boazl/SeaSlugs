@@ -392,3 +392,78 @@ class SampleAdminListTests(TaxonomyBase):
         from django.utils.safestring import SafeString
         from .admin import DatalistTextInput
         self.assertIsInstance(DatalistTextInput(['a']).render('x', 'v'), SafeString)
+
+
+class ReferenceTableTests(TaxonomyBase):
+    """cf./aff. and juv. come from admin-editable reference tables, which also transfer."""
+    def test_tables_are_seeded_and_new_values_can_be_added(self):
+        from .models import IdentificationQualifier, LifeStage
+        self.assertEqual(set(IdentificationQualifier.objects.values_list('code', flat=True)), {'cf.', 'aff.'})
+        self.assertEqual(set(LifeStage.objects.values_list('code', flat=True)), {'juv.'})
+        LifeStage.objects.create(code='ad.', name='בוגר', name_en='adult')
+        form = SampleForm()
+        self.assertIn(('ad.', 'ad. — בוגר'), list(form.fields['life_stage'].choices))
+        s = self.sample(species=self.species, life_stage='ad.'); s.full_clean()
+        self.assertEqual(s.taxon_label, 'Chromodoris strigata ad.')
+    def test_a_value_missing_from_the_table_is_rejected(self):
+        for field in ('identification_qualifier', 'life_stage'):
+            with self.assertRaises(ValidationError) as ctx:
+                self.sample(species=self.species, **{field: 'zz.'}).full_clean()
+            self.assertIn(field, ctx.exception.message_dict)
+    def test_selects_offer_the_table_values_and_managers_get_an_add_link(self):
+        form = SampleForm()
+        self.assertEqual([c[0] for c in form.fields['identification_qualifier'].choices], ['', 'aff.', 'cf.'])
+        self.assertNotIn('/admin/', form['life_stage'].as_widget())
+        form.enable_add_links()
+        self.assertIn('/admin/observations/lifestage/add/', form['life_stage'].as_widget())
+        self.assertIn('/admin/observations/identificationqualifier/add/', form['identification_qualifier'].as_widget())
+    def test_public_edit_page_shows_add_links_only_to_staff(self):
+        s = self.sample(species=self.species); s.save()
+        staff = User.objects.create_user('staffer', password='pw-for-tests-4', is_staff=True)
+        s.owner = staff; s.save()
+        self.client.force_login(staff)
+        url = f'/observations/{s.pk}/edit/'
+        self.assertContains(self.client.get(url), '/admin/observations/lifestage/add/')
+        plain = User.objects.create_user('plainuser', password='pw-for-tests-5')
+        s.owner = plain; s.save()
+        self.client.force_login(plain)
+        self.assertNotContains(self.client.get(url), '/admin/observations/lifestage/add/')
+    def test_admin_pages_for_the_tables_and_add_links_on_the_change_form(self):
+        admin = User.objects.create_superuser('boss2', password='pw-for-tests-2'); self.client.force_login(admin)
+        for name in ('identificationqualifier', 'lifestage'):
+            self.assertEqual(self.client.get(f'/admin/observations/{name}/').status_code, 200)
+            self.assertEqual(self.client.get(f'/admin/observations/{name}/add/').status_code, 200)
+        s = self.sample(species=self.species); s.save()
+        response = self.client.get(f'/admin/observations/sample/{s.pk}/change/')
+        self.assertContains(response, '/admin/observations/identificationqualifier/add/')
+    def test_full_name_field_sits_right_after_the_species_field(self):
+        names = list(SampleForm().fields)
+        self.assertEqual(names[names.index('species') + 1], 'full_name')
+        self.assertEqual(SampleForm().fields['full_name'].label, 'השם המדעי המלא (כולל מחבר ותוספות)')
+    def test_reference_tables_are_in_the_table_transfer_list_before_samples(self):
+        keys = list(TABLES)
+        self.assertIn('qualifiers', keys); self.assertIn('lifestages', keys)
+        self.assertLess(keys.index('qualifiers'), keys.index('samples')); self.assertLess(keys.index('lifestages'), keys.index('samples'))
+        admin = User.objects.create_superuser('boss3', password='pw-for-tests-3'); self.client.force_login(admin)
+        response = self.client.get('/admin/table-transfer/')
+        self.assertContains(response, 'qualifiers'); self.assertContains(response, 'lifestages')
+    def test_reference_tables_roundtrip_through_table_transfer(self):
+        from .models import IdentificationQualifier, LifeStage
+        LifeStage.objects.create(code='ad.', name='בוגר', name_en='adult')
+        for table, model in (('qualifiers', IdentificationQualifier), ('lifestages', LifeStage)):
+            doc = json.loads(json.dumps(export_table(table)))
+            self.assertEqual(set(doc['rows'][0]), {'code', 'name', 'name_en'})
+            self.assertEqual({r['action'] for r in plan(doc)}, {'same'})
+            # a new value is created, an edited one updated -- matched by its abbreviation
+            doc['rows'].append({'code': 'sp.', 'name': 'מין לא מזוהה', 'name_en': 'unidentified'})
+            doc['rows'][0]['name_en'] = 'changed'
+            actions = {r['label']: r['action'] for r in plan(doc)}
+            self.assertEqual(list(actions.values()).count('new'), 1); self.assertIn('update', actions.values())
+    def test_samples_carry_the_new_fields_and_need_the_table_values_at_the_target(self):
+        from .models import IdentificationQualifier
+        s = self.sample(species=self.species, identification_qualifier='cf.', life_stage='juv.'); s.save_reviewed(actor=self.user)
+        doc = json.loads(json.dumps(export_table('samples')))
+        self.assertEqual((doc['rows'][0]['identification_qualifier'], doc['rows'][0]['life_stage']), ('cf.', 'juv.'))
+        self.assertEqual(plan(doc)[0]['action'], 'same')
+        IdentificationQualifier.objects.filter(code='cf.').delete()      # target environment without the table row
+        with self.assertRaises(ValidationError): plan(doc)

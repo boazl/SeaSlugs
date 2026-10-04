@@ -2,10 +2,12 @@ from io import BytesIO
 from uuid import uuid4
 from PIL import Image, ImageOps, UnidentifiedImageError
 from django import forms
+from django.urls import reverse
+from django.utils.html import format_html
 from django.core.files.base import ContentFile
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
-from .models import Sample, Profile, Species, Country, Region, Site, DiveTrip, TaxonOrder, TaxonFamily, TaxonGenus, split_undetermined_variant
+from .models import Sample, Profile, Species, Country, Region, Site, DiveTrip, TaxonOrder, TaxonFamily, TaxonGenus, IdentificationQualifier, LifeStage, split_undetermined_variant
 
 
 class SignupForm(UserCreationForm):
@@ -72,6 +74,27 @@ class SampleImageInput(forms.ClearableFileInput):
 
 
 
+class ReferenceSelect(forms.Select):
+    """A <select> whose values come from an admin-editable reference table, with an "add a value"
+    link to that table's admin page when `add_url` is set (managers only)."""
+    add_url = None
+    def render(self, name, value, attrs=None, renderer=None):
+        html = super().render(name, value, attrs, renderer)
+        if self.add_url:
+            html += format_html(' <a href="{}" target="_blank" rel="noopener">+ הוספת ערך חדש לרשימה</a>', self.add_url)
+        return html
+
+
+def reference_choices(model):
+    return [('', 'ללא')] + [(row.code, str(row)) for row in model.objects.all()]
+
+
+def reference_field(model, label, help_text=''):
+    """Choice field over a CodedReference table; the model's `code` is what the sample stores."""
+    return forms.ChoiceField(label=label, required=False, widget=ReferenceSelect, help_text=help_text,
+                             choices=lambda: reference_choices(model))
+
+
 def taxonomy_for_form():
     """The order -> family -> genus chain (from the taxonomy tables) and each catalogued
     species' author, for the cascading taxonomy fields (observation form and Samples admin,
@@ -130,13 +153,17 @@ class SampleForm(forms.ModelForm):
     # depends on the kind (form.html's script enables/disables them live, and
     # Sample.sync_taxonomy() normalises on the server). Each is a text input with a <datalist>
     # that the script narrows by the level above it.
-    full_name = forms.CharField(label='השם המלא (כולל מחבר)', required=False, disabled=True,
-        help_text='מתעדכן אוטומטית לפי הסדרה/המשפחה/הסוג/המין שנבחרו, סימון הזהות ושלב החיים.')
+    full_name = forms.CharField(label='השם המדעי המלא (כולל מחבר ותוספות)', required=False, disabled=True,
+        widget=forms.TextInput(attrs={'size': 60}),
+        help_text='מתעדכן אוטומטית לפי הסדרה/המשפחה/הסוג/המין שנבחרו, סימון הזהות (cf./aff.) ושלב החיים.')
+    identification_qualifier = reference_field(IdentificationQualifier, 'סימון זהות לא ודאית',
+        'cf. = דומה ל…, aff. = קרוב ל… — מוצג בין הסוג למין. רק בדגימה מסוג ״מין״. הערכים נשמרים בטבלת העזר.')
+    life_stage = reference_field(LifeStage, 'שלב חיים', 'למשל juv. = פרט צעיר — מוצג אחרי השם. הערכים נשמרים בטבלת העזר.')
     site = forms.ChoiceField(label='אתר צלילה',required=False)
     trip = TripChoiceField(label='מסע צלילה', queryset=DiveTrip.objects.all(), help_text='לא מוצא/ת את המסע? אפשר להוסיף מסע חדש ולחזור לכאן.')
     class Meta:
         model = Sample
-        fields = ['title','kind','order','family','genus','species','identification_qualifier','life_stage','full_name','species_other','trip','site','site_other','day','depth','video_url','image']
+        fields = ['title','kind','order','family','genus','species','full_name','identification_qualifier','life_stage','species_other','trip','site','site_other','day','depth','video_url','image']
         widgets = {'image': SampleImageInput,
                    'order': forms.TextInput(attrs={'list': 'order-options', 'autocomplete': 'off', 'placeholder': 'הקלידו לחיפוש…'}),
                    'family': forms.TextInput(attrs={'list': 'family-options', 'autocomplete': 'off', 'placeholder': 'הקלידו לחיפוש…'}),
@@ -144,10 +171,6 @@ class SampleForm(forms.ModelForm):
     def __init__(self,*args,**kwargs):
         super().__init__(*args,**kwargs)
         self.fields['kind'].required = False
-        for name in ('identification_qualifier', 'life_stage'):
-            self.fields[name].choices = [('', 'ללא')] + [c for c in self.fields[name].choices if c[0]]
-        self.fields['identification_qualifier'].help_text = 'cf. = דומה ל…, aff. = קרוב ל… — מוצג בין הסוג למין. רק בדגימה מסוג ״מין״.'
-        self.fields['life_stage'].help_text = 'juv. = פרט צעיר — מוצג אחרי השם.'
         self.initial['full_name'] = self.instance.taxon_full_name if self.instance.pk else ''
         self.fields['video_url'].help_text = 'אפשר להשאיר ריק כאשר מעלים תמונה. ניתן להוסיף סרטון בהמשך.'
         if self.instance.pk:
@@ -165,6 +188,11 @@ class SampleForm(forms.ModelForm):
         # now checked live against the current species+trip fields (see form.html and
         # views.species_area_status), since either one changing changes the answer.
         self.fields['image'].help_text = 'JPEG, PNG או WebP, עד 10MB ועד 25 מיליון פיקסלים. מומלץ צילום רוחבי 1920×1080 ומעלה. נשמור JPEG עד 1920×1080, ללא חיתוך או הגדלת תמונה קטנה. תמונה שהועלתה תשמש כתצוגה מקדימה לסרטון; ללא סרטון תיפתח התמונה המלאה. ללא תמונה נשתמש בתצוגה המקדימה של YouTube. העלו רק תמונות שיש לכם הרשאה לפרסם.'
+    def enable_add_links(self):
+        """Show an "add a value" link next to the two reference-table selects (managers only --
+        the tables are edited in the admin)."""
+        for name, model in (('identification_qualifier', 'identificationqualifier'), ('life_stage', 'lifestage')):
+            self.fields[name].widget.add_url = reverse(f'admin:observations_{model}_add')
     def clean(self):
         data = super().clean()
         data['kind'] = data.get('kind') or Sample.Kind.SPECIES
@@ -241,14 +269,16 @@ class SampleChangelistForm(forms.ModelForm):
     column is looked up through genus + epithet exactly like the observation form does; only a
     SPECIES-kind sample has one."""
     species = forms.CharField(label='מין', required=False, widget=forms.TextInput(attrs={'size': 12, 'list': 'sample-species-options', 'autocomplete': 'off'}))
+    identification_qualifier = forms.ChoiceField(label='סימון זהות', required=False,
+        choices=lambda: [('', '—')] + [(r.code, r.code) for r in IdentificationQualifier.objects.all()])
+    life_stage = forms.ChoiceField(label='שלב חיים', required=False,
+        choices=lambda: [('', '—')] + [(r.code, r.code) for r in LifeStage.objects.all()])
     class Meta:
         model = Sample
         fields = ['order', 'family', 'genus', 'species', 'identification_qualifier', 'life_stage']
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if self.instance.pk: self.initial['species'] = species_epithet_with_variant(self.instance)
-        for name in ('identification_qualifier', 'life_stage'):
-            self.fields[name].choices = [('', '—')] + [c for c in self.fields[name].choices if c[0]]
     def clean(self):
         data = super().clean()
         if self.instance.kind != Sample.Kind.SPECIES:

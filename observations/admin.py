@@ -9,7 +9,7 @@ from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django.urls import reverse
 from .forms import SampleForm, SampleChangelistForm, taxonomy_for_form, species_name_options
-from .models import Country, Sea, Region, Site, Species, Profile, Sample, DiveTrip, SiteImage, SpeciesArea, TaxonOrder, TaxonFamily, TaxonGenus, SampleKind
+from .models import Country, Sea, Region, Site, Species, Profile, Sample, DiveTrip, SiteImage, SpeciesArea, TaxonOrder, TaxonFamily, TaxonGenus, SampleKind, IdentificationQualifier, LifeStage
 
 for model in [Country,Sea,Region,Site,Profile,SiteImage,SampleKind]: admin.site.register(model)
 
@@ -109,6 +109,20 @@ class SpeciesAdmin(admin.ModelAdmin):
         elif db_field.name == 'family':
             kwargs['widget'] = DatalistTextInput(datalist_options=self._family_options())
         return super().formfield_for_dbfield(db_field, request, **kwargs)
+
+@admin.register(IdentificationQualifier)
+class IdentificationQualifierAdmin(admin.ModelAdmin):
+    # The values offered by a sample's "סימון זהות לא ודאית" field -- add new ones here.
+    list_display = ['code', 'name', 'name_en']
+    search_fields = ['code', 'name', 'name_en']
+
+
+@admin.register(LifeStage)
+class LifeStageAdmin(admin.ModelAdmin):
+    # The values offered by a sample's "שלב חיים" field -- add new ones here.
+    list_display = ['code', 'name', 'name_en']
+    search_fields = ['code', 'name', 'name_en']
+
 
 @admin.register(TaxonOrder)
 class TaxonOrderAdmin(admin.ModelAdmin):
@@ -248,6 +262,13 @@ class SampleAdmin(admin.ModelAdmin):
             'species':sorted(set(Species.objects.exclude(species='').values_list('species',flat=True))),
         }
         return super().changelist_view(request,extra_context)
+    def get_form(self,request,obj=None,change=False,**kwargs):
+        form=super().get_form(request,obj,change=change,**kwargs)
+        class AdminSampleForm(form):
+            def __init__(self,*args,**kw):
+                super().__init__(*args,**kw)
+                self.enable_add_links()
+        return AdminSampleForm
     def render_change_form(self,request,context,*args,**kwargs):
         # The same cascading order -> family -> genus -> species fields as the observation form
         # (templates/observations/_taxonomy_cascade.html, included by this model's change_form).

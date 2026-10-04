@@ -403,6 +403,7 @@ def edit(request,pk=None):
     else:
         next_url=reverse('observations')
     form=SampleForm(request.POST or None,request.FILES or None,instance=item,initial=initial)
+    if request.user.is_staff: form.enable_add_links()
     if request.method=='POST' and form.is_valid():
         item=form.save(commit=False)
         def canonical_image_write(source_sample, target_sample=None):

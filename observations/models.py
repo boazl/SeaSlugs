@@ -442,6 +442,32 @@ class SampleKind(Named):
         verbose_name_plural = 'סוגי דגימה'
 
 
+class CodedReference(Named):
+    """Reference table of short abbreviations used on samples: `code` is the abbreviation as
+    shown after/within the name ("cf.", "juv."), `name`/`name_en` explain it. Admin-editable, so
+    new values are added there."""
+    code = models.CharField('קיצור', max_length=8, unique=True)
+    class Meta(Named.Meta):
+        abstract = True
+        ordering = ['code']
+    def __str__(self): return f'{self.code} — {self.name}' if self.name else self.code
+
+
+class IdentificationQualifier(CodedReference):
+    """Open-nomenclature qualifiers for an observation's identification: cf. ("compare with"),
+    aff. ("close to")... shown between the genus and the species. See Sample.identification_qualifier."""
+    class Meta(CodedReference.Meta):
+        verbose_name = 'סימון זהות לא ודאית'
+        verbose_name_plural = 'סימוני זהות לא ודאית (cf., aff.)'
+
+
+class LifeStage(CodedReference):
+    """Life stage of the observed animal: juv. (juvenile)... shown after the name. See Sample.life_stage."""
+    class Meta(CodedReference.Meta):
+        verbose_name = 'שלב חיים'
+        verbose_name_plural = 'שלבי חיים (juv.)'
+
+
 # English fallback labels for Sample.Kind, used both to seed/refresh SampleKind (the
 # admin-editable bilingual reference table -- see build_taxonomy_tables) and, in views.py,
 # as a fallback for the observations listing's English mode when that table is empty
@@ -483,16 +509,15 @@ class Sample(models.Model):
     family = models.CharField('משפחה', max_length=150, blank=True)
     genus = models.CharField('סוג', max_length=150, blank=True)
     species = models.ForeignKey(Species, null=True, blank=True, on_delete=models.PROTECT, verbose_name='מין')
-    class Qualifier(models.TextChoices):
-        CF = 'cf.', 'cf. — דומה ל…'
-        AFF = 'aff.', 'aff. — קרוב ל…'
-    class LifeStage(models.TextChoices):
-        JUVENILE = 'juv.', 'juv. — צעיר'
     # Open-nomenclature qualifier shown between genus and species ("Genus cf. species") and a
     # life-stage note shown after the name ("Genus species juv.") -- facts about THIS
-    # observation, so they live on the sample rather than on the catalog species.
-    identification_qualifier = models.CharField('סימון זהות לא ודאית', max_length=8, blank=True, choices=Qualifier.choices)
-    life_stage = models.CharField('שלב חיים', max_length=8, blank=True, choices=LifeStage.choices)
+    # observation, so they live on the sample rather than on the catalog species. Both hold the
+    # abbreviation (the `code`) of a row of the admin-editable reference tables
+    # IdentificationQualifier / LifeStage -- new values are added there -- and are checked
+    # against them (Sample.sync_taxonomy). Plain strings rather than ForeignKeys for the same
+    # reason as Sample.kind (see SampleKind).
+    identification_qualifier = models.CharField('סימון זהות לא ודאית', max_length=8, blank=True)
+    life_stage = models.CharField('שלב חיים', max_length=8, blank=True)
     site = models.ForeignKey(Site, null=True, blank=True, on_delete=models.PROTECT, verbose_name='אתר צלילה')
     # Only for a SPECIES-kind sample whose species is not (yet) in the species table.
     species_other = models.CharField('מין אחר', max_length=200, blank=True)
@@ -666,6 +691,10 @@ class Sample(models.Model):
                 elif self.order and self.order not in orders and self.kind in (K.FAMILY, K.GENUS):
                     errors['order'] = f'המשפחה {self.family} שייכת לסדרה {" / ".join(sorted(orders))}, לא ל{self.order}.'
         if strict:
+            for field, table in (('identification_qualifier', IdentificationQualifier), ('life_stage', LifeStage)):
+                value = getattr(self, field)
+                if value and not table.objects.filter(code=value).exists():
+                    errors[field] = f'הערך "{value}" אינו קיים בטבלת העזר. אפשר להוסיף אותו שם.'
             if self.kind == K.ORDER and not self.order: errors['order'] = 'יש לבחור סדרה.'
             if self.kind == K.FAMILY and not self.family: errors['family'] = 'יש לבחור משפחה.'
             if self.kind == K.GENUS and not self.genus: errors['genus'] = 'יש לבחור סוג.'
