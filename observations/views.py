@@ -39,7 +39,7 @@ def species_page(request, slug):
     thumbnail, image_url, video_id = taxon_media(area.defining_sample)
     if not (image_url or video_id):
         raise Http404
-    samples = list(area_samples(area).select_related('trip', 'trip__region', 'site', 'owner', 'owner__profile').order_by('created_at', 'pk'))
+    samples = list(area_samples(area).select_related('species', 'trip', 'trip__region', 'site', 'owner', 'owner__profile').order_by('created_at', 'pk'))
     if not samples:
         raise Http404
     order_obj, family_obj, genus_obj = TaxonResolver().resolve(area.species)

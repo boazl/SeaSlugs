@@ -36,6 +36,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
         .species-badges{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
         .badge{display:inline-block;padding:4px 12px;border-radius:20px;background:var(--panel);border:1px solid var(--line);font-size:13px;color:var(--muted)}
         .badge-migrant{color:var(--accent);border-color:var(--accent)}
+        .sample-name{margin:0 0 8px;font-family:Georgia,"Times New Roman",serif;font-weight:400;font-size:17px;line-height:1.35;color:var(--ink);overflow-wrap:anywhere}
         .species-links{display:flex;flex-wrap:wrap;gap:14px}
         .species-links a{color:var(--accent);text-decoration:none;font-size:15px}
         .species-links a:hover{text-decoration:underline}
@@ -107,6 +108,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
             <div class="grid">
                 {% for s in samples %}
                 <article class="card">
+                    <h3 class="sample-name" dir="ltr">{{ s.taxon_full_name }}</h3>
                     <a class="video-button" href="{% if s.video_url %}{{ s.video_url }}{% else %}{% url 'observation-photo' s.pk %}{% endif %}" target="_blank" rel="noopener">
                         <span class="image-wrap"><img src="{% if s.image %}{% url 'observation-photo' s.pk %}{% else %}{{ s.thumbnail }}{% endif %}" alt="" width="640" height="360" loading="lazy"><span class="play" aria-hidden="true">{% if s.video_url %}▶{% else %}⤢{% endif %}</span></span>
                         <span class="card-info">

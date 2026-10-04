@@ -40,6 +40,16 @@ class GenusPageTests(TestCase):
         self.assertContains(response, '<span class="count-badge" aria-hidden="true">2</span>')
         self.assertContains(response, '<span>2 תצפיות</span>')
 
+    def test_species_page_shows_the_full_name_above_each_observation(self):
+        self.species.species = 'annae'; self.species.author = 'Bergh, 1877'; self.species.save()
+        cf = Sample(owner=self.owner, trip=self.trip, species=self.species, identification_qualifier='cf.',
+                    video_url='https://youtu.be/44444444444')
+        cf.save_reviewed()
+        html = self.client.get(f'/species/{self.area.slug}/').content.decode()
+        self.assertEqual(html.count('class="sample-name"'), 2)
+        self.assertIn('>Chromodoris cf. annae', html)       # the qualifier is visible on that observation only
+        self.assertEqual(html.count('Chromodoris cf. annae'), 1)
+
     def test_genus_page_404s_without_a_defining_sample(self):
         self.genus_sample.soft_delete(self.owner)  # only genus-kind sample -- see Sample.save
         self.genus.refresh_from_db()
