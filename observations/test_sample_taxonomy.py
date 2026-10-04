@@ -646,3 +646,61 @@ class Migration0047Tests(TransactionTestCase):
         self.assertEqual(Sp.objects.get(pk=blank.pk).author, 'Baba, 1972')
         self.assertEqual(Sp.objects.get(pk=kept.pk).author, 'my own')
         self.assertEqual(Sp.objects.get(pk=other.pk).author, '')
+
+
+class Migration0048Tests(TransactionTestCase):
+    before = [('observations', '0047_species_authors_from_worms')]
+    after = [('observations', '0048_nakamotoensis_and_reticulatus')]
+
+    def tearDown(self):
+        executor = MigrationExecutor(connection)
+        executor.loader.build_graph()
+        executor.migrate(executor.loader.graph.leaf_nodes())
+        super().tearDown()
+
+    def rows(self, with_new):
+        executor = MigrationExecutor(connection)
+        executor.migrate(self.before)
+        old = executor.loader.project_state(self.before).apps
+        g = lambda n: old.get_model('observations', n)
+        owner = old.get_model('auth', 'User').objects.create(username='o')
+        trip = g('DiveTrip').objects.create(title='t')
+        country, sea = g('Country').objects.create(name='PH'), g('Sea').objects.create(name='SCS')
+        mk = lambda genus, epithet, **kw: g('Species').objects.create(genus=genus, species=epithet, scientific_name=f'{genus} {epithet}', **kw)
+        old_sp = mk('Okenia', 'nakamotoensis', phylogenetic_order='C9')
+        new_sp = mk('Ceratodoris', 'nakamotoensis') if with_new else None
+        ret = mk('Goniobranchus', 'reticulatus')
+        kept = mk('Goniobranchus', 'verrieri', author='mine')
+        sample = g('Sample').objects.create(owner=owner, trip=trip, species=old_sp, video_url='https://youtu.be/12345678903')
+        area = g('SpeciesArea').objects.create(species=old_sp, country=country, sea=sea, defining_sample=sample, slug='okenia-slug')
+        return old_sp, new_sp, ret, sample, area
+
+    def migrate_after(self):
+        executor = MigrationExecutor(connection)
+        executor.migrate(self.after)
+        return executor.loader.project_state(self.after).apps
+
+    def test_old_combination_is_folded_into_the_accepted_name_and_authors_are_set(self):
+        old_sp, new_sp, ret, sample, area = self.rows(True)
+        new = self.migrate_after()
+        Sp, S, A = (new.get_model('observations', n) for n in ('Species', 'Sample', 'SpeciesArea'))
+        self.assertFalse(Sp.objects.filter(pk=old_sp.pk).exists())
+        merged = Sp.objects.get(pk=new_sp.pk)
+        self.assertEqual((merged.author, merged.phylogenetic_order), ('(Hamatani, 2001)', 'C9'))
+        self.assertEqual(S.objects.get(pk=sample.pk).species_id, new_sp.pk)
+        self.assertEqual(A.objects.get(pk=area.pk).species_id, new_sp.pk)
+        self.assertEqual(Sp.objects.get(pk=ret.pk).author, '(Quoy & Gaimard, 1832)')
+        self.assertEqual(Sp.objects.get(genus='Goniobranchus', species='verrieri').author, 'mine')   # existing author kept
+
+    def test_without_an_accepted_row_the_old_one_is_renamed(self):
+        old_sp, _, _, _, _ = self.rows(False)
+        new = self.migrate_after()
+        renamed = new.get_model('observations', 'Species').objects.get(pk=old_sp.pk)
+        self.assertEqual((renamed.genus, renamed.species, renamed.scientific_name, renamed.author),
+                         ('Ceratodoris', 'nakamotoensis', 'Ceratodoris nakamotoensis', '(Hamatani, 2001)'))
+
+    def test_an_existing_reticulatus_author_is_not_overwritten(self):
+        _, _, ret, _, _ = self.rows(True)
+        type(ret).objects.filter(pk=ret.pk).update(author='already there')
+        new = self.migrate_after()
+        self.assertEqual(new.get_model('observations', 'Species').objects.get(pk=ret.pk).author, 'already there')
