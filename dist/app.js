@@ -719,10 +719,17 @@ function buildSpeciesCard(sp, index) {
     if (state.area === 'migrant' && (sp.first_observed_year || sp.last_observed_year)) {
         const years = document.createElement('span');
         years.className = 'card-years';
-        const parts = [];
-        if (sp.first_observed_year) parts.push((language === 'he' ? 'נצפה לראשונה בים התיכון ' : 'First seen in the Mediterranean ') + sp.first_observed_year);
-        if (sp.last_observed_year) parts.push((language === 'he' ? 'נראה לאחרונה ' : 'Last seen ') + sp.last_observed_year);
-        years.textContent = parts.join(' · ');
+        // One row per date, the year in bold; the grid lines the years up one under the other.
+        const addYear = (labelHe, labelEn, year) => {
+            if (!year) return;
+            const label = document.createElement('span');
+            label.textContent = language === 'he' ? labelHe : labelEn;
+            const value = document.createElement('strong');
+            value.textContent = year;
+            years.append(label, ' ', value, ' ');
+        };
+        addYear('נצפה לראשונה בים התיכון', 'First seen in the Mediterranean', sp.first_observed_year);
+        addYear('נראה לאחרונה', 'Last seen', sp.last_observed_year);
         info.append(years);
     }
     info.append(meta);

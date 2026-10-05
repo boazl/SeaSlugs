@@ -79,7 +79,11 @@ class GalleryScriptTests(SimpleTestCase):
         self.assertIn('state.sortChosen = false', js)
         # The years line only appears under the migrant filter.
         self.assertIn("if (state.area === 'migrant' && (sp.first_observed_year || sp.last_observed_year))", js)
-        self.assertIn('נצפה לראשונה בים התיכון ', js)
-        self.assertIn('נראה לאחרונה ', js)
-        self.assertIn('First seen in the Mediterranean ', js)
-        self.assertIn('.card-years{display:block;', css)
+        self.assertIn("'נצפה לראשונה בים התיכון'", js)
+        self.assertIn("'נראה לאחרונה'", js)
+        self.assertIn("'First seen in the Mediterranean'", js)
+        # Each date on its own row, the year bold, the years aligned one under the other.
+        self.assertIn('.card-years{display:grid;grid-template-columns:max-content max-content;', css)
+        self.assertIn('.card-years strong{', css)
+        self.assertIn("document.createElement('strong')", js)
+        self.assertNotIn("parts.join(' · ')", js)
