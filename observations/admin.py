@@ -75,11 +75,11 @@ class SpeciesAdmin(admin.ModelAdmin):
     @admin.display(description='שם מלא כולל מחבר (נגזר)')
     def full_name_display(self, obj):
         return obj.full_name if obj and obj.pk else '—'
-    list_display = ['phylogenetic_order','scientific_name','is_migrant','name_he','name_en','genus','species','author','family','order']
+    list_display = ['phylogenetic_order','scientific_name','is_migrant','name_he','name_en','first_observed_year','last_observed_year','genus','species','author','family','order']
     # Migrant status is checked far more often than any other field is edited here, so it's
     # editable straight from the changelist (a checkbox + one "Save" for the whole page) --
     # no need to open a species' full change form just to flag it as migrant.
-    list_editable = ['is_migrant','name_he','name_en','author','family','order']
+    list_editable = ['is_migrant','name_he','name_en','first_observed_year','last_observed_year','author','family','order']
     search_fields = ['scientific_name','genus','species','author','family','name_he']
     list_filter = ['order','family','genus','is_migrant']
     fieldsets = [
@@ -96,6 +96,17 @@ class SpeciesAdmin(admin.ModelAdmin):
         canonical = TaxonFamily.objects.exclude(name='').values_list('name', flat=True)
         existing = Species.objects.exclude(family='').values_list('family', flat=True)
         return sorted(set(canonical) | set(existing))
+    # Compact inputs for the changelist only (the full change form keeps its normal width):
+    # the Hebrew/English names were taking far more of the row than they need, and the two
+    # observed-year columns only ever hold four digits.
+    changelist_input_widths = {'name_he': '9em', 'name_en': '9em', 'first_observed_year': '5em', 'last_observed_year': '5em'}
+    def get_changelist_form(self, request, **kwargs):
+        # Through Meta.widgets (not by editing base_fields): the changelist formset builds a
+        # subclass of this form and regenerates its model fields, which would drop such edits.
+        widgets = {name: (forms.NumberInput(attrs={'min': 1900, 'style': f'width:{width}'}) if name.endswith('_year')
+                          else forms.TextInput(attrs={'style': f'width:{width}'}))
+                   for name, width in self.changelist_input_widths.items()}
+        return super().get_changelist_form(request, widgets=widgets, **kwargs)
     def formfield_for_dbfield(self, db_field, request, **kwargs):
         # author/family/order are plain TextFields, which Django would otherwise render as
         # a multi-line Textarea -- a single-line TextInput fits the changelist row (and the

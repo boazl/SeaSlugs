@@ -1,3 +1,5 @@
+import re
+
 from django.contrib.auth.models import User
 from django.test import TestCase
 
@@ -18,6 +20,7 @@ class SpeciesAdminMigrantColumnTests(TestCase):
         self.species = Species.objects.create(
             scientific_name='Test species', name_he='שם בדיקה', name_en='Test name',
             author='(Someone, 2020)', family='Flabellinidae', order='Nudibranchia',
+            first_observed_year=2015, last_observed_year=2024,
         )
 
     def changelist_post(self, **field_overrides):
@@ -32,6 +35,8 @@ class SpeciesAdminMigrantColumnTests(TestCase):
             'form-0-author': self.species.author,
             'form-0-family': self.species.family,
             'form-0-order': self.species.order,
+            'form-0-first_observed_year': self.species.first_observed_year or '',
+            'form-0-last_observed_year': self.species.last_observed_year or '',
             '_save': 'Save',
         }
         data.update(field_overrides)
@@ -98,6 +103,7 @@ class SpeciesAdminMigrantColumnTests(TestCase):
         self.assertEqual(self.species.author, '(Someone, 2020)')
         self.assertEqual(self.species.family, 'Flabellinidae')
         self.assertEqual(self.species.order, 'Nudibranchia')
+        self.assertEqual((self.species.first_observed_year, self.species.last_observed_year), (2015, 2024))
 
     def test_author_renders_as_a_single_line_text_input(self):
         self.client.force_login(self.manager)
@@ -116,6 +122,36 @@ class SpeciesAdminMigrantColumnTests(TestCase):
         # ...as is a curated TaxonFamily/TaxonOrder name no species uses yet.
         self.assertIn('<option value="Aeolidiidae">', html)
         self.assertIn('<option value="Cephalaspidea">', html)
+
+    def test_observed_years_are_editable_from_the_changelist(self):
+        response = self.changelist_post(**{'form-0-first_observed_year': '2012', 'form-0-last_observed_year': '2026'})
+        self.assertEqual(response.status_code, 200)
+        self.species.refresh_from_db()
+        self.assertEqual((self.species.first_observed_year, self.species.last_observed_year), (2012, 2026))
+
+    def test_last_year_before_first_year_is_rejected_in_the_changelist(self):
+        self.changelist_post(**{'form-0-first_observed_year': '2020', 'form-0-last_observed_year': '2010'})
+        self.species.refresh_from_db()
+        self.assertEqual((self.species.first_observed_year, self.species.last_observed_year), (2015, 2024))
+
+    def test_year_columns_are_shown_in_the_changelist(self):
+        self.client.force_login(self.manager)
+        html = self.client.get('/admin/observations/species/').content.decode()
+        self.assertIn('name="form-0-first_observed_year"', html)
+        self.assertIn('name="form-0-last_observed_year"', html)
+
+    def test_name_and_year_inputs_are_compact_in_the_changelist(self):
+        self.client.force_login(self.manager)
+        html = self.client.get('/admin/observations/species/').content.decode()
+        for name, width in (('name_he', '9em'), ('name_en', '9em'), ('first_observed_year', '5em'), ('last_observed_year', '5em')):
+            tag = re.search(r'<input[^>]*name="form-0-%s"[^>]*>' % name, html).group(0)
+            self.assertIn('style="width:%s"' % width, tag, name)
+
+    def test_change_form_name_inputs_keep_their_normal_width(self):
+        self.client.force_login(self.manager)
+        html = self.client.get(f'/admin/observations/species/{self.species.pk}/change/').content.decode()
+        tag = re.search(r'<[^>]*name="name_he"[^>]*>', html).group(0)
+        self.assertNotIn('width:9em', tag)
 
 
 class SpeciesNameDerivedFromGenusAndSpeciesTests(TestCase):
