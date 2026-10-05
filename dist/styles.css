@@ -74,4 +74,4 @@ html[dir="ltr"] .card h3.hebrew{direction:ltr;text-align:left}
     .filter-toggle{display:inline-flex}
     .filter-close{display:inline-flex}
 }
-.card-years{display:grid;grid-template-columns:max-content max-content;justify-content:start;column-gap:8px;margin-top:2px;font-size:13px;color:var(--muted)}.card-years strong{color:var(--ink);font-weight:700}
+.card-years{display:grid;grid-template-columns:minmax(0,max-content) max-content;justify-content:start;column-gap:8px;margin-top:2px;font-size:13px;color:var(--muted)}.card-years strong{color:var(--ink);font-weight:700}

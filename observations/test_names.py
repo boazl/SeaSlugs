@@ -89,7 +89,7 @@ class GalleryScriptTests(SimpleTestCase):
         self.assertIn("'נראה לאחרונה'", js)
         self.assertIn("'First seen in the Mediterranean'", js)
         # Each date on its own row, the year bold, the years aligned one under the other.
-        self.assertIn('.card-years{display:grid;grid-template-columns:max-content max-content;', css)
+        self.assertIn('.card-years{display:grid;grid-template-columns:minmax(0,max-content) max-content;', css)
         self.assertIn('.card-years strong{', css)
         self.assertIn("document.createElement('strong')", js)
         self.assertNotIn("parts.join(' · ')", js)
