@@ -212,10 +212,8 @@ function renderAreaFilters() {
             state.area = key;
             state.regions.clear(); state.sites.clear(); state.photographers.clear(); state.years.clear();
             state.order = 'all'; state.subOrder = 'all'; state.superfamily = 'all'; state.family = 'all'; state.genus = 'all';
-            if (!state.sortChosen) {
-                state.sort = key === 'migrant' ? 'year' : 'taxonomic';
-                document.querySelector('#sortSelect').value = state.sort;
-            }
+            if (!state.sortChosen) state.sort = key === 'migrant' ? 'year' : 'taxonomic';
+            syncSortControl();
             renderSidebar(); render();
         });
         container.append(b);
@@ -796,6 +794,21 @@ function speciesYearCompare(a, b) {
     if (la !== lb) return la < lb ? -1 : 1;
     return speciesSortCompare(a, b);
 }
+// The observation-year sort only makes sense for the migrant species, so its <option> is in
+// the sort menu only while that area filter is active (removed, not just hidden: Safari
+// ignores `hidden` on options). Leaving the migrant view while sorted by year falls back to
+// the taxonomic order.
+const sortSelect = document.querySelector('#sortSelect');
+const yearSortOption = sortSelect.querySelector('option[value="year"]');
+function syncSortControl() {
+    if (state.area === 'migrant') {
+        if (!yearSortOption.parentNode) sortSelect.append(yearSortOption);
+    } else {
+        if (state.sort === 'year') { state.sort = 'taxonomic'; state.sortChosen = false; }
+        yearSortOption.remove();
+    }
+    sortSelect.value = state.sort;
+}
 function render() {
     updateCollectionStatus();
     const q = normalize(search.value);
@@ -900,13 +913,14 @@ if (accountMenuToggle && accountMenuList) {
     });
 }
 
+syncSortControl();
 document.querySelector('#total').textContent = `(${speciesList.length})`;
 search.addEventListener('input', render);
 document.querySelector('#reset').addEventListener('click', () => {
     search.value = '';
     state.area = 'all'; state.regions.clear(); state.sites.clear(); state.photographers.clear(); state.years.clear();
     state.order = 'all'; state.subOrder = 'all'; state.superfamily = 'all'; state.family = 'all'; state.genus = 'all'; state.collection = null;
-    state.sort = 'taxonomic'; state.sortChosen = false; document.querySelector('#sortSelect').value = 'taxonomic';
+    state.sort = 'taxonomic'; state.sortChosen = false; syncSortControl();
     renderSidebar(); render(); search.focus();
 });
 document.querySelector('#orderSelect').addEventListener('change', e => { state.order = e.target.value; state.subOrder = 'all'; state.superfamily = 'all'; state.family = 'all'; state.genus = 'all'; renderTaxonomySelects(); render(); });
@@ -1004,7 +1018,7 @@ function setLanguage(value) {
     document.querySelector('#sortSelect').setAttribute('aria-label', en ? 'Sort species' : 'מיון המינים');
     document.querySelector('#sortSelect option[value="taxonomic"]').textContent = en ? 'Taxonomic order' : 'סדר טקסונומי';
     document.querySelector('#sortSelect option[value="alpha"]').textContent = en ? 'Alphabetical (genus then species)' : 'אלפביתי (סוג ואז מין)';
-    document.querySelector('#sortSelect option[value="year"]').textContent = en ? 'Observation year (earliest first)' : 'שנת תצפית (מהמוקדם למאוחר)';
+    yearSortOption.textContent = en ? 'Observation year (earliest first)' : 'שנת תצפית (מהמוקדם למאוחר)';
     languageButton.textContent = en ? 'עברית' : 'English';
     languageButton.lang = en ? 'he' : 'en';
     languageButton.setAttribute('aria-label', en ? 'Switch to Hebrew' : 'מעבר לאנגלית');
