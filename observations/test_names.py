@@ -64,3 +64,22 @@ class GalleryScriptTests(SimpleTestCase):
         self.assertEqual(css.count('.card h3{'), 2)        # the later override must not bring the old 24px back
         for rule in css.split('}'):
             if rule.strip().startswith('.card h3{'): self.assertIn('font-size:18px', rule + '}')
+
+    def test_observation_year_sort_and_migrant_card_years(self):
+        from pathlib import Path
+        root = Path(__file__).resolve().parent.parent / 'dist'
+        js, css, html = (root / 'app.js').read_text(encoding='utf-8'), (root / 'styles.css').read_text(encoding='utf-8'), (root / 'index.html').read_text(encoding='utf-8')
+        self.assertIn('<option value="year">', html)
+        self.assertIn("if (state.sort === 'year')", js)
+        self.assertIn('function speciesYearCompare(', js)
+        # Migrant view defaults to the year sort, but never overrides a sort the visitor picked.
+        self.assertIn("state.sort = key === 'migrant' ? 'year' : 'taxonomic'", js)
+        self.assertIn('if (!state.sortChosen)', js)
+        self.assertIn('state.sortChosen = true', js)
+        self.assertIn('state.sortChosen = false', js)
+        # The years line only appears under the migrant filter.
+        self.assertIn("if (state.area === 'migrant' && (sp.first_observed_year || sp.last_observed_year))", js)
+        self.assertIn('נצפה לראשונה בים התיכון ', js)
+        self.assertIn('נראה לאחרונה ', js)
+        self.assertIn('First seen in the Mediterranean ', js)
+        self.assertIn('.card-years{display:block;', css)

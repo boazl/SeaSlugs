@@ -165,6 +165,10 @@ def gallery_file(request, filename='index.html'):
                 # filter button in app.js (a species-level flag, not species+area-specific,
                 # so it's the same for every area entry of the same species).
                 'is_migrant': area.species.is_migrant,
+                # Species.first/last_observed_year (first and latest documented record in the
+                # Mediterranean) -- shown on the cards, and sortable, under the migrant filter.
+                'first_observed_year': area.species.first_observed_year,
+                'last_observed_year': area.species.last_observed_year,
                 # The genus/family filter+search values are the CURATED names (via genus_obj/
                 # family_obj, already resolved above), not the species' raw genus/family text --
                 # both fields are blank on many species whose genus is still resolvable (via

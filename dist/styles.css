@@ -74,3 +74,4 @@ html[dir="ltr"] .card h3.hebrew{direction:ltr;text-align:left}
     .filter-toggle{display:inline-flex}
     .filter-close{display:inline-flex}
 }
+.card-years{display:block;margin-top:2px;font-size:13px;color:var(--muted)}

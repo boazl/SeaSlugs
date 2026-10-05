@@ -46,6 +46,15 @@ class GalleryTests(TestCase):
         self.item.species.save()
         self.assertEqual(self.catalog()['species'][0]['author'], '(Bergh, 1877)')
 
+    def test_catalog_exposes_the_first_and_last_observed_years(self):
+        # The migrant-species view shows "first seen in the Mediterranean / last seen" on each
+        # card and can sort by it, so both years must reach catalog.js.
+        self.item.species.first_observed_year = 1978
+        self.item.species.last_observed_year = 2003
+        self.item.species.save()
+        entry = self.catalog()['species'][0]
+        self.assertEqual((entry['first_observed_year'], entry['last_observed_year']), (1978, 2003))
+
     def test_catalog_exposes_is_migrant_for_the_area_filter(self):
         # The gallery's "migrant species" area-filter button (app.js) is driven entirely by
         # this field, straight from Species.is_migrant -- default False must reach catalog.js

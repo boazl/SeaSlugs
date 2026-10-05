@@ -33,6 +33,9 @@ const state = {
     genus: 'all',
     collection: null,
     sort: 'taxonomic',
+    // True once the visitor picks a sort by hand; until then the sort follows the area
+    // (the migrant-species view defaults to observation year, every other view to taxonomic).
+    sortChosen: false,
 };
 
 let opener = null;
@@ -209,6 +212,10 @@ function renderAreaFilters() {
             state.area = key;
             state.regions.clear(); state.sites.clear(); state.photographers.clear(); state.years.clear();
             state.order = 'all'; state.subOrder = 'all'; state.superfamily = 'all'; state.family = 'all'; state.genus = 'all';
+            if (!state.sortChosen) {
+                state.sort = key === 'migrant' ? 'year' : 'taxonomic';
+                document.querySelector('#sortSelect').value = state.sort;
+            }
             renderSidebar(); render();
         });
         container.append(b);
@@ -707,6 +714,17 @@ function buildSpeciesCard(sp, index) {
     meta.append(where, label);
     info.append(h3);
     if (common) info.append(sub);
+    // Under the migrant-species filter: when the species was first and last recorded in
+    // the Mediterranean (Species.first/last_observed_year).
+    if (state.area === 'migrant' && (sp.first_observed_year || sp.last_observed_year)) {
+        const years = document.createElement('span');
+        years.className = 'card-years';
+        const parts = [];
+        if (sp.first_observed_year) parts.push((language === 'he' ? 'נצפה לראשונה בים התיכון ' : 'First seen in the Mediterranean ') + sp.first_observed_year);
+        if (sp.last_observed_year) parts.push((language === 'he' ? 'נראה לאחרונה ' : 'Last seen ') + sp.last_observed_year);
+        years.textContent = parts.join(' · ');
+        info.append(years);
+    }
     info.append(meta);
     button.append(wrap, info);
     if (!sp.slug) button.addEventListener('click', () => openSpeciesDialog(sp, button));
@@ -758,12 +776,26 @@ function speciesSortCompare(a, b) {
     if (ea !== eb) return ea.localeCompare(eb, 'he');
     return normalize(a.title || '').localeCompare(normalize(b.title || ''), 'he');
 }
+// Observation-year sort: earliest first record in the Mediterranean first (the order the
+// species arrived in); species with no recorded year come last, alphabetical among themselves.
+function speciesYearKey(sp) {
+    const y = sp.first_observed_year || sp.last_observed_year;
+    return y || Infinity;
+}
+function speciesYearCompare(a, b) {
+    const ya = speciesYearKey(a), yb = speciesYearKey(b);
+    if (ya !== yb) return ya < yb ? -1 : 1;
+    const la = a.last_observed_year || Infinity, lb = b.last_observed_year || Infinity;
+    if (la !== lb) return la < lb ? -1 : 1;
+    return speciesSortCompare(a, b);
+}
 function render() {
     updateCollectionStatus();
     const q = normalize(search.value);
     const filteredCollections = collectionsList.filter(c => collectionMatches(c, q));
     let filteredSpecies = speciesList.filter(sp => speciesMatches(sp, q));
     if (state.sort === 'alpha') filteredSpecies = [...filteredSpecies].sort(speciesSortCompare);
+    if (state.sort === 'year') filteredSpecies = [...filteredSpecies].sort(speciesYearCompare);
     grid.replaceChildren();
     const frag = document.createDocumentFragment();
     if (filteredCollections.length) {
@@ -867,7 +899,7 @@ document.querySelector('#reset').addEventListener('click', () => {
     search.value = '';
     state.area = 'all'; state.regions.clear(); state.sites.clear(); state.photographers.clear(); state.years.clear();
     state.order = 'all'; state.subOrder = 'all'; state.superfamily = 'all'; state.family = 'all'; state.genus = 'all'; state.collection = null;
-    state.sort = 'taxonomic'; document.querySelector('#sortSelect').value = 'taxonomic';
+    state.sort = 'taxonomic'; state.sortChosen = false; document.querySelector('#sortSelect').value = 'taxonomic';
     renderSidebar(); render(); search.focus();
 });
 document.querySelector('#orderSelect').addEventListener('change', e => { state.order = e.target.value; state.subOrder = 'all'; state.superfamily = 'all'; state.family = 'all'; state.genus = 'all'; renderTaxonomySelects(); render(); });
@@ -876,7 +908,7 @@ document.querySelector('#superfamilySelect').addEventListener('change', e => { s
 document.querySelector('#familySelect').addEventListener('change', e => { state.family = e.target.value; state.genus = 'all'; renderTaxonomySelects(); render(); });
 document.querySelector('#genusSelect').addEventListener('change', e => { state.genus = e.target.value; render(); });
 document.querySelector('#tripSelect').addEventListener('change', e => { state.collection = e.target.value === 'all' ? null : e.target.value; render(); });
-document.querySelector('#sortSelect').addEventListener('change', e => { state.sort = e.target.value; render(); });
+document.querySelector('#sortSelect').addEventListener('change', e => { state.sort = e.target.value; state.sortChosen = true; render(); });
 document.querySelector('#close').addEventListener('click', () => dialog.close());
 dialog.addEventListener('click', e => {
     if (e.target === dialog) {
@@ -965,6 +997,7 @@ function setLanguage(value) {
     document.querySelector('#sortSelect').setAttribute('aria-label', en ? 'Sort species' : 'מיון המינים');
     document.querySelector('#sortSelect option[value="taxonomic"]').textContent = en ? 'Taxonomic order' : 'סדר טקסונומי';
     document.querySelector('#sortSelect option[value="alpha"]').textContent = en ? 'Alphabetical (genus then species)' : 'אלפביתי (סוג ואז מין)';
+    document.querySelector('#sortSelect option[value="year"]').textContent = en ? 'Observation year (earliest first)' : 'שנת תצפית (מהמוקדם למאוחר)';
     languageButton.textContent = en ? 'עברית' : 'English';
     languageButton.lang = en ? 'he' : 'en';
     languageButton.setAttribute('aria-label', en ? 'Switch to Hebrew' : 'מעבר לאנגלית');
