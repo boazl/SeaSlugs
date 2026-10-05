@@ -31,6 +31,18 @@ class GalleryScriptTests(SimpleTestCase):
         self.assertIn('setLatinName(h3, sp.title)', js)
         self.assertIn("setLatinName(document.querySelector('#playerTitle'), species.title)", js)
 
+    def test_sidebar_counts_go_through_the_area_filter_so_pseudo_areas_do_not_show_zero(self):
+        # "migrant" / "multi-area" are not real values of sp.area: comparing sp.area === area in a
+        # count function made every sidebar count 0 while those buttons were active.
+        from pathlib import Path
+        js = (Path(__file__).resolve().parent.parent / 'dist' / 'app.js').read_text(encoding='utf-8')
+        self.assertNotIn('sp.area !== area', js)
+        self.assertNotIn('c.area !== area', js)
+        self.assertNotIn("sp.area === area)", js)
+        for fn in ('regionCount', 'siteCount', 'tripCount', 'photographerSpeciesCount', 'photographerCollectionCount', 'yearCount'):
+            body = js.split('function %s(' % fn)[1].split('\nfunction ')[0]
+            self.assertIn('matchesAreaFilter(sp, area)' if fn != 'photographerCollectionCount' else 'collectionMatchesArea(c, area)', body, fn)
+
     def test_gallery_card_shows_the_author_small_and_the_photographer_filter_splits_species_and_collections(self):
         from pathlib import Path
         root = Path(__file__).resolve().parent.parent / 'dist'

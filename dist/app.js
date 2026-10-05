@@ -125,28 +125,28 @@ function optionsForArea(area) {
     return { regionIds, siteIds, photographers, trips, years };
 }
 function regionCount(area, id) {
-    return speciesList.filter(sp => (area === 'all' || sp.area === area) && sp.samples.some(sm => sm.region === id)).length;
+    return speciesList.filter(sp => matchesAreaFilter(sp, area) && sp.samples.some(sm => sm.region === id)).length;
 }
 function siteCount(area, id) {
-    return speciesList.filter(sp => (area === 'all' || sp.area === area) && sp.samples.some(sm => sm.site === id && (!state.regions.size || state.regions.has(sm.region)))).length;
+    return speciesList.filter(sp => matchesAreaFilter(sp, area) && sp.samples.some(sm => sm.site === id && (!state.regions.size || state.regions.has(sm.region)))).length;
 }
 function tripCount(area, id) {
-    return speciesList.filter(sp => (area === 'all' || sp.area === area) && sp.samples.some(sm => String(sm.trip_id) === id)).length;
+    return speciesList.filter(sp => matchesAreaFilter(sp, area) && sp.samples.some(sm => String(sm.trip_id) === id)).length;
 }
 function photographerSpeciesCount(area, name) {
     let n = 0;
-    for (const sp of speciesList) { if (area !== 'all' && sp.area !== area) continue; if (sp.samples.some(sm => sm.photographer === name)) n++; }
+    for (const sp of speciesList) { if (!matchesAreaFilter(sp, area)) continue; if (sp.samples.some(sm => sm.photographer === name)) n++; }
     return n;
 }
 function photographerCollectionCount(area, name) {
     let n = 0;
-    for (const c of collectionsList) { if (area !== 'all' && c.area !== area) continue; if (c.photographer === name) n++; }
+    for (const c of collectionsList) { if (!collectionMatchesArea(c, area)) continue; if (c.photographer === name) n++; }
     return n;
 }
 function yearCount(area, year) {
     let n = 0;
-    for (const sp of speciesList) { if (area !== 'all' && sp.area !== area) continue; if (sp.samples.some(sm => String(sm.year) === year && (!state.regions.size || state.regions.has(sm.region)))) n++; }
-    for (const c of collectionsList) { if (area !== 'all' && c.area !== area) continue; if (String(c.year) === year && (!state.regions.size || state.regions.has(c.region))) n++; }
+    for (const sp of speciesList) { if (!matchesAreaFilter(sp, area)) continue; if (sp.samples.some(sm => String(sm.year) === year && (!state.regions.size || state.regions.has(sm.region)))) n++; }
+    for (const c of collectionsList) { if (!collectionMatchesArea(c, area)) continue; if (String(c.year) === year && (!state.regions.size || state.regions.has(c.region))) n++; }
     return n;
 }
 // Each of orders/subOrders/superfamilies/families is a Map of value -> species count,
