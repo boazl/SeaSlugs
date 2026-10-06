@@ -340,6 +340,18 @@ class TaxonGenus(models.Model):
         return (with_image or candidates)[0]
 
 
+def taxon_kind_defining_sample(kind, name):
+    """Best published FAMILY- or ORDER-kind sample for the taxon of this name: one with an
+    uploaded image over a video-only one, oldest first -- the same rule as
+    TaxonGenus.pick_defining_sample."""
+    field = 'family' if kind == Sample.Kind.FAMILY else 'order'
+    candidates = [c for c in Sample.objects.filter(
+        kind=kind, **{field: name}, status=Sample.Status.PUBLISHED, deleted_at__isnull=True,
+    ).order_by('created_at', 'pk') if c.image or c.video_url]
+    with_image = [c for c in candidates if c.image]
+    return (with_image or candidates or [None])[0]
+
+
 class SiteImage(models.Model):
     key = models.SlugField('מזהה', max_length=50, unique=True)
     image = models.ImageField('תמונה', upload_to='site/')
@@ -846,6 +858,19 @@ class Sample(models.Model):
         if self.kind == self.Kind.GENUS and self.genus:
             TaxonGenus.objects.filter(name=self.genus).update(
                 defining_sample=TaxonGenus.pick_defining_sample(self.genus))
+        # FAMILY- and ORDER-kind samples are likewise purpose-built media for a family / order
+        # page. Unlike genera, those taxa usually already show a species photo picked by
+        # build_taxonomy_tables, so a family/order-kind sample replaces it when one exists,
+        # and a stale family/order-kind pick (deleted / unpublished) is cleared -- the page
+        # then falls back to one of its species' photos (views.taxon_hero_media).
+        for kind, model, name in ((self.Kind.FAMILY, TaxonFamily, self.family), (self.Kind.ORDER, TaxonOrder, self.order)):
+            if self.kind == kind and name:
+                rows = model.objects.filter(name=name)
+                picked = taxon_kind_defining_sample(kind, name)
+                if picked:
+                    rows.update(defining_sample=picked)
+                else:
+                    rows.filter(defining_sample__kind=kind).update(defining_sample=None)
     def save_reviewed(self, actor=None, approve=False):
         self.full_clean(validate_constraints=False)
         with transaction.atomic():

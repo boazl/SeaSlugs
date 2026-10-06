@@ -106,7 +106,8 @@ def species_page(request, slug):
         if line:
             host = urlparse(line).netloc.removeprefix('www.') if line.startswith('http') else ''
             sources.append({'url': line if host else '', 'label': host or line})
-    common_name = (species.name_en or species.name_he) if lang == 'en' else (species.name_he or species.name_en)
+    # A common name is shown only in its own language (no Hebrew name in the English view).
+    common_name = species.name_en if lang == 'en' else species.name_he
     description = (species.description_en or species.description_he) if lang == 'en' else (species.description_he or species.description_en)
     return render(request, 'observations/species_page.html', {
         'area': area, 'species': species, 'species_label': species_label, 'samples': samples,
@@ -169,7 +170,7 @@ def genus_page(request, name):
 
     taxon_family = genus.family
     taxon_order = taxon_family.order if (taxon_family and taxon_family.order_id) else None
-    common_name = (genus.name_en or genus.name_he) if lang == 'en' else (genus.name_he or genus.name_en)
+    common_name = genus.name_en if lang == 'en' else genus.name_he
     description = (genus.description_en or genus.description_he) if lang == 'en' else (genus.description_he or genus.description_en)
     return render(request, 'observations/genus_page.html', {
         'genus': genus, 'areas': areas,
@@ -221,12 +222,13 @@ def _taxon_page(request, rank, obj, areas, children, parent, parent_url):
     sub = getattr(obj, 'sub_order', '') or getattr(obj, 'sub_family', '')
     return render(request, 'observations/taxon_page.html', {
         'rank': rank, 'taxon': obj, 'latin_name': f'{obj.name} — {sub}' if sub else obj.name,
-        'common_name': pick(obj.name_he, obj.name_en),
+        # Names only in the page's own language; otherwise the Latin name stands alone.
+        'common_name': obj.name_en if lang == 'en' else obj.name_he,
         'description': pick(obj.description_he, obj.description_en),
         'identification': pick(obj.identification_he, obj.identification_en),
         'sources': [line.strip() for line in obj.sources.splitlines() if line.strip()],
         'areas': areas, 'children': children,
-        'parent_label': pick(parent.name_he, parent.name_en) or parent.name if parent else '',
+        'parent_label': ((parent.name_en if lang == 'en' else parent.name_he) or parent.name) if parent else '',
         'parent_url': parent_url,
         'image_url': image_url, 'video_id': video_id, 'thumbnail': thumbnail,
         'canonical_url': request.build_absolute_uri(request.path),
@@ -392,7 +394,6 @@ def listing(request):
         users = get_user_model().objects.select_related('profile').filter(pk__in=credited)
         return sorted({name for name in (full_name_for(u, page_lang) for u in users) if name})
 
-    present_kinds = set(visible.order_by().values_list('kind', flat=True).distinct())
     present_statuses = set(visible.order_by().values_list('status', flat=True).distinct())
 
     lang = get_lang(request)
@@ -420,7 +421,9 @@ def listing(request):
         # A filter whose data holds only zero or one distinct value is never useful --
         # narrowing it can't change the result set -- so each list below is only rendered
         # by the template when it has more than one option (see list.html's length checks).
-        'kind_choices': [(v, kind_label_lookup.get(v, label)) for v, label in Sample.Kind.choices if v in present_kinds],
+        # Every record type is always offered (family/order records are new and may not
+        # exist yet), unlike the other filters below that list only values present.
+        'kind_choices': [(v, kind_label_lookup.get(v, label)) for v, label in Sample.Kind.choices],
         'status_choices': [(v, status_label_lookup.get(v, label)) for v, label in Sample.Status.choices if v in present_statuses],
         'countries': Country.objects.filter(dive_trips__samples__in=visible).distinct().order_by('name'),
         'regions': Region.objects.filter(dive_trips__samples__in=visible).distinct().order_by('name'),

@@ -256,7 +256,8 @@ class ObservationsFilterTests(TestCase):
         # order etc. are all published with the exact same values in setUp/make().
         self.make(Species.objects.create(scientific_name='Only species', order='Nudibranchia'))
         content = self.client.get('/observations/').content.decode()
-        for hidden_field in ('name="kind"', 'name="status"', 'name="country"', 'name="region"',
+        # (The record-type filter is the exception: it always lists every type.)
+        for hidden_field in ('name="status"', 'name="country"', 'name="region"',
                               'name="order"', 'name="genus"', 'name="photographer"'):
             self.assertNotIn(hidden_field, content)
 

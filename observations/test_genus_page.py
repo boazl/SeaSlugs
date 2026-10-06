@@ -107,6 +107,24 @@ class GenusPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.context['image_url'] or response.context['video_id'])
 
+    def test_family_kind_sample_becomes_the_family_page_media(self):
+        sample = Sample(owner=self.owner, kind=Sample.Kind.FAMILY, family='Chromodorididae', order='Nudibranchia',
+                        trip=self.trip, video_url='https://youtu.be/44444444444')
+        sample.save_reviewed(actor=self.owner, approve=True)
+        self.family.refresh_from_db()
+        self.assertEqual(self.family.defining_sample_id, sample.pk)
+        self.assertEqual(self.client.get('/family/Chromodorididae/').context['video_id'], '44444444444')
+        sample.soft_delete(self.owner)   # a stale family-kind pick is cleared; the page falls back to a species
+        self.family.refresh_from_db()
+        self.assertIsNone(self.family.defining_sample_id)
+        self.assertEqual(self.client.get('/family/Chromodorididae/').status_code, 200)
+
+    def test_observation_filter_offers_every_record_type(self):
+        self.client.force_login(self.owner)
+        html = self.client.get('/observations/').content.decode()
+        for value in ('species', 'collection', 'genus', 'family', 'order'):
+            self.assertIn(f'<option value="{value}"', html)
+
     def test_order_and_family_pages_list_the_species(self):
         from observations.gallery_data import TaxonResolver
         order, family, _ = TaxonResolver().resolve(self.species)
