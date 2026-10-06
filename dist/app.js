@@ -26,6 +26,9 @@ const state = {
     sites: new Set(),
     photographers: new Set(),
     years: new Set(),
+    // 'multi' when the "species with several observations" filter is on (a Set so the
+    // sidebar's checkbox helper can drive it like the other checkbox groups).
+    observations: new Set(),
     order: 'all',
     subOrder: 'all',
     superfamily: 'all',
@@ -37,6 +40,14 @@ const state = {
     // (the migrant-species view defaults to observation year, every other view to taxonomic).
     sortChosen: false,
 };
+const multiObsOn = () => state.observations.has('multi');
+// The sort a view falls back to until the visitor picks one by hand: by number of
+// observations under the several-observations filter, by year under the migrant
+// filter, taxonomic otherwise.
+function defaultSort() {
+    if (multiObsOn()) return 'count';
+    return state.area === 'migrant' ? 'year' : 'taxonomic';
+}
 
 let opener = null;
 
@@ -212,7 +223,7 @@ function renderAreaFilters() {
             state.area = key;
             state.regions.clear(); state.sites.clear(); state.photographers.clear(); state.years.clear();
             state.order = 'all'; state.subOrder = 'all'; state.superfamily = 'all'; state.family = 'all'; state.genus = 'all';
-            if (!state.sortChosen) state.sort = key === 'migrant' ? 'year' : 'taxonomic';
+            if (!state.sortChosen) state.sort = defaultSort();
             syncSortControl();
             renderSidebar(); render();
         });
@@ -341,6 +352,13 @@ function renderSidebar() {
         .map(id => [id, labelFor(id, regionLabelsData), regionCount(area, id)])
         .sort((a, b) => a[1].localeCompare(b[1], language === 'he' ? 'he' : 'en'));
     renderCheckboxGroup(document.querySelector('#regionOptions'), regionEntries, state.regions, () => { renderSidebar(); render(); });
+    const multiCount = speciesList.filter(sp => matchesAreaFilter(sp, area) && sp.samples.length > 1).length;
+    renderCheckboxGroup(document.querySelector('#observationOptions'),
+        [['multi', language === 'he' ? 'מינים עם מספר תצפיות' : 'Species with several observations', multiCount]],
+        state.observations, () => {
+            if (!state.sortChosen || (!multiObsOn() && state.sort === 'count')) { state.sort = defaultSort(); state.sortChosen = false; }
+            syncSortControl(); render();
+        });
     const siteEntries = [...opts.siteIds]
         .map(id => [id, labelFor(id, siteLabelsData), siteCount(area, id)])
         .sort((a, b) => a[1].localeCompare(b[1], language === 'he' ? 'he' : 'en'));
@@ -439,11 +457,30 @@ function speciesMatches(sp, q) {
     if (state.family !== 'all' && sp.family !== state.family) return false;
     if (state.genus !== 'all' && sp.genus !== state.genus) return false;
     if ((state.regions.size || state.sites.size || state.photographers.size || state.years.size) && !sp.samples.some(sampleMatchesFilters)) return false;
-    if (q && !speciesSearchText(sp).includes(q)) return false;
+    if (multiObsOn() && observationCount(sp) < 2) return false;
+    if (q && !(searchByName ? speciesNameMatches(sp, q) : speciesSearchText(sp).includes(q))) return false;
     return true;
+}
+// Name-first search: when what's typed starts a word of some species' name (scientific,
+// genus, family, order or common name), only name matches count -- so "ph" lists the
+// Phyllidia, Phestilla... species rather than every species from the Philippines. When
+// no name matches, the search falls back to everything (places, photographers...).
+let searchByName = false;
+function speciesNameText(sp) {
+    return normalize([sp.title, sp.genus, sp.family, sp.superfamily, sp.order, sp.name_he, sp.name_en].filter(Boolean).join(' '));
+}
+function speciesNameMatches(sp, q) {
+    const text = speciesNameText(sp);
+    return text.startsWith(q) || text.includes(' ' + q);
+}
+// How many observations a species card stands for in the current view (the same number
+// as its count badge): the samples matching the active filters, or all of them.
+function observationCount(sp) {
+    return (scopedSamples(sp) || sp.samples).length;
 }
 function collectionMatches(c, q) {
     if (state.collection) return false;
+    if (multiObsOn()) return false;
     if (!collectionMatchesArea(c, state.area)) return false;
     if (state.regions.size && !state.regions.has(c.region)) return false;
     if (state.sites.size) return false;
@@ -453,7 +490,9 @@ function collectionMatches(c, q) {
     if (q) {
         const r = regionLabelsData[c.region];
         const a = areaLabelsData[c.area];
-        const hay = normalize([c.title, r?.label, r?.label_en, a?.label, a?.label_en, c.photographer].filter(Boolean).join(' '));
+        // Includes the card's own heading ("50 מינים · מרץ 2023"), so the species count, month
+        // and year shown on the card are searchable too.
+        const hay = normalize([collectionTitle(c), c.title, c.year, r?.label, r?.label_en, a?.label, a?.label_en, c.photographer, photographerLabel(c)].filter(Boolean).join(' '));
         if (!hay.includes(q)) return false;
     }
     return true;
@@ -591,7 +630,8 @@ function buildCollectionCard(c, index) {
     const meta = document.createElement('span');
     meta.className = 'card-meta';
     const region = document.createElement('span');
-    region.textContent = labelFor(c.region, regionLabelsData);
+    // Filtered to a single region: its name is already the filter, so don't repeat it.
+    if (state.regions.size !== 1) region.textContent = labelFor(c.region, regionLabelsData);
     const label = document.createElement('span');
     label.textContent = language === 'he' ? 'צפייה באוסף' : 'View collection';
     meta.append(region, label);
@@ -698,7 +738,10 @@ function buildSpeciesCard(sp, index) {
     // sample when one is scoped in, otherwise the species' defining sample.
     const regionSrc = pickSamples ? pickSamples[0] : sp;
     const regionLabel = labelFor(regionSrc.region, regionLabelsData);
-    area.textContent = regionLabel && regionSrc.year ? `${regionLabel}, ${regionSrc.year}` : areaLabelFor(sp.area);
+    // Filtered to a single region: its name is already the filter, so show only the year.
+    const regionFiltered = state.regions.size === 1;
+    area.textContent = regionFiltered && regionSrc.year ? String(regionSrc.year)
+        : regionLabel && regionSrc.year ? `${regionLabel}, ${regionSrc.year}` : areaLabelFor(sp.area);
     const label = document.createElement('span');
     label.textContent = displayCount > 1 && !cardSample
         ? (language === 'he' ? `${displayCount} תצפיות` : `${displayCount} observations`)
@@ -726,7 +769,7 @@ function buildSpeciesCard(sp, index) {
             value.textContent = year;
             years.append(label, ' ', value, ' ');
         };
-        addYear('נצפה לראשונה בים התיכון', 'First seen in the Mediterranean', sp.first_observed_year);
+        addYear('נצפה לראשונה בים התיכון', 'Mediterranean first sight', sp.first_observed_year);
         addYear('נראה לאחרונה', 'Last seen', sp.last_observed_year);
         info.append(years);
     }
@@ -794,28 +837,44 @@ function speciesYearCompare(a, b) {
     if (la !== lb) return la < lb ? -1 : 1;
     return speciesSortCompare(a, b);
 }
+// Number-of-observations sort: most observations first, taxonomic order among equals.
+function speciesCountCompare(a, b) {
+    const ca = observationCount(a), cb = observationCount(b);
+    if (ca !== cb) return cb - ca;
+    return speciesSortCompare(a, b);
+}
 // The observation-year sort only makes sense for the migrant species, so its <option> is in
 // the sort menu only while that area filter is active (removed, not just hidden: Safari
 // ignores `hidden` on options). Leaving the migrant view while sorted by year falls back to
 // the taxonomic order.
 const sortSelect = document.querySelector('#sortSelect');
 const yearSortOption = sortSelect.querySelector('option[value="year"]');
+// Likewise the number-of-observations sort is offered only under its own filter.
+const countSortOption = sortSelect.querySelector('option[value="count"]');
 function syncSortControl() {
     if (state.area === 'migrant') {
         if (!yearSortOption.parentNode) sortSelect.append(yearSortOption);
     } else {
-        if (state.sort === 'year') { state.sort = 'taxonomic'; state.sortChosen = false; }
+        if (state.sort === 'year') { state.sort = defaultSort(); state.sortChosen = false; }
         yearSortOption.remove();
+    }
+    if (multiObsOn()) {
+        if (!countSortOption.parentNode) sortSelect.append(countSortOption);
+    } else {
+        if (state.sort === 'count') { state.sort = defaultSort(); state.sortChosen = false; }
+        countSortOption.remove();
     }
     sortSelect.value = state.sort;
 }
 function render() {
     updateCollectionStatus();
     const q = normalize(search.value);
+    searchByName = !!q && speciesList.some(sp => speciesNameMatches(sp, q));
     const filteredCollections = collectionsList.filter(c => collectionMatches(c, q));
     let filteredSpecies = speciesList.filter(sp => speciesMatches(sp, q));
     if (state.sort === 'alpha') filteredSpecies = [...filteredSpecies].sort(speciesSortCompare);
     if (state.sort === 'year') filteredSpecies = [...filteredSpecies].sort(speciesYearCompare);
+    if (state.sort === 'count') filteredSpecies = [...filteredSpecies].sort(speciesCountCompare);
     grid.replaceChildren();
     const frag = document.createDocumentFragment();
     if (filteredCollections.length) {
@@ -872,7 +931,7 @@ function updateFilterToggleCount() {
     // state.area is excluded here: the area chips now live in their own always-visible
     // bar above the gallery (see .area-filter-bar), not inside the collapsible drawer this
     // toggle/badge refers to, so counting it here would over-count what's actually hidden.
-    let n = state.regions.size + state.sites.size + state.photographers.size + state.years.size;
+    let n = state.regions.size + state.sites.size + state.photographers.size + state.years.size + state.observations.size;
     if (state.order !== 'all') n++;
     if (state.subOrder !== 'all') n++;
     if (state.superfamily !== 'all') n++;
@@ -913,12 +972,121 @@ if (accountMenuToggle && accountMenuList) {
     });
 }
 
+// ---- search autocomplete ----
+// Suggestions under the search box as you type: species (scientific and common names),
+// genera, families, dive sites and regions. Picking a species that has a single page goes
+// straight to it; anything else fills the box and filters the gallery as usual.
+const suggestBox = document.createElement('ul');
+suggestBox.id = 'searchSuggest';
+suggestBox.className = 'search-suggest';
+suggestBox.setAttribute('role', 'listbox');
+suggestBox.hidden = true;
+search.closest('.collection-head').append(suggestBox);
+search.setAttribute('role', 'combobox');
+search.setAttribute('aria-autocomplete', 'list');
+search.setAttribute('aria-controls', 'searchSuggest');
+search.setAttribute('aria-expanded', 'false');
+search.spellcheck = false;
+let suggestItems = [], suggestActive = -1;
+const SUGGEST_KINDS = { genus: 0, family: 1, species: 2, common: 3, site: 4, region: 5 };
+function suggestKindLabel(kind) {
+    const he = { common: 'שם עממי', genus: 'סוג', family: 'משפחה', site: 'אתר צלילה', region: 'אזור צלילה' };
+    const en = { common: 'Common name', genus: 'Genus', family: 'Family', site: 'Dive site', region: 'Dive region' };
+    return (language === 'he' ? he : en)[kind] || '';
+}
+function buildSuggestCandidates() {
+    const out = new Map();   // dedupe by kind + text
+    const add = (kind, text, extra = {}) => {
+        if (!text) return;
+        const key = kind + '|' + normalize(text);
+        const prev = out.get(key);
+        if (prev) { prev.slugs.add(extra.slug); return; }
+        out.set(key, { kind, text, norm: normalize(text), slugs: new Set([extra.slug]), latin: !!extra.latin });
+    };
+    for (const sp of speciesList) {
+        add('species', sp.title, { slug: sp.slug, latin: true });
+        const common = language === 'he' ? sp.name_he : sp.name_en;
+        if (common) add('common', common, { slug: sp.slug });
+        add('genus', sp.genus, { latin: true });
+        add('family', sp.family);
+    }
+    const lbl = e => e && (language === 'en' ? (e.label_en || e.label) : e.label);
+    for (const id in siteLabelsData) add('site', lbl(siteLabelsData[id]));
+    for (const id in regionLabelsData) add('region', lbl(regionLabelsData[id]));
+    return [...out.values()];
+}
+function suggestRank(c, q) {
+    if (c.norm.startsWith(q)) return 0;
+    if (c.norm.split(' ').some(w => w.startsWith(q))) return 1;
+    return c.norm.includes(q) ? 2 : -1;
+}
+function closeSuggest() {
+    suggestBox.hidden = true;
+    suggestBox.replaceChildren();
+    suggestItems = []; suggestActive = -1;
+    search.setAttribute('aria-expanded', 'false');
+    search.removeAttribute('aria-activedescendant');
+}
+function updateSuggest() {
+    const q = normalize(search.value);
+    if (q.length < 2) { closeSuggest(); return; }
+    suggestItems = buildSuggestCandidates()
+        .map(c => ({ c, r: suggestRank(c, q) }))
+        .filter(x => x.r >= 0 && x.c.norm !== q)
+        .sort((a, b) => a.r - b.r || SUGGEST_KINDS[a.c.kind] - SUGGEST_KINDS[b.c.kind] || a.c.text.localeCompare(b.c.text, language === 'he' ? 'he' : 'en'))
+        .slice(0, 8).map(x => x.c);
+    if (!suggestItems.length) { closeSuggest(); return; }
+    suggestActive = -1;
+    suggestBox.replaceChildren(...suggestItems.map((c, i) => {
+        const li = document.createElement('li');
+        li.id = 'searchSuggest-' + i;
+        li.setAttribute('role', 'option');
+        const name = document.createElement('span');
+        name.className = 'suggest-name';
+        if (c.latin) { setLatinName(name, c.text); name.dir = 'ltr'; } else name.textContent = c.text;
+        li.append(name);
+        const kind = suggestKindLabel(c.kind);
+        if (kind) { const k = document.createElement('small'); k.textContent = kind; li.append(k); }
+        li.addEventListener('mousedown', e => e.preventDefault());   // keep focus in the box
+        li.addEventListener('click', () => pickSuggest(i));
+        return li;
+    }));
+    suggestBox.hidden = false;
+    search.setAttribute('aria-expanded', 'true');
+}
+function highlightSuggest(i) {
+    suggestActive = i;
+    [...suggestBox.children].forEach((li, j) => li.setAttribute('aria-selected', String(j === i)));
+    if (i >= 0) { search.setAttribute('aria-activedescendant', 'searchSuggest-' + i); suggestBox.children[i].scrollIntoView({ block: 'nearest' }); }
+    else search.removeAttribute('aria-activedescendant');
+}
+// Picking a suggestion fills the box and filters the gallery to it (the same as typing it
+// in full), then brings the results into view.
+function pickSuggest(i) {
+    const c = suggestItems[i];
+    if (!c) return;
+    search.value = c.text;
+    closeSuggest();
+    render();
+    document.querySelector('#resultCount').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+search.addEventListener('input', updateSuggest);
+search.addEventListener('focus', updateSuggest);
+search.addEventListener('blur', () => setTimeout(() => { if (!suggestBox.contains(document.activeElement)) closeSuggest(); }, 150));
+search.addEventListener('keydown', e => {
+    if (suggestBox.hidden) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); highlightSuggest((suggestActive + 1) % suggestItems.length); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); highlightSuggest(suggestActive <= 0 ? suggestItems.length - 1 : suggestActive - 1); }
+    else if (e.key === 'Enter' && suggestActive >= 0) { e.preventDefault(); pickSuggest(suggestActive); }
+    else if (e.key === 'Escape') { e.preventDefault(); closeSuggest(); }
+});
+
 syncSortControl();
 document.querySelector('#total').textContent = `(${speciesList.length})`;
 search.addEventListener('input', render);
 document.querySelector('#reset').addEventListener('click', () => {
     search.value = '';
-    state.area = 'all'; state.regions.clear(); state.sites.clear(); state.photographers.clear(); state.years.clear();
+    state.area = 'all'; state.regions.clear(); state.sites.clear(); state.photographers.clear(); state.years.clear(); state.observations.clear();
     state.order = 'all'; state.subOrder = 'all'; state.superfamily = 'all'; state.family = 'all'; state.genus = 'all'; state.collection = null;
     state.sort = 'taxonomic'; state.sortChosen = false; syncSortControl();
     renderSidebar(); render(); search.focus();
@@ -967,6 +1135,7 @@ const translations = [
     ['#filterToggleLabel', 'Filters'],
     ['#areaGroupTitle', 'Area'],
     ['#regionGroupTitle', 'Dive region'],
+    ['#observationGroupTitle', 'Observations'],
     ['#siteGroupTitle', 'Dive site'],
     ['#tripGroupTitle', 'Dive trip'],
     ['#photographerGroupTitle', 'Photographer'],
@@ -1018,6 +1187,7 @@ function setLanguage(value) {
     document.querySelector('#sortSelect').setAttribute('aria-label', en ? 'Sort species' : 'מיון המינים');
     document.querySelector('#sortSelect option[value="taxonomic"]').textContent = en ? 'Taxonomic order' : 'סדר טקסונומי';
     document.querySelector('#sortSelect option[value="alpha"]').textContent = en ? 'Alphabetical (genus then species)' : 'אלפביתי (סוג ואז מין)';
+    countSortOption.textContent = en ? 'Number of observations (most first)' : 'מספר תצפיות (מהגדול לקטן)';
     yearSortOption.textContent = en ? 'Observation year (earliest first)' : 'שנת תצפית (מהמוקדם למאוחר)';
     languageButton.textContent = en ? 'עברית' : 'English';
     languageButton.lang = en ? 'he' : 'en';

@@ -75,3 +75,4 @@ html[dir="ltr"] .card h3.hebrew{direction:ltr;text-align:left}
     .filter-close{display:inline-flex}
 }
 .card-years{display:grid;grid-template-columns:minmax(0,max-content) max-content;justify-content:start;column-gap:8px;margin-top:2px;font-size:13px;color:var(--muted)}.card-years strong{color:var(--ink);font-weight:700}
+.search-suggest{flex-basis:100%;display:flex;flex-wrap:wrap;gap:8px;list-style:none;margin:-6px 0 0;padding:0}.search-suggest li{display:inline-flex;align-items:baseline;gap:8px;padding:6px 12px;border:1px solid var(--line);border-radius:20px;cursor:pointer;font-size:14px;background:transparent}.search-suggest li:hover,.search-suggest li[aria-selected="true"]{border-color:var(--accent);background:#1a3a46}.search-suggest .suggest-name{color:var(--ink);overflow-wrap:anywhere}.search-suggest small{font-size:12px;color:var(--muted)}

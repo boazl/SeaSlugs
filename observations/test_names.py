@@ -87,7 +87,7 @@ class GalleryScriptTests(SimpleTestCase):
         self.assertIn("if (state.area === 'migrant' && (sp.first_observed_year || sp.last_observed_year))", js)
         self.assertIn("'נצפה לראשונה בים התיכון'", js)
         self.assertIn("'נראה לאחרונה'", js)
-        self.assertIn("'First seen in the Mediterranean'", js)
+        self.assertIn("'Mediterranean first sight'", js)
         # Each date on its own row, the year bold, the years aligned one under the other.
         self.assertIn('.card-years{display:grid;grid-template-columns:minmax(0,max-content) max-content;', css)
         self.assertIn('.card-years strong{', css)

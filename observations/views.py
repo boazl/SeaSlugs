@@ -61,10 +61,15 @@ def species_page(request, slug):
     for s in samples:
         s.show_name = s.taxon_label != species.scientific_name
         s.name_main, s.name_author, s.name_stage = s.taxon_parts()
+    # The main observation is the area's defining sample (the one behind the hero photo/
+    # video); the observations grid below lists only the other ones.
+    main_sample = next((s for s in samples if s.pk == area.defining_sample_id), samples[0])
+    other_samples = [s for s in samples if s is not main_sample]
     common_name = (species.name_en or species.name_he) if lang == 'en' else (species.name_he or species.name_en)
     description = (species.description_en or species.description_he) if lang == 'en' else (species.description_he or species.description_en)
     return render(request, 'observations/species_page.html', {
         'area': area, 'species': species, 'species_label': species_label, 'samples': samples,
+        'main_sample': main_sample, 'other_samples': other_samples,
         'image_url': image_url, 'video_id': video_id, 'thumbnail': thumbnail,
         'taxon_order': order_obj, 'taxon_family': family_obj, 'taxon_genus': genus_obj,
         'taxon_order_label': taxon_label(order_obj), 'taxon_family_label': taxon_label(family_obj),
