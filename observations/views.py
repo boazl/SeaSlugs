@@ -24,7 +24,23 @@ def trips(request):
     published = Sample.objects.filter(status='published', deleted_at__isnull=True, trip__isnull=False,
         trip__country__isnull=False, trip__region__isnull=False, trip__year__isnull=False,
         species_other='', site_other='').filter(Q(kind='collection', species__isnull=True) | Q(kind='species',species__isnull=False)).select_related('species','trip','owner','owner__profile')
-    rows = DiveTrip.objects.filter(samples__in=published).distinct().prefetch_related(Prefetch('samples',queryset=published,to_attr='public_samples'))
+    rows = list(DiveTrip.objects.filter(samples__in=published).distinct().select_related('country', 'region', 'site')
+                .prefetch_related(Prefetch('samples',queryset=published,to_attr='public_samples')))
+    lang = get_lang(request)
+    for trip in rows:
+        # A trip's title is typed in Hebrew only; in English it is shown as its place and
+        # date ("Eilat · Coral Beach 8/2026") built from the localized site/region names.
+        if lang == 'en':
+            place = (trip.site.name_en or trip.site.name) if trip.site_id else (
+                (trip.region.name_en or trip.region.name) if trip.region_id else trip.region_name)
+            when = f'{trip.month}/{trip.year}' if trip.year and trip.month else (str(trip.year) if trip.year else '')
+            trip.display_title = ' '.join(x for x in (place, when) if x) or trip.title
+        else:
+            trip.display_title = trip.title
+        trip.display_description = (trip.description_en or '') if lang == 'en' else (trip.description_he or '')
+        # The free-text reserve/site name is usually typed in Hebrew -- left out in English.
+        hebrew = any('\u0590' <= ch <= '\u05ff' for ch in trip.reserve)
+        trip.display_reserve = '' if lang == 'en' and hebrew else trip.reserve
     return render(request, 'observations/trips.html', {'trips':rows})
 
 

@@ -1,16 +1,18 @@
-{% extends 'observations/base.html' %}{% block content %}
-<h1>מסעות צלילה / Dive trips</h1>
-<p>סרטוני אוסף ממסעות צלילה, לצד הדגימות המשויכות לכל מסע.</p>
+{% extends 'observations/base.html' %}{% load seaslugs_i18n %}{% block html_lang %}{{ lang }}{% endblock %}{% block html_dir %}{% if lang == 'en' %}ltr{% else %}rtl{% endif %}{% endblock %}{% load seaslugs_i18n %}{% block content %}<style>.trip-species summary{cursor:pointer;margin:12px 0}.trip-thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px;margin-top:12px}.trip-thumb{display:flex;flex-direction:column;gap:4px;text-decoration:none;color:inherit;font-size:14px}.trip-thumb i{color:#64dfce;font-family:Georgia,"Times New Roman",serif;font-size:15px;overflow-wrap:anywhere}.trip-thumb small{font-size:12px}.trip-thumb-img{position:relative;display:block;aspect-ratio:4/3;border-radius:6px;overflow:hidden;background:#0d2732}.trip-thumb-img img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .3s}.trip-thumb:hover img{transform:scale(1.05)}.trip-thumb-play{position:absolute;bottom:6px;inset-inline-start:6px;width:26px;height:26px;border-radius:50%;background:#05141dcc;display:grid;place-items:center;font-size:11px;color:#fff}</style>
+<h1>{{ "מסעות צלילה"|t:lang }}</h1>
+<p>{{ "סרטוני אוסף ממסעות צלילה, לצד הדגימות המשויכות לכל מסע."|t:lang }}</p>
 {% for trip in trips %}
 <section style="margin:32px 0;border-top:1px solid #36515a;padding-top:20px">
-<h2>{{trip.title}}</h2>
-<p>{{trip.country_name}} · {{trip.region_name}}{% if trip.reserve %} · {{trip.reserve}}{% endif %}{% if trip.year %} · {{trip.year}}{% if trip.month %}/{{trip.month}}{% endif %}{% endif %}</p>
-<p>מספר מינים בגלריה: <strong>{{trip.display_species_count}}</strong></p>
+<h2>{{ trip.display_title }}</h2>
+<p>{% if trip.country %}{{ trip.country|loc:lang }}{% else %}{{ trip.country_name }}{% endif %} · {% if trip.region %}{{ trip.region|loc:lang }}{% else %}{{ trip.region_name }}{% endif %}{% if trip.site %} · {{ trip.site|loc:lang }}{% elif trip.display_reserve %} · {{ trip.display_reserve }}{% endif %}{% if trip.year %} · {% if trip.month %}{{ trip.month }}/{% endif %}{{ trip.year }}{% endif %}</p>
+{% if trip.display_description %}<p>{{ trip.display_description|linebreaksbr }}</p>{% endif %}
+<p>{{ "מספר מינים בגלריה:"|t:lang }} <strong>{{ trip.display_species_count }}</strong></p>
 <div class="cards">
 {% for item in trip.public_samples %}{% if item.kind == 'collection' %}
-<article><a href="{% if item.video_url %}{{item.video_url}}{% else %}{% url 'observation-photo' item.pk %}{% endif %}" target="_blank" rel="noopener">{% if item.image %}<img src="{% url 'observation-photo' item.pk %}" alt="" loading="lazy">{% else %}<img src="{{item.thumbnail}}" alt="" loading="lazy">{% endif %}<h3>{{item.title}}</h3><small>צילום: {{item.photographer_name}}</small><span>{% if item.video_url %}צפייה בסרטון המסע ב־YouTube ↗{% else %}צפייה בתמונה המלאה ↗{% endif %}</span></a></article>
+<article><a href="{% if item.video_url %}{{item.video_url}}{% else %}{% url 'observation-photo' item.pk %}{% endif %}" target="_blank" rel="noopener">{% if item.image %}<img src="{% url 'observation-photo' item.pk %}" alt="" loading="lazy">{% else %}<img src="{{item.thumbnail}}" alt="" loading="lazy">{% endif %}<h3>{% if lang == 'en' %}{{ trip.display_title }}{% else %}{{ item.title }}{% endif %}</h3><small>{{ "צילום:"|t:lang }} {{ item|photographer_name:lang }}</small><span>{% if item.video_url %}{{ "צפייה בסרטון המסע ב־YouTube ↗"|t:lang }}{% else %}{{ "צפייה בתמונה המלאה ↗"|t:lang }}{% endif %}</span></a></article>
 {% endif %}{% endfor %}</div>
-<details><summary>דגימות מינים מהמסע</summary><ul>{% for item in trip.public_samples %}{% if item.kind == 'species' %}<li><a href="{% if item.video_url %}{{item.video_url}}{% else %}{% url 'observation-photo' item.pk %}{% endif %}" target="_blank" rel="noopener">{{item.species}}</a> · צילום: {{item.photographer_name}}</li>{% endif %}{% endfor %}</ul></details>
+<details class="trip-species"><summary>{{ "דגימות מינים מהמסע"|t:lang }}</summary><div class="trip-thumbs">{% for item in trip.public_samples %}{% if item.kind == 'species' %}<a class="trip-thumb" href="{% if item.video_url %}{{item.video_url}}{% else %}{% url 'observation-photo' item.pk %}{% endif %}" target="_blank" rel="noopener"><span class="trip-thumb-img">{% if item.image %}<img src="{% url 'observation-photo' item.pk %}" alt="" loading="lazy">{% else %}<img src="{{item.thumbnail}}" alt="" loading="lazy">{% endif %}{% if item.video_url %}<span class="trip-thumb-play" aria-hidden="true">▶</span>{% endif %}</span><i dir="ltr">{{item.species}}</i><small>{{ "צילום:"|t:lang }} {{ item|photographer_name:lang }}</small></a>{% endif %}{% endfor %}</div></details>
+
 </section>
-{% empty %}<p>עדיין אין מסעות עם סרטונים מפורסמים.</p>{% endfor %}
+{% empty %}<p>{{ "עדיין אין מסעות עם סרטונים מפורסמים."|t:lang }}</p>{% endfor %}
 {% endblock %}
