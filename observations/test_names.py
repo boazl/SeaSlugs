@@ -65,6 +65,26 @@ class GalleryScriptTests(SimpleTestCase):
         for rule in css.split('}'):
             if rule.strip().startswith('.card h3{'): self.assertIn('font-size:18px', rule + '}')
 
+    def test_taxonomic_level_drill_down(self):
+        from pathlib import Path
+        root = Path(__file__).resolve().parent.parent / 'dist'
+        js, html = (root / 'app.js').read_text(encoding='utf-8'), (root / 'index.html').read_text(encoding='utf-8')
+        # Level selector next to the sort: order (default), family, genus, species.
+        self.assertIn('<select id="levelSelect"', html)
+        self.assertIn('<option value="order" selected>', html)
+        self.assertIn("level: 'order',", js)
+        # The taxonomic view hides dive-trip collections and draws one card per taxon above species level.
+        self.assertIn("const filteredCollections = taxonomic ? [] :", js)
+        self.assertIn('function renderTaxonLevel(', js)
+        # A card click drills one rank down; picking a taxon in the search jumps to its own rank.
+        self.assertIn('state.drill = { level, id: String(key) };', js)
+        self.assertIn('setLevel(nextLevel(level, members));', js)
+        # Full hierarchy, empty ranks skipped while drilling.
+        self.assertIn("const LEVELS = ['order', 'suborder', 'superfamily', 'family', 'genus', 'species'];", js)
+        for value in ('suborder', 'superfamily'):
+            self.assertIn(f'<option value="{value}">', html)
+        self.assertIn('state.drill = { level: c.kind, id: String(c.id) };', js)
+
     def test_observation_year_sort_and_migrant_card_years(self):
         from pathlib import Path
         root = Path(__file__).resolve().parent.parent / 'dist'

@@ -76,3 +76,9 @@ html[dir="ltr"] .card h3.hebrew{direction:ltr;text-align:left}
 }
 .card-years{display:grid;grid-template-columns:minmax(0,max-content) max-content;justify-content:start;column-gap:8px;margin-top:2px;font-size:13px;color:var(--muted)}.card-years strong{color:var(--ink);font-weight:700}
 .search-suggest{flex-basis:100%;display:flex;flex-wrap:wrap;gap:8px;list-style:none;margin:-6px 0 0;padding:0}.search-suggest li{display:inline-flex;align-items:baseline;gap:8px;padding:6px 12px;border:1px solid var(--line);border-radius:20px;cursor:pointer;font-size:14px;background:transparent}.search-suggest li:hover,.search-suggest li[aria-selected="true"]{border-color:var(--accent);background:#1a3a46}.search-suggest .suggest-name{color:var(--ink);overflow-wrap:anywhere}.search-suggest small{font-size:12px;color:var(--muted)}
+.taxon-card{display:flex;flex-direction:column}.taxon-card .card-info h3{font-family:Georgia,"Times New Roman",serif}.taxon-card-page{align-self:flex-start;margin-top:6px;font-size:13px;color:var(--accent);text-decoration:none}.taxon-card-page:hover{text-decoration:underline}.level-select[hidden]{display:none!important}
+.taxon-level-heading{grid-column:1/-1;margin:14px 0 0;font-size:16px;font-weight:600;color:var(--accent);border-bottom:1px solid var(--line);padding-bottom:6px}
+.collection-selection button.secondary{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+/* Desktop: no "Filters" heading on the sidebar (the mobile drawer keeps it, with its close button), and a little air between the area chips and the sidebar/gallery. */
+.gallery-layout{margin-top:18px}
+@media(min-width:1001px){.filter-sidebar-head{display:none}.filter-sidebar-head+.filter-group{padding-top:0;border-top:0}}

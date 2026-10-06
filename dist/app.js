@@ -29,6 +29,11 @@ const state = {
     // 'multi' when the "species with several observations" filter is on (a Set so the
     // sidebar's checkbox helper can drive it like the other checkbox groups).
     observations: new Set(),
+    // Taxonomic drill-down (taxonomic sort only): which rank the gallery shows cards for --
+    // 'order' (the default), 'family', 'genus' or 'species' -- and, once the visitor has
+    // clicked into a taxon card (or picked a taxon in the search), that taxon: {level, id}.
+    level: 'order',
+    drill: null,
     order: 'all',
     subOrder: 'all',
     superfamily: 'all',
@@ -78,6 +83,38 @@ grid.before(collectionStatus);
 
 function updateCollectionStatus() {
     collectionStatus.replaceChildren();
+    if (state.drill) {
+        const label = document.createElement('span');
+        const trip = state.collection ? collectionsList.find(x => String(x.trip_id) === state.collection) : null;
+        label.textContent = (language === 'he' ? 'מוצג: ' : 'Showing: ') + taxonLabel(state.drill.level, state.drill.id)
+            + (state.collection ? (language === 'he' ? ' · באוסף: ' : ' · in collection: ') + (trip ? collectionTitle(trip) : (labelFor(state.collection, tripLabelsData) || '')) : '');
+        // Up one rank (to the parent taxon this one was drilled from), and all the way up.
+        const parent = drillParent(state.drill);
+        const up = document.createElement('button');
+        up.type = 'button';
+        up.textContent = parent
+            ? (language === 'he' ? 'חזרה ל־' : 'Back to ') + taxonLabel(parent.level, parent.id)
+            : (language === 'he' ? 'חזרה לכל הסדרות' : 'Back to all orders');
+        up.addEventListener('click', () => {
+            if (parent) {
+                state.drill = parent;
+                setLevel(nextLevel(parent.level, speciesList.filter(sp => rankKey(sp, parent.level) === parent.id)));
+            } else {
+                state.drill = null; setLevel('order');
+            }
+            render();
+        });
+        collectionStatus.append(label, up);
+        if (parent) {
+            const top = document.createElement('button');
+            top.type = 'button';
+            top.className = 'secondary';
+            top.textContent = language === 'he' ? 'כל הסדרות' : 'All orders';
+            top.addEventListener('click', () => { state.drill = null; setLevel('order'); render(); });
+            collectionStatus.append(top);
+        }
+        return;
+    }
     if (!state.collection) return;
     const c = collectionsList.find(x => String(x.trip_id) === state.collection);
     const label = document.createElement('span');
@@ -450,6 +487,7 @@ function speciesSearchText(sp) {
 }
 function speciesMatches(sp, q) {
     if (state.collection && !sp.samples.some(sm => String(sm.trip_id) === state.collection)) return false;
+    if (state.drill && rankKey(sp, state.drill.level) !== String(state.drill.id)) return false;
     if (!matchesAreaFilter(sp, state.area)) return false;
     if (state.order !== 'all' && sp.order !== state.order) return false;
     if (state.subOrder !== 'all' && sp.sub_order !== state.subOrder) return false;
@@ -864,11 +902,188 @@ function syncSortControl() {
     }
     sortSelect.value = state.sort;
 }
+// ---- taxonomic drill-down ----
+// Ranks, top to bottom: order (e.g. Nudibranchia), sub-order (Doridina / Cladobranchia),
+// superfamily, family, genus, species. order / sub-order / superfamily are text fields on
+// the species; family / genus are the curated taxon tables (by id).
+const LEVELS = ['order', 'suborder', 'superfamily', 'family', 'genus', 'species'];
+const levelControl = document.querySelector('.level-select');
+const levelSelect = document.querySelector('#levelSelect');
+function setLevel(level) {
+    state.level = LEVELS.includes(level) ? level : 'order';
+    levelSelect.value = state.level;
+}
+// The species' own value at a rank ('' when it has none).
+function rankKey(sp, level) {
+    switch (level) {
+        case 'order': return sp.order || '';
+        case 'suborder': return sp.sub_order || '';
+        case 'superfamily': return sp.superfamily || '';
+        case 'family': return sp.taxon_family_id ? String(sp.taxon_family_id) : '';
+        case 'genus': return sp.taxon_genus_id ? String(sp.taxon_genus_id) : '';
+        default: return sp.slug || sp.title;
+    }
+}
+// The card a species falls under at a rank: its own value there, or -- when it has none
+// (e.g. no sub-order outside Nudibranchia) -- the nearest rank above that it does have.
+function cardKey(sp, level) {
+    for (let i = LEVELS.indexOf(level); i >= 0; i--) {
+        const key = rankKey(sp, LEVELS[i]);
+        if (key) return { level: LEVELS[i], key };
+    }
+    return { level: 'species', key: rankKey(sp, 'species') };
+}
+function taxonEntry(level, id) {
+    const dict = level === 'group' ? taxaData.orders : level === 'family' ? taxaData.families : level === 'genus' ? taxaData.genera : null;
+    return dict ? dict[id] : null;
+}
+const ORDER_COMMON = { Nudibranchia: ['חשופיות', 'Nudibranchs'] };
+function taxonLabel(level, key) {
+    const e = taxonEntry(level, key);
+    if (e) return language === 'en' ? (e.label_en || e.label) : e.label;
+    if (level === 'order') {
+        // A true order with a single curated group borrows that group's (named) label.
+        const groups = new Set(speciesList.filter(sp => sp.order === key).map(sp => sp.taxon_order_id).filter(Boolean));
+        if (groups.size === 1) return taxonLabel('group', String([...groups][0]));
+        const common = ORDER_COMMON[key];
+        return common ? `${key} (${language === 'en' ? common[1] : common[0]})` : key;
+    }
+    return key;
+}
+function rankName(level) {
+    const names = { order: ['סדרה', 'Order'], suborder: ['תת־סדרה', 'Suborder'],
+        superfamily: ['על־משפחה', 'Superfamily'], family: ['משפחה', 'Family'], genus: ['סוג', 'Genus'], species: ['מין', 'Species'] };
+    return (names[level] || names.species)[language === 'en' ? 1 : 0];
+}
+// The next rank worth showing below `level` for these species: a rank where they don't all
+// share one value (or lack one) adds nothing and is skipped -- Sacoglossa has no sub-order
+// and a single superfamily, so it opens straight onto its families.
+function nextLevel(level, species) {
+    for (let i = LEVELS.indexOf(level) + 1; i < LEVELS.length - 1; i++) {
+        const keys = new Set(species.map(sp => rankKey(sp, LEVELS[i])).filter(Boolean));
+        if (keys.size > 1) return LEVELS[i];
+    }
+    return 'species';
+}
+// The taxon one rank up from a drilled-into one: the nearest higher rank whose taxon holds
+// more species than this one (ranks that add nothing are skipped, as when drilling down).
+// null when the next step up is the top -- all orders.
+function drillParent(drill) {
+    const members = speciesList.filter(sp => rankKey(sp, drill.level) === drill.id);
+    if (!members.length) return null;
+    // Among ranks holding the same species (e.g. Sacoglossa and its single superfamily),
+    // the highest one is the parent -- the same taxon the visitor drilled down from.
+    let parent = null, parentSize = 0;
+    for (let i = LEVELS.indexOf(drill.level) - 1; i >= 0; i--) {
+        const key = rankKey(members[0], LEVELS[i]);
+        if (!key) continue;
+        const size = speciesList.filter(sp => rankKey(sp, LEVELS[i]) === key).length;
+        if (!parent && size > members.length) { parent = { level: LEVELS[i], id: key }; parentSize = size; }
+        else if (parent && size === parentSize) parent = { level: LEVELS[i], id: key };
+        else if (parent) break;
+    }
+    return parent;
+}
+// One card per taxon at the chosen rank holding at least one filtered species, in taxonomic
+// order, with a heading for each order above it. Clicking a card drills into that taxon at
+// the next informative rank. Returns the number of cards drawn.
+function renderTaxonLevel(species, level, frag) {
+    const heading = document.createElement('h2');
+    heading.className = 'gallery-group-title';
+    heading.textContent = rankName(level);
+    frag.append(heading);
+    const groups = new Map();   // keeps first-seen (= taxonomic) order
+    for (const sp of species) {
+        const ck = cardKey(sp, level);
+        const id = ck.level + ':' + ck.key;
+        if (!groups.has(id)) groups.set(id, { ...ck, first: sp, members: [] });
+        groups.get(id).members.push(sp);
+    }
+    let prevOrder = null, n = 0;
+    for (const g of groups.values()) {
+        const order = g.first.order || '';
+        if (level !== 'order' && order && order !== prevOrder) {
+            const h = document.createElement('h3');
+            h.className = 'taxon-level-heading';
+            h.textContent = taxonLabel('order', order);
+            frag.append(h);
+        }
+        prevOrder = order;
+        frag.append(g.level === 'species' ? buildSpeciesCard(g.first, n) : buildTaxonCard(g.level, g.key, g.members, n));
+        n++;
+    }
+    return n;
+}
+function buildTaxonCard(level, key, members, index) {
+    const entry = taxonEntry(level, key) || {};
+    const count = members.length;
+    const article = document.createElement('article');
+    article.className = 'card taxon-card';
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'video-button';
+    const label = taxonLabel(level, key);
+    button.setAttribute('aria-label', `${language === 'he' ? 'הצגת' : 'Show'}: ${label}`);
+    const wrap = document.createElement('span');
+    wrap.className = 'image-wrap';
+    const img = document.createElement('img');
+    img.src = entry.thumbnail || members[0].thumbnail;
+    img.alt = '';
+    img.width = 640; img.height = 360;
+    img.loading = index < 6 ? 'eager' : 'lazy';
+    const badge = document.createElement('span');
+    badge.className = 'count-badge';
+    badge.textContent = count;
+    badge.setAttribute('aria-hidden', 'true');
+    wrap.append(img, badge);
+    const info = document.createElement('span');
+    info.className = 'card-info';
+    const h3 = document.createElement('h3');
+    h3.className = 'hebrew';
+    h3.textContent = label;
+    const meta = document.createElement('span');
+    meta.className = 'card-meta';
+    const rank = document.createElement('span');
+    rank.textContent = rankName(level) + ' · ' + (language === 'he' ? `${count} מינים` : `${count} species`);
+    meta.append(rank);
+    info.append(h3, meta);
+    button.append(wrap, info);
+    button.addEventListener('click', () => {
+        state.drill = { level, id: String(key) };
+        setLevel(nextLevel(level, members));
+        render();
+        document.querySelector('#resultCount').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    article.append(button);
+    // The taxon's own page, as a separate link (a link can't sit inside the drill button).
+    // Order/sub-order/superfamily have no page; an order with a single group links to it.
+    let href = '';
+    if ((level === 'family' || level === 'genus') && entry.name) href = `/${level}/${encodeURIComponent(entry.name)}/`;
+    else if (level === 'order') {
+        const groups = new Set(members.map(sp => sp.taxon_order_id).filter(Boolean));
+        if (groups.size === 1) href = `/order/${[...groups][0]}/`;
+    }
+    if (href) {
+        const page = document.createElement('a');
+        page.className = 'taxon-card-page';
+        page.href = href + (language === 'en' ? '?lang=en' : '');
+        page.textContent = language === 'he' ? 'לדף ↗' : 'Page ↗';
+        article.append(page);
+    }
+    return article;
+}
+levelSelect.addEventListener('change', e => { setLevel(e.target.value); render(); });
+
 function render() {
     updateCollectionStatus();
     const q = normalize(search.value);
     searchByName = !!q && speciesList.some(sp => speciesNameMatches(sp, q));
-    const filteredCollections = collectionsList.filter(c => collectionMatches(c, q));
+    // The taxonomic view browses taxa, not dive-trip collections; the level selector applies
+    // to it under every filter, a single dive trip's collection included.
+    const taxonomic = state.sort === 'taxonomic';
+    const level = taxonomic ? state.level : 'species';
+    levelControl.hidden = !taxonomic;
+    const filteredCollections = taxonomic ? [] : collectionsList.filter(c => collectionMatches(c, q));
     let filteredSpecies = speciesList.filter(sp => speciesMatches(sp, q));
     if (state.sort === 'alpha') filteredSpecies = [...filteredSpecies].sort(speciesSortCompare);
     if (state.sort === 'year') filteredSpecies = [...filteredSpecies].sort(speciesYearCompare);
@@ -882,7 +1097,10 @@ function render() {
         frag.append(heading);
         filteredCollections.forEach((c, i) => frag.append(buildCollectionCard(c, i)));
     }
-    if (filteredSpecies.length) {
+    let cardCount = filteredSpecies.length;
+    if (filteredSpecies.length && level !== 'species') {
+        cardCount = renderTaxonLevel(filteredSpecies, level, frag);
+    } else if (filteredSpecies.length) {
         const heading = document.createElement('h2');
         heading.className = 'gallery-group-title';
         heading.textContent = language === 'he' ? 'מינים' : 'Species';
@@ -902,7 +1120,7 @@ function render() {
         });
     }
     grid.append(frag);
-    const total = filteredSpecies.length + filteredCollections.length;
+    const total = cardCount + filteredCollections.length;
     document.querySelector('#resultCount').textContent = language === 'he' ? `${total} פריטים` : `${total} ${total === 1 ? 'item' : 'items'}`;
     document.querySelector('#empty').hidden = total > 0;
     updateFilterToggleCount();
@@ -986,10 +1204,10 @@ search.setAttribute('aria-controls', 'searchSuggest');
 search.setAttribute('aria-expanded', 'false');
 search.spellcheck = false;
 let suggestItems = [], suggestActive = -1;
-const SUGGEST_KINDS = { genus: 0, family: 1, species: 2, common: 3, site: 4, region: 5 };
+const SUGGEST_KINDS = { order: 0, suborder: 1, superfamily: 2, family: 3, genus: 4, species: 5, common: 6, site: 7, region: 8 };
 function suggestKindLabel(kind) {
-    const he = { common: 'שם עממי', genus: 'סוג', family: 'משפחה', site: 'אתר צלילה', region: 'אזור צלילה' };
-    const en = { common: 'Common name', genus: 'Genus', family: 'Family', site: 'Dive site', region: 'Dive region' };
+    const he = { common: 'שם עממי', order: 'סדרה', suborder: 'תת־סדרה', superfamily: 'על־משפחה', genus: 'סוג', family: 'משפחה', site: 'אתר צלילה', region: 'אזור צלילה' };
+    const en = { common: 'Common name', order: 'Order', suborder: 'Suborder', superfamily: 'Superfamily', genus: 'Genus', family: 'Family', site: 'Dive site', region: 'Dive region' };
     return (language === 'he' ? he : en)[kind] || '';
 }
 function buildSuggestCandidates() {
@@ -999,17 +1217,22 @@ function buildSuggestCandidates() {
         const key = kind + '|' + normalize(text);
         const prev = out.get(key);
         if (prev) { prev.slugs.add(extra.slug); return; }
-        out.set(key, { kind, text, norm: normalize(text), slugs: new Set([extra.slug]), latin: !!extra.latin });
+        out.set(key, { kind, text, norm: normalize(text), slugs: new Set([extra.slug]), latin: !!extra.latin, id: extra.id });
     };
     for (const sp of speciesList) {
         add('species', sp.title, { slug: sp.slug, latin: true });
         const common = language === 'he' ? sp.name_he : sp.name_en;
         if (common) add('common', common, { slug: sp.slug });
-        add('genus', sp.genus, { latin: true });
-        add('family', sp.family);
+        add('genus', sp.genus, { latin: true, id: sp.taxon_genus_id });
+        add('family', sp.family, { id: sp.taxon_family_id });
     }
     const lbl = e => e && (language === 'en' ? (e.label_en || e.label) : e.label);
     for (const id in siteLabelsData) add('site', lbl(siteLabelsData[id]));
+    for (const sp of speciesList) {
+        add('order', sp.order, { latin: true, id: sp.order });
+        add('suborder', sp.sub_order, { latin: true, id: sp.sub_order });
+        add('superfamily', sp.superfamily, { latin: true, id: sp.superfamily });
+    }
     for (const id in regionLabelsData) add('region', lbl(regionLabelsData[id]));
     return [...out.values()];
 }
@@ -1063,7 +1286,15 @@ function highlightSuggest(i) {
 function pickSuggest(i) {
     const c = suggestItems[i];
     if (!c) return;
-    search.value = c.text;
+    if (['order', 'suborder', 'superfamily', 'family', 'genus'].includes(c.kind) && c.id) {
+        // A taxon: show that taxon itself, at its own rank (the drill-down's starting point).
+        search.value = '';
+        state.drill = { level: c.kind, id: String(c.id) };
+        setLevel(c.kind);
+    } else {
+        search.value = c.text;
+        setLevel('species');
+    }
     closeSuggest();
     render();
     document.querySelector('#resultCount').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1081,19 +1312,21 @@ search.addEventListener('keydown', e => {
 
 syncSortControl();
 document.querySelector('#total').textContent = `(${speciesList.length})`;
-search.addEventListener('input', render);
+// Typing a name searches species, so the view switches to the species level.
+search.addEventListener('input', () => { if (search.value.trim() && state.level !== 'species') setLevel('species'); render(); });
 document.querySelector('#reset').addEventListener('click', () => {
     search.value = '';
     state.area = 'all'; state.regions.clear(); state.sites.clear(); state.photographers.clear(); state.years.clear(); state.observations.clear();
     state.order = 'all'; state.subOrder = 'all'; state.superfamily = 'all'; state.family = 'all'; state.genus = 'all'; state.collection = null;
     state.sort = 'taxonomic'; state.sortChosen = false; syncSortControl();
+    state.drill = null; setLevel('order');
     renderSidebar(); render(); search.focus();
 });
-document.querySelector('#orderSelect').addEventListener('change', e => { state.order = e.target.value; state.subOrder = 'all'; state.superfamily = 'all'; state.family = 'all'; state.genus = 'all'; renderTaxonomySelects(); render(); });
-document.querySelector('#subOrderSelect').addEventListener('change', e => { state.subOrder = e.target.value; state.superfamily = 'all'; state.family = 'all'; state.genus = 'all'; renderTaxonomySelects(); render(); });
-document.querySelector('#superfamilySelect').addEventListener('change', e => { state.superfamily = e.target.value; state.family = 'all'; state.genus = 'all'; renderTaxonomySelects(); render(); });
-document.querySelector('#familySelect').addEventListener('change', e => { state.family = e.target.value; state.genus = 'all'; renderTaxonomySelects(); render(); });
-document.querySelector('#genusSelect').addEventListener('change', e => { state.genus = e.target.value; render(); });
+document.querySelector('#orderSelect').addEventListener('change', e => { if (e.target.value !== 'all') setLevel('order'); state.order = e.target.value; state.subOrder = 'all'; state.superfamily = 'all'; state.family = 'all'; state.genus = 'all'; renderTaxonomySelects(); render(); });
+document.querySelector('#subOrderSelect').addEventListener('change', e => { if (e.target.value !== 'all') setLevel('suborder'); state.subOrder = e.target.value; state.superfamily = 'all'; state.family = 'all'; state.genus = 'all'; renderTaxonomySelects(); render(); });
+document.querySelector('#superfamilySelect').addEventListener('change', e => { if (e.target.value !== 'all') setLevel('superfamily'); state.superfamily = e.target.value; state.family = 'all'; state.genus = 'all'; renderTaxonomySelects(); render(); });
+document.querySelector('#familySelect').addEventListener('change', e => { if (e.target.value !== 'all') setLevel('family'); state.family = e.target.value; state.genus = 'all'; renderTaxonomySelects(); render(); });
+document.querySelector('#genusSelect').addEventListener('change', e => { if (e.target.value !== 'all') setLevel('genus'); state.genus = e.target.value; render(); });
 document.querySelector('#tripSelect').addEventListener('change', e => { state.collection = e.target.value === 'all' ? null : e.target.value; render(); });
 document.querySelector('#sortSelect').addEventListener('change', e => { state.sort = e.target.value; state.sortChosen = true; render(); });
 document.querySelector('#close').addEventListener('click', () => dialog.close());
@@ -1185,6 +1418,9 @@ function setLanguage(value) {
     document.querySelector('#sortSelect').setAttribute('aria-label', en ? 'Sort species' : 'מיון המינים');
     document.querySelector('#sortSelect option[value="taxonomic"]').textContent = en ? 'Taxonomic order' : 'סדר טקסונומי';
     document.querySelector('#sortSelect option[value="alpha"]').textContent = en ? 'Alphabetical (genus then species)' : 'אלפביתי (סוג ואז מין)';
+    levelControl.querySelector('span').textContent = en ? 'Level' : 'רמה';
+    levelSelect.setAttribute('aria-label', en ? 'Gallery level' : 'רמת התצוגה');
+    LEVELS.forEach(v => { levelSelect.querySelector(`option[value="${v}"]`).textContent = rankName(v); });
     countSortOption.textContent = en ? 'Number of observations (most first)' : 'מספר תצפיות (מהגדול לקטן)';
     yearSortOption.textContent = en ? 'Observation year (earliest first)' : 'שנת תצפית (מהמוקדם למאוחר)';
     languageButton.textContent = en ? 'עברית' : 'English';

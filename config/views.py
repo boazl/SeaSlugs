@@ -66,6 +66,17 @@ def gallery_file(request, filename='index.html'):
                 taxon_order_by_name.get(species.order) if species.order else None)
             return order_obj, family_obj, genus_obj
 
+        def display_sub_order(order_obj):
+            # The phanerobranch dorids' row ("גלויי זים", Nudibranchia #3) is the order's
+            # blank-sub_order *base* row that build_taxonomy_tables and the resolver rely on,
+            # so it must stay blank in the database -- but its species are Doridina, and the
+            # gallery's sub-order filter / drill-down show them there.
+            if not order_obj:
+                return ''
+            if not order_obj.sub_order and order_obj.name == 'Nudibranchia' and order_obj.taxonomic_order == '3':
+                return 'Doridina'
+            return order_obj.sub_order
+
         def taxon_rank(value):
             return (1, '') if not value else (0, value)
 
@@ -194,7 +205,7 @@ def gallery_file(request, filename='index.html'):
                 # suborder this species' order was curated into (blank when none), and the
                 # ids used both to filter by suborder and to detect group transitions for the
                 # taxonomic-sort panel headings in app.js.
-                'sub_order': order_obj.sub_order if order_obj else '',
+                'sub_order': display_sub_order(order_obj),
                 'taxon_order_id': str(order_obj.pk) if order_obj else None,
                 'taxon_family_id': str(family_obj.pk) if family_obj else None,
                 'taxon_genus_id': str(genus_obj.pk) if genus_obj else None,
@@ -207,7 +218,7 @@ def gallery_file(request, filename='index.html'):
                 'samples': samples,
             }
             if order_obj:
-                register_taxon(taxa_orders, order_obj, order_obj.sub_order)
+                register_taxon(taxa_orders, order_obj, display_sub_order(order_obj))
             if family_obj:
                 register_taxon(taxa_families, family_obj, family_obj.sub_family)
             if genus_obj:
