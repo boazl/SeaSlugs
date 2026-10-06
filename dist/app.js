@@ -790,16 +790,14 @@ function renderTaxonPanel(level, id) {
         : (language === 'he' ? 'סוג' : 'Genus');
     const name = entry ? (language === 'en' ? (entry.label_en || entry.label) : entry.label) : '';
     const title = `${levelLabel} - ${name}`;
-    // A genus has its own public page (see buildSpeciesCard's identical sp.slug pattern) --
-    // link straight to it there whenever it has a photo/video of its own (via
-    // defining_sample). Order/family have no page of their own yet, so their panels are
-    // always plain, non-interactive (not even a media-preview click) until that exists.
-    const hasMedia = !!(entry && (entry.image_url || entry.video_id));
-    const isGenusLink = hasMedia && level === 'genus';
-    const panel = document.createElement(isGenusLink ? 'a' : 'div');
-    panel.className = `taxon-panel taxon-panel-${level}${isGenusLink ? ' taxon-panel-clickable' : ''}`;
-    if (isGenusLink) {
-        panel.href = `/genus/${encodeURIComponent(entry.name)}/`;
+    // Every order, family and genus has its own public page (order by id, since one order
+    // name can have several rows; family and genus by name) -- the panel links straight to it.
+    const href = !entry ? '' : level === 'order' ? `/order/${encodeURIComponent(id)}/`
+        : `/${level}/${encodeURIComponent(entry.name)}/`;
+    const panel = document.createElement(href ? 'a' : 'div');
+    panel.className = `taxon-panel taxon-panel-${level}${href ? ' taxon-panel-clickable' : ''}`;
+    if (href) {
+        panel.href = href + (language === 'en' ? '?lang=en' : '');
         panel.setAttribute('aria-label', title);
     }
     if (entry && entry.thumbnail) {

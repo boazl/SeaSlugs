@@ -257,6 +257,9 @@ class TaxonOrder(models.Model):
         help_text='הדגימה שתמונתה או סרטון היוטיוב שלה יוצגו בכותרת הסדרה בגלריה.')
     description_he = models.TextField('תיאור בעברית', blank=True)
     description_en = models.TextField('תיאור באנגלית', blank=True)
+    identification_he = models.TextField('סימני זיהוי', blank=True)
+    identification_en = models.TextField('סימני זיהוי (אנגלית)', blank=True)
+    sources = models.TextField('מקורות (קישור בכל שורה)', blank=True)
     link = models.URLField('קישור', blank=True)
     article_pdf = models.FileField('מאמר (PDF)', upload_to='articles/orders/', blank=True, validators=[FileExtensionValidator(['pdf'])])
     class Meta:
@@ -285,6 +288,9 @@ class TaxonFamily(models.Model):
         help_text='הדגימה שתמונתה או סרטון היוטיוב שלה יוצגו בכותרת המשפחה בגלריה.')
     description_he = models.TextField('תיאור בעברית', blank=True)
     description_en = models.TextField('תיאור באנגלית', blank=True)
+    identification_he = models.TextField('סימני זיהוי', blank=True)
+    identification_en = models.TextField('סימני זיהוי (אנגלית)', blank=True)
+    sources = models.TextField('מקורות (קישור בכל שורה)', blank=True)
     link = models.URLField('קישור', blank=True)
     article_pdf = models.FileField('מאמר (PDF)', upload_to='articles/families/', blank=True, validators=[FileExtensionValidator(['pdf'])])
     class Meta:
@@ -305,6 +311,9 @@ class TaxonGenus(models.Model):
         help_text='הדגימה שתמונתה או סרטון היוטיוב שלה יוצגו בכותרת הסוג ובאוסף המינים שלו בגלריה.')
     description_he = models.TextField('תיאור בעברית', blank=True)
     description_en = models.TextField('תיאור באנגלית', blank=True)
+    identification_he = models.TextField('סימני זיהוי', blank=True)
+    identification_en = models.TextField('סימני זיהוי (אנגלית)', blank=True)
+    sources = models.TextField('מקורות (קישור בכל שורה)', blank=True)
     link = models.URLField('קישור', blank=True)
     article_pdf = models.FileField('מאמר (PDF)', upload_to='articles/genera/', blank=True, validators=[FileExtensionValidator(['pdf'])])
     class Meta:

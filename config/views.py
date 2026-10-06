@@ -110,10 +110,9 @@ def gallery_file(request, filename='index.html'):
                 label, label_en = taxon_label_pair(obj, sub_value)
                 dest[key] = {'label': label, 'label_en': label_en, 'thumbnail': thumbnail, 'image_url': image_url, 'video_id': video_id,
                              # obj.name -- the plain taxon name (never the sub_value-qualified
-                             # label above) -- lets app.js link a genus panel straight to its
-                             # public page (/genus/<name>/), the same way species cards link to
-                             # their own page via sp.slug. Order/family have no page of their
-                             # own yet, so app.js only uses this for genus panels for now.
+                             # label above) -- lets app.js link a family/genus panel straight to
+                             # its public page (/family/<name>/, /genus/<name>/); order panels
+                             # link by id (/order/<pk>/), since one order name has several rows.
                              'name': obj.name}
                 if sub_value is not None:
                     dest[key]['sub_value'] = sub_value

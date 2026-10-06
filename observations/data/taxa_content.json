@@ -1,0 +1,447 @@
+{
+ "orders": [
+  {
+   "name": "Acteonoidea",
+   "sub_order": "",
+   "taxonomic_order": "1",
+   "description_en": "Acteonoidea is an early-branching group of heterobranch sea slugs that still carry a well-developed external shell into which the animal can partly withdraw. It includes the barrel-bubble and bubble shells of the families Acteonidae and Aplustridae (Hydatina, Micromelo, Aplustrum). Many are boldly patterned, burrow in sand and hunt polychaete worms at night.",
+   "description_he": "Acteonoidea היא קבוצה קדומה של חלזונות ים מקבוצת Heterobranchia, שעדיין נושאים קונכייה חיצונית מפותחת שהחיה יכולה להיסוג אליה בחלקה. היא כוללת את חלזונות הבועה מהמשפחות Acteonidae ו־Aplustridae (Hydatina, Micromelo, Aplustrum). רבים מהם בעלי דוגמת צבע בולטת, חופרים בחול וצדים תולעים רב־זיפיות בלילה.",
+   "identification_en": "An obvious, often colourful external shell (globose or barrel-shaped) combined with a broad, frilly or lobed body and a flattened head shield. Unlike nudibranchs they have no rhinophores or dorsal gills; unlike Cephalaspidea the shell is large, thin and boldly banded or lined.",
+   "identification_he": "קונכייה חיצונית בולטת, לעתים קרובות צבעונית (כדורית או דמוית חבית), יחד עם גוף רחב בעל שוליים מסולסלים או אונות ומגן ראש שטוח. בניגוד לחשופיות אין להם מחושים או זימים על הגב; בניגוד ל־Cephalaspidea הקונכייה גדולה, דקה ובעלת פסים או קווים בולטים."
+  },
+  {
+   "name": "Pleurobranchida",
+   "sub_order": "",
+   "taxonomic_order": "2",
+   "description_en": "Pleurobranchida are the side-gilled slugs: soft-bodied, mostly nocturnal heterobranchs with a single feathery gill on the right side, tucked under the edge of the mantle. Many keep a small internal shell. They feed mainly on sponges and ascidians and defend themselves with acidic secretions from glands in the skin.",
+   "description_he": "Pleurobranchida הם חלזונות צד־זימיים: חלזונות ים רכי גוף, רובם פעילים בלילה, עם זים נוצתי יחיד בצד ימין, מוסתר מתחת לשולי המעטפת. לרבים מהם קונכייה פנימית קטנה. הם ניזונים בעיקר מספוגים ומאצטלנים ומתגוננים בעזרת הפרשות חומציות מבלוטות בעור.",
+   "identification_en": "An oval, often domed body with a large mantle covering most of the foot; rolled, tube-like rhinophores; a broad oral veil; and one plume-like gill visible on the right side between mantle and foot. There are no dorsal gills or cerata.",
+   "identification_he": "גוף סגלגל, לעתים קרובות כיפתי, עם מעטפת גדולה המכסה את רוב הרגל; מחושים מגולגלים דמויי צינור; מצחייה קדמית רחבה; וזים נוצתי יחיד הנראה בצד ימין בין המעטפת לרגל. אין זימים או זיזים על הגב."
+  },
+  {
+   "name": "Nudibranchia",
+   "sub_order": "",
+   "taxonomic_order": "3",
+   "description_en": "The phanerobranch dorids are nudibranchs whose ring of gills on the back cannot be withdrawn into a pocket. They include the Polyceridae (Nembrotha, Tambja, Polycera, Plocamopherus), the Goniodorididae (Trapania, Okenia, Goniodoridella), the Aegiridae and the Calycidorididae. Many feed on bryozoans, ascidians or entoprocts.",
+   "description_he": "החשופיות הדורידיות \"גלויות הזים\" הן חשופיות שטבעת הזימים שעל גבן אינה יכולה להיסוג אל תוך כיס. הן כוללות את משפחת Polyceridae (Nembrotha, Tambja, Polycera, Plocamopherus), את Goniodorididae (Trapania, Okenia, Goniodoridella), את Aegiridae ואת Calycidorididae. רבות מהן ניזונות מטחביות, מאצטלנים או מפשוטי־גוף.",
+   "identification_en": "Dorid body plan (rhinophores at the front, a cluster of gills around the anus at the back) but the gills stay exposed when disturbed, often flanked by finger-like extra-branchial processes. Many have frontal velar processes or lateral papillae.",
+   "identification_he": "מבנה גוף דורידי (מחושים בחזית ואשכול זימים סביב פי הטבעת מאחור), אך הזימים נשארים חשופים גם כשהחיה מוטרדת, ולעתים קרובות לצידם זיזים דמויי אצבע. לרבות מהן זיזים בחזית הראש או בליטות לאורך הצדדים."
+  },
+  {
+   "name": "Nudibranchia",
+   "sub_order": "Doridina",
+   "taxonomic_order": "4",
+   "description_en": "The cryptobranch dorids are the largest group of dorid nudibranchs. Their ring of gills on the back can be fully withdrawn into a pocket in the mantle. The group includes the colourful Chromodorididae, the Discodorididae, the Spanish dancer family Hexabranchidae and others. Most feed on sponges and many store the sponges' chemical defences.",
+   "description_he": "החשופיות הדורידיות \"בעלות הנדן\" הן הקבוצה הגדולה ביותר של החשופיות הדורידיות. את טבעת הזימים שעל גבן הן יכולות להסיג לגמרי אל תוך כיס במעטפת. הקבוצה כוללת את Chromodorididae הצבעוניות, את Discodorididae, את משפחת \"הרקדנית הספרדייה\" Hexabranchidae ועוד. רובן ניזונות מספוגים, ורבות אוגרות את חומרי ההגנה הכימיים של הספוגים.",
+   "identification_en": "Flattened to high-backed body covered by a mantle, a pair of retractile rhinophores at the front and a circle of feathery gills around the anus at the rear that disappears into a pocket when touched. No cerata.",
+   "identification_he": "גוף שטוח עד גבוה המכוסה במעטפת, זוג מחושים נסוגים בחזית ומעגל זימים נוצתיים סביב פי הטבעת מאחור, הנעלם אל תוך כיס במגע. אין זיזי גב."
+  },
+  {
+   "name": "Nudibranchia",
+   "sub_order": "Doridina",
+   "taxonomic_order": "5",
+   "description_en": "The radula-less dorids (Phyllidiidae and Dendrodorididae) have lost the rasping radula of other nudibranchs. They feed on sponges by everting their pharynx and digesting the sponge tissue with enzymes outside the body. Phyllidiids are among the most common nudibranchs on Indo-Pacific reefs and are protected by distasteful chemicals.",
+   "description_he": "החשופיות הדורידיות \"חסרות השן\" (Phyllidiidae ו־Dendrodorididae) איבדו את השיננית, לשון הגירוד של חשופיות אחרות. הן ניזונות מספוגים בהוצאת הלוע החוצה ועיכול רקמת הספוג באנזימים מחוץ לגוף. מיני Phyllidiidae הם מהחשופיות הנפוצות ביותר בשוניות האינדו־פסיפי, ומוגנים בחומרים כימיים דוחים.",
+   "identification_en": "Phyllidiids have a firm, warty or ridged back in black with yellow, blue, pink or white, no visible gill plume on the back (the gills are under the mantle edge), and rhinophores that sit in pockets. Dendrodorids are soft and smooth, with a rosette of branching gills on the back.",
+   "identification_he": "ל־Phyllidiidae גב קשיח, מגובשש או מרוכס, בשחור עם צהוב, כחול, ורוד או לבן, בלי זימים נראים על הגב (הזימים מתחת לשולי המעטפת), ומחושים היושבים בתוך כיסים. מיני Dendrodorididae רכים וחלקים, עם שושנת זימים מסועפים על הגב."
+  },
+  {
+   "name": "Nudibranchia",
+   "sub_order": "Cladobranchia",
+   "taxonomic_order": "6",
+   "description_en": "This group of cladobranch nudibranchs (Arminidae, Doridomorphidae and relatives) have a broad mantle-like back, often ridged, and gills or lamellae along the sides under the mantle edge. Arminids live on sand and feed on soft corals and sea pens; Doridomorpha feeds on blue coral.",
+   "description_he": "קבוצה זו של חשופיות Cladobranchia (Arminidae, Doridomorphidae וקרוביהן) מאופיינת בגב רחב דמוי מעטפת, לעתים קרובות מרוכס, ובזימים או בפסים לאורך הצדדים מתחת לשולי המעטפת. מיני Arminidae חיים על חול וניזונים מאלמוגים רכים ומנוצות ים; Doridomorpha ניזונה מאלמוג כחול.",
+   "identification_en": "Flattened body with a distinct mantle edge and an oral veil at the front; the back of arminids carries many fine longitudinal ridges. There is no circle of gills on the back and no cerata.",
+   "identification_he": "גוף שטוח עם שולי מעטפת ברורים ומצחייה בחזית; על גבם של מיני Arminidae רכסים דקים רבים לאורך הגוף. אין מעגל זימים על הגב ואין זיזי גב."
+  },
+  {
+   "name": "Nudibranchia",
+   "sub_order": "Cladobranchia",
+   "taxonomic_order": "7",
+   "description_en": "The dendronotid nudibranchs (Bornellidae, Dotidae, Tritoniidae, Tethydidae, Dendronotidae) carry branched, tree-like gills or processes along both sides of the back. They include the hydroid-eating Doto, the soft-coral-eating Tritonia and Marionia, and the hooded Melibe that catches crustaceans in its oral hood.",
+   "description_he": "החשופיות הדנדרונוטיות (Bornellidae, Dotidae, Tritoniidae, Tethydidae, Dendronotidae) נושאות זימים או זיזים מסועפים דמויי עץ לאורך שני צדי הגב. הן כוללות את Doto הניזונה מהידרואידים, את Tritonia ו־Marionia הניזונות מאלמוגים רכים, ואת Melibe בעלת הברדס הלוכדת סרטנים בברדס הפה.",
+   "identification_en": "Rhinophores usually sit in sheaths with a crown or branched rim; pairs of branched (dendritic) gills or knobbed cerata line the sides of the back. No circle of gills at the rear, and the cerata lack the stinging cnidosacs of aeolids.",
+   "identification_he": "המחושים יושבים לרוב בתוך נדנים בעלי שוליים מסועפים או דמויי כתר; זוגות של זימים מסועפים או זיזים מגובששים לאורך צדי הגב. אין מעגל זימים מאחור, ולזיזים אין את שקי הצריבה של החשופיות האאולידיות."
+  },
+  {
+   "name": "Nudibranchia",
+   "sub_order": "Cladobranchia",
+   "taxonomic_order": "8",
+   "description_en": "Aeolid nudibranchs (Aeolidida) carry many finger-like cerata on the back, each containing a branch of the digestive gland. Most feed on cnidarians — hydroids, anemones or corals — and store the prey's unfired stinging cells in sacs at the ceras tips for their own defence. Some, like Phyllodesmium and Pteraeolidia, farm symbiotic algae.",
+   "description_he": "החשופיות האאולידיות (Aeolidida) נושאות על גבן זיזי גב רבים דמויי אצבע, ובכל אחד מהם שלוחה של בלוטת העיכול. רובן ניזונות מצורבים – הידרואידים, שושנות ים או אלמוגים – ואוגרות את תאי הצריבה של הטרף, שלא נורו, בשקים בקצות הזיזים לשם הגנה עצמית. חלקן, כמו Phyllodesmium ו־Pteraeolidia, \"מגדלות\" אצות סימביוטיות.",
+   "identification_en": "Slender body with rows or clusters of cerata along the back, smooth, ringed or lamellate rhinophores and long oral tentacles; the digestive gland often shows through the cerata as a coloured core. No circle of gills.",
+   "identification_he": "גוף תמיר עם שורות או אשכולות של זיזי גב לאורך הגב, מחושים חלקים, טבעתיים או מפוספסים ומחושי פה ארוכים; בלוטת העיכול נראית לעתים קרובות דרך הזיזים כליבה צבעונית. אין מעגל זימים."
+  },
+  {
+   "name": "Umbraculida",
+   "sub_order": "",
+   "taxonomic_order": "9",
+   "description_en": "Umbraculida are the umbrella slugs: heterobranchs with a flat, limpet-like external shell sitting on top of a bulky body. The group includes Umbraculum and Tylodina (Tylodinidae), which feeds on yellow Aplysina sponges and takes on their colour.",
+   "description_he": "Umbraculida הם \"חלזונות המטרייה\": חלזונות ים מקבוצת Heterobranchia עם קונכייה חיצונית שטוחה, דמוית כיפה, היושבת על גוף מגושם. הקבוצה כוללת את Umbraculum ואת Tylodina (Tylodinidae), הניזונה מספוגי Aplysina צהובים ומקבלת את צבעם.",
+   "identification_en": "A shallow, cap-like external shell covering the back (like a limpet), with the body and foot projecting around it; rolled rhinophores and a gill on the right side under the shell.",
+   "identification_he": "קונכייה חיצונית שטוחה דמוית כובע המכסה את הגב (כמו צלחית), כשהגוף והרגל בולטים סביבה; מחושים מגולגלים וזים בצד ימין מתחת לקונכייה."
+  },
+  {
+   "name": "Cephalaspidea",
+   "sub_order": "",
+   "taxonomic_order": "10",
+   "description_en": "Cephalaspidea are the headshield slugs and bubble snails. Their head is covered by a broad, shovel-like shield used to plough through sand. Many have a thin external or internal shell. The group includes herbivorous bubble snails (Haminoeidae) and fast predators such as Aglajidae (Chelidonura, Philinopsis), which track prey by chemical trails, and the swimming Gastropteridae.",
+   "description_he": "Cephalaspidea הם חלזונות מגן־הראש וחלזונות הבועה. ראשם מכוסה במגן רחב דמוי את, המשמש לחרישה בחול. לרבים מהם קונכייה דקה, חיצונית או פנימית. הקבוצה כוללת חלזונות בועה צמחוניים (Haminoeidae) וטורפים מהירים כמו Aglajidae (Chelidonura, Philinopsis), העוקבים אחר טרפם לפי עקבות כימיים, ואת Gastropteridae השוחים.",
+   "identification_en": "A smooth, shield-like head with no rhinophores or tentacles, often a rear shield and tail lobes; side flaps (parapodia) fold up over the body. Shells, when present, are thin bubble shells.",
+   "identification_he": "ראש חלק דמוי מגן בלי מחושים, לעתים קרובות גם מגן אחורי ואונות זנב; כנפיים בצדי הגוף מתקפלות כלפי מעלה. כשיש קונכייה, היא קונכיית בועה דקה."
+  },
+  {
+   "name": "Aplysiida",
+   "sub_order": "",
+   "taxonomic_order": "11",
+   "description_en": "Aplysiida are the sea hares: large, soft herbivores named for their ear-like rhinophores. Most graze algae or seagrass, carry a thin internal shell and release purple ink or milky secretions when disturbed. Some swim by flapping their parapodia, and some, like Bursatella and Stylocheilus, form large aggregations.",
+   "description_he": "Aplysiida הם ארנבי הים: צמחונים גדולים ורכים, שנקראו כך בזכות מחושיהם דמויי האוזן. רובם רועים אצות או עשבי ים, נושאים קונכייה פנימית דקה ומפרישים דיו סגול או הפרשה חלבית כשהם מוטרדים. חלקם שוחים בהנפת הכנפיים, וחלקם, כמו Bursatella ו־Stylocheilus, יוצרים ריכוזים גדולים.",
+   "identification_en": "Bulky body with a distinct neck, ear-like rolled rhinophores and a second pair of oral tentacles; large side flaps (parapodia) that fold over the back and hide the mantle and gill.",
+   "identification_he": "גוף מגושם עם צוואר ברור, מחושים מגולגלים דמויי אוזן וזוג נוסף של מחושי פה; כנפיים גדולות בצדדים המתקפלות מעל הגב ומסתירות את המעטפת והזים."
+  },
+  {
+   "name": "Sacoglossa",
+   "sub_order": "",
+   "taxonomic_order": "12",
+   "description_en": "Sacoglossa are the sap-sucking sea slugs. Each tooth of their single-row radula pierces algal cells so that the slug can suck out the contents. Many, such as Elysia and Plakobranchus, keep the algae's chloroplasts working in their own tissues for weeks and are nicknamed \"solar-powered\" slugs. Most are small and well camouflaged on their food algae.",
+   "description_he": "Sacoglossa הם חלזונות הים מוצצי המוהל. כל שן בשיננית החד־שורתית שלהם מנקבת תאי אצות, כך שהחילזון יכול למצוץ את תוכנם. רבים מהם, כמו Elysia ו־Plakobranchus, שומרים את הכלורופלסטים של האצות פעילים ברקמותיהם במשך שבועות, וזכו לכינוי חלזונות \"סולאריים\". רובם קטנים ומוסווים היטב על האצות שמהן הם ניזונים.",
+   "identification_en": "Two forms: elysiids have wing-like parapodia folded over a smooth back, while limapontioids (Cyerce, Costasiella, Stiliger) carry swollen, leaf-like or club-shaped cerata. Both have rolled or simple rhinophores and, typically, green tones from the algae they eat.",
+   "identification_he": "שתי צורות עיקריות: מיני Elysia וקרוביהם בעלי כנפיים דמויות כנף המקופלות מעל גב חלק, ואילו מיני Limapontioidea (Cyerce, Costasiella, Stiliger) נושאים זיזי גב נפוחים, דמויי עלה או אלה. לשתיהן מחושים מגולגלים או פשוטים, ולרוב גוונים ירוקים מהאצות שהם אוכלים."
+  }
+ ],
+ "families": [
+  {
+   "name": "Pleurobranchidae",
+   "name_he": "",
+   "description_en": "Pleurobranchidae are the side-gilled slugs, the main family of the order Pleurobranchida within Heterobranchia; they are not nudibranchs. The family includes several genera such as Pleurobranchus, Berthella and Berthellina, and occurs in temperate and tropical seas worldwide, including the Mediterranean. Many species retain a thin internal shell under the mantle. Most feed on sponges or ascidians, and the skin can secrete acid as a chemical defence.",
+   "description_he": "Pleurobranchidae הן חשופיות־זים־צד – המשפחה העיקרית בסדרה Pleurobranchida שבתוך Heterobranchia, ואינן חשופיות אמיתיות. המשפחה כוללת כמה סוגים, ביניהם Pleurobranchus,‏ Berthella ו־Berthellina, ונפוצה בימים ממוזגים וטרופיים ברחבי העולם, כולל הים התיכון. אצל מינים רבים נשארה קונכייה פנימית דקה מתחת למעטפת. רובם ניזונים מספוגים או מאצטלנים, והעור מסוגל להפריש חומצה כאמצעי הגנה כימי.",
+   "identification_en": "Oval, soft-bodied slugs with a broad smooth or tuberculate mantle and a single feathery gill hidden on the right side between mantle and foot, not on the back. The rhinophores are rolled (tubular) and emerge from the front edge of the mantle, above a wide oral veil. Unlike dorids, there is no circle of gills on the back.",
+   "identification_he": "חשופיות סגלגלות ורכות עם מעטפת רחבה, חלקה או מגובששת, וזים נוצי יחיד המוסתר בצד ימין בין המעטפת לרגל – לא על הגב. המחושים גליליים (מגולגלים) ובולטים מהשפה הקדמית של המעטפת, מעל צעיף פה רחב. בניגוד לחשופיות הדורידיות, אין זר זימים על הגב.",
+   "sources": "https://www.marinespecies.org/aphia.php?p=taxlist&tName=Pleurobranchidae\nhttps://opistobranquis.info/en/guia/"
+  },
+  {
+   "name": "Aegiridae",
+   "name_he": "",
+   "description_en": "Aegiridae is a small family of dorid nudibranchs in the superfamily Polyceroidea, with the genera Aegires and Notodoris. Aegires alone has about 30 species, mostly small, while Notodoris includes some large, bright yellow Indo-West Pacific species. Members occur in tropical and temperate seas, including the Mediterranean. They feed exclusively on calcareous sponges.",
+   "description_he": "Aegiridae היא משפחה קטנה של חשופיות דורידיות בעל־המשפחה Polyceroidea, הכוללת את הסוגים Aegires ו־Notodoris. בסוג Aegires לבדו כ־30 מינים, רובם קטנים, ואילו Notodoris כולל כמה מינים גדולים בצבע צהוב עז מהאינדו־פסיפי המערבי. בני המשפחה נמצאים בימים טרופיים וממוזגים, כולל הים התיכון. הם ניזונים אך ורק מספוגים גירניים.",
+   "identification_en": "Firm, stiff-bodied dorids whose back is covered with rounded knobs or tubercles. The few gills are small and protected by tubercles or lobes rather than forming an open retractable circlet, and the rhinophores sit in raised sheath-like pockets. Aegires species are often white, cream or yellow with dark spots.",
+   "identification_he": "חשופיות דורידיות בעלות גוף מוצק ונוקשה שגבו מכוסה גבשושיות מעוגלות. הזימים מעטים וקטנים, מוגנים באונות או בגבשושיות ואינם יוצרים זר פתוח הנשלף לתוך חלל, והמחושים יושבים בתוך נדנים מוגבהים. מיני Aegires לרוב לבנים, בצבע שמנת או צהובים, עם כתמים כהים.",
+   "sources": "https://en.wikipedia.org/wiki/Aegires\nhttps://www.seaslugforum.net/notogard.htm\nhttps://www.marinespecies.org/aphia.php?p=taxlist&tName=Aegiridae"
+  },
+  {
+   "name": "Aplysiidae",
+   "name_he": "ארנבות ים",
+   "description_en": "Aplysiidae are the sea hares, the main family of the order Aplysiida within Heterobranchia. The family contains around ten genera, including Aplysia, Dolabella, Dolabrifera, Stylocheilus and Bursatella, and occurs in warm and temperate seas worldwide; several species are common in the Mediterranean and along the Israeli coast. They are herbivores grazing on algae and seagrass epiphytes. When disturbed many release ink and an opaline secretion as a defence, and Aplysia is a classic model animal in neurobiology.",
+   "description_he": "Aplysiidae הן ארנבות הים – המשפחה העיקרית בסדרה Aplysiida שבתוך Heterobranchia. המשפחה כוללת כעשרה סוגים, ביניהם Aplysia,‏ Dolabella,‏ Dolabrifera,‏ Stylocheilus ו־Bursatella, ונפוצה בימים חמים וממוזגים בכל העולם; כמה מינים נפוצים בים התיכון ולאורך חופי ישראל. הן צמחוניות הרועות אצות ואפיפיטים על עשבי ים. כשהן מוטרדות רבות מהן משחררות דיו והפרשה לבנבנה להגנה, ו־Aplysia היא חיית מודל קלאסית במחקר מערכת העצבים.",
+   "identification_en": "Large, soft, plump slugs with two pairs of head tentacles: rolled rhinophores that look like a hare's ears and flattened oral tentacles. Paired fleshy flaps (parapodia) rise along the sides and largely cover the back, enclosing the mantle and a thin internal shell. Colours are mostly mottled brown, olive or green, unlike the bright patterns of many nudibranchs.",
+   "identification_he": "חשופיות גדולות, רכות ובשרניות עם שני זוגות מחושים בראש: מחושים מגולגלים הדומים לאוזני ארנבת ומחושי פה שטוחים. כנפיים בשרניות עולות לאורך הצדדים ומכסות את רוב הגב, ובתוכן המעטפת וקונכייה פנימית דקה. הצבעים בדרך כלל מנומרים בחום, זית או ירוק, בשונה מהדוגמאות הבוהקות של חשופיות רבות.",
+   "sources": "https://www.marinespecies.org/aphia.php?p=taxlist&tName=Aplysiidae\nhttps://en.wikipedia.org/wiki/Aplysiidae"
+  },
+  {
+   "name": "Discodorididae",
+   "name_he": "",
+   "description_en": "Discodorididae is one of the largest families of dorid nudibranchs (superfamily Doridoidea), with roughly thirty genera such as Discodoris, Jorunna, Peltodoris, Platydoris, Rostanga, Sclerodoris and Thordisa. They occur in all oceans from the intertidal to deep water, and several species are found in the Mediterranean. All feed on sponges, often matching their prey in colour and texture. Many are nocturnal and spend the day hidden under rocks.",
+   "description_he": "Discodorididae היא אחת המשפחות הגדולות של חשופיות דורידיות (בעל־המשפחה Doridoidea), עם כשלושים סוגים כגון Discodoris,‏ Jorunna,‏ Peltodoris,‏ Platydoris,‏ Rostanga,‏ Sclerodoris ו־Thordisa. הן נמצאות בכל האוקיינוסים, מאזור הגאות והשפל ועד מים עמוקים, וכמה מינים מצויים בים התיכון. כולן ניזונות מספוגים, ולעתים קרובות דומות לטרפן בצבע ובמרקם. רבות מהן פעילות בלילה ומסתתרות ביום מתחת לאבנים.",
+   "identification_en": "Typical 'cryptobranch' dorids: oval, often flattened bodies with a broad mantle that is usually rough with tubercles, papillae or caryophyllidia (tiny spiculed bumps), giving a velvety or gritty look. A circlet of gills on the rear of the back and the rhinophores can both be pulled into pockets. Colours tend to be cryptic browns, greys, yellows or oranges, unlike the smooth, brightly patterned Chromodorididae.",
+   "identification_he": "חשופיות דורידיות טיפוסיות: גוף סגלגל, לעתים קרובות שטוח, עם מעטפת רחבה ובדרך כלל מחוספסת – מכוסה גבשושיות, פטמות או בליטות זעירות עם מחטים – המעניקה מראה קטיפתי או גרגירי. זר הזימים בחלק האחורי של הגב והמחושים יכולים להישלף לתוך כיסים. הצבעים נוטים להסוואה – חום, אפור, צהוב או כתום – בשונה מ־Chromodorididae החלקות וצבעוניות.",
+   "sources": "https://www.marinespecies.org/aphia.php?p=taxlist&tName=Discodorididae\nhttps://opistobranquis.info/en/guia/"
+  },
+  {
+   "name": "Goniodorididae",
+   "name_he": "",
+   "description_en": "Goniodorididae is a family of small dorid nudibranchs in the superfamily Onchidoridoidea, including genera such as Goniodoris, Okenia, Trapania, Ancula and Lophodoris. Most species are only a few millimetres to about two centimetres long and occur worldwide, with many in the Mediterranean and the Indo-West Pacific. They mainly feed on bryozoans and colonial ascidians, and some Trapania species feed on entoprocts. Many species are rarely seen because of their size, and new species continue to be described.",
+   "description_he": "Goniodorididae היא משפחה של חשופיות דורידיות קטנות בעל־המשפחה Onchidoridoidea, הכוללת סוגים כגון Goniodoris,‏ Okenia,‏ Trapania,‏ Ancula ו־Lophodoris. רוב המינים באורך של מילימטרים ספורים עד כשני סנטימטרים, והם נפוצים בכל העולם, עם מינים רבים בים התיכון ובאינדו־פסיפי המערבי. הם ניזונים בעיקר מטחביות ומאצטלנים קולוניאליים, וכמה ממיני Trapania ניזונים מנבוביים קטנים (Entoprocta). מינים רבים נצפים רק לעתים רחוקות בשל גודלם, ומינים חדשים ממשיכים להיות מתוארים.",
+   "identification_en": "Small, slender, often translucent dorids in which the mantle is reduced to a ridge or to a row of finger-like processes along each side of the body. The gills form a small, non-retractable cluster on the rear of the back, often flanked by extra appendages, and the rhinophores are usually lamellate. Unlike most dorids they cannot withdraw their gills into a pocket.",
+   "identification_he": "חשופיות דורידיות קטנות ודקות, לעתים קרובות שקופות למחצה, שבהן המעטפת מצומצמת לרכס או לשורה של שלוחות דמויות אצבע לאורך כל צד של הגוף. הזימים יוצרים אשכול קטן שאינו נשלף בחלק האחורי של הגב, ולעתים קרובות לצדם שלוחות נוספות; המחושים בדרך כלל מפוספסים (למליים). בניגוד לרוב החשופיות הדורידיות, הן אינן יכולות למשוך את הזימים לתוך כיס.",
+   "sources": "https://www.marinespecies.org/aphia.php?p=taxlist&tName=Goniodorididae\nhttps://en.wikipedia.org/wiki/Goniodorididae"
+  },
+  {
+   "name": "Aglajidae",
+   "name_he": "",
+   "description_en": "Aglajidae are head-shield slugs of the order Cephalaspidea. The family includes genera such as Chelidonura, Philinopsis, Navanax, Aglaja and Odontoglaja, with species in tropical and temperate seas worldwide. They are active predators that lack a radula and swallow prey whole, mainly flatworms, other sea slugs, polychaetes or small fish depending on the genus. Many follow the mucus trails of their prey, and the shell is reduced and internal.",
+   "description_he": "Aglajidae הן חשופיות בעלות מגן ראש מהסדרה Cephalaspidea. המשפחה כוללת סוגים כגון Chelidonura,‏ Philinopsis,‏ Navanax,‏ Aglaja ו־Odontoglaja, עם מינים בימים טרופיים וממוזגים ברחבי העולם. הן טורפות פעילות חסרות שיננית (radula) הבולעות את טרפן בשלמותו – בעיקר תולעים שטוחות, חשופיות אחרות, רב־זיפיים או דגים קטנים, בהתאם לסוג. רבות מהן עוקבות אחר שובל הריר של הטרף, והקונכייה מצומצמת ופנימית.",
+   "identification_en": "Smooth, elongate slugs with no rhinophores or cerata; the body is divided into a large flat head shield in front and a posterior shield behind, with wing-like parapodia along the sides. The rear end often has two tail-like lobes, sometimes of unequal length. They are frequently seen gliding on sand or rubble, often in bold black, blue, orange or striped patterns.",
+   "identification_he": "חשופיות חלקות ומוארכות ללא מחושים וללא זיזי גב; הגוף מחולק למגן ראש גדול ושטוח מלפנים ולמגן אחורי מאחור, עם כנפיים לאורך הצדדים. בקצה האחורי יש לעתים קרובות שתי אונות דמויות זנב, לפעמים באורך לא שווה. נצפות לעתים קרובות זוחלות על חול או על שברי אלמוגים, לרוב בדוגמאות בולטות בשחור, כחול, כתום או בפסים.",
+   "sources": "https://www.marinespecies.org/aphia.php?p=taxlist&tName=Aglajidae\nhttps://en.wikipedia.org/wiki/Aglajidae"
+  },
+  {
+   "name": "Bornellidae",
+   "name_he": "",
+   "description_en": "Bornellidae is a small family of cladobranch nudibranchs containing the single genus Bornella, with about a dozen species. Most live in the tropical Indo-West Pacific. They feed on hydroids. Unlike most nudibranchs, Bornella can swim by flexing the body from side to side like an eel, and the cerata can be shed when the animal is attacked.",
+   "description_he": "Bornellidae היא משפחה קטנה של חשופיות מקבוצת Cladobranchia, הכוללת סוג יחיד, Bornella, עם כתריסר מינים. רובם חיים באזור הטרופי של האינדו־פסיפי המערבי. הם ניזונים מהידרואידים. בשונה מרוב החשופיות, Bornella מסוגלת לשחות בתנועות צד לצד כמו צלופח, וזיזי הגב יכולים להינשר כשבעל החיים מותקף.",
+   "identification_en": "Elongate, laterally compressed slugs with a few pairs of tall, branched or finger-like dorsal processes (cerata) along the back, often with gills at their base. Each rhinophore rises from a sheath crowned with finger-like papillae, which looks like a small crown or 'antler' beside the rhinophore. Many species are orange, white or yellow with bold lines or spots.",
+   "identification_he": "חשופיות מוארכות ופחוסות מן הצדדים, עם זוגות אחדים של זיזי גב גבוהים, מסועפים או דמויי אצבע, לאורך הגב, ולרוב עם זימים בבסיסם. כל מחוש יוצא מנדן שבראשו שלוחות דמויות אצבעות, היוצרות מעין כתר קטן או 'קרניים' לצד המחוש. מינים רבים כתומים, לבנים או צהובים עם קווים או כתמים בולטים.",
+   "sources": "https://www.marinespecies.org/aphia.php?p=taxlist&tName=Bornellidae\nhttps://en.wikipedia.org/wiki/Bornella"
+  },
+  {
+   "name": "Facelinidae",
+   "name_he": "",
+   "description_en": "Facelinidae is one of the largest families of aeolid nudibranchs (superfamily Aeolidioidea), with over 40 genera recognised in WoRMS, including Facelina, Caloria, Cratena, Phidiana and Favorinus. It is cosmopolitan and well represented in the Mediterranean and the Indo-West Pacific. Most species feed on hydroids, and they store stinging cells (nematocysts) from their prey in cnidosacs at the tips of the cerata for defence. Recent molecular studies have reorganised several genera, and parts of its classification are still debated.",
+   "description_he": "Facelinidae היא אחת המשפחות הגדולות של חשופיות אאולידיות (בעל־המשפחה Aeolidioidea), עם יותר מ־40 סוגים המוכרים ב־WoRMS, ביניהם Facelina,‏ Caloria,‏ Cratena,‏ Phidiana ו־Favorinus. המשפחה נפוצה בכל העולם ומיוצגת היטב בים התיכון ובאינדו־פסיפי המערבי. רוב המינים ניזונים מהידרואידים, ואוגרים תאים צורבים (נמטוציסטים) מהטרף בשקיקים בקצות זיזי הגב לשם הגנה. מחקרים מולקולריים עדכניים ארגנו מחדש כמה סוגים, וחלק מהסיווג עדיין שנוי במחלוקת.",
+   "identification_en": "Slender, elongate aeolids with long oral tentacles and well-developed, often tentacle-like front corners of the foot. The rhinophores may be smooth or ringed (lamellate), and the cerata are arranged in clusters or rows along the sides, typically split into groups before and behind the heart. Compared with Flabellinidae, the cerata usually arise in separate clusters rather than on raised stalks.",
+   "identification_he": "חשופיות אאולידיות דקות ומוארכות עם מחושי פה ארוכים ופינות רגל קדמיות מפותחות, לעתים קרובות דמויות מחושים. המחושים יכולים להיות חלקים או מטובעתים (למליים), וזיזי הגב מסודרים באשכולות או בשורות לאורך הצדדים, בדרך כלל בקבוצות לפני הלב ואחריו. בהשוואה ל־Flabellinidae, זיזי הגב צומחים לרוב באשכולות נפרדים ולא על בסיסים מוגבהים.",
+   "sources": "https://opistobranquis.info/en/guia/nudibranchia/aeolidioidea/facelinidae/\nhttps://seaslugsofhawaii.com/general/facelinidae.html\nhttps://www.marinespecies.org/aphia.php?p=taxlist&tName=Facelinidae"
+  },
+  {
+   "name": "Chromodorididae",
+   "name_he": "זריות",
+   "description_en": "Chromodorididae is the largest family of dorid nudibranchs (superfamily Doridoidea), with more than 300 species in genera such as Chromodoris, Goniobranchus, Hypselodoris, Felimare, Felimida, Doriprismatica and Glossodoris. Members occur in tropical and temperate seas worldwide and are especially diverse on Indo-West Pacific reefs; several species live in the Mediterranean and the Red Sea. They feed on sponges and store distasteful chemicals from them, advertising this with bright warning colours. Many species flap or lift the mantle edge, which contains glands holding these defensive compounds.",
+   "description_he": "Chromodorididae היא המשפחה הגדולה ביותר של חשופיות דורידיות (בעל־המשפחה Doridoidea), עם יותר מ־300 מינים בסוגים כמו Chromodoris,‏ Goniobranchus,‏ Hypselodoris,‏ Felimare,‏ Felimida,‏ Doriprismatica ו־Glossodoris. בני המשפחה נמצאים בימים טרופיים וממוזגים בכל העולם, ובמגוון גדול במיוחד בשוניות האינדו־פסיפי המערבי; כמה מינים חיים בים התיכון ובים סוף. הם ניזונים מספוגים ואוגרים מהם חומרים דוחים, ומפרסמים זאת בצבעי אזהרה בוהקים. מינים רבים מנפנפים או מרימים את שפת המעטפת, שבה בלוטות המכילות חומרי הגנה אלה.",
+   "identification_en": "Smooth, soft-bodied dorids, usually elongate, with a smooth mantle and bold colours: stripes, spots and contrasting mantle borders in blue, purple, yellow, orange, red or white. The gills form a plume on the rear of the back and, like the lamellate rhinophores, can be withdrawn into pockets. The smooth, bright mantle separates them from the rough, cryptic Discodorididae.",
+   "identification_he": "חשופיות דורידיות רכות, בדרך כלל מוארכות, עם מעטפת חלקה וצבעים עזים: פסים, כתמים ושוליים מנוגדים במעטפת בכחול, סגול, צהוב, כתום, אדום או לבן. הזימים יוצרים נוצה בחלק האחורי של הגב, ובדומה למחושים המפוספסים ניתנים למשיכה לתוך כיסים. המעטפת החלקה והצבעונית מבדילה אותן מ־Discodorididae המחוספסות והמוסוות.",
+   "sources": "https://www.marinespecies.org/aphia.php?p=taxlist&tName=Chromodorididae\nhttps://en.wikipedia.org/wiki/Chromodorididae"
+  },
+  {
+   "name": "Colpodaspididae",
+   "name_he": "",
+   "description_en": "Colpodaspididae is a family of tiny head-shield slugs (Cephalaspidea) containing the genus Colpodaspis; it was recently separated from Diaphanidae because of distinctive anatomical features. Members have a completely internal, globular shell with a short protruding spire. Most species are only a few millimetres long and are easily overlooked. The family has a remarkably wide geographic and depth range, including the Indo-West Pacific and the North-East Atlantic.",
+   "description_he": "Colpodaspididae היא משפחה של חשופיות זעירות בעלות מגן ראש (Cephalaspidea) הכוללת את הסוג Colpodaspis; היא הופרדה לאחרונה מ־Diaphanidae בשל מאפיינים אנטומיים ייחודיים. לבני המשפחה קונכייה פנימית לחלוטין וכדורית, עם צריח קצר בולט. רוב המינים באורך מילימטרים ספורים בלבד, ולכן קל להחמיץ אותם. למשפחה תפוצה גאוגרפית ותחום עומקים רחבים במיוחד, כולל האינדו־פסיפי המערבי וצפון־מזרח האוקיינוס האטלנטי.",
+   "identification_en": "Minute slugs (often around 3 mm) in which the mantle completely covers a small rounded shell, giving a humped body. The foot has expanded front lobes and an extended tail behind. Known Indo-Pacific forms are often dark brown with raised white patches containing yellow spots. Unlike Haminoeidae and other bubble shells, no shell is visible from outside.",
+   "identification_he": "חשופיות זעירות (לרוב כ־3 מ\"מ) שבהן המעטפת מכסה לחלוטין קונכייה קטנה ומעוגלת, ויוצרת גוף מגובנן. לרגל אונות קדמיות מורחבות וזנב מוארך מאחור. צורות מוכרות מהאינדו־פסיפי לרוב חומות כהות עם כתמים לבנים מוגבהים ובהם נקודות צהובות. בשונה מ־Haminoeidae ומשבלולי־בועה אחרים, הקונכייה אינה נראית מבחוץ.",
+   "sources": "https://seashellsofnsw.org.au/Colpodaspididae/Pages/Colpodaspididae_intro.htm\nhttps://en.seaslug.world/species/49\nhttps://www.biodiversity.no/Pages/149766"
+  },
+  {
+   "name": "Flabellinidae",
+   "name_he": "",
+   "description_en": "Flabellinidae is a family of aeolid nudibranchs (superfamily Aeolidioidea). After a 2017 molecular revision by Korshunova and colleagues, the old broad family was split into several (including Coryphellidae, Samlidae and Paracoryphellidae), and Flabellinidae in the strict sense now includes genera such as Flabellina, Edmundsella, Calmella, Coryphellina, Carronella and Paraflabellina. Members live in temperate and tropical seas worldwide, including the Mediterranean, mostly on rocky bottoms and reefs where hydroids are abundant. They feed on hydroids and are active, fast-moving animals.",
+   "description_he": "Flabellinidae היא משפחה של חשופיות אאולידיות (בעל־המשפחה Aeolidioidea). בעקבות רוויזיה מולקולרית של Korshunova ועמיתיה ב־2017 פוצלה המשפחה הרחבה הישנה לכמה משפחות (ביניהן Coryphellidae,‏ Samlidae ו־Paracoryphellidae), וכיום Flabellinidae במובן הצר כוללת סוגים כגון Flabellina,‏ Edmundsella,‏ Calmella,‏ Coryphellina,‏ Carronella ו־Paraflabellina. בני המשפחה חיים בימים ממוזגים וטרופיים בכל העולם, כולל הים התיכון, בעיקר על קרקעית סלעית ובשוניות שבהן הידרואידים רבים. הם ניזונים מהידרואידים והם בעלי חיים פעילים ומהירים.",
+   "identification_en": "Slender, elongate aeolids with very long oral tentacles and numerous slender cerata arranged in clusters along the back, the clusters often borne on raised stalks. The digestive gland is visible through the cerata, often coloured, and the tips are frequently white or banded. Colours are often striking violet, pink or orange; the clusters on raised stalks help separate them from Facelinidae.",
+   "identification_he": "חשופיות אאולידיות דקות ומוארכות עם מחושי פה ארוכים מאוד וזיזי גב דקים ורבים, המסודרים באשכולות לאורך הגב – לעתים קרובות על בסיסים מוגבהים. בלוטת העיכול נראית דרך זיזי הגב, לרוב בצבע, והקצוות לעתים קרובות לבנים או מפוספסים. הצבעים לרוב בולטים – סגול, ורוד או כתום; האשכולות על בסיסים מוגבהים עוזרים להבדיל אותן מ־Facelinidae.",
+   "sources": "https://opistobranquis.info/en/guia/nudibranchia/aeolidioidea/flabellinidae/\nhttps://pmc.ncbi.nlm.nih.gov/articles/PMC5784208\nhttps://www.marinespecies.org/aphia.php?p=taxlist&tName=Flabellinidae"
+  },
+  {
+   "name": "Costasiellidae",
+   "name_he": "",
+   "description_en": "Costasiellidae is a family of sacoglossan sea slugs (Sacoglossa), currently accepted in WoRMS with the genera Costasiella and Panderevela; some classifications place Costasiella within Limapontiidae. Species are tiny, usually under 1 cm, and occur in tropical and warm-temperate seas, especially the Indo-West Pacific and Caribbean. They feed on green algae, mainly Avrainvillea, piercing cells and sucking out the contents. Some species keep functional chloroplasts from their food; Costasiella kuroshimae, the 'leaf sheep', is a popular macro subject.",
+   "description_he": "Costasiellidae היא משפחה של חשופיות מוצצות (Sacoglossa), המוכרת כיום ב־WoRMS עם הסוגים Costasiella ו־Panderevela; יש סיווגים המציבים את Costasiella בתוך Limapontiidae. המינים זעירים, לרוב פחות מסנטימטר, ונמצאים בימים טרופיים וממוזגים חמים, בעיקר באינדו־פסיפי המערבי ובקריביים. הם ניזונים מאצות ירוקות, בעיקר Avrainvillea, באמצעות ניקוב התאים ומציצת תוכנם. מינים אחדים שומרים כלורופלסטים פעילים מהמזון; Costasiella kuroshimae, 'כבשת העלים', היא מושא מבוקש בצילום מאקרו.",
+   "identification_en": "Tiny, soft slugs with many inflated, leaf- or spindle-shaped cerata crowded over the back, often green with white, blue or yellow tips. The eyes sit close together on top of the head between two smooth, rolled rhinophores, giving a 'face'. They are usually found on Avrainvillea; the close-set eyes help separate them from similar Limapontiidae such as Ercolania.",
+   "identification_he": "חשופיות זעירות ורכות עם זיזי גב רבים ונפוחים, דמויי עלה או כישור, הצפופים על הגב – לרוב ירוקים עם קצוות לבנים, כחולים או צהובים. העיניים קרובות זו לזו על גבי הראש, בין שני מחושים חלקים ומגולגלים, ויוצרות מראה של 'פנים'. נמצאות בדרך כלל על Avrainvillea; העיניים הקרובות עוזרות להבדיל אותן ממיני Limapontiidae דומים כמו Ercolania.",
+   "sources": "https://www.marinespecies.org/aphia.php?p=taxlist&tName=Costasiellidae\nhttps://en.wikipedia.org/wiki/Costasiella_kuroshimae\nhttps://en.seaslug.world/species/269"
+  },
+  {
+   "name": "Hermaeidae",
+   "name_he": "",
+   "description_en": "Hermaeidae is a family of sacoglossan sea slugs (Sacoglossa) that WoRMS currently restricts to the genera Hermaea and Aplysiopsis; older treatments also included genera such as Cyerce, Caliphylla and Polybranchia. Species are small and occur in temperate and tropical seas worldwide, including the Mediterranean. Like other sacoglossans, they pierce algal cells and suck out the contents; Hermaea species typically feed on red algae and Aplysiopsis on filamentous green algae.",
+   "description_he": "Hermaeidae היא משפחה של חשופיות מוצצות (Sacoglossa), ש־WoRMS מגביל כיום לסוגים Hermaea ו־Aplysiopsis; בסיווגים ישנים יותר נכללו בה גם סוגים כמו Cyerce,‏ Caliphylla ו־Polybranchia. המינים קטנים ונמצאים בימים ממוזגים וטרופיים בכל העולם, כולל הים התיכון. כמו חשופיות מוצצות אחרות, הן מנקבות תאי אצות ומוצצות את תוכנם; מיני Hermaea ניזונים בדרך כלל מאצות אדומות, ומיני Aplysiopsis מאצות ירוקות חוטיות.",
+   "identification_en": "Small, slender, translucent slugs with rows of spindle-shaped or swollen cerata along the back, through which the branched digestive gland, coloured by the algal food, is clearly visible. The head bears a pair of rolled rhinophores. They resemble aeolid nudibranchs but lack oral tentacles and are found on algae rather than hydroids.",
+   "identification_he": "חשופיות קטנות, דקות ושקופות למחצה, עם שורות של זיזי גב דמויי כישור או נפוחים לאורך הגב, שדרכם נראית בבירור בלוטת העיכול המסועפת, הצבועה בצבע האצה הנאכלת. בראש זוג מחושים מגולגלים. הן דומות לחשופיות אאולידיות, אך אין להן מחושי פה והן נמצאות על אצות ולא על הידרואידים.",
+   "sources": "https://www.marinespecies.org/aphia.php?p=taxlist&tName=Hermaeidae\nhttps://en.wikipedia.org/wiki/Hermaeidae\nhttps://en.wikipedia.org/wiki/Hermaea_(gastropod)"
+  },
+  {
+   "name": "Dendrodorididae",
+   "name_he": "",
+   "description_en": "Dendrodorididae is a family of dorid nudibranchs (superfamily Phyllidioidea) with the genera Dendrodoris and Doriopsilla. Members lack a radula and instead digest sponges externally with secretions from a muscular oral tube, sucking in the result. They occur in tropical and temperate seas worldwide, and several species are common in the Mediterranean, including Israel. They produce distasteful defensive chemicals.",
+   "description_he": "Dendrodorididae היא משפחה של חשופיות דורידיות (בעל־המשפחה Phyllidioidea) הכוללת את הסוגים Dendrodoris ו־Doriopsilla. לבני המשפחה אין שיננית (radula); במקום זאת הם מעכלים ספוגים מחוץ לגוף בעזרת הפרשות מצינור פה שרירי, ויונקים את התוצר. הם נמצאים בימים טרופיים וממוזגים בכל העולם, וכמה מינים נפוצים בים התיכון, כולל בישראל. הם מייצרים חומרי הגנה דוחים.",
+   "identification_en": "Soft, smooth, rather slimy dorids with a broad, wavy mantle and no tough spicules, often in black, brown, red, orange or yellow. The gills are a large, branched circlet on the rear of the back and can be withdrawn; the rhinophores are lamellate. The soft, pliable body helps distinguish them from the rougher Discodorididae.",
+   "identification_he": "חשופיות דורידיות רכות, חלקות ומעט ריריות, עם מעטפת רחבה וגלית ללא מחטים קשות, לעתים קרובות בצבע שחור, חום, אדום, כתום או צהוב. הזימים יוצרים זר גדול ומסועף בחלק האחורי של הגב וניתנים למשיכה פנימה; המחושים מפוספסים (למליים). הגוף הרך והגמיש עוזר להבדיל אותן מ־Discodorididae.",
+   "sources": "https://www.marinespecies.org/aphia.php?p=taxlist&tName=Dendrodorididae\nhttps://en.wikipedia.org/wiki/Dendrodorididae"
+  },
+  {
+   "name": "Arminidae",
+   "name_he": "",
+   "description_en": "Arminidae is a family of cladobranch nudibranchs (superfamily Arminoidea) with the genera Armina and Dermatobranchus. They occur in tropical and temperate seas worldwide, often burrowing in soft sand or mud; Armina species are found in the Mediterranean. Armina feeds mainly on sea pens and other soft corals, while Dermatobranchus species feed on soft corals and gorgonians.",
+   "description_he": "Arminidae היא משפחה של חשופיות מקבוצת Cladobranchia (בעל־המשפחה Arminoidea) הכוללת את הסוגים Armina ו־Dermatobranchus. הן נפוצות בימים טרופיים וממוזגים בכל העולם, ולעתים קרובות מתחפרות בחול רך או בבוץ; מיני Armina נמצאים בים התיכון. Armina ניזונה בעיקר מנוצות ים ומאלמוגים רכים אחרים, ואילו מיני Dermatobranchus ניזונים מאלמוגים רכים ומגורגוניות.",
+   "identification_en": "Flattened, often elongate slugs with a firm mantle covered in fine longitudinal ridges; there are no cerata and no dorsal gill circlet. A broad oral veil covers the head, and the rhinophores emerge close together near the front of the mantle. Gill lamellae lie hidden under the mantle edge along the sides.",
+   "identification_he": "חשופיות שטוחות, לרוב מוארכות, עם מעטפת מוצקה מכוסה רכסים אורכיים דקים; אין זיזי גב ואין זר זימים על הגב. צעיף פה רחב מכסה את הראש, והמחושים בולטים קרוב זה לזה בחלק הקדמי של המעטפת. עלי זימים מוסתרים מתחת לשפת המעטפת לאורך הצדדים.",
+   "sources": "https://www.marinespecies.org/aphia.php?p=taxlist&tName=Arminidae\nhttps://en.wikipedia.org/wiki/Arminidae"
+  },
+  {
+   "name": "Haminoeidae",
+   "name_he": "",
+   "description_en": "Haminoeidae are bubble snails in the order Cephalaspidea, with genera such as Haminoea, Lamprohaminoea, Atys, Phanerophthalmus and Smaragdinella. They are common in tropical and temperate seas worldwide, often in shallow water on sand, mud or algae; several Haminoea species occur in Israel, including Indo-Pacific species that entered via the Suez Canal. Most are herbivores feeding on algae and diatoms.",
+   "description_he": "Haminoeidae הן שבלולי־בועה מהסדרה Cephalaspidea, עם סוגים כגון Haminoea,‏ Lamprohaminoea,‏ Atys,‏ Phanerophthalmus ו־Smaragdinella. הן נפוצות בימים טרופיים וממוזגים בכל העולם, לרוב במים רדודים על חול, בוץ או אצות; כמה מיני Haminoea נמצאים בישראל, כולל מינים מהאינדו־פסיפי שחדרו דרך תעלת סואץ. רובן צמחוניות הניזונות מאצות ומדיאטומאות.",
+   "identification_en": "Small slugs with a thin, fragile, bubble-like shell that is partly or largely covered by the body. A flattened head shield, with no tentacles, is used for ploughing through sediment, and side flaps (parapodia) wrap around the shell. Colours are usually translucent, green or brown, though Lamprohaminoea species are brightly patterned.",
+   "identification_he": "חשופיות קטנות עם קונכייה דקה ושבירה דמוית בועה, המכוסה חלקית או ברובה בגוף. מגן ראש שטוח, ללא מחושים, משמש לחפירה בתוך המשקע, וכנפיים עוטפות את הקונכייה. הצבעים לרוב שקופים למחצה, ירוקים או חומים, אך מיני Lamprohaminoea צבעוניים ובולטים.",
+   "sources": "https://www.marinespecies.org/aphia.php?p=taxlist&tName=Haminoeidae\nhttps://en.wikipedia.org/wiki/Haminoeidae"
+  },
+  {
+   "name": "Doridomorphidae",
+   "name_he": "",
+   "description_en": "Doridomorphidae is a family with a single genus and species, Doridomorpha gardineri, placed in the superfamily Doridoxoidea. Despite its dorid-like external appearance, it is not a dorid. It lives only on, and feeds on, the blue coral Heliopora coerulea throughout the Indo-West Pacific. Its colour closely matches the host coral, so it is rarely noticed.",
+   "description_he": "Doridomorphidae היא משפחה עם סוג ומין יחידים, Doridomorpha gardineri, המוצבת בעל־המשפחה Doridoxoidea. למרות מראהו החיצוני הדומה לחשופית דורידית, אין הוא חשופית דורידית. הוא חי אך ורק על האלמוג הכחול Heliopora coerulea וניזון ממנו, בכל רחבי האינדו־פסיפי המערבי. צבעו תואם מאוד את צבע אלמוג המארח, ולכן הוא נצפה לעתים רחוקות.",
+   "identification_en": "A small (about 1 cm) rounded slug with a smooth, domed mantle in greyish blue, closely matching blue coral. It is found only on living Heliopora, which is the main clue to identification. Its colour and host separate it from true dorids that might look similar.",
+   "identification_he": "חשופית קטנה (כסנטימטר) ומעוגלת עם מעטפת חלקה וקמורה בצבע כחלחל־אפרפר, התואם מאוד את האלמוג הכחול. נמצאת רק על Heliopora חי, וזהו הרמז העיקרי לזיהוי. הצבע והמארח מבדילים אותה מחשופיות דורידיות אמיתיות שעשויות להיראות דומות.",
+   "sources": "https://en.seaslug.world/species/doridomorpha_gardineri\nhttps://en.wikipedia.org/wiki/Doridomorpha\nhttps://www.marinespecies.org/aphia.php?p=taxlist&tName=Doridomorphidae"
+  },
+  {
+   "name": "Plakobranchidae",
+   "name_he": "",
+   "description_en": "Plakobranchidae is the largest family of sacoglossan sea slugs (Sacoglossa), with genera such as Elysia, Thuridilla and Plakobranchus; Elysia alone has well over 100 species. It occurs worldwide, especially in tropical seas, and several Elysia species live in the Mediterranean and Israel. All are herbivores that pierce algal cells and suck out the contents. Many keep functional chloroplasts from their food for weeks to months ('kleptoplasty'), making them partly 'solar-powered'.",
+   "description_he": "Plakobranchidae היא המשפחה הגדולה ביותר של חשופיות מוצצות (Sacoglossa), עם סוגים כגון Elysia,‏ Thuridilla ו־Plakobranchus; בסוג Elysia לבדו הרבה יותר מ־100 מינים. המשפחה נפוצה בכל העולם, בעיקר בימים טרופיים, וכמה מיני Elysia חיים בים התיכון ובישראל. כולן צמחוניות המנקבות תאי אצות ומוצצות את תוכנם. רבות שומרות כלורופלסטים פעילים מהמזון במשך שבועות עד חודשים (קלפטופלסטיה), ולכן הן 'מונעות באור שמש' באופן חלקי.",
+   "identification_en": "Smooth slugs without cerata, with a pair of wide parapodia that fold up over the back like wings and can open out. The head bears rolled rhinophores. Elysia species are often green, Thuridilla are boldly striped in blue, orange, black and white, and Plakobranchus has a flattened body with many ridges on the inner side of the parapodia.",
+   "identification_he": "חשופיות חלקות ללא זיזי גב, עם זוג כנפיים רחבות המתקפלות מעל הגב וניתנות לפתיחה. בראש מחושים מגולגלים. מיני Elysia לרוב ירוקים, מיני Thuridilla מפוספסים בבולטות בכחול, כתום, שחור ולבן, ול־Plakobranchus גוף שטוח עם רכסים רבים בצד הפנימי של הכנפיים.",
+   "sources": "https://www.marinespecies.org/aphia.php?p=taxlist&tName=Plakobranchidae\nhttps://en.wikipedia.org/wiki/Plakobranchidae\nhttps://opistobranquis.info/en/guia/sacoglossa/plakobranchoidea/"
+  },
+  {
+   "name": "Limapontiidae",
+   "name_he": "",
+   "description_en": "Limapontiidae is a family of small to minute sacoglossan sea slugs (Sacoglossa). WoRMS accepts about a dozen genera, including Ercolania, Placida, Stiliger, Limapontia, Alderia and Olea. Members occur worldwide, including the Mediterranean, mostly in shallow water and sometimes in brackish habitats. Most feed on green algae by piercing cells and sucking out the contents, which often colours them green.",
+   "description_he": "Limapontiidae היא משפחה של חשופיות מוצצות (Sacoglossa) קטנות עד זעירות. WoRMS מכיר בכתריסר סוגים, ביניהם Ercolania,‏ Placida,‏ Stiliger,‏ Limapontia,‏ Alderia ו־Olea. בני המשפחה נפוצים בכל העולם, כולל הים התיכון, בעיקר במים רדודים ולעתים בבתי גידול מליחים. רובם ניזונים מאצות ירוקות באמצעות ניקוב התאים ומציצת תוכנם, ולכן לעתים קרובות צבעם ירוק.",
+   "identification_en": "Tiny slugs, usually a few millimetres long, often with simple, swollen or spindle-shaped cerata along the back through which the green digestive gland shows; some genera, such as Limapontia, lack cerata altogether. Rhinophores are simple or rolled, and there are no oral tentacles. They live directly on their host algae; Costasiella, sometimes placed here, has eyes set unusually close together.",
+   "identification_he": "חשופיות זעירות, לרוב באורך מילימטרים ספורים, לעתים קרובות עם זיזי גב פשוטים, נפוחים או דמויי כישור, שדרכם נראית בלוטת העיכול הירוקה; בסוגים אחדים, כמו Limapontia, אין זיזי גב כלל. המחושים פשוטים או מגולגלים, ואין מחושי פה. הן חיות ישירות על אצות המארח; ל־Costasiella, המוצבת לעתים במשפחה זו, עיניים קרובות זו לזו באופן בולט.",
+   "sources": "https://www.marinespecies.org/aphia.php?p=taxlist&tName=Limapontiidae\nhttps://en.wikipedia.org/wiki/Limapontiidae"
+  },
+  {
+   "name": "Eubranchidae",
+   "name_he": "",
+   "description_en": "Eubranchidae is a family of small aeolid nudibranchs in the superfamily Fionoidea (suborder Cladobranchia). After recent molecular revisions WoRMS lists about 16 genera, with Eubranchus by far the largest. Members occur worldwide from polar to tropical seas, including the Mediterranean, and most are only a few millimetres to about 2 cm long. They feed on hydroids and, like other aeolids, store the prey's stinging cells (nematocysts) in the tips of their cerata for defence.",
+   "description_he": "Eubranchidae היא משפחה של חשופיות אאולידיות קטנות בעל־המשפחה Fionoidea (תת־סדרה Cladobranchia). לאחר רוויזיות מולקולריות אחרונות מונה WoRMS כ־16 סוגים, והגדול שבהם הוא Eubranchus. בני המשפחה נפוצים בכל הימים, מהקטבים ועד האזורים הטרופיים, כולל הים התיכון, ורובם באורך של מילימטרים בודדים ועד כ־2 ס\"מ. הם ניזונים מהידרואידים, וכמו חשופיות אאולידיות אחרות אוגרים את תאי הצריבה של הטרף בקצות זיזי הגב לצורך הגנה.",
+   "identification_en": "Look for a tiny aeolid with swollen, often bulbous or club-shaped cerata that are frequently ringed or studded with small tubercles. The rhinophores are smooth, the oral tentacles are fairly short and the front of the foot is rounded rather than drawn out into long corners. The inflated, knobbly cerata separate them from Trinchesiidae, whose cerata are smooth and spindle-shaped, and from Flabellinidae-type aeolids with ringed or perfoliate rhinophores.",
+   "identification_he": "יש לחפש חשופית אאולידית זעירה עם זיזי גב נפוחים, לעיתים בצורת בצל או אלה, שעליהם פעמים רבות טבעות או בליטות קטנות. המחושים חלקים, מחושי הפה קצרים יחסית וקדמת הרגל מעוגלת ואינה נמשכת לפינות ארוכות. זיזי הגב הנפוחים והגבשושיים מבדילים אותם מ־Trinchesiidae, שזיזי הגב שלהן חלקים ובצורת כישור, ומחשופיות דמויות Flabellinidae בעלות מחושים טבעתיים או עליים.",
+   "sources": "https://www.marinespecies.org/aphia.php?p=taxdetails&id=193\nhttps://en.wikipedia.org/wiki/Eubranchidae\nhttps://opistobranquis.info/en/"
+  },
+  {
+   "name": "Polyceridae",
+   "name_he": "",
+   "description_en": "Polyceridae is a large family of dorid nudibranchs (superfamily Polyceroidea, suborder Doridina), divided into several subfamilies such as Polycerinae, Triophinae and Nembrothinae, with roughly two dozen genera. Members are found in all oceans from cold to tropical waters; Polycera, Thecacera and Limacia occur in the Mediterranean, while Nembrotha and Tambja are typical of Indo-Pacific reefs. Most species feed on bryozoans, but the Nembrothinae eat ascidians and some also prey on other sea slugs. Some Plocamopherus species can produce bioluminescent flashes.",
+   "description_he": "Polyceridae היא משפחה גדולה של חשופיות דורידיות (בעל־המשפחה Polyceroidea, תת־סדרה Doridina), המחולקת לכמה תת־משפחות כמו Polycerinae,‏ Triophinae ו־Nembrothinae, וכוללת כשני תריסרים סוגים. בני המשפחה נמצאים בכל האוקיינוסים, מהמים הקרים ועד הטרופיים; Polycera,‏ Thecacera ו־Limacia מצויות בים התיכון, ואילו Nembrotha ו־Tambja אופייניות לשוניות האינדו־פסיפי. רוב המינים ניזונים מטחביות, אך Nembrothinae אוכלות אצטלנים וחלקן טורפות גם חשופיות אחרות. מינים מסוימים של Plocamopherus מסוגלים להפיק הבזקי אור ביולומינסצנטיים.",
+   "identification_en": "Polycerids are dorids with a rather narrow, often elongate body and a reduced mantle edge rather than a broad flat skirt. The gills form a cluster around the anus but cannot be withdrawn into a pocket, and they are often flanked by finger- or club-like extra-branchial processes; the front of the head usually bears a veil with finger-like papillae. The lamellate rhinophores, often with sheaths, plus the non-retractile gills distinguish them from Chromodorididae and Discodorididae, whose gills retract into the mantle.",
+   "identification_he": "חשופיות Polyceridae הן חשופיות דורידיות בעלות גוף צר יחסית ולרוב מוארך, עם שולי מעטפת מצומצמים במקום חצאית רחבה ושטוחה. הזימים יוצרים אשכול סביב פי הטבעת אך אינם נאספים לתוך כיס, ולצידם לעיתים קרובות זיזים דמויי אצבע או אלה; קדמת הראש נושאת בדרך כלל צעיף עם זיזים דמויי אצבעות. המחושים העליים, לעיתים בתוך נדנים, יחד עם הזימים שאינם נסוגים, מבדילים אותן מ־Chromodorididae ומ־Discodorididae, שזימיהן נסוגים לתוך המעטפת.",
+   "sources": "https://www.marinespecies.org/aphia.php?p=taxdetails&id=177\nhttps://en.wikipedia.org/wiki/Polyceridae\nhttps://en.seaslug.world/"
+  },
+  {
+   "name": "Hexabranchidae",
+   "name_he": "",
+   "description_en": "Hexabranchidae is a dorid nudibranch family (superfamily Chromodoridoidea, suborder Doridina) containing the single genus Hexabranchus, best known for the Spanish dancer, Hexabranchus sanguineus. It is widespread in the Indo-West Pacific, including the Red Sea, and is among the largest nudibranchs, with individuals reaching several tens of centimetres. Hexabranchus feeds on sponges and uses sponge-derived compounds for chemical defence, also passing them to its large red, rose-shaped egg ribbons. When disturbed it can swim by rhythmically flapping its broad mantle, and it often carries commensal emperor shrimps.",
+   "description_he": "Hexabranchidae היא משפחה של חשופיות דורידיות (בעל־המשפחה Chromodoridoidea, תת־סדרה Doridina) הכוללת סוג יחיד, Hexabranchus, הידוע בזכות הרקדנית הספרדייה, Hexabranchus sanguineus. היא נפוצה באינדו־פסיפי המערבי, כולל ים סוף, ונמנית עם החשופיות הגדולות ביותר, עם פרטים המגיעים לכמה עשרות סנטימטרים. Hexabranchus ניזונה מספוגים ומשתמשת בתרכובות שמקורן בספוג להגנה כימית, ואף מעבירה אותן לסרטי הביצים האדומים הגדולים שלה, דמויי ורד. כשהיא מוטרדת היא מסוגלת לשחות בתנועות גליות של המעטפת הרחבה, ולעיתים קרובות נושאת עליה שרימפסי קיסר שותפים.",
+   "identification_en": "A very large, soft dorid with a broad, wavy mantle edge, usually red, orange or mottled, that is often rolled up while crawling and unfurled in a 'dancing' swim. The name refers to the gills, which are six separate branched plumes, each retractile into its own pocket, rather than a single ring around the anus. Its size, flexible frilly mantle and swimming behaviour make it hard to confuse with any other reef dorid.",
+   "identification_he": "חשופית דורידית גדולה ורכה מאוד עם שולי מעטפת רחבים וגליים, לרוב בצבע אדום, כתום או מנומר, המקופלים לעיתים קרובות בזמן זחילה ונפרשים בעת השחייה ה'רוקדת'. שם המשפחה מתייחס לזימים: שש נוצות מסועפות נפרדות, שכל אחת נסוגה לכיס משלה, במקום טבעת אחת סביב פי הטבעת. הגודל, המעטפת הגמישה והמסולסלת והשחייה הופכים אותה לקשה לבלבול עם כל חשופית דורידית אחרת בשונית.",
+   "sources": "https://www.marinespecies.org/aphia.php?p=taxdetails&id=412582\nhttps://en.wikipedia.org/wiki/Hexabranchus\nhttps://en.wikipedia.org/wiki/Spanish_dancer"
+  },
+  {
+   "name": "Dotidae",
+   "name_he": "",
+   "description_en": "Dotidae is a family of small nudibranchs in the superfamily Dendronotoidea (suborder Cladobranchia). WoRMS recognises four genera, Doto, Kabeiro, Miesea and Caecinella, with the great majority of species in Doto. The family is found worldwide, including the Mediterranean, mostly in shallow water. Dotids are typically less than 2 cm long and feed on hydroids, on which they also lay their eggs.",
+   "description_he": "Dotidae היא משפחה של חשופיות קטנות בעל־המשפחה Dendronotoidea (תת־סדרה Cladobranchia). WoRMS מכיר בארבעה סוגים, Doto,‏ Kabeiro,‏ Miesea ו־Caecinella, ורוב המינים שייכים ל־Doto. המשפחה נפוצה בכל העולם, כולל הים התיכון, בעיקר במים רדודים. בני המשפחה בדרך כלל קצרים מ־2 ס\"מ, ניזונים מהידרואידים ואף מטילים עליהם את ביציהם.",
+   "identification_en": "Doto and its relatives have a slender body with a single row of swollen, egg- or pinecone-shaped cerata on each side, covered with rounded tubercles in rings, so they look like tiny bunches of grapes. The smooth rhinophores emerge from conspicuous flared, cup-like sheaths. These knobbly cerata and cupped rhinophore sheaths separate them from aeolids, which lack sheaths, and from Eubranchidae, whose cerata are inflated but not arranged in neat tubercle rings.",
+   "identification_he": "ל־Doto ולקרובותיה גוף צר עם שורה אחת של זיזי גב נפוחים, דמויי ביצה או אצטרובל, בכל צד, המכוסים בבליטות מעוגלות בטבעות, כך שהן נראות כמו אשכולות ענבים זעירים. המחושים החלקים בולטים מתוך נדנים בולטים, מתרחבים ודמויי גביע. זיזי הגב הגבשושיים ונדני המחושים דמויי הגביע מבדילים אותן מחשופיות אאולידיות, שאין להן נדנים, ומ־Eubranchidae, שזיזי הגב שלהן נפוחים אך ללא טבעות בליטות מסודרות.",
+   "sources": "https://www.marinespecies.org/aphia.php?p=taxdetails&id=187\nhttps://en.wikipedia.org/wiki/Dotidae\nhttps://en.wikipedia.org/wiki/Doto_(gastropod)"
+  },
+  {
+   "name": "Tritoniidae",
+   "name_he": "",
+   "description_en": "Tritoniidae is a family of nudibranchs in the superfamily Tritonioidea (suborder Cladobranchia), currently divided by WoRMS into the subfamilies Tritoniinae and Marioniinae, with genera such as Tritonia, Tritoniopsis, Tochuina and Marionia. Members range from polar and cold-temperate waters to tropical reefs, and several species occur in the Mediterranean, for example Tritonia striata and Marionia blainvillea. They feed on octocorals such as soft corals, sea fans and sea pens. Tritonia species have been important model animals in neurobiology because of their large, identifiable nerve cells.",
+   "description_he": "Tritoniidae היא משפחה של חשופיות בעל־המשפחה Tritonioidea (תת־סדרה Cladobranchia), המחולקת כיום ב־WoRMS לתת־המשפחות Tritoniinae ו־Marioniinae, עם סוגים כמו Tritonia,‏ Tritoniopsis,‏ Tochuina ו־Marionia. בני המשפחה נמצאים מהמים הקוטביים והממוזגים־קרים ועד שוניות טרופיות, וכמה מינים מצויים בים התיכון, למשל Tritonia striata ו־Marionia blainvillea. הם ניזונים מאלמוגים שמונה־זרועיים כגון אלמוגים רכים, מניפות ים ונוצות ים. מיני Tritonia שימשו בעלי חיים מודליים חשובים במחקר העצבים בזכות תאי העצב הגדולים והניתנים לזיהוי שלהם.",
+   "identification_en": "Tritoniids have a soft, often flattened body with a row of small branched or tufted gills along each side of the back, rather than cerata or a gill ring. The head carries a frontal veil with finger-like processes, and the rhinophores rise from sheaths and end in a crown of branched filaments. They resemble Dendronotidae, but those have taller, tree-like cerata and branched processes on the rhinophore sheaths, and Tritoniids are usually found on or near octocorals.",
+   "identification_he": "ל־Tritoniidae גוף רך, לעיתים פחוס, עם שורה של זימים קטנים, מסועפים או דמויי ציצה, לאורך כל צד של הגב, במקום זיזי גב או טבעת זימים. בקדמת הראש צעיף עם זיזים דמויי אצבעות, והמחושים עולים מתוך נדנים ומסתיימים בכתר של סיבים מסועפים. הן דומות ל־Dendronotidae, אך לאלה זיזי גב גבוהים דמויי עץ וזיזים מסועפים על נדני המחושים; Tritoniidae נמצאות בדרך כלל על אלמוגים שמונה־זרועיים או לידם.",
+   "sources": "https://www.marinespecies.org/aphia.php?p=taxdetails&id=183\nhttps://en.wikipedia.org/wiki/Tritoniidae\nhttps://opistobranquis.info/en/"
+  },
+  {
+   "name": "Tethydidae",
+   "name_he": "",
+   "description_en": "Tethydidae, the hooded nudibranchs, is a family in the superfamily Dendronotoidea (suborder Cladobranchia); WoRMS now includes both Tethys and Melibe in it. The family occurs worldwide in temperate and tropical seas; Tethys fimbria is a large Mediterranean species, and Melibe viridis has spread into the Mediterranean from the Indo-Pacific. Unlike most nudibranchs they have no radula and catch small crustaceans and other plankton with a huge expandable oral hood. Many can swim by flexing the body from side to side and can shed their cerata when attacked.",
+   "description_he": "Tethydidae, חשופיות הברדס, היא משפחה בעל־המשפחה Dendronotoidea (תת־סדרה Cladobranchia); WoRMS כולל בה כיום את Tethys ואת Melibe. המשפחה נפוצה בימים ממוזגים וטרופיים ברחבי העולם; Tethys fimbria הוא מין גדול מהים התיכון, ו־Melibe viridis התפשט אל הים התיכון מהאינדו־פסיפי. בניגוד לרוב החשופיות אין להן רדולה, והן לוכדות סרטנים קטנים ופלנקטון אחר בעזרת ברדס פה ענק הניתן להרחבה. רבות מהן יכולות לשחות בכיפוף הגוף מצד לצד ולהשיל את זיזי הגב כשהן מותקפות.",
+   "identification_en": "The giveaway is the enormous, translucent oral hood at the front of the body, often fringed with small tentacles, that the animal casts over the substrate or water like a net. The back bears a row of large, flattened, leaf- or paddle-shaped cerata on each side, and the rhinophores sit in sheaths on top of the hood. No other family has this combination of a net-like hood and big leafy cerata.",
+   "identification_he": "סימן ההיכר הוא ברדס פה ענק ושקוף בקדמת הגוף, לרוב מעוטר במחושונים קטנים, שבעל החיים פורש על המצע או במים כמו רשת. על הגב שורה של זיזי גב גדולים, פחוסים, דמויי עלה או משוט, בכל צד, והמחושים יושבים בתוך נדנים על גבי הברדס. לאף משפחה אחרת אין שילוב כזה של ברדס דמוי רשת וזיזי גב גדולים דמויי עלים.",
+   "sources": "https://www.marinespecies.org/aphia.php?p=taxdetails&id=23125\nhttps://en.wikipedia.org/wiki/Tethydidae\nhttps://en.wikipedia.org/wiki/Melibe_viridis"
+  },
+  {
+   "name": "Trinchesiidae",
+   "name_he": "",
+   "description_en": "Trinchesiidae is a family of small aeolid nudibranchs in the superfamily Fionoidea (suborder Cladobranchia), separated from the former Tergipedidae largely on molecular evidence; it includes genera such as Trinchesia, Catriona, Diaphoreolis, Tenellia and Phestilla, though the number of genera is still debated. Members occur worldwide, and several Trinchesia species are common in the Mediterranean. Most feed on hydroids, but Phestilla species eat stony corals. Many species were previously placed in the genus Cuthona.",
+   "description_he": "Trinchesiidae היא משפחה של חשופיות אאולידיות קטנות בעל־המשפחה Fionoidea (תת־סדרה Cladobranchia), שהופרדה מ־Tergipedidae לשעבר בעיקר על סמך ראיות מולקולריות; היא כוללת סוגים כמו Trinchesia,‏ Catriona,‏ Diaphoreolis,‏ Tenellia ו־Phestilla, אם כי מספר הסוגים עדיין שנוי במחלוקת. בני המשפחה נפוצים בכל העולם, וכמה מיני Trinchesia נפוצים בים התיכון. רובם ניזונים מהידרואידים, אך מיני Phestilla אוכלים אלמוגי אבן. מינים רבים שויכו בעבר לסוג Cuthona.",
+   "identification_en": "Trinchesiids are small, slender aeolids with smooth rhinophores and smooth, spindle-shaped cerata arranged in rows along the back; the cerata often show bright subapical bands of blue, yellow, orange or white. The oral tentacles are moderately long and the foot corners are rounded. Smooth, banded cerata distinguish them from the swollen, knobbly cerata of Eubranchidae, and smooth rhinophores separate them from Flabellinidae-type and Facelinidae aeolids with ringed or perfoliate rhinophores.",
+   "identification_he": "Trinchesiidae הן חשופיות אאולידיות קטנות ודקות עם מחושים חלקים וזיזי גב חלקים בצורת כישור, המסודרים בשורות לאורך הגב; לזיזי הגב לעיתים קרובות פסים בהירים מתחת לקצה בכחול, צהוב, כתום או לבן. מחושי הפה באורך בינוני ופינות הרגל מעוגלות. זיזי הגב החלקים והמפוספסים מבדילים אותן מזיזי הגב הנפוחים והגבשושיים של Eubranchidae, והמחושים החלקים מבדילים אותן מחשופיות דמויות Flabellinidae ו־Facelinidae בעלות מחושים טבעתיים או עליים.",
+   "sources": "https://www.marinespecies.org/aphia.php?p=taxdetails&id=151283\nhttps://en.wikipedia.org/wiki/Trinchesiidae\nhttps://opistobranquis.info/en/guia/nudibranchia/cladobranchia/fionoidea/trinchesia-caerulea"
+  },
+  {
+   "name": "Phyllidiidae",
+   "name_he": "",
+   "description_en": "Phyllidiidae is a family of dorid nudibranchs (superfamily Phyllidioidea, suborder Doridina) with five genera: Phyllidia, Phyllidiella, Phyllidiopsis, Reticulidia and Ceratophyllidia. It is most diverse on coral reefs of the Indo-West Pacific, including the Red Sea, where phyllidiids are among the most frequently seen nudibranchs, with a few species elsewhere such as Phyllidia flava in the Mediterranean. They lack a radula and feed on sponges by everting the pharynx and digesting the tissue externally. Their skin contains distasteful compounds, often derived from sponges, that deter predators.",
+   "description_he": "Phyllidiidae היא משפחה של חשופיות דורידיות (בעל־המשפחה Phyllidioidea, תת־סדרה Doridina) עם חמישה סוגים: Phyllidia,‏ Phyllidiella,‏ Phyllidiopsis,‏ Reticulidia ו־Ceratophyllidia. המגוון הרב ביותר נמצא בשוניות האלמוגים של האינדו־פסיפי המערבי, כולל ים סוף, שם הן מהחשופיות הנצפות ביותר, ומינים מעטים נמצאים במקומות אחרים, כמו Phyllidia flava בים התיכון. אין להן רדולה, והן ניזונות מספוגים על ידי הוצאת הלוע ועיכול הרקמה מחוץ לגוף. העור שלהן מכיל תרכובות דוחות, שמקורן לעיתים קרובות בספוגים, המרתיעות טורפים.",
+   "identification_en": "Phyllidiids have a firm, leathery, almost rigid mantle covered in tubercles or ridges, usually in bold combinations of black, white, blue, yellow or pink. There is no gill cluster on the back: the gills are rows of leaflets hidden in the groove between the mantle and the foot. Only the lamellate rhinophores, which retract into pockets, protrude from the top, so the lack of visible dorsal gills plus the hard tuberculate mantle quickly separates them from other reef dorids.",
+   "identification_he": "ל־Phyllidiidae מעטפת מוצקה, עורית וכמעט קשיחה, מכוסה בליטות או רכסים, לרוב בשילובים בולטים של שחור, לבן, כחול, צהוב או ורוד. אין אשכול זימים על הגב: הזימים הם שורות של עלעלים המוסתרים בתעלה שבין המעטפת לרגל. רק המחושים העליים, הנסוגים לתוך כיסים, בולטים מלמעלה, ולכן היעדר זימים גלויים על הגב יחד עם המעטפת הקשה והמגובששת מבדילים אותן במהירות מחשופיות דורידיות אחרות בשונית.",
+   "sources": "https://www.marinespecies.org/aphia.php?p=taxdetails&id=23093\nhttps://en.wikipedia.org/wiki/Phyllidiidae\nhttps://en.seaslug.world/"
+  },
+  {
+   "name": "Myrrhinidae",
+   "name_he": "",
+   "description_en": "Myrrhinidae is a family of aeolid nudibranchs in the superfamily Aeolidioidea (suborder Cladobranchia), resurrected after DNA studies showed the old Facelinidae to be polyphyletic. WoRMS lists six genera: Dondice, Godiva, Hermissenda, Nanuca, Nemesignis and Phyllodesmium, the last being by far the largest, with more than 30 species. Members live in many regions; Phyllodesmium is mainly Indo-West Pacific, Hermissenda is North Pacific, and Nemesignis banyulensis occurs in the Mediterranean. Many Phyllodesmium species eat soft corals and keep the coral's symbiotic zooxanthellae alive in their tissues, gaining energy from photosynthesis.",
+   "description_he": "Myrrhinidae היא משפחה של חשופיות אאולידיות בעל־המשפחה Aeolidioidea (תת־סדרה Cladobranchia), שהוחזרה לשימוש לאחר שמחקרי DNA הראו ש־Facelinidae במובנה הישן אינה קבוצה טבעית. WoRMS מונה שישה סוגים: Dondice,‏ Godiva,‏ Hermissenda,‏ Nanuca,‏ Nemesignis ו־Phyllodesmium, האחרון הגדול ביותר עם יותר מ־30 מינים. בני המשפחה נמצאים באזורים רבים; Phyllodesmium בעיקר באינדו־פסיפי המערבי, Hermissenda בצפון האוקיינוס השקט, ו־Nemesignis banyulensis בים התיכון. מיני Phyllodesmium רבים אוכלים אלמוגים רכים ושומרים בחיים בתוך רקמותיהם את האצות הסימביוטיות (זואוקסנטלות) של האלמוג, ומפיקים אנרגיה מפוטוסינתזה.",
+   "identification_en": "Myrrhinids look like typical facelinid-style aeolids: an elongate body, long oral tentacles, pointed foot corners and numerous cerata in clusters or arches along the back. Phyllodesmium is the most distinctive genus, with often flattened, translucent cerata that may mimic soft-coral polyps and with no cnidosacs at the ceratal tips. In the field members are best recognised at genus level, because they are not easily separated externally from Facelinidae.",
+   "identification_he": "Myrrhinidae נראות כמו חשופיות אאולידיות טיפוסיות בסגנון Facelinidae: גוף מוארך, מחושי פה ארוכים, פינות רגל מחודדות וזיזי גב רבים באשכולות או בקשתות לאורך הגב. Phyllodesmium הוא הסוג הבולט ביותר, עם זיזי גב שלעיתים קרובות פחוסים ושקופים, העשויים לחקות פוליפים של אלמוגים רכים, וללא שקי צריבה בקצותיהם. בשטח מזהים את בני המשפחה בעיקר ברמת הסוג, מאחר שקשה להבדיל אותם חיצונית מ־Facelinidae.",
+   "sources": "https://www.marinespecies.org/aphia.php?p=taxdetails&id=570862\nhttps://en.wikipedia.org/wiki/Myrrhinidae\nhttps://en.seaslug.world/categories/812\nhttps://en.wikipedia.org/wiki/Phyllodesmium"
+  },
+  {
+   "name": "Samlidae",
+   "name_he": "",
+   "description_en": "Samlidae is a family of aeolid nudibranchs in the superfamily Fionoidea (suborder Cladobranchia), erected by Korshunova and colleagues in 2017 when the former Flabellinidae was split on molecular evidence. It contains two genera, Samla and Luisella, with about ten known species and undescribed forms. Samla species such as S. bicolor and S. macassarana are Indo-West Pacific, while Luisella babai occurs in the Mediterranean and nearby Atlantic. Like their flabellinid relatives they feed on hydroids.",
+   "description_he": "Samlidae היא משפחה של חשופיות אאולידיות בעל־המשפחה Fionoidea (תת־סדרה Cladobranchia), שהוגדרה בידי Korshunova ועמיתיה ב־2017 כאשר Flabellinidae לשעבר פוצלה על סמך ראיות מולקולריות. היא כוללת שני סוגים, Samla ו־Luisella, עם כעשרה מינים ידועים וצורות שטרם תוארו. מיני Samla כמו S. bicolor ו־S. macassarana נפוצים באינדו־פסיפי המערבי, ואילו Luisella babai מצוי בים התיכון ובאוקיינוס האטלנטי הסמוך. כמו קרוביהן מ־Flabellinidae, הן ניזונות מהידרואידים.",
+   "identification_en": "Samlids have the classic 'flabellinid' look: a narrow body, long oral tentacles, perfoliate (stacked-ring) rhinophores and cerata grouped in clusters on raised stalks along the sides of the back. Colours are often bright, for example white or translucent cerata with orange or white tips. They are hard to separate from Flabellinidae and Coryphellidae in the field, so identification is usually made at genus or species level.",
+   "identification_he": "ל־Samlidae מראה 'פלבליני' קלאסי: גוף צר, מחושי פה ארוכים, מחושים עליים (טבעות מוערמות) וזיזי גב המקובצים באשכולות על בסיסים מורמים לאורך צידי הגב. הצבעים לרוב בהירים, למשל זיזי גב לבנים או שקופים עם קצוות כתומים או לבנים. קשה להבדיל אותן בשטח מ־Flabellinidae ומ־Coryphellidae, ולכן הזיהוי נעשה בדרך כלל ברמת הסוג או המין.",
+   "sources": "https://www.marinespecies.org/aphia.php?p=taxdetails&id=1047246\nhttps://en.wikipedia.org/wiki/Samlidae\nhttps://en.seaslug.world/categories/741"
+  },
+  {
+   "name": "Fionidae",
+   "name_he": "",
+   "description_en": "Fionidae is the type family of the superfamily Fionoidea (suborder Cladobranchia), a group of aeolid nudibranchs. In its current narrow sense WoRMS includes the genera Fiona, Tergiposacca and Zatteria; earlier broad concepts that merged many tergipedid aeolids into Fionidae have been abandoned. The best-known member, Fiona pinnata, is an oceanic species found worldwide in warm and temperate seas, living on floating objects and drifting animals. It feeds on pelagic prey such as goose barnacles and by-the-wind sailors (Velella).",
+   "description_he": "Fionidae היא משפחת הטיפוס של בעל־המשפחה Fionoidea (תת־סדרה Cladobranchia), קבוצה של חשופיות אאולידיות. במובנה הצר הנוכחי WoRMS כולל בה את הסוגים Fiona,‏ Tergiposacca ו־Zatteria; תפיסות רחבות קודמות, שמיזגו לתוך Fionidae חשופיות רבות מ־Tergipedidae, ננטשו. הנציג המוכר ביותר, Fiona pinnata, הוא מין אוקייני הנפוץ בכל העולם בימים חמים וממוזגים, החי על עצמים צפים ועל בעלי חיים נסחפים. הוא ניזון מטרף פלגי כמו ברנקלים ברווזיים ו־Velella.",
+   "identification_en": "Fiona pinnata is a pale, often bluish, brown or purplish aeolid with smooth rhinophores and many crowded cerata, each bearing a thin wavy membrane along its inner side. Finding it on driftwood, floats or other drifting objects at the surface, rather than on the reef, is itself a strong clue. The sail-like ceratal membrane is not seen in other aeolid families.",
+   "identification_he": "Fiona pinnata היא חשופית אאולידית חיוורת, לעיתים כחלחלה, חומה או סגלגלה, עם מחושים חלקים וזיזי גב צפופים רבים, שלאורך הצד הפנימי של כל אחד מהם קרום דק וגלי. מציאתה על עץ סחף, מצופים או עצמים נסחפים אחרים על פני המים, ולא על השונית, היא כשלעצמה רמז חזק. הקרום דמוי המפרש על זיזי הגב אינו מופיע במשפחות אאולידיות אחרות.",
+   "sources": "https://www.marinespecies.org/aphia.php?p=taxdetails&id=23039\nhttps://en.wikipedia.org/wiki/Fionidae\nhttps://en.wikipedia.org/wiki/Fiona_pinnata"
+  },
+  {
+   "name": "Dendronotidae",
+   "name_he": "",
+   "description_en": "Dendronotidae is a family of nudibranchs in the superfamily Dendronotoidea (suborder Cladobranchia), with the genera Dendronotus, Cabangus and Pseudobornella. Dendronotus, the largest genus, is mainly found in cold and temperate waters of the Northern Hemisphere, while Cabangus is known from the tropical Indo-West Pacific. Most species feed on hydroids. Some Dendronotus species can swim by flexing the body from side to side.",
+   "description_he": "Dendronotidae היא משפחה של חשופיות בעל־המשפחה Dendronotoidea (תת־סדרה Cladobranchia), עם הסוגים Dendronotus,‏ Cabangus ו־Pseudobornella. Dendronotus, הסוג הגדול ביותר, נמצא בעיקר במים קרים וממוזגים בחצי הכדור הצפוני, ואילו Cabangus ידוע מהאינדו־פסיפי המערבי הטרופי. רוב המינים ניזונים מהידרואידים. מינים אחדים של Dendronotus מסוגלים לשחות בכיפוף הגוף מצד לצד.",
+   "identification_en": "Dendronotids carry pairs of tall, branched, tree-like cerata along each side of the back, and the head bears an oral veil with branched papillae. The rhinophores sit in sheaths whose rims carry branched, crown-like processes. They differ from Tritoniidae, which have low tufted gills and live on octocorals, and from Tethydidae, which have a large oral hood and leaf-like cerata.",
+   "identification_he": "ל־Dendronotidae זוגות של זיזי גב גבוהים, מסועפים ודמויי עץ לאורך כל צד של הגב, ובראש צעיף פה עם זיזים מסועפים. המחושים יושבים בתוך נדנים ששוליהם נושאים זיזים מסועפים דמויי כתר. הן שונות מ־Tritoniidae, שלהן זימים נמוכים דמויי ציצה והן חיות על אלמוגים שמונה־זרועיים, ומ־Tethydidae, שלהן ברדס פה גדול וזיזי גב דמויי עלים.",
+   "sources": "https://www.marinespecies.org/aphia.php?p=taxdetails&id=186\nhttps://en.wikipedia.org/wiki/Dendronotidae\nhttps://en.wikipedia.org/wiki/Dendronotus"
+  },
+  {
+   "name": "Unidentiidae",
+   "name_he": "",
+   "description_en": "Unidentiidae is a family of small aeolid nudibranchs described by Millen and Hermosillo in 2012 for the genus Unidentia, named for its radula with a single tooth per row. Its placement is unsettled: WoRMS currently treats it as a junior synonym of Piseinotecidae within Fionoidea, while Korshunova et al. (2025) placed it in its own superfamily, Unidentioidea, because it combines traits of several aeolid lineages. About nine species of Unidentia are known from the western and eastern Pacific. Species are slender and small, roughly 4–20 mm long.",
+   "description_he": "Unidentiidae היא משפחה של חשופיות אאולידיות קטנות שתוארה בידי Millen ו־Hermosillo ב־2012 עבור הסוג Unidentia, הקרוי על שם הרדולה שלו, שבה שן אחת בכל שורה. מיקומה הטקסונומי אינו מוסכם: WoRMS מתייחס אליה כיום כשם נרדף צעיר של Piseinotecidae בתוך Fionoidea, ואילו Korshunova ועמיתיה (2025) הציבו אותה בעל־משפחה נפרד, Unidentioidea, משום שהיא משלבת תכונות של כמה שושלות אאולידיות. ידועים כתשעה מיני Unidentia מהאוקיינוס השקט המערבי והמזרחי. המינים דקים וקטנים, באורך של כ־4–20 מ\"מ.",
+   "identification_en": "Unidentia species are slender little aeolids with smooth rhinophores about as long as the oral tentacles, a single row of cerata along each side of the back, and long, tentacle-like front corners of the foot. The anus opens between the ceratal rows. These features overlap with other small aeolids, so field identification is usually made at species level from colour pattern.",
+   "identification_he": "מיני Unidentia הם חשופיות אאולידיות קטנות ודקות עם מחושים חלקים באורך דומה למחושי הפה, שורה אחת של זיזי גב לאורך כל צד של הגב ופינות רגל קדמיות ארוכות דמויות מחושים. פי הטבעת נפתח בין שורות זיזי הגב. תכונות אלה חופפות לחשופיות אאולידיות קטנות אחרות, ולכן הזיהוי בשטח נעשה בדרך כלל ברמת המין לפי דגם הצבע.",
+   "sources": "https://en.wikipedia.org/wiki/Unidentiidae\nhttps://en.seaslug.world/categories/738\nhttps://www.marinespecies.org/aphia.php?p=taxdetails&id=23096"
+  },
+  {
+   "name": "Gastropteridae",
+   "name_he": "",
+   "description_en": "Gastropteridae is a family of small headshield sea slugs in the order Cephalaspidea (superfamily Philinoidea), not nudibranchs. WoRMS recognises five genera: Gastropteron, Siphopteron, Sagaminopteron, Enotepteron and Africanopteron. They occur in temperate and tropical seas worldwide, including Gastropteron rubrum in the Mediterranean, and are especially diverse in the Indo-West Pacific. Most are only a few millimetres to about 2 cm long and can swim by flapping their wing-like parapodia; Sagaminopteron species live and feed on sponges.",
+   "description_he": "Gastropteridae היא משפחה של חלזונות ים קטנים בעלי מגן ראש מהסדרה Cephalaspidea (בעל־המשפחה Philinoidea), ואינם חשופיות. WoRMS מכיר בחמישה סוגים: Gastropteron,‏ Siphopteron,‏ Sagaminopteron,‏ Enotepteron ו־Africanopteron. הם נפוצים בימים ממוזגים וטרופיים בכל העולם, כולל Gastropteron rubrum בים התיכון, ומגוונים במיוחד באינדו־פסיפי המערבי. רובם באורך של מילימטרים בודדים ועד כ־2 ס\"מ, והם יכולים לשחות בעזרת נפנוף הכנפיים; מיני Sagaminopteron חיים על ספוגים וניזונים מהם.",
+   "identification_en": "Gastropterids have a short body with a head shield in front and broad, wing-like parapodia that are folded over the back at rest and flapped when swimming, giving them the nickname 'bat-winged slugs'. The shell is small and internal, and many Siphopteron species have a whip-like flagellum projecting from the rear. They lack the rhinophores and gill plumes of nudibranchs, and their wide parapodial wings distinguish them from other small headshield slugs such as Aglajidae.",
+   "identification_he": "ל־Gastropteridae גוף קצר עם מגן ראש בחזית וכנפיים רחבות, המקופלות מעל הגב במנוחה ומנופנפות בשחייה, ומכאן כינוין 'חלזונות כנפי עטלף'. הקונכייה קטנה ופנימית, ולמיני Siphopteron רבים זיז דמוי שוט הבולט מאחור. אין להם המחושים והזימים הנוצתיים של חשופיות, והכנפיים הרחבות מבדילות אותם מחלזונות קטנים אחרים בעלי מגן ראש כמו Aglajidae.",
+   "sources": "https://www.marinespecies.org/aphia.php?p=taxdetails&id=23045\nhttps://en.wikipedia.org/wiki/Gastropteridae\nhttps://en.seaslug.world/"
+  },
+  {
+   "name": "Aplustridae",
+   "name_he": "",
+   "description_en": "Aplustridae is a family of bubble snails in the superfamily Acteonoidea, an early-branching group of heterobranch sea slugs that keep a well-developed external shell. WoRMS lists genera including Hydatina, Micromelo, Bullina and Aplustrum. Members live mainly in tropical and warm-temperate seas worldwide, often on sandy or muddy bottoms, and Hydatina physis has been recorded in the Mediterranean. They hunt polychaete worms.",
+   "description_he": "Aplustridae היא משפחה של חלזונות בועה בעל־המשפחה Acteonoidea, קבוצה מוקדמת של חלזונות ים מקבוצת Heterobranchia השומרים על קונכייה חיצונית מפותחת. WoRMS מונה בה סוגים ובהם Hydatina,‏ Micromelo,‏ Bullina ו־Aplustrum. בני המשפחה חיים בעיקר בימים טרופיים וממוזגים־חמים בכל העולם, לעיתים קרובות על קרקעית חולית או בוצית, ו־Hydatina physis נרשם בים התיכון. הם צדים תולעים רב־זיפיות.",
+   "identification_en": "Look for a thin, globose external shell boldly patterned with spiral lines or bands, carried on top of a large, soft, often translucent and frilly-edged body that is too big to withdraw fully into the shell. The head bears a broad cephalic disc with lobes rather than nudibranch-style rhinophores. The colourful external shell and expansive mantle lobes set them apart from Haminoeidae and other bubble snails with plainer shells.",
+   "identification_he": "יש לחפש קונכייה חיצונית דקה וכדורית עם דגם בולט של קווים או פסים ספירליים, הנישאת על גוף גדול, רך, לרוב שקוף ובעל שוליים מסולסלים, הגדול מכדי להיכנס כולו לקונכייה. בראש דיסקה רחבה עם אונות, ולא מחושים כמו של חשופיות. הקונכייה החיצונית הצבעונית והאונות הרחבות מבדילות אותם מ־Haminoeidae ומחלזונות בועה אחרים בעלי קונכיות פשוטות יותר.",
+   "sources": "https://www.marinespecies.org/aphia.php?p=taxdetails&id=411859\nhttps://en.wikipedia.org/wiki/Aplustridae\nhttps://en.wikipedia.org/wiki/Hydatina_physis"
+  },
+  {
+   "name": "Cadlinellidae",
+   "name_he": "",
+   "description_en": "Cadlinellidae Odhner, 1934 is a small family of dorid nudibranchs in the superfamily Chromodoridoidea (suborder Doridina), accepted by WoRMS for the single genus Cadlinella, which was long treated as part of Chromodorididae. Only about three species are recognised, including Cadlinella ornatissima and C. subornatissima. The genus is found in the tropical Indo-West Pacific.",
+   "description_he": "Cadlinellidae Odhner, 1934 היא משפחה קטנה של חשופיות דורידיות בעל־המשפחה Chromodoridoidea (תת־סדרה Doridina), המוכרת ב־WoRMS עבור הסוג היחיד Cadlinella, שבמשך זמן רב נחשב חלק מ־Chromodorididae. מוכרים בה כשלושה מינים בלבד, ובהם Cadlinella ornatissima ו־C. subornatissima. הסוג נמצא באזור הטרופי של האינדו־פסיפי המערבי.",
+   "identification_en": "Cadlinella is a small, chromodorid-like dorid whose translucent white mantle is covered with long, soft, finger-like papillae, typically tipped with yellow or orange, giving it a fuzzy appearance. It has the gill circlet and lamellate rhinophores of other chromodoridoids. The dense coat of coloured-tipped papillae distinguishes it from the smooth-mantled Chromodorididae.",
+   "identification_he": "Cadlinella היא חשופית דורידית קטנה, דמוית Chromodorididae, שמעטפתה הלבנה־שקופה מכוסה זיזים ארוכים, רכים ודמויי אצבע, לרוב בקצוות צהובים או כתומים, המעניקים לה מראה פרוותי. יש לה טבעת זימים ומחושים עליים כמו לשאר בני Chromodoridoidea. כיסוי הזיזים הצפוף בעלי הקצוות הצבעוניים מבדיל אותה מבני Chromodorididae בעלי המעטפת החלקה.",
+   "sources": "https://www.marinespecies.org/aphia.php?p=taxdetails&id=1423460\nhttps://en.wikipedia.org/wiki/Cadlinella\nhttps://nudipixel.net/genus/cadlinella"
+  },
+  {
+   "name": "Tylodinidae",
+   "name_he": "",
+   "description_en": "Tylodinidae is a family of sidegill slugs in the order Umbraculida (superfamily Umbraculoidea), not nudibranchs; WoRMS currently recognises only the genus Tylodina. Tylodina perversa is a well-known Mediterranean and eastern Atlantic species, and other species occur in the Indo-Pacific and elsewhere. Tylodina feed on sponges, and T. perversa specialises on yellow Aplysina sponges, taking up their pigments and defensive bromotyrosine compounds.",
+   "description_he": "Tylodinidae היא משפחה של חלזונות זים־צד מהסדרה Umbraculida (בעל־המשפחה Umbraculoidea), ואינם חשופיות; WoRMS מכיר כיום רק בסוג Tylodina. Tylodina perversa הוא מין מוכר מהים התיכון ומהאוקיינוס האטלנטי המזרחי, ומינים אחרים מצויים באינדו־פסיפי ובמקומות אחרים. Tylodina ניזונים מספוגים, ו־T. perversa מתמחה בספוגי Aplysina הצהובים וקולט מהם פיגמנטים ותרכובות הגנה מסוג ברומוטירוזין.",
+   "identification_en": "Tylodina has a flattened, limpet-like external shell, often with a hairy periostracum, sitting on top of the body, which is usually the same colour as its host sponge (bright yellow in T. perversa). The rhinophores are rolled and there is a single feather-like gill on the right side beneath the shell edge. It differs from Umbraculum, the other umbraculid, which has a huge tuberculate body with a small shell perched on top, and from true limpets by its soft slug body and rhinophores.",
+   "identification_he": "ל־Tylodina קונכייה חיצונית פחוסה דמוית פטלה, לעיתים עם שכבה חיצונית שעירה, היושבת על הגוף, שצבעו בדרך כלל כצבע הספוג המארח (צהוב בוהק ב־T. perversa). המחושים מגולגלים, ובצד ימין, מתחת לשולי הקונכייה, זים יחיד דמוי נוצה. הוא שונה מ־Umbraculum, בן המשפחה הקרובה, שלו גוף ענק ומגובשש עם קונכייה קטנה מעליו, ומפטלות אמיתיות בגוף הרך ובמחושים.",
+   "sources": "https://www.marinespecies.org/aphia.php?p=taxdetails&id=23136\nhttps://en.wikipedia.org/wiki/Tylodina_perversa\nhttps://opistobranquis.info/en/"
+  },
+  {
+   "name": "Calycidorididae",
+   "name_he": "",
+   "description_en": "Calycidorididae Roginskaya, 1972 is a family of dorid nudibranchs in the superfamily Onchidoridoidea (suborder Doridina), with two genera, Calycidoris and Diaphorodoris. Calycidoris is a cold-water northern genus, while Diaphorodoris occurs in the Mediterranean and north-east Atlantic (D. luteocincta, D. papillata, D. alba) and in the North Pacific (D. lirulatocauda, D. mitsuii). They are small dorids, mostly 1–2 cm long, and Diaphorodoris feeds mainly on bryozoans.",
+   "description_he": "Calycidorididae Roginskaya, 1972 היא משפחה של חשופיות דורידיות בעל־המשפחה Onchidoridoidea (תת־סדרה Doridina), עם שני סוגים, Calycidoris ו־Diaphorodoris. Calycidoris הוא סוג צפוני של מים קרים, ואילו Diaphorodoris נמצא בים התיכון ובצפון־מזרח האוקיינוס האטלנטי (D. luteocincta,‏ D. papillata,‏ D. alba) ובצפון האוקיינוס השקט (D. lirulatocauda,‏ D. mitsuii). אלה חשופיות דורידיות קטנות, רובן באורך 1–2 ס\"מ, ו־Diaphorodoris ניזון בעיקר מטחביות.",
+   "identification_en": "Diaphorodoris are small, oval dorids with a white or translucent mantle stiffened by spicules and covered in small conical tubercles, often edged with a yellow or orange band or marked with red patches. A small circlet of simple gills and smooth or lamellate rhinophores sit on the back. They resemble Onchidorididae and some Goniodorididae, but the white mantle with a coloured rim is a good first clue for the common Mediterranean species.",
+   "identification_he": "Diaphorodoris הן חשופיות דורידיות קטנות וסגלגלות עם מעטפת לבנה או שקופה, מוקשחת במחטים ומכוסה בליטות חרוטיות קטנות, לעיתים קרובות עם פס שוליים צהוב או כתום או עם כתמים אדומים. על הגב טבעת קטנה של זימים פשוטים ומחושים חלקים או עליים. הן דומות ל־Onchidorididae ולחלק מ־Goniodorididae, אך המעטפת הלבנה עם שוליים צבעוניים היא רמז ראשון טוב למינים הנפוצים בים התיכון.",
+   "sources": "https://www.marinespecies.org/aphia.php?p=taxdetails&id=845524\nhttps://en.wikipedia.org/wiki/Calycidorididae\nhttps://en.wikipedia.org/wiki/Diaphorodoris\nhttps://www.salentosommerso.it/pp_nudibranchia/Diaphorodoris luteocincta/pp_Diaphorodoris luteocincta.php"
+  }
+ ]
+}

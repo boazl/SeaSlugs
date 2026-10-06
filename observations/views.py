@@ -145,9 +145,6 @@ def genus_page(request, name):
     the same rule species_page uses."""
     genus = get_object_or_404(
         TaxonGenus.objects.select_related('family', 'family__order', 'defining_sample'), name=name)
-    thumbnail, image_url, video_id = taxon_media(genus.defining_sample)
-    if not (image_url or video_id):
-        raise Http404
     resolver = TaxonResolver()
     areas = []
     for area in SpeciesArea.objects.select_related(
@@ -162,6 +159,7 @@ def genus_page(request, name):
             areas.append(area)
     if not areas:
         raise Http404
+    thumbnail, image_url, video_id = taxon_hero_media(genus.defining_sample, areas)
     lang = get_lang(request)
 
     def taxon_label(obj):
@@ -179,8 +177,108 @@ def genus_page(request, name):
         'taxon_order': taxon_order, 'taxon_family': taxon_family,
         'taxon_order_label': taxon_label(taxon_order), 'taxon_family_label': taxon_label(taxon_family),
         'common_name': common_name, 'description': description,
+        'identification': (genus.identification_en or genus.identification_he) if lang == 'en' else (genus.identification_he or genus.identification_en),
         'canonical_url': request.build_absolute_uri(request.path),
     })
+
+
+def taxon_hero_media(defining_sample, areas):
+    """(thumbnail, image_url, video_id) for a taxon page's hero: the taxon's own defining
+    sample when it has a photo/video, otherwise the first of its species' defining samples
+    that does -- so a genus/family/order page never 404s just for lacking its own media."""
+    media = taxon_media(defining_sample)
+    if media[1] or media[2]:
+        return media
+    for area in areas:
+        media = taxon_media(area.defining_sample)
+        if media[1] or media[2]:
+            return media
+    return '', '', ''
+
+
+def gallery_areas():
+    """Every SpeciesArea the gallery shows (published defining sample with a photo or video),
+    each with its resolved (order, family, genus) and observation count attached -- shared by
+    the order and family pages."""
+    resolver = TaxonResolver()
+    out = []
+    for area in SpeciesArea.objects.select_related(
+            'species', 'country', 'sea', 'defining_sample', 'defining_sample__trip', 'defining_sample__trip__region'
+    ).order_by('species__scientific_name'):
+        defining = area.defining_sample
+        if not defining or defining.status != 'published' or defining.deleted_at or not (defining.image or defining.video_url):
+            continue
+        area.taxon_order, area.taxon_family, area.taxon_genus = resolver.resolve(area.species)
+        area.observation_count = area_samples(area).count()
+        out.append(area)
+    return out
+
+
+def _taxon_page(request, rank, obj, areas, children, parent, parent_url):
+    lang = get_lang(request)
+    pick = lambda he, en: (en or he) if lang == 'en' else (he or en)
+    thumbnail, image_url, video_id = taxon_hero_media(obj.defining_sample, areas)
+    sub = getattr(obj, 'sub_order', '') or getattr(obj, 'sub_family', '')
+    return render(request, 'observations/taxon_page.html', {
+        'rank': rank, 'taxon': obj, 'latin_name': f'{obj.name} — {sub}' if sub else obj.name,
+        'common_name': pick(obj.name_he, obj.name_en),
+        'description': pick(obj.description_he, obj.description_en),
+        'identification': pick(obj.identification_he, obj.identification_en),
+        'sources': [line.strip() for line in obj.sources.splitlines() if line.strip()],
+        'areas': areas, 'children': children,
+        'parent_label': pick(parent.name_he, parent.name_en) or parent.name if parent else '',
+        'parent_url': parent_url,
+        'image_url': image_url, 'video_id': video_id, 'thumbnail': thumbnail,
+        'canonical_url': request.build_absolute_uri(request.path),
+    })
+
+
+def _child_list(areas, attr, url_name, lang):
+    """[{label, latin, url, count}] for the distinct families/genera under a taxon, in
+    taxonomic order, each with the number of species cards it holds."""
+    seen = {}
+    for area in areas:
+        child = getattr(area, attr)
+        if child is None:
+            continue
+        entry = seen.setdefault(child.pk, {'obj': child, 'count': 0})
+        entry['count'] += 1
+    out = []
+    for entry in sorted(seen.values(), key=lambda e: ((e['obj'].taxonomic_order or '~'), e['obj'].name)):
+        obj = entry['obj']
+        common = (obj.name_en if lang == 'en' else obj.name_he) or ''
+        out.append({'latin': obj.name, 'common': common, 'count': entry['count'],
+                    'url': reverse(url_name, args=[obj.name])})
+    return out
+
+
+def order_page(request, pk):
+    """Public page for one order group (TaxonOrder row -- keyed by pk, since one order name
+    such as Nudibranchia has several rows): its description and identification, the
+    families it holds and every gallery species in it."""
+    order = get_object_or_404(TaxonOrder.objects.select_related('defining_sample'), pk=pk)
+    areas = [a for a in gallery_areas() if a.taxon_order and a.taxon_order.pk == order.pk]
+    if not areas:
+        raise Http404
+    children = _child_list(areas, 'taxon_family', 'family-page', get_lang(request))
+    return _taxon_page(request, 'order', order, areas, children, None, '')
+
+
+def family_page(request, name):
+    """Public page for one family, keyed by name (the rare sub_family rows of one family are
+    shown together): description, identification, its genera and every gallery species."""
+    families = list(TaxonFamily.objects.select_related('order', 'defining_sample').filter(name=name))
+    if not families:
+        raise Http404
+    ids = {f.pk for f in families}
+    areas = [a for a in gallery_areas() if a.taxon_family and a.taxon_family.pk in ids]
+    if not areas:
+        raise Http404
+    family = next((f for f in families if not f.sub_family), families[0])
+    children = _child_list(areas, 'taxon_genus', 'genus-page', get_lang(request))
+    order = family.order or areas[0].taxon_order
+    return _taxon_page(request, 'family', family, areas, children, order,
+                       reverse('order-page', args=[order.pk]) if order else '')
 
 
 def genus_article(request, name):

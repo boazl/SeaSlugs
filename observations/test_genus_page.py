@@ -97,12 +97,28 @@ class GenusPageTests(TestCase):
         html = self.client.get(f'/genus/{self.genus.name}/').content.decode()
         self.assertNotIn('card-author', html)
 
-    def test_genus_page_404s_without_a_defining_sample(self):
+    def test_genus_page_without_a_defining_sample_falls_back_to_a_species_photo(self):
+        # Breadcrumbs and gallery panels always link to the genus page, so a genus with no
+        # media of its own still gets a page, using one of its species' photo/video.
         self.genus_sample.soft_delete(self.owner)  # only genus-kind sample -- see Sample.save
         self.genus.refresh_from_db()
         self.assertIsNone(self.genus.defining_sample_id)
         response = self.client.get(f'/genus/{self.genus.name}/')
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context['image_url'] or response.context['video_id'])
+
+    def test_order_and_family_pages_list_the_species(self):
+        from observations.gallery_data import TaxonResolver
+        order, family, _ = TaxonResolver().resolve(self.species)
+        if order:
+            response = self.client.get(f'/order/{order.pk}/')
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, f'/species/{self.area.slug}/')
+        if family:
+            response = self.client.get(f'/family/{family.name}/')
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, f'/genus/{self.genus.name}/')
+        self.assertEqual(self.client.get('/family/Nonexistentidae/').status_code, 404)
 
     def test_genus_page_404s_when_no_species_resolve_to_it(self):
         empty_genus = TaxonGenus.objects.create(name='Hypselodoris')
