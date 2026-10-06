@@ -1034,7 +1034,7 @@ function updateSuggest() {
         .map(c => ({ c, r: suggestRank(c, q) }))
         .filter(x => x.r >= 0 && x.c.norm !== q)
         .sort((a, b) => a.r - b.r || SUGGEST_KINDS[a.c.kind] - SUGGEST_KINDS[b.c.kind] || a.c.text.localeCompare(b.c.text, language === 'he' ? 'he' : 'en'))
-        .slice(0, 8).map(x => x.c);
+        .map(x => x.c);   // every match, however many: the chips wrap onto more rows
     if (!suggestItems.length) { closeSuggest(); return; }
     suggestActive = -1;
     suggestBox.replaceChildren(...suggestItems.map((c, i) => {
