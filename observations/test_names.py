@@ -73,7 +73,8 @@ class GalleryScriptTests(SimpleTestCase):
         self.assertIn("if (state.sort === 'year')", js)
         self.assertIn('function speciesYearCompare(', js)
         # Migrant view defaults to the year sort, but never overrides a sort the visitor picked.
-        self.assertIn("state.sort = key === 'migrant' ? 'year' : 'taxonomic'", js)
+        self.assertIn("return state.area === 'migrant' ? 'year' : 'taxonomic';", js)
+        self.assertIn('if (!state.sortChosen) state.sort = defaultSort();', js)
         self.assertIn('if (!state.sortChosen)', js)
         self.assertIn('state.sortChosen = true', js)
         self.assertIn('state.sortChosen = false', js)
@@ -81,8 +82,8 @@ class GalleryScriptTests(SimpleTestCase):
         # removed otherwise, and a year sort falls back to taxonomic on leaving that view.
         self.assertIn('function syncSortControl()', js)
         self.assertIn('yearSortOption.remove()', js)
-        self.assertIn("if (state.sort === 'year') { state.sort = 'taxonomic'; state.sortChosen = false; }", js)
-        self.assertEqual(js.count('syncSortControl();'), 3)   # area click, reset, initial load
+        self.assertIn("if (state.sort === 'year') { state.sort = defaultSort(); state.sortChosen = false; }", js)
+        self.assertEqual(js.count('syncSortControl();'), 4)   # area click, observations filter, reset, initial load
         # The years line only appears under the migrant filter.
         self.assertIn("if (state.area === 'migrant' && (sp.first_observed_year || sp.last_observed_year))", js)
         self.assertIn("'נצפה לראשונה בים התיכון'", js)

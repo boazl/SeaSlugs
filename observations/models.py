@@ -123,6 +123,29 @@ class Species(models.Model):
     description_en = models.TextField('תיאור באנגלית', blank=True)
     link = models.URLField('קישור', blank=True)
     article_pdf = models.FileField('מאמר (PDF)', upload_to='articles/species/', blank=True, validators=[FileExtensionValidator(['pdf'])])
+    # Species-page content in both languages. habitat / food above hold the Hebrew text;
+    # their English counterparts are habitat_en / food_en.
+    habitat_en = models.TextField('בית גידול (אנגלית)', blank=True)
+    food_en = models.TextField('מזון (אנגלית)', blank=True)
+    identification_he = models.TextField('סימני זיהוי', blank=True)
+    identification_en = models.TextField('סימני זיהוי (אנגלית)', blank=True)
+    similar_species_he = models.TextField('מינים דומים', blank=True)
+    similar_species_en = models.TextField('מינים דומים (אנגלית)', blank=True)
+    native_range_he = models.TextField('תפוצה מקורית', blank=True)
+    native_range_en = models.TextField('תפוצה מקורית (אנגלית)', blank=True)
+    depth_min = models.PositiveSmallIntegerField('עומק מינימלי (מ׳)', null=True, blank=True)
+    depth_max = models.PositiveSmallIntegerField('עומק מקסימלי (מ׳)', null=True, blank=True)
+    # Migrant species: how and where it was recorded in the Mediterranean (the years are
+    # first_observed_year / last_observed_year above).
+    introduction_route_he = models.CharField('דרך ההגעה לים התיכון', max_length=200, blank=True)
+    introduction_route_en = models.CharField('דרך ההגעה לים התיכון (אנגלית)', max_length=200, blank=True)
+    med_status_he = models.CharField('מעמד בים התיכון', max_length=200, blank=True)
+    med_status_en = models.CharField('מעמד בים התיכון (אנגלית)', max_length=200, blank=True)
+    first_record_place_he = models.CharField('מקום התצפית הראשונה', max_length=200, blank=True)
+    first_record_place_en = models.CharField('מקום התצפית הראשונה (אנגלית)', max_length=200, blank=True)
+    last_record_place_he = models.CharField('מקום התצפית האחרונה', max_length=200, blank=True)
+    last_record_place_en = models.CharField('מקום התצפית האחרונה (אנגלית)', max_length=200, blank=True)
+    sources = models.TextField('מקורות (קישור בכל שורה)', blank=True)
     class Meta:
         ordering = [models.functions.NullIf('phylogenetic_order', models.Value('')).asc(nulls_last=True), 'scientific_name']
         verbose_name = 'מין'; verbose_name_plural = 'מינים'

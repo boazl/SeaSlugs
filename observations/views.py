@@ -65,11 +65,53 @@ def species_page(request, slug):
     # video); the observations grid below lists only the other ones.
     main_sample = next((s for s in samples if s.pk == area.defining_sample_id), samples[0])
     other_samples = [s for s in samples if s is not main_sample]
+    def pick(he, en):
+        # The current language's text, falling back to the other language when it's blank.
+        return (en or he) if lang == 'en' else (he or en)
+
+    en = lang == 'en'
+    info = {
+        'identification': pick(species.identification_he, species.identification_en),
+        'similar': pick(species.similar_species_he, species.similar_species_en),
+        'habitat': pick(species.habitat, species.habitat_en),
+        'food': pick(species.food, species.food_en),
+        'native_range': pick(species.native_range_he, species.native_range_en),
+        'route': pick(species.introduction_route_he, species.introduction_route_en),
+        'status': pick(species.med_status_he, species.med_status_en),
+        'first_place': pick(species.first_record_place_he, species.first_record_place_en),
+        'last_place': pick(species.last_record_place_he, species.last_record_place_en),
+    }
+    # Short values for the quick-facts row under the name.
+    def num(value):
+        return str(int(value)) if value == value.to_integral_value() else str(value.normalize())
+    unit = 'mm' if en else 'מ״מ'
+    size_short = ''
+    if species.size_from is not None and species.size_to is not None:
+        size_short = f'\u2066{num(species.size_from)}–{num(species.size_to)}\u2069 {unit}'
+    elif species.size_from is not None or species.size_to is not None:
+        size_short = f'{num(species.size_from if species.size_from is not None else species.size_to)} {unit}'
+    if species.size_max is not None and (species.size_to is None or species.size_max > species.size_to):
+        size_short += (' · ' if size_short else '') + (f'max {num(species.size_max)} {unit}' if en else f'עד {num(species.size_max)} {unit}')
+    m = 'm' if en else 'מ׳'
+    if species.depth_min is not None and species.depth_max is not None:
+        depth_short = f'\u2066{species.depth_min}–{species.depth_max}\u2069 {m}'   # LRI..PDI: keep '0–35' in order inside Hebrew text
+    elif species.depth_max is not None:
+        depth_short = (f'to {species.depth_max} {m}' if en else f'עד {species.depth_max} {m}')
+    else:
+        depth_short = f'{species.depth_min} {m}' if species.depth_min is not None else ''
+    from urllib.parse import urlparse
+    sources = []
+    for line in species.sources.splitlines():
+        line = line.strip()
+        if line:
+            host = urlparse(line).netloc.removeprefix('www.') if line.startswith('http') else ''
+            sources.append({'url': line if host else '', 'label': host or line})
     common_name = (species.name_en or species.name_he) if lang == 'en' else (species.name_he or species.name_en)
     description = (species.description_en or species.description_he) if lang == 'en' else (species.description_he or species.description_en)
     return render(request, 'observations/species_page.html', {
         'area': area, 'species': species, 'species_label': species_label, 'samples': samples,
         'main_sample': main_sample, 'other_samples': other_samples,
+        'info': info, 'size_short': size_short, 'depth_short': depth_short, 'sources': sources,
         'image_url': image_url, 'video_id': video_id, 'thumbnail': thumbnail,
         'taxon_order': order_obj, 'taxon_family': family_obj, 'taxon_genus': genus_obj,
         'taxon_order_label': taxon_label(order_obj), 'taxon_family_label': taxon_label(family_obj),

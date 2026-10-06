@@ -86,7 +86,10 @@ class SpeciesAdmin(admin.ModelAdmin):
         ('זיהוי מדעי', {'fields':['phylogenetic_order','genus','species','author','scientific_name','full_name_display','formatted_author','reference_author','full_species_name_with_order']}),
         ('סיווג טקסונומי', {'fields':['order','superfamily','family','accepted_genus','accepted_species']}),
         ('שמות ותפוצה', {'fields':['name_he','name_en','common_name','transliteration','language','distribution']}),
-        ('תוכן לעמוד המין', {'fields':['habitat','food','is_migrant','first_observed_year','last_observed_year','size_from','size_to','size_max','description_he','description_en','link','article_pdf']}),
+        ('תוכן לעמוד המין', {'fields':['description_he','description_en','identification_he','identification_en','similar_species_he','similar_species_en','size_from','size_to','size_max','link','article_pdf']}),
+        ('בית גידול ותזונה', {'fields':['habitat','habitat_en','food','food_en','depth_min','depth_max','native_range_he','native_range_en']}),
+        ('מין מהגר — הים התיכון', {'fields':['is_migrant','first_observed_year','first_record_place_he','first_record_place_en','last_observed_year','last_record_place_he','last_record_place_en','med_status_he','med_status_en','introduction_route_he','introduction_route_en']}),
+        ('מקורות', {'fields':['sources']}),
     ]
     def _order_options(self):
         canonical = TaxonOrder.objects.exclude(name='').values_list('name', flat=True)
