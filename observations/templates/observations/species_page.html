@@ -117,7 +117,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
 
         <p class="back-row">{% if taxon_genus_label %}<a class="back-button" href="{% url 'genus-page' taxon_genus.name %}{% if lang == 'en' %}?lang=en{% endif %}">{{ "חזרה לסוג"|t:lang }} {{ taxon_genus_label }}</a>{% elif taxon_family_label %}<a class="back-button" href="{% url 'family-page' taxon_family.name %}{% if lang == 'en' %}?lang=en{% endif %}">{{ "חזרה למשפחה"|t:lang }} {{ taxon_family_label }}</a>{% elif taxon_order_label %}<a class="back-button" href="{% url 'order-page' taxon_order.pk %}{% if lang == 'en' %}?lang=en{% endif %}">{{ "חזרה לסדרה"|t:lang }} {{ taxon_order_label }}</a>{% else %}<a class="back-button" href="/{% if lang == 'en' %}?lang=en{% endif %}">{{ "חזרה לגלריה"|t:lang }}</a>{% endif %}{% if edit_url %}<a class="edit-button" href="{{ edit_url }}">{{ "עריכה"|t:lang }}</a>{% endif %}</p>
 
-        <article class="species-hero">
+        <article class="species-hero" id="obs-{{ main_sample.pk }}">
             <div class="species-media">
                 {% with s=main_sample %}
                 {% if video_id %}
@@ -217,7 +217,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
             <h2>{{ "תצפיות נוספות"|t:lang }} ({{ other_samples|length }})</h2>
             <div class="grid">
                 {% for s in other_samples %}
-                <article class="card">
+                <article class="card" id="obs-{{ s.pk }}">
                     <a class="video-button lightbox-link" href="{% if s.video_url %}{{ s.video_url }}{% else %}{% url 'observation-photo' s.pk %}{% endif %}"{% if s.video_url %} data-video="1"{% endif %}>
                         <span class="image-wrap"><img src="{% if s.image %}{% url 'observation-photo' s.pk %}{% else %}{{ s.thumbnail }}{% endif %}" alt="" width="640" height="360" loading="lazy"><span class="play" aria-hidden="true">{% if s.video_url %}▶{% else %}⤢{% endif %}</span></span>
                         {% if s.show_name %}<h3 class="sample-name" dir="ltr">{{ s.name_main|name_html }}{% if s.name_author %} <span class="sample-author">{{ s.name_author }}</span>{% endif %}{% if s.name_stage %} {{ s.name_stage }}{% endif %}</h3>{% endif %}

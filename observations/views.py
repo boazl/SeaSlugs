@@ -57,6 +57,43 @@ def sample_edit_url(request, samples):
     return None
 
 
+def gallery_urls(samples, lang):
+    """pk -> the public gallery page that shows each of these observations (the species page,
+    anchored to the observation, or the genus/family/order page), for those that are actually
+    shown there: published, not deleted, and -- for a taxon -- with gallery species under it, so a
+    link never leads to a 404."""
+    suffix = '?lang=en' if lang == 'en' else ''
+    out = {}
+    live = [x for x in samples if x.status == Sample.Status.PUBLISHED and not x.deleted_at]
+    species_samples = [x for x in live if x.kind == Sample.Kind.SPECIES and x.species_id and x.trip_id and x.trip.year
+                       and x.trip.country_id and x.trip.region_id and x.trip.region.sea_id and not x.species_other and not x.site_other]
+    if species_samples:
+        areas = {(a.species_id, a.country_id, a.sea_id, a.undetermined_variant): a for a in SpeciesArea.objects.filter(
+            species_id__in={x.species_id for x in species_samples}).select_related('defining_sample')}
+        for x in species_samples:
+            area = areas.get((x.species_id, x.trip.country_id, x.trip.region.sea_id, x.undetermined_variant))
+            d = area.defining_sample if area else None
+            if d and d.status == Sample.Status.PUBLISHED and not d.deleted_at and (d.image or d.video_url):
+                out[x.pk] = f'/species/{area.slug}/{suffix}#obs-{x.pk}'
+    taxon_samples = [x for x in live if x.kind in (Sample.Kind.GENUS, Sample.Kind.FAMILY, Sample.Kind.ORDER)]
+    if taxon_samples:
+        areas = gallery_areas()
+        genera = {a.taxon_genus.name for a in areas if a.taxon_genus}
+        families = {a.taxon_family.name for a in areas if a.taxon_family}
+        order_rows = {a.taxon_order.pk: a.taxon_order for a in areas if a.taxon_order}
+        for x in taxon_samples:
+            if x.kind == Sample.Kind.GENUS and x.genus in genera:
+                out[x.pk] = f'/genus/{x.genus}/{suffix}'
+            elif x.kind == Sample.Kind.FAMILY and x.family in families:
+                out[x.pk] = f'/family/{x.family}/{suffix}'
+            elif x.kind == Sample.Kind.ORDER:
+                rows = [r for r in order_rows.values() if r.name == x.order]
+                row = next((r for r in rows if r.defining_sample_id == x.pk), rows[0] if rows else None)
+                if row:
+                    out[x.pk] = reverse('order-page', args=[row.pk]) + suffix
+    return out
+
+
 def species_page(request, slug):
     """Public, server-rendered, individually-URLed page for one species+area (a species
     observed in a given country+sea -- the same unit the gallery already keys a card on,
@@ -510,6 +547,11 @@ def listing(request):
         return (sk.name if sk and sk.name else '') or he_label
     kind_label_lookup = {code: kind_label(code, he_label) for code, he_label in Sample.Kind.choices}
     status_label_lookup = {code: labels[lang] for code, labels in STATUS_LABELS.items()}
+
+    rows = list(rows.select_related('trip', 'trip__region'))
+    by_pk = {r.pk: r for r in rows}
+    for pk_, url_ in gallery_urls(rows, lang).items():
+        by_pk[pk_].gallery_url = url_
 
     context = {
         'observations': rows,

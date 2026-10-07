@@ -79,6 +79,7 @@ TRANSLATIONS = {
     'צפייה ב־YouTube': 'Watch on YouTube',
     'צפייה בתמונה המלאה': 'View full image',
     'עריכה': 'Edit',
+    'הצגה בגלריה': 'Show in gallery',
     'הסרה מהאתר': 'Remove from site',
     'בדיקה בניהול': 'Review in admin',
     'עדיין אין תצפיות להצגה. אפשר להוסיף את התצפית הראשונה.':

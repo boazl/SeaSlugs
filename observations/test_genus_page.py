@@ -177,6 +177,29 @@ class GenusPageTests(TestCase):
         self.assertContains(response, '<a class="back-button" href="/">חזרה לגלריה</a>')
         self.assertNotContains(response, 'חזרה לסוג')
 
+    def test_observation_cards_link_to_their_place_in_the_gallery(self):
+        species_sample = Sample.objects.get(species=self.species)
+        family_sample = self._taxon_sample(Sample.Kind.FAMILY, family='Chromodorididae')
+        order_sample = self._taxon_sample(Sample.Kind.ORDER, order='Nudibranchia')
+        lonely_family = TaxonFamily.objects.create(name='Emptyidae', order=self.order)
+        lonely = self._taxon_sample(Sample.Kind.FAMILY, family='Emptyidae')   # no gallery species under it: no page
+        self.client.force_login(self.owner)
+        html = self.client.get('/observations/?lang=he').content.decode()
+        def card(sample):
+            start = html.index(f'<article id="obs-{sample.pk}"')
+            return html[start:html.index('</article>', start)]
+        self.assertIn(f'<a class="gallery-link" href="/species/{self.area.slug}/#obs-{species_sample.pk}">הצגה בגלריה</a>', card(species_sample))
+        self.assertIn(f'href="/genus/Chromodoris/">הצגה בגלריה', card(self.genus_sample))
+        self.assertIn('href="/family/Chromodorididae/">הצגה בגלריה', card(family_sample))
+        self.assertIn(f'href="/order/{self.order.pk}/">הצגה בגלריה', card(order_sample))
+        self.assertNotIn('gallery-link', card(lonely))
+        self.assertIn(f'?lang=en#obs-{species_sample.pk}">Show in gallery', self.client.get('/observations/?lang=en').content.decode())
+        # the link really lands on the observation: the species page anchors it
+        self.assertContains(self.client.get(f'/species/{self.area.slug}/'), f'id="obs-{species_sample.pk}"')
+        species_sample.soft_delete(self.owner)                      # a deleted observation is not in the gallery any more
+        html = self.client.get('/observations/?lang=he').content.decode()
+        self.assertNotIn(f'/species/{self.area.slug}/#obs-{species_sample.pk}', html)
+
     def test_card_shows_the_observation_count_when_the_species_has_several(self):
         url = f'/genus/{self.genus.name}/'
         self.assertNotContains(self.client.get(url), 'count-badge" aria-hidden')      # one observation: no badge
