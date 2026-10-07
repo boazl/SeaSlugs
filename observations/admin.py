@@ -138,6 +138,40 @@ class LifeStageAdmin(admin.ModelAdmin):
     search_fields = ['code', 'name', 'name_en']
 
 
+class TaxonOrderListFilter(admin.RelatedFieldListFilter):
+    """Filter by order row, labelled so rows that share a name can be told apart. TaxonOrder has
+    several rows per order name (Nudibranchia/Doridina, Nudibranchia/Cladobranchia, ...), so the
+    plain name reads like duplicates: each option also shows the group's Hebrew name and the
+    superfamilies of its families. The counts beside the options are the rows of the list
+    being filtered (genera or families), which the title says."""
+    counted = 'הסוגים'
+
+    def field_choices(self, field, request, model_admin):
+        superfamilies = {}
+        for order_id, superfamily in TaxonFamily.objects.exclude(superfamily='').values_list('order_id', 'superfamily'):
+            if order_id and '\\' not in superfamily:    # a few rows hold the import artifact "\N"
+                superfamilies.setdefault(order_id, set()).add(superfamily)
+        orders = {o.pk: o for o in TaxonOrder.objects.all()}
+        choices = []
+        for pk, label in super().field_choices(field, request, model_admin):
+            order = orders.get(pk)
+            if order is not None:
+                parts = [str(order)]
+                if order.name_he: parts.append(order.name_he)
+                if superfamilies.get(pk): parts.append(', '.join(sorted(superfamilies[pk])))
+                label = ' · '.join(parts)
+            choices.append((pk, label))
+        return choices
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.title = f'סדרה (בסוגריים: מספר {self.counted})'
+
+
+class TaxonOrderFamilyListFilter(TaxonOrderListFilter):
+    counted = 'המשפחות'
+
+
 @admin.register(TaxonOrder)
 class TaxonOrderAdmin(admin.ModelAdmin):
     list_display = ['taxonomic_order', 'name', 'name_he', 'name_en', 'sub_order', 'defining_sample']
@@ -147,7 +181,7 @@ class TaxonOrderAdmin(admin.ModelAdmin):
 @admin.register(TaxonFamily)
 class TaxonFamilyAdmin(admin.ModelAdmin):
     list_display = ['taxonomic_order', 'name', 'name_he', 'name_en', 'sub_family', 'superfamily', 'order', 'defining_sample']
-    list_filter = ['order']
+    list_filter = [('order', TaxonOrderFamilyListFilter)]
     search_fields = ['name', 'name_he', 'name_en', 'sub_family', 'superfamily']
     autocomplete_fields = ['order']
 
@@ -155,7 +189,7 @@ class TaxonFamilyAdmin(admin.ModelAdmin):
 @admin.register(TaxonGenus)
 class TaxonGenusAdmin(admin.ModelAdmin):
     list_display = ['taxonomic_order', 'name', 'name_he', 'name_en', 'family', 'defining_sample']
-    list_filter = ['family__order']
+    list_filter = [('family__order', TaxonOrderListFilter)]
     search_fields = ['name', 'name_he', 'name_en']
     autocomplete_fields = ['family']
     fieldsets = [
