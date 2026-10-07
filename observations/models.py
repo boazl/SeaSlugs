@@ -272,6 +272,15 @@ class TaxonOrder(models.Model):
         # taxonomic_order (see build_taxonomy_tables' taxon_order_reference seeding).
         constraints = [models.UniqueConstraint(fields=['name', 'sub_order', 'taxonomic_order'], name='unique_taxonorder_name_sub_order_taxonomic_order')]
     def __str__(self): return f'{self.name} ({self.sub_order})' if self.sub_order else self.name
+    @property
+    def display_sub_order(self):
+        """The sub-order the gallery and the admin filters show. The phanerobranch dorids' row
+        ("גלויי זים", Nudibranchia #3) is the order's blank-sub_order *base* row that
+        build_taxonomy_tables and the resolver rely on, so it must stay blank in the database --
+        but its species are Doridina, so they are shown there."""
+        if not self.sub_order and self.name == 'Nudibranchia' and self.taxonomic_order == '3':
+            return 'Doridina'
+        return self.sub_order
 
 
 class TaxonFamily(models.Model):

@@ -19,13 +19,16 @@ class TaxonFiltersTests(TestCase):
         self.dor = TaxonOrder.objects.create(name='Nudibranchia', sub_order='Doridina', taxonomic_order='4')
         self.cla1 = TaxonOrder.objects.create(name='Nudibranchia', sub_order='Cladobranchia', taxonomic_order='7')
         self.cla2 = TaxonOrder.objects.create(name='Nudibranchia', sub_order='Cladobranchia', taxonomic_order='8')
+        self.other = TaxonOrder.objects.create(name='Nudibranchia', sub_order='', taxonomic_order='9')     # no sub-order at all
         self.f_sac = TaxonFamily.objects.create(name='Plakobranchidae', order=self.sac, superfamily='Plakobranchoidea')
         self.f_bare = TaxonFamily.objects.create(name='Polyceridae', order=self.bare, superfamily='Polyceroidea')
         self.f_dor = TaxonFamily.objects.create(name='Chromodorididae', order=self.dor, superfamily='Chromodoridoidea')
         self.f_cla1 = TaxonFamily.objects.create(name='Tethydidae', order=self.cla1, superfamily='Dendronotoidea')
         self.f_cla2 = TaxonFamily.objects.create(name='Flabellinidae', order=self.cla2, superfamily='Fionoidea')
+        self.f_other = TaxonFamily.objects.create(name='Zzzidae', order=self.other, superfamily='Zzzoidea')
         TaxonFamily.objects.create(name='Heroidae', order=self.cla1, superfamily='\\N')   # import artifact
         TaxonGenus.objects.create(name='Elysia', family=self.f_sac)
+        TaxonGenus.objects.create(name='Zzzus', family=self.f_other)
         TaxonGenus.objects.create(name='Polycera', family=self.f_bare)
         TaxonGenus.objects.create(name='Hypselodoris', family=self.f_dor)
         TaxonGenus.objects.create(name='Felimare', family=self.f_dor)
@@ -49,12 +52,13 @@ class TaxonFiltersTests(TestCase):
         self.assertIn('<span class="depth0">Sacoglossa</span>', html)
         self.assertIn('לפי סדרה (בגלריה, ובקטן: במאגר)', html)
         # all the Nudibranchia genera, across its four rows
-        self.assertIn('<span class="depth0">Nudibranchia</span> <span class="gal-count">0</span> <span class="db-count">(5)</span>', html)
+        self.assertIn('<span class="depth0">Nudibranchia</span> <span class="gal-count">0</span> <span class="db-count">(6)</span>', html)
 
     def test_group_filter_indents_superfamilies_under_their_sub_order(self):
         html = self.page()
         self.assertIn('לפי תת־סדרה / על־משפחה', html)
-        for text in ('<span class="depth0">Doridina</span>', '<span class="depth0">Cladobranchia</span>', '<span class="depth0">אחרים</span>',
+        for text in ('<span class="depth0">Doridina</span>', '<span class="depth0">Cladobranchia</span>', '<span class="depth0">Others</span>',
+                     '<span class="depth1">Zzzoidea</span>',
                      '<span class="depth1">Chromodoridoidea</span>', '<span class="depth1">Dendronotoidea</span>',
                      '<span class="depth1">Fionoidea</span>', '<span class="depth1">Polyceroidea</span>'):
             self.assertIn(text, html)
@@ -62,10 +66,21 @@ class TaxonFiltersTests(TestCase):
         self.assertEqual(html.count('>Cladobranchia<'), 1)                     # two rows, one option
         self.assertNotIn('\\N</span>', html)                                    # the import artifact never becomes an option
 
+    def test_phanerobranch_row_is_shown_under_doridina_not_others(self):
+        # Nudibranchia #3 has no sub-order in the table, but its species are Doridina (as in the gallery).
+        html = self.page()
+        doridina = html.index('<span class="depth0">Doridina</span>')
+        self.assertLess(doridina, html.index('<span class="depth1">Polyceroidea</span>'))
+        self.assertLess(html.index('<span class="depth1">Polyceroidea</span>'), html.index('<span class="depth0">Cladobranchia</span>'))
+        self.assertLess(html.index('<span class="depth0">Cladobranchia</span>'), html.index('<span class="depth0">Others</span>'))
+        self.assertLess(html.index('<span class="depth0">Others</span>'), html.index('<span class="depth1">Zzzoidea</span>'))
+        self.assertIn('<span class="depth0">Doridina</span> <span class="gal-count">0</span> <span class="db-count">(3)</span>', html)
+        self.assertIn('<span class="depth0">Others</span> <span class="gal-count">0</span> <span class="db-count">(1)</span>', html)
+
     def test_counts_are_gallery_first_then_small_table_total(self):
         self.put_in_gallery('Hypselodoris', 'Chromodorididae')
         html = self.page()
-        self.assertIn('<span class="depth0">Doridina</span> <span class="gal-count">1</span> <span class="db-count">(2)</span>', html)
+        self.assertIn('<span class="depth0">Doridina</span> <span class="gal-count">1</span> <span class="db-count">(3)</span>', html)
         self.assertIn('<span class="depth1">Chromodoridoidea</span> <span class="gal-count">1</span> <span class="db-count">(2)</span>', html)
         self.assertIn('<span class="depth0">Cladobranchia</span> <span class="gal-count">0</span> <span class="db-count">(2)</span>', html)
 
@@ -77,12 +92,12 @@ class TaxonFiltersTests(TestCase):
     def test_filters_filter_the_list(self):
         def rows(query):
             html = self.page(query)
-            return sorted(n for n in ('Elysia', 'Polycera', 'Hypselodoris', 'Felimare', 'Flabellina', 'Tethys') if f'<td class="field-name">{n}</td>' in html)
-        self.assertEqual(rows('?order_name=Nudibranchia'), ['Felimare', 'Flabellina', 'Hypselodoris', 'Polycera', 'Tethys'])
+            return sorted(n for n in ('Elysia', 'Zzzus', 'Polycera', 'Hypselodoris', 'Felimare', 'Flabellina', 'Tethys') if f'<td class="field-name">{n}</td>' in html)
+        self.assertEqual(rows('?order_name=Nudibranchia'), ['Felimare', 'Flabellina', 'Hypselodoris', 'Polycera', 'Tethys', 'Zzzus'])
         self.assertEqual(rows('?group=sub:Cladobranchia'), ['Flabellina', 'Tethys'])
         self.assertEqual(rows('?group=sf:Chromodoridoidea'), ['Felimare', 'Hypselodoris'])
-        self.assertEqual(rows('?group=none:Nudibranchia'), ['Polycera'])
-        self.assertEqual(rows('?order_name=Nudibranchia&group=sub:Doridina'), ['Felimare', 'Hypselodoris'])
+        self.assertEqual(rows('?group=none:Nudibranchia'), ['Zzzus'])
+        self.assertEqual(rows('?order_name=Nudibranchia&group=sub:Doridina'), ['Felimare', 'Hypselodoris', 'Polycera'])
 
     def test_family_changelist_has_the_same_filters_counting_families(self):
         self.put_in_gallery('Hypselodoris', 'Chromodorididae')
@@ -92,7 +107,8 @@ class TaxonFiltersTests(TestCase):
         self.assertIn('Flabellinidae', rows)
         self.assertNotIn('>Polyceridae<', rows)
 
-    def test_panel_is_wider_left_aligned_and_smaller(self):
+    def test_panel_keeps_stock_width_and_font_but_is_left_aligned(self):
         html = self.page()
-        self.assertIn('#changelist-filter { flex: 0 0 360px; }', html)          # 240px + 50%
-        self.assertIn('direction: ltr; text-align: left; font-size: 11.5px;', html)
+        self.assertNotIn('flex: 0 0', html)                                      # the stock width and font size
+        self.assertNotIn('font-size: 11.5px', html)
+        self.assertIn('direction: ltr; text-align: left;', html)

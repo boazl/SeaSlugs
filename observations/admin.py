@@ -215,21 +215,24 @@ class TaxonOrderNameFilter(TaxonSplitListFilter):
 
 class TaxonGroupFilter(TaxonSplitListFilter):
     """Sub-orders and superfamilies, indented under the sub-order they belong to; narrowed to
-    the chosen order when the order filter is set. Families of an order that has sub-orders but
-    sit in no sub-order are listed under "Others", as in the gallery."""
+    the chosen order when the order filter is set. Sub-orders are the ones the gallery shows
+    (TaxonOrder.display_sub_order). Families of an order that has sub-orders but sit in none
+    are listed under "Others", as in the gallery."""
     title = 'תת־סדרה / על־משפחה'
     parameter_name = 'group'
 
     def lookups(self, request, model_admin):
         only_order = request.GET.get('order_name')
+        orders = {o.pk: o for o in TaxonOrder.objects.all()}       # in the table's taxonomic order
         families = {}     # (order name, sub-order) -> superfamilies
-        for order, sub, superfamily in TaxonFamily.objects.exclude(superfamily='').values_list('order__name', 'order__sub_order', 'superfamily'):
-            if order and '\\' not in superfamily:    # a few rows hold the import artifact "\N"
-                families.setdefault((order, sub), set()).add(superfamily)
+        for order_id, superfamily in TaxonFamily.objects.exclude(superfamily='').values_list('order_id', 'superfamily'):
+            if order_id in orders and '\\' not in superfamily:    # a few rows hold the import artifact "\N"
+                o = orders[order_id]
+                families.setdefault((o.name, o.display_sub_order), set()).add(superfamily)
         rows = []         # (order name, sub-order), in the table's order
-        for name, sub in TaxonOrder.objects.values_list('name', 'sub_order'):
-            if (name, sub) not in rows and (not only_order or name == only_order):
-                rows.append((name, sub))
+        for o in orders.values():
+            if (o.name, o.display_sub_order) not in rows and (not only_order or o.name == only_order):
+                rows.append((o.name, o.display_sub_order))
         choices = []
         for name in dict.fromkeys(n for n, _ in rows):
             subs = [sub for n, sub in rows if n == name]
@@ -239,7 +242,7 @@ class TaxonGroupFilter(TaxonSplitListFilter):
                 if has_subs:
                     value = f'sub:{sub}' if sub else f'none:{name}'
                     if sub or families.get((name, sub)):
-                        choices.append((value, sub or 'אחרים'))
+                        choices.append((value, sub or 'Others'))
                         self.depths[value] = 0
                     depth = 1
                 for superfamily in sorted(families.get((name, sub), ())):
@@ -250,9 +253,11 @@ class TaxonGroupFilter(TaxonSplitListFilter):
     def condition(self, value):
         kind, _, name = value.partition(':')
         if kind == 'sub':
-            return models.Q(**{f'{self.prefix}order__sub_order': name})
+            pks = [o.pk for o in TaxonOrder.objects.all() if o.display_sub_order == name]
+            return models.Q(**{f'{self.prefix}order__in': pks})
         if kind == 'none':
-            return models.Q(**{f'{self.prefix}order__name': name, f'{self.prefix}order__sub_order': ''})
+            pks = [o.pk for o in TaxonOrder.objects.filter(name=name) if not o.display_sub_order]
+            return models.Q(**{f'{self.prefix}order__in': pks})
         return models.Q(**{f'{self.prefix}superfamily': name})
 
 

@@ -362,6 +362,16 @@ class TaxonomicSortAndPanelTests(TestCase):
         self.assertIsNone(entry['taxon_order_id'])
         self.assertEqual(entry['sub_order'], '')
 
+    def test_phanerobranch_dorids_row_is_shown_as_doridina(self):
+        from .models import TaxonOrder, TaxonFamily
+        # Nudibranchia #3 ("גלויי זים") stays blank in the table (the resolver relies on that), but
+        # its species are Doridina and the gallery shows them there rather than under "Others".
+        order = TaxonOrder.objects.create(name='Nudibranchia', sub_order='', taxonomic_order='3')
+        TaxonFamily.objects.create(name='Polyceridae', order=order, superfamily='Polyceroidea')
+        self.publish(Species.objects.create(scientific_name='Polycera test', order='Nudibranchia', family='Polyceridae'))
+        self.assertEqual(self.catalog()['species'][0]['sub_order'], 'Doridina')
+        self.assertEqual(order.sub_order, '')
+
     def test_catalog_order_field_uses_the_curated_name_not_a_stale_raw_synonym(self):
         from .models import TaxonOrder, TaxonFamily
         # A species whose Species.order text is a legacy synonym ("Doridida") still shows up
