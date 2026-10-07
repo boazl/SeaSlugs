@@ -59,10 +59,10 @@ class GenusPageTests(TestCase):
     def test_order_page_has_a_back_button_to_the_gallery(self):
         url = f'/order/{self.order.pk}/'
         response = self.client.get(url)
-        self.assertContains(response, '<a class="back-button" href="/">חזרה לגלריה</a>')
+        self.assertContains(response, '<a class="back-button" href="/">חזרה לכל הסדרות</a>')
         self.assertNotContains(response, 'חזרה לסדרה')
         response = self.client.get(url + '?lang=en')
-        self.assertContains(response, '<a class="back-button" href="/?lang=en">Back to the gallery</a>')
+        self.assertContains(response, '<a class="back-button" href="/?lang=en">Back to all orders</a>')
 
     def test_card_shows_the_observation_count_when_the_species_has_several(self):
         url = f'/genus/{self.genus.name}/'

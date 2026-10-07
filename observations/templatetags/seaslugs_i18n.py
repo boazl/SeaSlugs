@@ -94,6 +94,7 @@ TRANSLATIONS = {
     'מקור:': 'Source:',
     'חזרה למשפחה': 'Back to family',
     'חזרה לסדרה': 'Back to order',
+    'חזרה לכל הסדרות': 'Back to all orders',
     'חזרה לגלריה': 'Back to the gallery',
     'תיאור': 'Description',
     'בית גידול': 'Habitat',

@@ -78,7 +78,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
             <span>›</span><span aria-current="page">{% if common_name %}{{ common_name }}{% else %}<span dir="ltr">{{ taxon.name }}</span>{% endif %}</span>
         </nav>
 
-        {% if rank == 'family' and parent_url %}<p class="back-row"><a class="back-button" href="{{ parent_url }}{% if lang == 'en' %}?lang=en{% endif %}">{{ "חזרה לסדרה"|t:lang }} {{ parent_label }}</a></p>{% elif rank == 'order' %}<p class="back-row"><a class="back-button" href="/{% if lang == 'en' %}?lang=en{% endif %}">{{ "חזרה לגלריה"|t:lang }}</a></p>{% endif %}
+        {% if rank == 'family' and parent_url %}<p class="back-row"><a class="back-button" href="{{ parent_url }}{% if lang == 'en' %}?lang=en{% endif %}">{{ "חזרה לסדרה"|t:lang }} {{ parent_label }}</a></p>{% elif rank == 'order' %}<p class="back-row"><a class="back-button" href="/{% if lang == 'en' %}?lang=en{% endif %}">{{ "חזרה לכל הסדרות"|t:lang }}</a></p>{% endif %}
 
         <article class="species-hero">
             <div class="species-media">
