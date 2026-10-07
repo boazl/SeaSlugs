@@ -5,6 +5,7 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
+from django.db import models
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django.urls import reverse
@@ -138,13 +139,37 @@ class LifeStageAdmin(admin.ModelAdmin):
     search_fields = ['code', 'name', 'name_en']
 
 
+def gallery_taxon_ids(request):
+    """The ids of the genera and families that have a species in the public gallery, read from
+    the gallery's own catalog so the admin can never disagree with what visitors see.
+    Cached for a minute (building the catalog is the slow part)."""
+    ids = cache.get('gallery_taxon_ids')
+    if ids is None:
+        import json
+        from config.views import gallery_file
+        text = gallery_file(request, 'catalog.js').content.decode('utf-8')
+        species = json.loads(text[text.index('{'):].rstrip().rstrip(';'))['species']
+        ids = ({int(s['taxon_genus_id']) for s in species if s['taxon_genus_id']},
+               {int(s['taxon_family_id']) for s in species if s['taxon_family_id']})
+        cache.set('gallery_taxon_ids', ids, 60)
+    return ids
+
+
 class TaxonOrderListFilter(admin.RelatedFieldListFilter):
     """Filter by order row, labelled so rows that share a name can be told apart. TaxonOrder has
     several rows per order name (Nudibranchia/Doridina, Nudibranchia/Cladobranchia, ...), so the
     plain name reads like duplicates: each option also shows the group's Hebrew name and the
-    superfamilies of its families. The counts beside the options are the rows of the list
-    being filtered (genera or families), which the title says."""
+    superfamilies of its families. Beside each option: how many of the listed rows (genera or
+    families) have species in the gallery -- what matters here -- and, small, how many the
+    reference table holds in all."""
+    template = 'admin/taxon_order_filter.html'
     counted = 'הסוגים'
+    gallery_index = 0          # which of gallery_taxon_ids()'s sets holds the listed model's ids
+
+    def __init__(self, field, request, params, model, model_admin, field_path):
+        self.gallery_ids = gallery_taxon_ids(request)[self.gallery_index]
+        super().__init__(field, request, params, model, model_admin, field_path)
+        self.title = f'סדרה (מספר {self.counted} בגלריה, ובקטן: במאגר)'
 
     def field_choices(self, field, request, model_admin):
         superfamilies = {}
@@ -163,13 +188,26 @@ class TaxonOrderListFilter(admin.RelatedFieldListFilter):
             choices.append((pk, label))
         return choices
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.title = f'סדרה (בסוגריים: מספר {self.counted})'
+    def get_facet_counts(self, pk_attname, filtered_qs):
+        counts = super().get_facet_counts(pk_attname, filtered_qs)
+        for pk_val, _ in self.lookup_choices:
+            counts[f'{pk_val}__g'] = models.Count(pk_attname, filter=models.Q(**{self.lookup_kwarg: pk_val}) & models.Q(pk__in=self.gallery_ids))
+        return counts
+
+    def choices(self, changelist):
+        items = list(super().choices(changelist))
+        if not changelist.add_facets:
+            return iter(items)
+        counts = self.get_facet_queryset(changelist)
+        for item, (pk, label) in zip(items[1:], self.lookup_choices):
+            item['display'] = format_html('{} <span class="gal-count">{}</span> <span class="db-count">({})</span>',
+                                          label, counts[f'{pk}__g'], counts[f'{pk}__c'])
+        return iter(items)
 
 
 class TaxonOrderFamilyListFilter(TaxonOrderListFilter):
     counted = 'המשפחות'
+    gallery_index = 1
 
 
 @admin.register(TaxonOrder)
@@ -180,6 +218,7 @@ class TaxonOrderAdmin(admin.ModelAdmin):
 
 @admin.register(TaxonFamily)
 class TaxonFamilyAdmin(admin.ModelAdmin):
+    show_facets = admin.ShowFacets.ALWAYS     # the order filter's counts are the point of it
     list_display = ['taxonomic_order', 'name', 'name_he', 'name_en', 'sub_family', 'superfamily', 'order', 'defining_sample']
     list_filter = [('order', TaxonOrderFamilyListFilter)]
     search_fields = ['name', 'name_he', 'name_en', 'sub_family', 'superfamily']
@@ -188,6 +227,7 @@ class TaxonFamilyAdmin(admin.ModelAdmin):
 
 @admin.register(TaxonGenus)
 class TaxonGenusAdmin(admin.ModelAdmin):
+    show_facets = admin.ShowFacets.ALWAYS     # the order filter's counts are the point of it
     list_display = ['taxonomic_order', 'name', 'name_he', 'name_en', 'family', 'defining_sample']
     list_filter = [('family__order', TaxonOrderListFilter)]
     search_fields = ['name', 'name_he', 'name_en']
