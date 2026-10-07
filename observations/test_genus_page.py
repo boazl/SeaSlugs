@@ -105,10 +105,22 @@ class GenusPageTests(TestCase):
         self.client.force_login(owner)
         self.assertNotContains(self.client.get(url), 'class="edit-button"')
 
-    def test_no_edit_button_without_an_observation_of_the_taxons_kind(self):
-        self.client.force_login(self.owner)
-        self.assertNotContains(self.client.get(f'/family/{self.family.name}/'), 'class="edit-button"')
-        self.assertNotContains(self.client.get(f'/order/{self.order.pk}/'), 'class="edit-button"')
+    def test_without_an_observation_of_its_own_an_admin_gets_the_taxon_rows_admin_page(self):
+        from django.urls import reverse
+        self.client.force_login(self.owner)                          # superuser
+        for url, route, row in ((f'/family/{self.family.name}/', 'admin:observations_taxonfamily_change', self.family),
+                                (f'/order/{self.order.pk}/', 'admin:observations_taxonorder_change', self.order)):
+            response = self.client.get(url + '?lang=he')
+            self.assertContains(response, f'<a class="edit-button" href="{reverse(route, args=[row.pk])}">')
+            self.assertEqual(self.client.get(reverse(route, args=[row.pk])).status_code, 200)
+
+    def test_no_edit_button_without_an_observation_for_a_non_admin(self):
+        photographer = User.objects.create_user('photographer', password='x')
+        staff = User.objects.create_user('staff', password='x', is_staff=True)     # staff, but no change permission
+        for user in (photographer, staff):
+            self.client.force_login(user)
+            self.assertNotContains(self.client.get(f'/family/{self.family.name}/'), 'class="edit-button"')
+            self.assertNotContains(self.client.get(f'/order/{self.order.pk}/'), 'class="edit-button"')
 
     def test_card_shows_the_observation_count_when_the_species_has_several(self):
         url = f'/genus/{self.genus.name}/'

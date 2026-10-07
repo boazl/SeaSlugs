@@ -245,8 +245,8 @@ def taxon_edit_url(request, kind, taxon):
     """Link to the edit page of the order/family/genus observation behind this taxon page, for
     a visitor who may edit it -- a manager (any observation) or the observation's own owner
     (not deleted), exactly edit()'s rule. The taxon's defining sample comes first, then the
-    newest other observation of that kind and name. None when there is no such observation or
-    the visitor can't edit it. After saving, the edit page returns to this page."""
+    newest other observation of that kind and name; failing that, for an admin, the taxon row's
+    admin page. None when the visitor can edit neither. After saving, the edit page returns to this page."""
     user = request.user
     if not user.is_authenticated:
         return None
@@ -257,6 +257,12 @@ def taxon_edit_url(request, kind, taxon):
     for sample in candidates:
         if sample.kind == kind and getattr(sample, field) == taxon.name and (manager or (sample.owner_id == user.id and not sample.deleted_at)):
             return reverse('observation-edit', args=[sample.pk]) + '?' + urlencode({'next': request.get_full_path()})
+    # No observation of its own (the page's picture is then borrowed from one of its species):
+    # an admin who may change the taxonomy row gets that row's admin page instead, where the
+    # same texts live.
+    opts = type(taxon)._meta
+    if user.is_staff and user.has_perm(f'{opts.app_label}.change_{opts.model_name}'):
+        return reverse(f'admin:{opts.app_label}_{opts.model_name}_change', args=[taxon.pk])
     return None
 
 
