@@ -44,6 +44,19 @@ def trips(request):
     return render(request, 'observations/trips.html', {'trips':rows})
 
 
+def sample_edit_url(request, samples):
+    """Edit link for the first of these observations the visitor may edit (a manager: any;
+    otherwise their own, not deleted -- edit()'s rule); after saving, back to this page."""
+    user = request.user
+    if not user.is_authenticated:
+        return None
+    manager = is_manager(user)
+    for sample in samples:
+        if manager or (sample.owner_id == user.id and not sample.deleted_at):
+            return reverse('observation-edit', args=[sample.pk]) + '?' + urlencode({'next': request.get_full_path()})
+    return None
+
+
 def species_page(request, slug):
     """Public, server-rendered, individually-URLed page for one species+area (a species
     observed in a given country+sea -- the same unit the gallery already keys a card on,
@@ -129,6 +142,7 @@ def species_page(request, slug):
         'taxon_genus_label': taxon_label(genus_obj),
         'common_name': common_name, 'description': description, 'size_text': species.size_text(lang),
         'canonical_url': request.build_absolute_uri(request.path),
+        'edit_url': sample_edit_url(request, [main_sample] + other_samples),
     })
 
 

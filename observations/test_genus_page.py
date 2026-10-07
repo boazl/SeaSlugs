@@ -122,6 +122,32 @@ class GenusPageTests(TestCase):
             self.assertNotContains(self.client.get(f'/family/{self.family.name}/'), 'class="edit-button"')
             self.assertNotContains(self.client.get(f'/order/{self.order.pk}/'), 'class="edit-button"')
 
+    def test_species_page_has_back_and_edit_buttons(self):
+        from django.urls import reverse
+        url = f'/species/{self.area.slug}/'
+        species_sample = Sample.objects.get(species=self.species)
+        response = self.client.get(url + '?lang=he')                 # a visitor: back button only
+        self.assertContains(response, f'<a class="back-button" href="/genus/{self.genus.name}/">חזרה לסוג Chromodoris</a>')
+        self.assertNotContains(response, 'class="edit-button"')
+        self.assertContains(self.client.get(url + '?lang=en'), f'href="/genus/{self.genus.name}/?lang=en">Back to genus Chromodoris</a>')
+        self.client.force_login(self.owner)                          # a manager: edit button to the observation
+        response = self.client.get(url + '?lang=he')
+        self.assertContains(response, f'<a class="edit-button" href="{reverse("observation-edit", args=[species_sample.pk])}?next=')
+        self.assertEqual(self.client.get(response.context['edit_url']).status_code, 200)
+        stranger = User.objects.create_user('stranger', password='x')
+        self.client.force_login(stranger)
+        self.assertNotContains(self.client.get(url + '?lang=he'), 'class="edit-button"')
+        species_sample.owner = stranger; species_sample.save(update_fields=['owner'])   # ...but the observation's own owner does
+        self.assertContains(self.client.get(url + '?lang=he'), 'class="edit-button"')
+
+    def test_species_page_back_button_goes_to_the_gallery_when_the_species_has_no_taxonomy_row(self):
+        url = f'/species/{self.area.slug}/'
+        self.genus.delete()
+        response = self.client.get(url + '?lang=he')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<a class="back-button" href="/">חזרה לגלריה</a>')
+        self.assertNotContains(response, 'חזרה לסוג')
+
     def test_card_shows_the_observation_count_when_the_species_has_several(self):
         url = f'/genus/{self.genus.name}/'
         self.assertNotContains(self.client.get(url), 'count-badge" aria-hidden')      # one observation: no badge
