@@ -30,6 +30,23 @@ class GenusPageTests(TestCase):
         self.assertContains(response, 'Chromodoris annae')
         self.assertContains(response, f'/species/{self.area.slug}/')
 
+    def test_back_button_returns_to_the_family_page(self):
+        response = self.client.get(f'/genus/{self.genus.name}/')
+        self.assertContains(response, f'<a class="back-button" href="/family/{self.family.name}/">')
+        self.assertContains(response, 'חזרה למשפחה')
+
+    def test_back_button_is_in_english_and_keeps_the_language(self):
+        response = self.client.get(f'/genus/{self.genus.name}/?lang=en')
+        self.assertContains(response, f'<a class="back-button" href="/family/{self.family.name}/?lang=en">')
+        self.assertContains(response, 'Back to family')
+
+    def test_back_button_goes_to_the_gallery_when_the_genus_has_no_family(self):
+        self.genus.family = None
+        self.genus.save()
+        response = self.client.get(f'/genus/{self.genus.name}/')
+        self.assertContains(response, '<a class="back-button" href="/">')
+        self.assertContains(response, 'חזרה לגלריה')
+
     def test_card_shows_the_observation_count_when_the_species_has_several(self):
         url = f'/genus/{self.genus.name}/'
         self.assertNotContains(self.client.get(url), 'count-badge" aria-hidden')      # one observation: no badge
