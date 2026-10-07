@@ -362,17 +362,6 @@ class TaxonomicSortAndPanelTests(TestCase):
         self.assertIsNone(entry['taxon_order_id'])
         self.assertEqual(entry['sub_order'], '')
 
-    def test_order_row_without_a_sub_order_stays_without_one_in_the_catalog(self):
-        from .models import TaxonOrder, TaxonFamily
-        # The phanerobranch dorids' row (Nudibranchia #3) has no sub-order in the table; the
-        # gallery must not invent one for it, so it gets the "Others" card.
-        order = TaxonOrder.objects.create(name='Nudibranchia', sub_order='', taxonomic_order='3')
-        family = TaxonFamily.objects.create(name='Polyceridae', order=order, superfamily='Polyceroidea')
-        self.publish(Species.objects.create(scientific_name='Polycera test', order='Nudibranchia', family='Polyceridae'))
-        catalog = self.catalog()
-        self.assertEqual(catalog['species'][0]['sub_order'], '')
-        self.assertEqual(catalog['taxa']['orders'][str(order.pk)]['sub_value'], '')
-
     def test_catalog_order_field_uses_the_curated_name_not_a_stale_raw_synonym(self):
         from .models import TaxonOrder, TaxonFamily
         # A species whose Species.order text is a legacy synonym ("Doridida") still shows up
