@@ -26,6 +26,8 @@ gtag('config', 'G-CPGTC09P2P');</script>
         .breadcrumb{display:flex;flex-wrap:wrap;gap:8px;color:var(--muted);font-size:14px;margin-bottom:20px}
         .breadcrumb a{color:var(--accent);text-decoration:none}
         .breadcrumb a:hover{text-decoration:underline}
+        .notice{border-right:4px solid var(--accent);padding:14px;white-space:pre-line;background:var(--panel);border-radius:4px;margin:0 0 20px}
+        .new-observation{border-right-color:#ffcf5c;background:#ffcf5c1a;font-weight:700;color:#ffe4a1}
         .back-button{display:inline-block;background:var(--accent);color:#08232a;padding:10px 20px;border-radius:7px;text-decoration:none;font-weight:600}
         .back-button:hover{filter:brightness(1.08)}
         .back-row{margin:0 0 22px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
@@ -66,6 +68,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
                 dir="ltr">SeaSlugs<span class="brand-dot">.</span></span><span class="brand-he">חינניות
                 ים</span></a>{% include 'observations/account_menu.html' %}<a class="language-switch" href="{{ lang_toggle_url }}">{% if lang == 'en' %}עברית{% else %}English{% endif %}</a></header>
     <main class="species-page">
+        {% for message in messages %}<p class="notice{% if message.extra_tags %} {{ message.extra_tags }}{% endif %}">{{ message|t:lang }}</p>{% endfor %}
         <nav class="breadcrumb" aria-label="מיקום בטקסונומיה">
             <a href="/">{{ "הגלריה"|t:lang }}</a>
             {% if taxon_order_label %}<span>›</span><a href="{% url 'order-page' taxon_order.pk %}{% if lang == 'en' %}?lang=en{% endif %}">{{ taxon_order_label }}</a>{% endif %}

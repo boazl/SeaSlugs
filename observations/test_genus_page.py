@@ -242,6 +242,19 @@ class GenusPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn('trip', response.context['form'].errors)
 
+    def test_the_save_message_shows_on_the_page_the_edit_returns_to_and_only_once(self):
+        self.client.force_login(self.owner)
+        for url in (f'/family/{self.family.name}/', f'/genus/{self.genus.name}/', f'/species/{self.area.slug}/'):
+            sample = self.genus_sample if '/genus/' in url else Sample.objects.get(species=self.species)
+            response = self.client.post(f'/observations/{sample.pk}/edit/', {
+                'kind': sample.kind, 'genus': sample.genus, 'species': 'annae' if sample.species_id else '', 'trip': str(self.trip.pk), 'site': '',
+                'video_url': sample.video_url, 'next': url}, follow=True)
+            self.assertContains(response, 'class="notice', msg_prefix=url)
+            self.assertNotContains(self.client.get(url), 'class="notice')       # shown once, then gone
+        family_sample = self._taxon_sample(Sample.Kind.FAMILY, family='Chromodorididae')
+        self.client.post(f'/observations/{family_sample.pk}/edit/', {'kind': 'family', 'family': 'Chromodorididae', 'next': f'/family/{self.family.name}/'})
+        self.assertContains(self.client.get(f'/family/{self.family.name}/'), 'התצפית נשמרה')
+
     def test_card_shows_the_observation_count_when_the_species_has_several(self):
         url = f'/genus/{self.genus.name}/'
         self.assertNotContains(self.client.get(url), 'count-badge" aria-hidden')      # one observation: no badge
