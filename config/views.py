@@ -67,15 +67,11 @@ def gallery_file(request, filename='index.html'):
             return order_obj, family_obj, genus_obj
 
         def display_sub_order(order_obj):
-            # The phanerobranch dorids' row ("גלויי זים", Nudibranchia #3) is the order's
-            # blank-sub_order *base* row that build_taxonomy_tables and the resolver rely on,
-            # so it must stay blank in the database -- but its species are Doridina, and the
-            # gallery's sub-order filter / drill-down show them there.
-            if not order_obj:
-                return ''
-            if not order_obj.sub_order and order_obj.name == 'Nudibranchia' and order_obj.taxonomic_order == '3':
-                return 'Doridina'
-            return order_obj.sub_order
+            # The sub-order exactly as curated in the table. The phanerobranch dorids' row
+            # ("גלויי זים", Nudibranchia #3) has none, so the gallery shows its species under
+            # an "Others" card next to Doridina and Cladobranchia (see renderTaxonLevel in
+            # app.js) instead of folding them into Doridina.
+            return order_obj.sub_order if order_obj else ''
 
         def taxon_rank(value):
             return (1, '') if not value else (0, value)
