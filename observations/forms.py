@@ -161,6 +161,13 @@ def species_epithet_with_variant(sample):
     return f'{sample.species.species} {sample.undetermined_variant}'.strip() if sample.species_id else ''
 
 
+class TaxonTextField(forms.CharField):
+    """A taxon's page text edited in a textarea. Browsers submit line breaks as CRLF, so a text
+    stored with LF would look changed on every save: compare, and store, with LF."""
+    def to_python(self, value):
+        return super().to_python(value).replace('\r\n', '\n')
+
+
 class SampleForm(forms.ModelForm):
     # A native text input backed by a <datalist> (rendered in form.html from
     # species_options) rather than a <select> -- there can be hundreds of species, and
@@ -229,10 +236,15 @@ class SampleForm(forms.ModelForm):
         return None
 
     def enable_taxon_files(self):
-        """Managers only (these files are shared page content, not the sample's own): adds the
-        attached-file fields of the order/family/genus this sample stands for -- an article PDF
-        for any of the three, plus the identification file with its caption and source for a
-        genus -- so they can be edited right here instead of in the admin."""
+        """Managers only (these texts and files are shared page content, not the sample's own):
+        adds the page content of the order/family/genus this sample stands for -- description,
+        identification and sources (Hebrew and English) and an article PDF for any of the three,
+        plus the identification file with its caption and source for a genus -- so they can be
+        edited right here instead of in the admin."""
+        for attr, label, rows in self.TAXON_TEXT_FIELDS:
+            self.fields['taxon_' + attr] = TaxonTextField(required=False, label=label,
+                widget=forms.Textarea(attrs={'rows': rows, 'data-taxon-file': 'any'}),
+                help_text='קישור בכל שורה (אפשר להוסיף טקסט לפני הקישור).' if attr == 'sources' else '')
         pdf = [FileExtensionValidator(['pdf']), validate_taxon_file_size]
         self.fields['taxon_article_pdf'] = forms.FileField(required=False, label='מאמר (PDF) של הסדרה / המשפחה / הסוג',
             widget=TaxonFileInput(attrs={'accept': 'application/pdf', 'data-taxon-file': 'any'}), validators=pdf)
@@ -249,6 +261,8 @@ class SampleForm(forms.ModelForm):
         instance = self.instance
         taxon = self.taxon_for(instance.kind, instance.order, instance.family, instance.genus) if instance.pk else None
         if taxon is not None:
+            for attr, _label, _rows in self.TAXON_TEXT_FIELDS:
+                self.initial['taxon_' + attr] = getattr(taxon, attr)
             self.initial['taxon_article_pdf'] = taxon.article_pdf or None
             if instance.kind == Sample.Kind.GENUS:
                 self.initial['taxon_identification_file'] = taxon.identification_file or None
@@ -263,7 +277,18 @@ class SampleForm(forms.ModelForm):
             else:
                 self.fields['taxon_article_pdf'].widget.link_url = reverse('order-article', args=[taxon.pk])
 
-    TAXON_FILE_FIELDS = ('taxon_article_pdf', 'taxon_identification_file', 'taxon_identification_caption', 'taxon_identification_caption_en', 'taxon_identification_source')
+    # (TaxonOrder/Family/Genus attribute, label, textarea rows) -- the page texts every taxon-level sample can edit
+    TAXON_TEXT_FIELDS = (
+        ('description_he', 'תיאור בעברית (של הסדרה / המשפחה / הסוג)', 5),
+        ('description_en', 'תיאור באנגלית (של הסדרה / המשפחה / הסוג)', 5),
+        ('identification_he', 'סימני זיהוי בעברית', 4),
+        ('identification_en', 'סימני זיהוי באנגלית', 4),
+        ('sources', 'מקורות', 3),
+    )
+    TAXON_FILE_FIELDS = (tuple('taxon_' + attr for attr, _l, _r in TAXON_TEXT_FIELDS)
+                         + ('taxon_article_pdf', 'taxon_identification_file', 'taxon_identification_caption', 'taxon_identification_caption_en', 'taxon_identification_source'))
+    # the identification file, its captions and its source exist for genera only
+    GENUS_ONLY_FIELDS = ('taxon_identification_file', 'taxon_identification_caption', 'taxon_identification_caption_en', 'taxon_identification_source')
 
     def clean_taxon_files(self, data):
         """Rejects an upload/clear that has no taxon row to attach to or that does not match
@@ -277,8 +302,8 @@ class SampleForm(forms.ModelForm):
         if kind not in self.TAXON_KINDS:
             self.add_error(touched[0], 'קבצים אלה מתאימים רק לדגימה מסוג סדרה, משפחה או סוג.')
             return
-        if kind != Sample.Kind.GENUS and any(n != 'taxon_article_pdf' for n in touched):
-            self.add_error(next(n for n in touched if n != 'taxon_article_pdf'), 'קובץ זיהוי, כיתוב ומקור זמינים רק בסוג.')
+        if kind != Sample.Kind.GENUS and any(n in self.GENUS_ONLY_FIELDS for n in touched):
+            self.add_error(next(n for n in touched if n in self.GENUS_ONLY_FIELDS), 'קובץ זיהוי, כיתוב ומקור זמינים רק בסוג.')
             return
         if self.taxon_for(kind, data.get('order') or '', data.get('family') or '', data.get('genus') or '') is None:
             self.add_error(touched[0], 'לא נמצאה שורה בטבלת הטקסונומיה לסדרה/משפחה/סוג שנבחרו — יש להוסיף אותה בניהול.')
@@ -302,6 +327,10 @@ class SampleForm(forms.ModelForm):
                 setattr(taxon, attr, value)
             changed.append(attr)
         apply('article_pdf', 'taxon_article_pdf')
+        for attr, _label, _rows in self.TAXON_TEXT_FIELDS:
+            if 'taxon_' + attr in self.changed_data:
+                setattr(taxon, attr, self.cleaned_data.get('taxon_' + attr) or '')
+                changed.append(attr)
         if sample.kind == Sample.Kind.GENUS:
             apply('identification_file', 'taxon_identification_file')
             for attr, field in (('identification_caption', 'taxon_identification_caption'), ('identification_caption_en', 'taxon_identification_caption_en'),
