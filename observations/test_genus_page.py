@@ -227,6 +227,16 @@ class GenusIdentificationFileTests(TestCase):
             self.assertContains(response, 'Species of Hypselodoris')
             self.assertContains(response, 'Gosliner 2015')
 
+    def test_caption_follows_the_page_language_with_a_fallback_to_the_other(self):
+        with tempfile.TemporaryDirectory() as tmp, override_settings(MEDIA_ROOT=tmp):
+            self.attach('key.png', self.PNG, identification_caption='כיתוב בעברית', identification_caption_en='English caption')
+            self.assertContains(self.client.get(f'/genus/{self.genus.name}/'), 'כיתוב בעברית')
+            self.assertNotContains(self.client.get(f'/genus/{self.genus.name}/'), 'English caption')
+            self.assertContains(self.client.get(f'/genus/{self.genus.name}/?lang=en'), 'English caption')
+            self.assertNotContains(self.client.get(f'/genus/{self.genus.name}/?lang=en'), 'כיתוב בעברית')
+            self.genus.identification_caption_en = ''; self.genus.save()
+            self.assertContains(self.client.get(f'/genus/{self.genus.name}/?lang=en'), 'כיתוב בעברית')
+
     def test_pdf_file_is_shown_as_a_link_not_an_image(self):
         with tempfile.TemporaryDirectory() as tmp, override_settings(MEDIA_ROOT=tmp):
             self.attach('key.pdf', b'%PDF-1.4 test')

@@ -107,12 +107,12 @@ gtag('config', 'G-CPGTC09P2P');</script>
             {% if genus.identification_file %}
             <figure class="identification-file">
                 {% if genus.identification_is_image %}
-                <a class="identification-image" href="{% url 'genus-identification' genus.name %}" target="_blank" rel="noopener" aria-label="{{ "פתיחת תרשים הזיהוי בגודל מלא"|t:lang }}"><img src="{% url 'genus-identification' genus.name %}" alt="{{ genus.identification_caption|default:genus.name }}" loading="lazy"></a>
+                <a class="identification-image" href="{% url 'genus-identification' genus.name %}" target="_blank" rel="noopener" aria-label="{{ "פתיחת תרשים הזיהוי בגודל מלא"|t:lang }}"><img src="{% url 'genus-identification' genus.name %}" alt="{{ identification_caption|default:genus.name }}" loading="lazy"></a>
                 {% else %}
                 <a class="identification-pdf" href="{% url 'genus-identification' genus.name %}" target="_blank" rel="noopener">{{ "מפתח זיהוי (PDF) ↗"|t:lang }}</a>
                 {% endif %}
-                {% if genus.identification_caption or genus.identification_source %}
-                <figcaption>{% if genus.identification_caption %}{{ genus.identification_caption }}{% endif %}{% if genus.identification_source %}<span class="identification-source">{{ "מקור:"|t:lang }} {{ genus.identification_source }}</span>{% endif %}</figcaption>
+                {% if identification_caption or genus.identification_source %}
+                <figcaption>{% if identification_caption %}{{ identification_caption }}{% endif %}{% if genus.identification_source %}<span class="identification-source">{{ "מקור:"|t:lang }} {{ genus.identification_source }}</span>{% endif %}</figcaption>
                 {% endif %}
             </figure>
             {% endif %}

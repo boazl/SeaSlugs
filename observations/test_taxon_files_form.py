@@ -48,7 +48,7 @@ class TaxonFilesOnObservationFormTests(TestCase):
     # --- who sees the fields ---
     def test_manager_sees_the_file_fields_on_a_genus_observation(self):
         html = self.client.get(f'/observations/{self.genus_sample.pk}/edit/').content.decode()
-        for name in ('taxon_article_pdf', 'taxon_identification_file', 'taxon_identification_caption', 'taxon_identification_source'):
+        for name in ('taxon_article_pdf', 'taxon_identification_file', 'taxon_identification_caption', 'taxon_identification_caption_en', 'taxon_identification_source'):
             self.assertIn(f'name="{name}"', html)
 
     def test_ordinary_member_does_not_get_the_file_fields(self):
@@ -65,12 +65,14 @@ class TaxonFilesOnObservationFormTests(TestCase):
     def test_genus_article_and_identification_file_are_saved_from_the_form(self):
         response = self.post(self.genus_sample, taxon_article_pdf=self.upload('a.pdf', self.PDF),
                              taxon_identification_file=self.upload('key.png', self.PNG),
-                             taxon_identification_caption='Species of Hypselodoris', taxon_identification_source='Gosliner 2015')
+                             taxon_identification_caption='מינים של היפסלודוריס', taxon_identification_caption_en='Species of Hypselodoris',
+                             taxon_identification_source='Gosliner 2015')
         self.assertEqual(response.status_code, 302)
         self.genus.refresh_from_db()
         self.assertTrue(self.genus.article_pdf.name.endswith('.pdf'))
         self.assertTrue(self.genus.identification_file.name.endswith('.png'))
-        self.assertEqual((self.genus.identification_caption, self.genus.identification_source), ('Species of Hypselodoris', 'Gosliner 2015'))
+        self.assertEqual((self.genus.identification_caption, self.genus.identification_caption_en, self.genus.identification_source),
+                         ('מינים של היפסלודוריס', 'Species of Hypselodoris', 'Gosliner 2015'))
 
     def test_current_files_are_shown_with_links_through_the_public_views(self):
         self.genus.identification_file.save('key.png', ContentFile(self.PNG), save=False)

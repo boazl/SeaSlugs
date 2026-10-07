@@ -242,6 +242,8 @@ class SampleForm(forms.ModelForm):
             help_text='תרשים, לוח תמונות או מפתח לזיהוי המינים בסוג: PDF או תמונה (JPG, PNG, WebP, GIF), עד 15MB.')
         self.fields['taxon_identification_caption'] = forms.CharField(required=False, max_length=300, label='כיתוב לקובץ הזיהוי',
             widget=forms.TextInput(attrs={'data-taxon-file': 'genus'}))
+        self.fields['taxon_identification_caption_en'] = forms.CharField(required=False, max_length=300, label='כיתוב לקובץ הזיהוי (אנגלית)',
+            widget=forms.TextInput(attrs={'data-taxon-file': 'genus', 'dir': 'ltr'}))
         self.fields['taxon_identification_source'] = forms.CharField(required=False, max_length=300, label='מקור קובץ הזיהוי',
             widget=forms.TextInput(attrs={'data-taxon-file': 'genus'}))
         instance = self.instance
@@ -251,6 +253,7 @@ class SampleForm(forms.ModelForm):
             if instance.kind == Sample.Kind.GENUS:
                 self.initial['taxon_identification_file'] = taxon.identification_file or None
                 self.initial['taxon_identification_caption'] = taxon.identification_caption
+                self.initial['taxon_identification_caption_en'] = taxon.identification_caption_en
                 self.initial['taxon_identification_source'] = taxon.identification_source
                 self.fields['taxon_identification_file'].widget.link_url = reverse('genus-identification', args=[taxon.name])
                 self.fields['taxon_identification_file'].widget.show_image = taxon.identification_is_image
@@ -260,7 +263,7 @@ class SampleForm(forms.ModelForm):
             else:
                 self.fields['taxon_article_pdf'].widget.link_url = reverse('order-article', args=[taxon.pk])
 
-    TAXON_FILE_FIELDS = ('taxon_article_pdf', 'taxon_identification_file', 'taxon_identification_caption', 'taxon_identification_source')
+    TAXON_FILE_FIELDS = ('taxon_article_pdf', 'taxon_identification_file', 'taxon_identification_caption', 'taxon_identification_caption_en', 'taxon_identification_source')
 
     def clean_taxon_files(self, data):
         """Rejects an upload/clear that has no taxon row to attach to or that does not match
@@ -301,7 +304,8 @@ class SampleForm(forms.ModelForm):
         apply('article_pdf', 'taxon_article_pdf')
         if sample.kind == Sample.Kind.GENUS:
             apply('identification_file', 'taxon_identification_file')
-            for attr, field in (('identification_caption', 'taxon_identification_caption'), ('identification_source', 'taxon_identification_source')):
+            for attr, field in (('identification_caption', 'taxon_identification_caption'), ('identification_caption_en', 'taxon_identification_caption_en'),
+                            ('identification_source', 'taxon_identification_source')):
                 if field in self.changed_data:
                     setattr(taxon, attr, self.cleaned_data.get(field) or '')
                     changed.append(attr)

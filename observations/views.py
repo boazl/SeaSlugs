@@ -202,6 +202,7 @@ def genus_page(request, name):
         'taxon_order_label': taxon_label(taxon_order), 'taxon_family_label': taxon_label(taxon_family),
         'common_name': common_name, 'description': description,
         'identification': (genus.identification_en or genus.identification_he) if lang == 'en' else (genus.identification_he or genus.identification_en),
+        'identification_caption': (genus.identification_caption_en or genus.identification_caption) if lang == 'en' else (genus.identification_caption or genus.identification_caption_en),
         'sources': parse_sources(genus.sources),
         'canonical_url': request.build_absolute_uri(request.path),
     })

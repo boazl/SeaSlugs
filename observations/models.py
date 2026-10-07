@@ -338,6 +338,7 @@ class TaxonGenus(models.Model):
         validators=[FileExtensionValidator(IDENTIFICATION_FILE_EXTENSIONS), validate_identification_file_size],
         help_text='תרשים, לוח תמונות או מפתח לזיהוי המינים בסוג: PDF או תמונה (JPG, PNG, WebP, GIF), עד 15MB.')
     identification_caption = models.CharField('כיתוב לקובץ הזיהוי', max_length=300, blank=True)
+    identification_caption_en = models.CharField('כיתוב לקובץ הזיהוי (אנגלית)', max_length=300, blank=True)
     identification_source = models.CharField('מקור קובץ הזיהוי', max_length=300, blank=True,
         help_text='למשל: שם המחבר, הספר או המאמר שממנו נלקח התרשים.')
     class Meta:
