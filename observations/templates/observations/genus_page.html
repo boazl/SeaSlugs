@@ -38,6 +38,18 @@ gtag('config', 'G-CPGTC09P2P');</script>
         .species-section{margin-top:40px;padding-top:24px;border-top:1px solid var(--line)}
         .species-section h2{font-size:22px;font-weight:600;margin:0 0 14px}
         .species-share{margin-top:18px;font-size:14px;color:var(--muted);display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+        .identification-file{margin:18px 0 0;max-width:900px}
+        .identification-file a.identification-image{display:block;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}
+        .identification-file img{display:block;width:100%;height:auto}
+        .identification-file figcaption{margin-top:8px;font-size:14px;color:var(--muted)}
+        .identification-file .identification-source{display:block;font-size:13px}
+        .identification-pdf{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--accent);text-decoration:none}
+        .identification-pdf:hover{border-color:var(--accent)}
+        .species-sources{margin-top:28px;font-size:14px;color:var(--muted)}
+        .species-sources summary{cursor:pointer;color:var(--accent);font-weight:600}
+        .species-sources ul{margin:10px 0 0;padding-inline-start:20px;display:grid;gap:4px}
+        .species-sources a{color:var(--muted);word-break:break-all}
+        .species-sources a:hover{color:var(--accent)}
         .species-share a{color:var(--accent);word-break:break-all}
         .species-share button{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:4px 10px;font-size:13px;cursor:pointer}
     </style>
@@ -82,10 +94,22 @@ gtag('config', 'G-CPGTC09P2P');</script>
         </section>
         {% endif %}
 
-        {% if identification %}
-        <section class="species-section">
+        {% if identification or genus.identification_file %}
+        <section class="species-section" id="identification">
             <h2>{{ "זיהוי"|t:lang }}</h2>
-            <p>{{ identification|linebreaksbr }}</p>
+            {% if identification %}<p>{{ identification|linebreaksbr }}</p>{% endif %}
+            {% if genus.identification_file %}
+            <figure class="identification-file">
+                {% if genus.identification_is_image %}
+                <a class="identification-image" href="{% url 'genus-identification' genus.name %}" target="_blank" rel="noopener" aria-label="{{ "פתיחת תרשים הזיהוי בגודל מלא"|t:lang }}"><img src="{% url 'genus-identification' genus.name %}" alt="{{ genus.identification_caption|default:genus.name }}" loading="lazy"></a>
+                {% else %}
+                <a class="identification-pdf" href="{% url 'genus-identification' genus.name %}" target="_blank" rel="noopener">{{ "מפתח זיהוי (PDF) ↗"|t:lang }}</a>
+                {% endif %}
+                {% if genus.identification_caption or genus.identification_source %}
+                <figcaption>{% if genus.identification_caption %}{{ genus.identification_caption }}{% endif %}{% if genus.identification_source %}<span class="identification-source">{{ "מקור:"|t:lang }} {{ genus.identification_source }}</span>{% endif %}</figcaption>
+                {% endif %}
+            </figure>
+            {% endif %}
         </section>
         {% endif %}
         <section class="species-section">
@@ -106,6 +130,12 @@ gtag('config', 'G-CPGTC09P2P');</script>
         </section>
 
         <section class="species-section">
+        {% if sources %}
+        <details class="species-sources">
+            <summary>{{ "מקורות"|t:lang }} ({{ sources|length }})</summary>
+            <ul>{% for src in sources %}<li>{% if src.url %}<a href="{{ src.url }}" target="_blank" rel="noopener" dir="ltr">{{ src.label }} ↗</a>{% else %}{{ src.label }}{% endif %}</li>{% endfor %}</ul>
+        </details>
+        {% endif %}
             <p class="species-share"><span>{{ "קישור לשיתוף:"|t:lang }}</span> <a href="{{ canonical_url }}" id="species-share-link">{{ canonical_url }}</a> <button type="button" id="species-share-copy" data-copy-label="{{ "העתקה"|t:lang }}" data-copied-label="{{ "הועתק!"|t:lang }}">{{ "העתקה"|t:lang }}</button></p>
         </section>
     </main>

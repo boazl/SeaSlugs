@@ -158,6 +158,12 @@ class TaxonGenusAdmin(admin.ModelAdmin):
     list_filter = ['family__order']
     search_fields = ['name', 'name_he', 'name_en']
     autocomplete_fields = ['family']
+    fieldsets = [
+        ('זיהוי וסיווג', {'fields': ['name', 'name_he', 'name_en', 'family', 'taxonomic_order', 'defining_sample']}),
+        ('תיאור וזיהוי', {'fields': ['description_he', 'description_en', 'identification_he', 'identification_en']}),
+        ('קובץ זיהוי (תרשים, תמונות או מפתח)', {'fields': ['identification_file', 'identification_caption', 'identification_source']}),
+        ('מקורות וקבצים', {'fields': ['sources', 'link', 'article_pdf']}),
+    ]
     actions = ['refresh_defining_samples']
     @admin.action(description='עדכון דגימה מגדירה לכל הסוגים מתוך דגימות ה"סוג" הקיימות (מתעלם מהבחירה)')
     def refresh_defining_samples(self, request, queryset):

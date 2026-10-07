@@ -301,6 +301,22 @@ class TaxonFamily(models.Model):
     def __str__(self): return f'{self.name} ({self.sub_family})' if self.sub_family else self.name
 
 
+IDENTIFICATION_FILE_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png', 'webp', 'gif']
+IDENTIFICATION_IMAGE_EXTENSIONS = {'jpg', 'jpeg', 'png', 'webp', 'gif'}
+IDENTIFICATION_FILE_MAX_BYTES = 15 * 1024 * 1024
+
+
+def validate_identification_file_size(value):
+    # Also runs against an already-stored file when a genus is re-saved; if that file is
+    # missing from disk (e.g. after a database replace) the check must not break the save.
+    try:
+        size = value.size
+    except (OSError, ValueError):
+        return
+    if size > IDENTIFICATION_FILE_MAX_BYTES:
+        raise ValidationError('קובץ הזיהוי גדול מדי (עד 15MB).')
+
+
 class TaxonGenus(models.Model):
     family = models.ForeignKey(TaxonFamily, on_delete=models.PROTECT, null=True, blank=True, related_name='genera', verbose_name='משפחה')
     name = models.CharField('סוג', max_length=150, unique=True)
@@ -316,11 +332,23 @@ class TaxonGenus(models.Model):
     sources = models.TextField('מקורות (קישור בכל שורה)', blank=True)
     link = models.URLField('קישור', blank=True)
     article_pdf = models.FileField('מאמר (PDF)', upload_to='articles/genera/', blank=True, validators=[FileExtensionValidator(['pdf'])])
+    # One scientific identification file for the genus -- a diagram, plate of photos or key
+    # for telling its species apart: a PDF or an image (see IDENTIFICATION_FILE_EXTENSIONS).
+    identification_file = models.FileField('קובץ זיהוי (PDF או תמונה)', upload_to='identification/genera/', blank=True,
+        validators=[FileExtensionValidator(IDENTIFICATION_FILE_EXTENSIONS), validate_identification_file_size],
+        help_text='תרשים, לוח תמונות או מפתח לזיהוי המינים בסוג: PDF או תמונה (JPG, PNG, WebP, GIF), עד 15MB.')
+    identification_caption = models.CharField('כיתוב לקובץ הזיהוי', max_length=300, blank=True)
+    identification_source = models.CharField('מקור קובץ הזיהוי', max_length=300, blank=True,
+        help_text='למשל: שם המחבר, הספר או המאמר שממנו נלקח התרשים.')
     class Meta:
         ordering = [models.functions.NullIf('taxonomic_order', models.Value('')).asc(nulls_last=True), 'name']
         verbose_name = 'סוג (טקסונומיה)'
         verbose_name_plural = 'סוגים (טקסונומיה)'
     def __str__(self): return self.name
+    @property
+    def identification_is_image(self):
+        name = self.identification_file.name if self.identification_file else ''
+        return name.rsplit('.', 1)[-1].lower() in IDENTIFICATION_IMAGE_EXTENSIONS
     @staticmethod
     def pick_defining_sample(name):
         """Best genus-kind sample to represent a genus by this exact name: prefer one with

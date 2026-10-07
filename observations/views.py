@@ -115,13 +115,7 @@ def species_page(request, slug):
         depth_short = (f'to {species.depth_max} {m}' if en else f'עד {species.depth_max} {m}')
     else:
         depth_short = f'{species.depth_min} {m}' if species.depth_min is not None else ''
-    from urllib.parse import urlparse
-    sources = []
-    for line in species.sources.splitlines():
-        line = line.strip()
-        if line:
-            host = urlparse(line).netloc.removeprefix('www.') if line.startswith('http') else ''
-            sources.append({'url': line if host else '', 'label': host or line})
+    sources = parse_sources(species.sources)
     # A common name is shown only in its own language (no Hebrew name in the English view).
     common_name = species.name_en if lang == 'en' else species.name_he
     description = (species.description_en or species.description_he) if lang == 'en' else (species.description_he or species.description_en)
@@ -151,6 +145,19 @@ def species_article(request, slug):
     response['Cache-Control'] = 'public, max-age=3600'
     response['Content-Disposition'] = 'inline; filename="%s.pdf"' % area.species.scientific_name.replace('"', "'")
     return response
+
+
+def parse_sources(text):
+    """One entry per non-empty line of a "sources" text field: a link (labelled by its host)
+    when the line is a URL, otherwise plain text -- shared by the species and genus pages."""
+    from urllib.parse import urlparse
+    sources = []
+    for line in (text or '').splitlines():
+        line = line.strip()
+        if line:
+            host = urlparse(line).netloc.removeprefix('www.') if line.startswith('http') else ''
+            sources.append({'url': line if host else '', 'label': host or line})
+    return sources
 
 
 def genus_page(request, name):
@@ -195,6 +202,7 @@ def genus_page(request, name):
         'taxon_order_label': taxon_label(taxon_order), 'taxon_family_label': taxon_label(taxon_family),
         'common_name': common_name, 'description': description,
         'identification': (genus.identification_en or genus.identification_he) if lang == 'en' else (genus.identification_he or genus.identification_en),
+        'sources': parse_sources(genus.sources),
         'canonical_url': request.build_absolute_uri(request.path),
     })
 
@@ -308,6 +316,20 @@ def genus_article(request, name):
     response = FileResponse(genus.article_pdf.open('rb'), content_type='application/pdf')
     response['Cache-Control'] = 'public, max-age=3600'
     response['Content-Disposition'] = 'inline; filename="%s.pdf"' % genus.name.replace('"', "'")
+    return response
+
+def genus_identification(request, name):
+    """Streams a genus' identification file (a PDF or an image -- see TaxonGenus.
+    identification_file), inline, with the content type its extension implies."""
+    import mimetypes
+    genus = get_object_or_404(TaxonGenus, name=name)
+    if not genus.identification_file:
+        raise Http404
+    content_type = mimetypes.guess_type(genus.identification_file.name)[0] or 'application/octet-stream'
+    response = FileResponse(genus.identification_file.open('rb'), content_type=content_type)
+    response['Cache-Control'] = 'public, max-age=3600'
+    extension = genus.identification_file.name.rsplit('.', 1)[-1].lower()
+    response['Content-Disposition'] = 'inline; filename="%s-identification.%s"' % (genus.name.replace('"', "'"), extension)
     return response
 
 SORT_OPTIONS = {

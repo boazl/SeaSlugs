@@ -10,7 +10,7 @@ from observations.release_views import releases
 from observations.image_manager import manager as image_manager, image_file
 
 from observations.folder_import import folder_import
-from observations.views import site_image, species_page, species_article, genus_page, genus_article, order_page, family_page, divetrip_locations
+from observations.views import site_image, species_page, species_article, genus_page, genus_article, genus_identification, order_page, family_page, divetrip_locations
 from observations.db_replace import db_replace, db_replace_download
 
 urlpatterns = [
@@ -33,6 +33,7 @@ urlpatterns = [
     path('order/<int:pk>/', order_page, name='order-page'),
     path('family/<str:name>/', family_page, name='family-page'),
     path('genus/<str:name>/article.pdf', genus_article, name='genus-article'),
+    path('genus/<str:name>/identification/', genus_identification, name='genus-identification'),
     # Must come before the catch-all gallery-file pattern below, or that route (which only
     # knows about the static dist/ files) would swallow this request first.
     path('sitemap.xml', sitemap, {'sitemaps': SITEMAPS}, name='sitemap'),

@@ -1,4 +1,5 @@
 import tempfile
+from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
 from django.test import TestCase, override_settings
@@ -181,3 +182,94 @@ class GenusPageTests(TestCase):
         data = json.loads(response.content.decode().split('=', 1)[1].strip().removesuffix(';'))
         entry = data['taxa']['genera'][str(self.genus.pk)]
         self.assertEqual(entry['name'], 'Chromodoris')
+
+
+class GenusIdentificationFileTests(TestCase):
+    """A genus can carry ONE identification file -- a PDF or an image (a diagram, plate of
+    photos or key for telling its species apart) -- with a caption and a source."""
+    PNG = b'\x89PNG\r\n\x1a\n' + b'0' * 20
+
+    def setUp(self):
+        GenusPageTests.setUp(self)
+
+    def attach(self, filename, data, **extra):
+        self.genus.identification_file.save(filename, ContentFile(data), save=False)
+        for key, value in extra.items():
+            setattr(self.genus, key, value)
+        self.genus.save()
+
+    def test_page_without_a_file_has_no_identification_section(self):
+        self.assertNotContains(self.client.get(f'/genus/{self.genus.name}/'), 'id="identification"')
+
+    def test_image_file_is_shown_inline_with_caption_and_source(self):
+        with tempfile.TemporaryDirectory() as tmp, override_settings(MEDIA_ROOT=tmp):
+            self.attach('key.png', self.PNG, identification_caption='Species of Hypselodoris', identification_source='Gosliner 2015')
+            response = self.client.get(f'/genus/{self.genus.name}/')
+            self.assertContains(response, 'id="identification"')
+            self.assertContains(response, f'<img src="/genus/{self.genus.name}/identification/"')
+            self.assertContains(response, 'Species of Hypselodoris')
+            self.assertContains(response, 'Gosliner 2015')
+
+    def test_pdf_file_is_shown_as_a_link_not_an_image(self):
+        with tempfile.TemporaryDirectory() as tmp, override_settings(MEDIA_ROOT=tmp):
+            self.attach('key.pdf', b'%PDF-1.4 test')
+            response = self.client.get(f'/genus/{self.genus.name}/')
+            self.assertContains(response, 'class="identification-pdf"')
+            self.assertNotContains(response, 'class="identification-image"')
+
+    def test_file_alone_still_shows_the_identification_section_in_english(self):
+        with tempfile.TemporaryDirectory() as tmp, override_settings(MEDIA_ROOT=tmp):
+            self.attach('key.pdf', b'%PDF-1.4 test')
+            response = self.client.get(f'/genus/{self.genus.name}/?lang=en')
+            self.assertContains(response, 'Identification key (PDF)')
+
+    def test_identification_view_serves_each_type_with_its_content_type(self):
+        with tempfile.TemporaryDirectory() as tmp, override_settings(MEDIA_ROOT=tmp):
+            self.attach('key.png', self.PNG)
+            response = self.client.get(f'/genus/{self.genus.name}/identification/')
+            self.assertEqual((response.status_code, response['Content-Type']), (200, 'image/png'))
+            self.assertIn('inline', response['Content-Disposition'])
+            self.genus.identification_file.delete(save=False)
+            self.attach('key.pdf', b'%PDF-1.4 test')
+            response = self.client.get(f'/genus/{self.genus.name}/identification/')
+            self.assertEqual(response['Content-Type'], 'application/pdf')
+
+    def test_identification_view_404s_without_a_file(self):
+        self.assertEqual(self.client.get(f'/genus/{self.genus.name}/identification/').status_code, 404)
+
+    def test_only_pdf_and_image_files_are_accepted(self):
+        for good in ('a.pdf', 'a.jpg', 'a.JPEG', 'a.png', 'a.webp', 'a.gif'):
+            self.genus.identification_file.name = good
+            self.genus.full_clean(exclude=['family', 'defining_sample'])
+        for bad in ('a.docx', 'a.txt', 'a.svg', 'a.exe'):
+            self.genus.identification_file.name = bad
+            with self.assertRaises(ValidationError, msg=bad):
+                self.genus.full_clean(exclude=['family', 'defining_sample'])
+
+    def test_oversized_file_is_rejected(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from .models import validate_identification_file_size
+        validate_identification_file_size(SimpleUploadedFile('a.pdf', b'x' * 1024))
+        with self.assertRaises(ValidationError):
+            validate_identification_file_size(SimpleUploadedFile('a.pdf', b'x' * (15 * 1024 * 1024 + 1)))
+
+    def test_a_stored_file_missing_from_disk_does_not_break_saving_the_genus(self):
+        # e.g. right after a database replace brought the row but not the media file
+        with tempfile.TemporaryDirectory() as tmp, override_settings(MEDIA_ROOT=tmp):
+            self.genus.identification_file.name = 'identification/genera/gone.png'
+            self.genus.full_clean(exclude=['family', 'defining_sample'])
+
+    def test_sources_are_listed_on_the_genus_page(self):
+        self.genus.sources = 'https://www.marinespecies.org/aphia.php?p=taxdetails&id=1\nGosliner et al. 2015'
+        self.genus.save()
+        response = self.client.get(f'/genus/{self.genus.name}/')
+        self.assertContains(response, 'class="species-sources"')
+        self.assertContains(response, 'marinespecies.org ↗')
+        self.assertContains(response, 'Gosliner et al. 2015')
+
+    def test_admin_form_offers_the_description_identification_and_file_fields(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(f'/admin/observations/taxongenus/{self.genus.pk}/change/')
+        for name in ('description_he', 'description_en', 'identification_he', 'identification_en',
+                     'identification_file', 'identification_caption', 'identification_source'):
+            self.assertContains(response, f'name="{name}"')
