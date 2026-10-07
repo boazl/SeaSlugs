@@ -95,7 +95,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
                     <div><dt>{{ "מינים בגלריה"|t:lang }}</dt><dd>{{ areas|length }}</dd></div>
                     {% if children %}<div><dt>{% if rank == 'order' %}{{ "משפחות"|t:lang }}{% else %}{{ "סוגים"|t:lang }}{% endif %}</dt><dd>{{ children|length }}</dd></div>{% endif %}
                 </dl>
-                {% if taxon.link %}<div class="species-links"><a href="{{ taxon.link }}" target="_blank" rel="noopener">{{ "קישור נוסף ↗"|t:lang }}</a></div>{% endif %}
+                {% if taxon.link or taxon.article_pdf %}<div class="species-links">{% if taxon.link %}<a href="{{ taxon.link }}" target="_blank" rel="noopener">{{ "קישור נוסף ↗"|t:lang }}</a>{% endif %}{% if taxon.article_pdf %}<a href="{% if rank == 'order' %}{% url 'order-article' taxon.pk %}{% else %}{% url 'family-article' taxon.name %}{% endif %}" target="_blank" rel="noopener">{{ "מאמר (PDF) ↗"|t:lang }}</a>{% endif %}</div>{% endif %}
             </div>
         </article>
 

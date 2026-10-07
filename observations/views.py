@@ -318,6 +318,29 @@ def genus_article(request, name):
     response['Content-Disposition'] = 'inline; filename="%s.pdf"' % genus.name.replace('"', "'")
     return response
 
+def family_article(request, name):
+    """Streams a family's article PDF (the family page's own row -- see family_page)."""
+    families = list(TaxonFamily.objects.filter(name=name))
+    family = next((f for f in families if not f.sub_family), families[0] if families else None)
+    if family is None or not family.article_pdf:
+        raise Http404
+    response = FileResponse(family.article_pdf.open('rb'), content_type='application/pdf')
+    response['Cache-Control'] = 'public, max-age=3600'
+    response['Content-Disposition'] = 'inline; filename="%s.pdf"' % family.name.replace('"', "'")
+    return response
+
+
+def order_article(request, pk):
+    """Streams an order group's article PDF."""
+    order = get_object_or_404(TaxonOrder, pk=pk)
+    if not order.article_pdf:
+        raise Http404
+    response = FileResponse(order.article_pdf.open('rb'), content_type='application/pdf')
+    response['Cache-Control'] = 'public, max-age=3600'
+    response['Content-Disposition'] = 'inline; filename="%s.pdf"' % order.name.replace('"', "'")
+    return response
+
+
 def genus_identification(request, name):
     """Streams a genus' identification file (a PDF or an image -- see TaxonGenus.
     identification_file), inline, with the content type its extension implies."""
@@ -592,6 +615,7 @@ def edit(request,pk=None):
         next_url=reverse('observations')
     form=SampleForm(request.POST or None,request.FILES or None,instance=item,initial=initial)
     if request.user.is_staff: form.enable_add_links()
+    if is_manager(request.user): form.enable_taxon_files()
     if request.method=='POST' and form.is_valid():
         item=form.save(commit=False)
         def canonical_image_write(source_sample, target_sample=None):
@@ -631,6 +655,7 @@ def edit(request,pk=None):
         # base.html, which renders it with its own highlighted style.
         is_new_observation = item.pk is None
         item.save_reviewed()
+        form.save_taxon_files(item)
         messages.success(request,'התצפית פורסמה.' if item.status=='published' else 'התצפית נשמרה וממתינה להשלמת נתונים ולאישור מנהל.',
             extra_tags='new-observation' if is_new_observation else '')
         return redirect(f'{next_url}#obs-{item.pk}')
