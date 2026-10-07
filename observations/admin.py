@@ -155,59 +155,121 @@ def gallery_taxon_ids(request):
     return ids
 
 
-class TaxonOrderListFilter(admin.RelatedFieldListFilter):
-    """Filter by order row, labelled so rows that share a name can be told apart. TaxonOrder has
-    several rows per order name (Nudibranchia/Doridina, Nudibranchia/Cladobranchia, ...), so the
-    plain name reads like duplicates: each option also shows the group's Hebrew name and the
-    superfamilies of its families. Beside each option: how many of the listed rows (genera or
-    families) have species in the gallery -- what matters here -- and, small, how many the
-    reference table holds in all."""
+class TaxonSplitListFilter(admin.SimpleListFilter):
+    """Base of the two taxonomy filters on the genus and family changelists (see the subclasses).
+    Beside each option: how many of the listed rows (genera or families) have species in the
+    gallery -- what matters here -- and, small, how many the reference table holds in all."""
     template = 'admin/taxon_order_filter.html'
-    counted = 'הסוגים'
+    prefix = ''                # path from the listed model to its TaxonFamily: 'family__' for genera
     gallery_index = 0          # which of gallery_taxon_ids()'s sets holds the listed model's ids
 
-    def __init__(self, field, request, params, model, model_admin, field_path):
+    def __init__(self, request, params, model, model_admin):
         self.gallery_ids = gallery_taxon_ids(request)[self.gallery_index]
-        super().__init__(field, request, params, model, model_admin, field_path)
-        self.title = f'סדרה (מספר {self.counted} בגלריה, ובקטן: במאגר)'
+        self.depths = {}
+        super().__init__(request, params, model, model_admin)
 
-    def field_choices(self, field, request, model_admin):
-        superfamilies = {}
-        for order_id, superfamily in TaxonFamily.objects.exclude(superfamily='').values_list('order_id', 'superfamily'):
-            if order_id and '\\' not in superfamily:    # a few rows hold the import artifact "\N"
-                superfamilies.setdefault(order_id, set()).add(superfamily)
-        orders = {o.pk: o for o in TaxonOrder.objects.all()}
-        choices = []
-        for pk, label in super().field_choices(field, request, model_admin):
-            order = orders.get(pk)
-            if order is not None:
-                parts = [str(order)]
-                if order.name_he: parts.append(order.name_he)
-                if superfamilies.get(pk): parts.append(', '.join(sorted(superfamilies[pk])))
-                label = ' · '.join(parts)
-            choices.append((pk, label))
-        return choices
+    def condition(self, value):
+        raise NotImplementedError
+
+    def queryset(self, request, queryset):
+        value = self.value()
+        return queryset.filter(self.condition(value)) if value else None
 
     def get_facet_counts(self, pk_attname, filtered_qs):
-        counts = super().get_facet_counts(pk_attname, filtered_qs)
-        for pk_val, _ in self.lookup_choices:
-            counts[f'{pk_val}__g'] = models.Count(pk_attname, filter=models.Q(**{self.lookup_kwarg: pk_val}) & models.Q(pk__in=self.gallery_ids))
+        counts = {}
+        for i, (value, _) in enumerate(self.lookup_choices):
+            matching = models.Q(pk__in=filtered_qs.filter(self.condition(value)))
+            counts[f'{i}__c'] = models.Count(pk_attname, filter=matching)
+            counts[f'{i}__g'] = models.Count(pk_attname, filter=matching & models.Q(pk__in=self.gallery_ids))
         return counts
 
     def choices(self, changelist):
-        items = list(super().choices(changelist))
-        if not changelist.add_facets:
-            return iter(items)
-        counts = self.get_facet_queryset(changelist)
-        for item, (pk, label) in zip(items[1:], self.lookup_choices):
-            item['display'] = format_html('{} <span class="gal-count">{}</span> <span class="db-count">({})</span>',
-                                          label, counts[f'{pk}__g'], counts[f'{pk}__c'])
-        return iter(items)
+        counts = self.get_facet_queryset(changelist) if changelist.add_facets else None
+        yield {'selected': self.value() is None, 'query_string': changelist.get_query_string(remove=[self.parameter_name]),
+               'display': 'הכול'}
+        for i, (value, label) in enumerate(self.lookup_choices):
+            display = format_html('<span class="depth{}">{}</span>', self.depths.get(value, 0), label)
+            if counts is not None:
+                display = format_html('{} <span class="gal-count">{}</span> <span class="db-count">({})</span>',
+                                      display, counts[f'{i}__g'], counts[f'{i}__c'])
+            yield {'selected': self.value() == str(value), 'query_string': changelist.get_query_string({self.parameter_name: value}),
+                   'display': display}
 
 
-class TaxonOrderFamilyListFilter(TaxonOrderListFilter):
-    counted = 'המשפחות'
+class TaxonOrderNameFilter(TaxonSplitListFilter):
+    """The order, by name -- one option per order (TaxonOrder has several rows per name, one per
+    sub-order group, which the second filter breaks down)."""
+    title = 'סדרה (בגלריה, ובקטן: במאגר)'
+    parameter_name = 'order_name'
+
+    def lookups(self, request, model_admin):
+        names = []
+        for name in TaxonOrder.objects.values_list('name', flat=True):    # in the table's taxonomic order
+            if name not in names:
+                names.append(name)
+        return [(name, name) for name in names]
+
+    def condition(self, value):
+        return models.Q(**{f'{self.prefix}order__name': value})
+
+
+class TaxonGroupFilter(TaxonSplitListFilter):
+    """Sub-orders and superfamilies, indented under the sub-order they belong to; narrowed to
+    the chosen order when the order filter is set. Families of an order that has sub-orders but
+    sit in no sub-order are listed under "Others", as in the gallery."""
+    title = 'תת־סדרה / על־משפחה'
+    parameter_name = 'group'
+
+    def lookups(self, request, model_admin):
+        only_order = request.GET.get('order_name')
+        families = {}     # (order name, sub-order) -> superfamilies
+        for order, sub, superfamily in TaxonFamily.objects.exclude(superfamily='').values_list('order__name', 'order__sub_order', 'superfamily'):
+            if order and '\\' not in superfamily:    # a few rows hold the import artifact "\N"
+                families.setdefault((order, sub), set()).add(superfamily)
+        rows = []         # (order name, sub-order), in the table's order
+        for name, sub in TaxonOrder.objects.values_list('name', 'sub_order'):
+            if (name, sub) not in rows and (not only_order or name == only_order):
+                rows.append((name, sub))
+        choices = []
+        for name in dict.fromkeys(n for n, _ in rows):
+            subs = [sub for n, sub in rows if n == name]
+            has_subs = any(subs)
+            for sub in subs:
+                depth = 0
+                if has_subs:
+                    value = f'sub:{sub}' if sub else f'none:{name}'
+                    if sub or families.get((name, sub)):
+                        choices.append((value, sub or 'אחרים'))
+                        self.depths[value] = 0
+                    depth = 1
+                for superfamily in sorted(families.get((name, sub), ())):
+                    choices.append((f'sf:{superfamily}', superfamily))
+                    self.depths[f'sf:{superfamily}'] = depth
+        return choices
+
+    def condition(self, value):
+        kind, _, name = value.partition(':')
+        if kind == 'sub':
+            return models.Q(**{f'{self.prefix}order__sub_order': name})
+        if kind == 'none':
+            return models.Q(**{f'{self.prefix}order__name': name, f'{self.prefix}order__sub_order': ''})
+        return models.Q(**{f'{self.prefix}superfamily': name})
+
+
+class TaxonFamilyOrderNameFilter(TaxonOrderNameFilter):
     gallery_index = 1
+
+
+class TaxonFamilyGroupFilter(TaxonGroupFilter):
+    gallery_index = 1
+
+
+class TaxonGenusOrderNameFilter(TaxonOrderNameFilter):
+    prefix = 'family__'
+
+
+class TaxonGenusGroupFilter(TaxonGroupFilter):
+    prefix = 'family__'
 
 
 @admin.register(TaxonOrder)
@@ -220,7 +282,7 @@ class TaxonOrderAdmin(admin.ModelAdmin):
 class TaxonFamilyAdmin(admin.ModelAdmin):
     show_facets = admin.ShowFacets.ALWAYS     # the order filter's counts are the point of it
     list_display = ['taxonomic_order', 'name', 'name_he', 'name_en', 'sub_family', 'superfamily', 'order', 'defining_sample']
-    list_filter = [('order', TaxonOrderFamilyListFilter)]
+    list_filter = [TaxonFamilyOrderNameFilter, TaxonFamilyGroupFilter]
     search_fields = ['name', 'name_he', 'name_en', 'sub_family', 'superfamily']
     autocomplete_fields = ['order']
 
@@ -229,7 +291,7 @@ class TaxonFamilyAdmin(admin.ModelAdmin):
 class TaxonGenusAdmin(admin.ModelAdmin):
     show_facets = admin.ShowFacets.ALWAYS     # the order filter's counts are the point of it
     list_display = ['taxonomic_order', 'name', 'name_he', 'name_en', 'family', 'defining_sample']
-    list_filter = [('family__order', TaxonOrderListFilter)]
+    list_filter = [TaxonGenusOrderNameFilter, TaxonGenusGroupFilter]
     search_fields = ['name', 'name_he', 'name_en']
     autocomplete_fields = ['family']
     fieldsets = [
