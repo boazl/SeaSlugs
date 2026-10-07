@@ -201,6 +201,18 @@ class GenusPageTests(TestCase):
         self.assertEqual(entry['name'], 'Chromodoris')
 
 
+class GenusPageEnglishTests(TestCase):
+    def setUp(self):
+        GenusPageTests.setUp(self)
+
+    def test_english_page_has_no_hebrew_section_title_or_meta_fallback(self):
+        html = self.client.get(f'/genus/{self.genus.name}/?lang=en').content.decode()
+        self.assertIn('Species in this genus', html)
+        self.assertNotIn('מינים בסוג זה', html)
+        self.assertIn('the sea slugs website', html)       # the meta description fallback
+        self.assertIn('מינים בסוג זה', self.client.get(f'/genus/{self.genus.name}/?lang=he').content.decode())
+
+
 class GenusIdentificationFileTests(TestCase):
     """A genus can carry ONE identification file -- a PDF or an image (a diagram, plate of
     photos or key for telling its species apart) -- with a caption and a source."""

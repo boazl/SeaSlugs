@@ -58,6 +58,8 @@ TRANSLATIONS = {
     'דגימות מינים מהמסע': 'Species observations from this trip',
     'עדיין אין מסעות עם סרטונים מפורסמים.': 'No trips with published videos yet.',
     'מינים בגלריה': 'Species in the gallery',
+    'מינים בסוג זה': 'Species in this genus',
+    'תצפיות, תמונות ומידע מאתר SeaSlugs, אתר חינניות הים.': 'Observations, photos and information from SeaSlugs, the sea slugs website.',
     'משפחות': 'Families',
     'סוגים': 'Genera',
     'מינים': 'Species',
