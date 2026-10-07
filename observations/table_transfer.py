@@ -13,6 +13,8 @@ from django.utils import timezone
 from .models import Country, Sea, Region, Site, Species, Sample, DiveTrip, SpeciesArea, IdentificationQualifier, LifeStage, youtube_id
 from django.contrib.auth import get_user_model
 from .account_transfer import ACCOUNT_TABLES, account_row, account_plan
+from .models import TaxonOrder, TaxonFamily, TaxonGenus
+from .taxon_transfer import TAXON_TABLES, taxon_plan
 
 # Ordered to match the actual transfer dependency chain (see TABLE-TRANSFER.md): each table
 # only ever references ones earlier in this dict, so exporting/importing in this order (as
@@ -24,6 +26,7 @@ TABLES = {'groups': ACCOUNT_TABLES['groups'], 'users': ACCOUNT_TABLES['users'],
           'countries': (Country,['name','name_en']), 'seas': (Sea,['name','name_en']),
           'regions': (Region,['name','name_en','country','sea']), 'sites': (Site,['name','name_en','region']),
           'profiles': ACCOUNT_TABLES['profiles'],
+          'orders': TAXON_TABLES['orders'][::2], 'families': TAXON_TABLES['families'][::2], 'genera': TAXON_TABLES['genera'][::2],
           'species': (Species, ['scientific_name','name_he','name_en','source_id','genus','species','author','order','family','superfamily','accepted_genus','accepted_species','common_name','transliteration','language','formatted_author','distribution','phylogenetic_order','full_species_name_with_order','reference_author','is_migrant','habitat','food','first_observed_year','last_observed_year','size_from','size_to','size_max','description_he','description_en','link']),
           'trips': (DiveTrip, ['code','title','source_sort','year','month','start_day','duration_days','country','region','site','country_name','region_name','reserve','sea_name','species_count','source_metadata','kind','description_he','description_en','link']),
           'qualifiers': (IdentificationQualifier,['code','name','name_en']), 'lifestages': (LifeStage,['code','name','name_en']),
@@ -115,6 +118,8 @@ def plan(document):
     if len(document['rows'])>10000: raise ValidationError('עד 10,000 רשומות בהעברה.')
     if document['table'] in ACCOUNT_TABLES:
         return account_plan(document)
+    if document['table'] in TAXON_TABLES:
+        return taxon_plan(document)
     if document['table'] == 'samples':
         from .sample_transfer import sample_plan
         return sample_plan(document, TABLES['samples'][1])
