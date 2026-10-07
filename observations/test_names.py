@@ -90,7 +90,8 @@ class GalleryScriptTests(SimpleTestCase):
         js = (Path(__file__).resolve().parent.parent / 'dist' / 'app.js').read_text(encoding='utf-8')
         # Inside a drilled-into taxon, a species with no value at the shown rank is not folded back
         # into a card for the taxon being browsed: it gets an "Others" card (last), which drills on.
-        self.assertIn('if (state.drill && LEVELS.indexOf(ck.level) <= drillIndex) ck = { level, key: \'\', others: true };', js)
+        self.assertIn('if (state.drill && below && LEVELS.indexOf(ck.level) <= drillIndex) ck = { level, key: \'\', others: true };', js)
+        self.assertIn('const below = LEVELS.indexOf(level) > drillIndex;', js)
         self.assertIn('.sort((a, b) => (a.others ? 1 : 0) - (b.others ? 1 : 0))', js)
         self.assertIn("function othersLabel() { return language === 'he' ? 'אחרים' : 'Others'; }", js)
         self.assertIn("if (others) state.drill = { ...state.drill, blanks: [...(state.drill.blanks || []), level] };", js)

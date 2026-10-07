@@ -1013,10 +1013,13 @@ function renderTaxonLevel(species, level, frag) {
     // card for that very taxon (or one above it) -- the page the visitor is already on. Those
     // species get an "Others" card instead, which drills on to the next rank (e.g. the
     // superfamilies of nudibranchs that have no sub-order) so they stay reachable.
+    // Only for ranks BELOW the drilled one: at the drilled rank itself (a picked genus shown at
+    // genus level) the card is the taxon itself, not a leftover.
     const drillIndex = state.drill ? LEVELS.indexOf(state.drill.level) : -1;
+    const below = LEVELS.indexOf(level) > drillIndex;
     for (const sp of species) {
         let ck = cardKey(sp, level);
-        if (state.drill && LEVELS.indexOf(ck.level) <= drillIndex) ck = { level, key: '', others: true };
+        if (state.drill && below && LEVELS.indexOf(ck.level) <= drillIndex) ck = { level, key: '', others: true };
         const id = ck.others ? 'others' : ck.level + ':' + ck.key;
         if (!groups.has(id)) groups.set(id, { ...ck, first: sp, members: [] });
         groups.get(id).members.push(sp);
