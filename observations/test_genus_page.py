@@ -47,6 +47,18 @@ class GenusPageTests(TestCase):
         self.assertContains(response, '<a class="back-button" href="/">')
         self.assertContains(response, 'חזרה לגלריה')
 
+    def test_family_page_has_a_back_button_to_its_order(self):
+        url = f'/family/{self.family.name}/'
+        response = self.client.get(url)
+        self.assertContains(response, f'<a class="back-button" href="/order/{self.order.pk}/">')
+        self.assertContains(response, 'חזרה לסדרה Nudibranchia')
+        response = self.client.get(url + '?lang=en')
+        self.assertContains(response, f'<a class="back-button" href="/order/{self.order.pk}/?lang=en">')
+        self.assertContains(response, 'Back to order Nudibranchia')
+
+    def test_order_page_has_no_back_to_order_button(self):
+        self.assertNotContains(self.client.get(f'/order/{self.order.pk}/'), 'class="back-button"')
+
     def test_card_shows_the_observation_count_when_the_species_has_several(self):
         url = f'/genus/{self.genus.name}/'
         self.assertNotContains(self.client.get(url), 'count-badge" aria-hidden')      # one observation: no badge

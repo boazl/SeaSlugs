@@ -93,6 +93,7 @@ TRANSLATIONS = {
     'פתיחת תרשים הזיהוי בגודל מלא': 'Open the identification figure full size',
     'מקור:': 'Source:',
     'חזרה למשפחה': 'Back to family',
+    'חזרה לסדרה': 'Back to order',
     'חזרה לגלריה': 'Back to the gallery',
     'תיאור': 'Description',
     'בית גידול': 'Habitat',
