@@ -85,6 +85,20 @@ class GalleryScriptTests(SimpleTestCase):
             self.assertIn(f'<option value="{value}">', html)
         self.assertIn('state.drill = { level: c.kind, id: String(c.id) };', js)
 
+    def test_others_card_keeps_species_without_a_rank_reachable(self):
+        from pathlib import Path
+        js = (Path(__file__).resolve().parent.parent / 'dist' / 'app.js').read_text(encoding='utf-8')
+        # Inside a drilled-into taxon, a species with no value at the shown rank is not folded back
+        # into a card for the taxon being browsed: it gets an "Others" card (last), which drills on.
+        self.assertIn('if (state.drill && LEVELS.indexOf(ck.level) <= drillIndex) ck = { level, key: \'\', others: true };', js)
+        self.assertIn('.sort((a, b) => (a.others ? 1 : 0) - (b.others ? 1 : 0))', js)
+        self.assertIn("function othersLabel() { return language === 'he' ? 'אחרים' : 'Others'; }", js)
+        self.assertIn("if (others) state.drill = { ...state.drill, blanks: [...(state.drill.blanks || []), level] };", js)
+        # The narrowed drill filters on the blank ranks, is named in the status line, and goes back up to the taxon.
+        self.assertIn('return !(drill.blanks || []).some(rank => rankKey(sp, rank));', js)
+        self.assertIn('if (state.drill && !inDrill(sp, state.drill)) return false;', js)
+        self.assertIn('if (drill.blanks && drill.blanks.length) {', js)
+
     def test_observation_year_sort_and_migrant_card_years(self):
         from pathlib import Path
         root = Path(__file__).resolve().parent.parent / 'dist'

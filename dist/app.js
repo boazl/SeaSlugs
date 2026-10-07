@@ -86,19 +86,19 @@ function updateCollectionStatus() {
     if (state.drill) {
         const label = document.createElement('span');
         const trip = state.collection ? collectionsList.find(x => String(x.trip_id) === state.collection) : null;
-        label.textContent = (language === 'he' ? 'מוצג: ' : 'Showing: ') + taxonLabel(state.drill.level, state.drill.id)
+        label.textContent = (language === 'he' ? 'מוצג: ' : 'Showing: ') + drillLabel(state.drill)
             + (state.collection ? (language === 'he' ? ' · באוסף: ' : ' · in collection: ') + (trip ? collectionTitle(trip) : (labelFor(state.collection, tripLabelsData) || '')) : '');
         // Up one rank (to the parent taxon this one was drilled from), and all the way up.
         const parent = drillParent(state.drill);
         const up = document.createElement('button');
         up.type = 'button';
         up.textContent = parent
-            ? (language === 'he' ? 'חזרה ל־' : 'Back to ') + taxonLabel(parent.level, parent.id)
+            ? (language === 'he' ? 'חזרה ל־' : 'Back to ') + drillLabel(parent)
             : (language === 'he' ? 'חזרה לכל הסדרות' : 'Back to all orders');
         up.addEventListener('click', () => {
             if (parent) {
                 state.drill = parent;
-                setLevel(nextLevel(parent.level, speciesList.filter(sp => rankKey(sp, parent.level) === parent.id)));
+                setLevel(nextLevel(parent.blanks && parent.blanks.length ? parent.blanks[parent.blanks.length - 1] : parent.level, drillMembers(parent)));
             } else {
                 state.drill = null; setLevel('order');
             }
@@ -487,7 +487,7 @@ function speciesSearchText(sp) {
 }
 function speciesMatches(sp, q) {
     if (state.collection && !sp.samples.some(sm => String(sm.trip_id) === state.collection)) return false;
-    if (state.drill && rankKey(sp, state.drill.level) !== String(state.drill.id)) return false;
+    if (state.drill && !inDrill(sp, state.drill)) return false;
     if (!matchesAreaFilter(sp, state.area)) return false;
     if (state.order !== 'all' && sp.order !== state.order) return false;
     if (state.subOrder !== 'all' && sp.sub_order !== state.subOrder) return false;
@@ -965,10 +965,26 @@ function nextLevel(level, species) {
     }
     return 'species';
 }
+// A drilled-into taxon {level, id}, optionally narrowed to its "Others": the species with no
+// value at the ranks listed in `blanks` (e.g. nudibranchs with no sub-order).
+function inDrill(sp, drill) {
+    if (rankKey(sp, drill.level) !== String(drill.id)) return false;
+    return !(drill.blanks || []).some(rank => rankKey(sp, rank));
+}
+function drillMembers(drill) { return speciesList.filter(sp => inDrill(sp, drill)); }
+function drillLabel(drill) {
+    return taxonLabel(drill.level, drill.id) + (drill.blanks && drill.blanks.length ? ' · ' + othersLabel() : '');
+}
+function othersLabel() { return language === 'he' ? 'אחרים' : 'Others'; }
 // The taxon one rank up from a drilled-into one: the nearest higher rank whose taxon holds
 // more species than this one (ranks that add nothing are skipped, as when drilling down).
 // null when the next step up is the top -- all orders.
 function drillParent(drill) {
+    // The "Others" of a taxon (its species with no value at some rank) goes back up to the taxon.
+    if (drill.blanks && drill.blanks.length) {
+        const blanks = drill.blanks.slice(0, -1);
+        return blanks.length ? { level: drill.level, id: drill.id, blanks } : { level: drill.level, id: drill.id };
+    }
     const members = speciesList.filter(sp => rankKey(sp, drill.level) === drill.id);
     if (!members.length) return null;
     // Among ranks holding the same species (e.g. Sacoglossa and its single superfamily),
@@ -993,14 +1009,22 @@ function renderTaxonLevel(species, level, frag) {
     heading.textContent = rankName(level);
     frag.append(heading);
     const groups = new Map();   // keeps first-seen (= taxonomic) order
+    // Inside a drilled-into taxon, a species with no value at this rank would fall back to a
+    // card for that very taxon (or one above it) -- the page the visitor is already on. Those
+    // species get an "Others" card instead, which drills on to the next rank (e.g. the
+    // superfamilies of nudibranchs that have no sub-order) so they stay reachable.
+    const drillIndex = state.drill ? LEVELS.indexOf(state.drill.level) : -1;
     for (const sp of species) {
-        const ck = cardKey(sp, level);
-        const id = ck.level + ':' + ck.key;
+        let ck = cardKey(sp, level);
+        if (state.drill && LEVELS.indexOf(ck.level) <= drillIndex) ck = { level, key: '', others: true };
+        const id = ck.others ? 'others' : ck.level + ':' + ck.key;
         if (!groups.has(id)) groups.set(id, { ...ck, first: sp, members: [] });
         groups.get(id).members.push(sp);
     }
+    // "Others" last: they are the leftovers of the taxon being browsed.
+    const ordered = [...groups.values()].sort((a, b) => (a.others ? 1 : 0) - (b.others ? 1 : 0));
     let prevOrder = null, n = 0;
-    for (const g of groups.values()) {
+    for (const g of ordered) {
         const order = g.first.order || '';
         if (level !== 'order' && order && order !== prevOrder) {
             const h = document.createElement('h3');
@@ -1009,20 +1033,20 @@ function renderTaxonLevel(species, level, frag) {
             frag.append(h);
         }
         prevOrder = order;
-        frag.append(g.level === 'species' ? buildSpeciesCard(g.first, n) : buildTaxonCard(g.level, g.key, g.members, n));
+        frag.append(g.level === 'species' ? buildSpeciesCard(g.first, n) : buildTaxonCard(g.level, g.key, g.members, n, g.others));
         n++;
     }
     return n;
 }
-function buildTaxonCard(level, key, members, index) {
-    const entry = taxonEntry(level, key) || {};
+function buildTaxonCard(level, key, members, index, others) {
+    const entry = others ? {} : (taxonEntry(level, key) || {});
     const count = members.length;
     const article = document.createElement('article');
     article.className = 'card taxon-card';
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'video-button';
-    const label = taxonLabel(level, key);
+    const label = others ? othersLabel() : taxonLabel(level, key);
     button.setAttribute('aria-label', `${language === 'he' ? 'הצגת' : 'Show'}: ${label}`);
     const wrap = document.createElement('span');
     wrap.className = 'image-wrap';
@@ -1044,12 +1068,14 @@ function buildTaxonCard(level, key, members, index) {
     const meta = document.createElement('span');
     meta.className = 'card-meta';
     const rank = document.createElement('span');
-    rank.textContent = rankName(level) + ' · ' + (language === 'he' ? `${count} מינים` : `${count} species`);
+    const rankText = others ? (language === 'he' ? 'ללא ' + rankName(level) : 'No ' + rankName(level).toLowerCase()) : rankName(level);
+    rank.textContent = rankText + ' · ' + (language === 'he' ? `${count} מינים` : `${count} species`);
     meta.append(rank);
     info.append(h3, meta);
     button.append(wrap, info);
     button.addEventListener('click', () => {
-        state.drill = { level, id: String(key) };
+        if (others) state.drill = { ...state.drill, blanks: [...(state.drill.blanks || []), level] };
+        else state.drill = { level, id: String(key) };
         setLevel(nextLevel(level, members));
         render();
         document.querySelector('#resultCount').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1058,7 +1084,8 @@ function buildTaxonCard(level, key, members, index) {
     // The taxon's own page, as a separate link (a link can't sit inside the drill button).
     // Order/sub-order/superfamily have no page; an order with a single group links to it.
     let href = '';
-    if ((level === 'family' || level === 'genus') && entry.name) href = `/${level}/${encodeURIComponent(entry.name)}/`;
+    if (others) href = '';
+    else if ((level === 'family' || level === 'genus') && entry.name) href = `/${level}/${encodeURIComponent(entry.name)}/`;
     else if (level === 'order') {
         const groups = new Set(members.map(sp => sp.taxon_order_id).filter(Boolean));
         if (groups.size === 1) href = `/order/${[...groups][0]}/`;
