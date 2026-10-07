@@ -35,6 +35,9 @@ html[data-theme="light"] body.change-form #id_full_name{color:#0b5fa5;-webkit-te
     const level=LEVEL[kind()]??4;
     toggle(orderEl,level>=1);toggle(familyEl,level>=2);toggle(genusEl,level>=3);toggle(speciesEl,level>=4);
     toggle(qualEl,level>=4);toggle(otherEl,level>=4);toggle(lifeEl,level>=1);
+    // An order/family/genus observation has no dive trip (nor the dive site and day that hang on it).
+    const onDive=!(level>=1&&level<=3);
+    ['trip','site','site_other','day'].forEach(n=>toggle($(n),onDive));
   }
   function refreshLists(){
     const order=orderEl.value.trim(),family=familyEl.value.trim(),genus=genusEl.value.trim();

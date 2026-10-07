@@ -572,7 +572,9 @@ class Sample(models.Model):
         FAMILY = 'family', 'משפחה'
         ORDER = 'order', 'סדרה'
     kind = models.CharField('סוג הסרטון', max_length=20, choices=Kind.choices, default=Kind.SPECIES)
-    trip = models.ForeignKey(DiveTrip, verbose_name='מסע צלילה', on_delete=models.PROTECT, related_name='samples')
+    # Required for every kind except an order/family/genus observation (see clean()): those describe a
+    # taxon, not a dive, and may have no trip.
+    trip = models.ForeignKey(DiveTrip, verbose_name='מסע צלילה', on_delete=models.PROTECT, related_name='samples', null=True, blank=True)
     title = models.CharField('כותרת הגלריה', max_length=240, blank=True)
     gallery_order = models.PositiveIntegerField(default=0)
     source_metadata = models.JSONField(default=dict, blank=True)
@@ -812,7 +814,9 @@ class Sample(models.Model):
         if self.kind == self.Kind.COLLECTION:
             if self.species_id or self.species_other: errors['species'] = 'סרטון אוסף אינו משויך למין יחיד. נקה את בחירת המין.'
             if not self.title.strip(): errors['title'] = 'יש להזין כותרת לסרטון האוסף.'
-        if not self.trip_id: errors['trip'] = 'יש לבחור מסע צלילה.'
+        taxon_level = self.kind in (self.Kind.ORDER, self.Kind.FAMILY, self.Kind.GENUS)
+        if not self.trip_id:
+            if not taxon_level: errors['trip'] = 'יש לבחור מסע צלילה.'
         elif not self.trip.year: errors['trip'] = 'למסע הנבחר אין שנה מוגדרת. יש להשלים שנה במסע הצלילה לפני פרסום.'
         self.site_other = self.site_other.strip()
         if self.kind == self.Kind.SPECIES and self.species_id and (self.species_other or '').strip():
@@ -918,7 +922,8 @@ class Sample(models.Model):
             if self.species_id:
                 Species.objects.filter(pk=self.species_id).update(scientific_name=models.F('scientific_name'))
             other = bool(self.species_other) or bool(self.site_other)
-            complete = bool(self.trip_id and self.trip.year and (self.species_id if self.kind == self.Kind.SPECIES else True) and not other)
+            taxon_level = self.kind in (self.Kind.ORDER, self.Kind.FAMILY, self.Kind.GENUS)
+            complete = bool((taxon_level and not self.trip_id or self.trip_id and self.trip.year) and (self.species_id if self.kind == self.Kind.SPECIES else True) and not other)
             if approve and not complete:
                 raise ValidationError('לפני אישור יש להשלים את שנת המסע ולהחליף ערכי ״אחר״ בערכים מטבלאות העזר.')
             self.status = 'published' if complete and (approve or self.kind == self.Kind.SPECIES) else 'pending'

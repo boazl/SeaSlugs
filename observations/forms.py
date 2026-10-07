@@ -191,7 +191,7 @@ class SampleForm(forms.ModelForm):
         'cf. = דומה ל…, aff. = קרוב ל… — מוצג בין הסוג למין. רק בדגימה מסוג ״מין״. הערכים נשמרים בטבלת העזר.')
     life_stage = reference_field(LifeStage, 'שלב חיים', 'למשל juv. = פרט צעיר — מוצג אחרי השם. הערכים נשמרים בטבלת העזר.')
     site = forms.ChoiceField(label='אתר צלילה',required=False)
-    trip = TripChoiceField(label='מסע צלילה', queryset=DiveTrip.objects.all(), help_text='לא מוצא/ת את המסע? אפשר להוסיף מסע חדש ולחזור לכאן.')
+    trip = TripChoiceField(label='מסע צלילה', queryset=DiveTrip.objects.all(), required=False, help_text='לא מוצא/ת את המסע? אפשר להוסיף מסע חדש ולחזור לכאן.')
     class Meta:
         model = Sample
         fields = ['title','kind','order','family','genus','species','full_name','identification_qualifier','life_stage','species_other','trip','site','site_other','day','depth','video_url','image']
@@ -219,6 +219,15 @@ class SampleForm(forms.ModelForm):
         # now checked live against the current species+trip fields (see form.html and
         # views.species_area_status), since either one changing changes the answer.
         self.fields['image'].help_text = 'JPEG, PNG או WebP, עד 10MB ועד 25 מיליון פיקסלים. מומלץ צילום רוחבי 1920×1080 ומעלה. נשמור JPEG עד 1920×1080, ללא חיתוך או הגדלת תמונה קטנה. תמונה שהועלתה תשמש כתצוגה מקדימה לסרטון; ללא סרטון תיפתח התמונה המלאה. ללא תמונה נשתמש בתצוגה המקדימה של YouTube. העלו רק תמונות שיש לכם הרשאה לפרסם.'
+        # An order/family/genus observation describes a taxon, not a dive: the trip (and what hangs on it,
+        # the dive site and day) isn't asked for. Disabled fields keep whatever the observation already
+        # has, so editing an old one never wipes its trip. The picker script mirrors this live.
+        self.fields['trip'].widget.attrs['required'] = True   # browser-side check; a disabled field is exempt from it
+        kind_now = (self.data.get('kind') if self.is_bound else None) or self.initial.get('kind') or self.instance.kind
+        if kind_now in self.TAXON_KINDS:
+            for name in ('trip', 'site', 'site_other', 'day'):
+                self.fields[name].disabled = True
+            self.fields['trip'].help_text = 'לא נדרש לתצפית ברמת סדרה, משפחה או סוג.'
     TAXON_KINDS = (Sample.Kind.ORDER, Sample.Kind.FAMILY, Sample.Kind.GENUS)
 
     @staticmethod
