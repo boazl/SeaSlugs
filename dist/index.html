@@ -1,4 +1,4 @@
-<!doctype html>
+{% load seo %}<!doctype html>
 <html lang="he" dir="rtl">
 
 <head>
@@ -17,6 +17,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
     <title>SeaSlugs — חינניות ים | בועז ליבס</title>
     <meta name="description"
         content="גלריית סרטוני חינניות ים של בועז ליבס. צלילה אל העולם הזעיר של רומבלון, ים סוף והים התיכון.">
+{% if has_site_image %}{% share_meta "SeaSlugs — חינניות ים" description="גלריית סרטוני חינניות ים של בועז ליבס. צלילה אל העולם הזעיר של רומבלון, ים סוף והים התיכון." image="/site-image/intro_photo.jpg" bilingual=False %}{% else %}{% share_meta "SeaSlugs — חינניות ים" description="גלריית סרטוני חינניות ים של בועז ליבס. צלילה אל העולם הזעיר של רומבלון, ים סוף והים התיכון." image="/intro-photo.jpg" bilingual=False %}{% endif %}
     <meta name="referrer" content="strict-origin-when-cross-origin">
     <link rel="icon" type="image/svg+xml"
         href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23091e28'/%3E%3Cpath d='M7 11c10-9 8 14 18 5M7 18c10-9 8 14 18 5' stroke='%235de0cb' stroke-width='3' fill='none'/%3E%3C/svg%3E">

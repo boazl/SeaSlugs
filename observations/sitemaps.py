@@ -82,8 +82,41 @@ class GenusPageSitemap(Sitemap):
         return reverse('genus-page', args=[genus.name])
 
 
+class FamilyPageSitemap(Sitemap):
+    """Each family's public page (views.family_page) that has at least one gallery species --
+    the same condition under which family_page() answers 200 rather than 404. One entry per
+    family name (rare sub_family rows of one family share its page)."""
+    protocol = 'https'
+    changefreq = 'weekly'
+    priority = 0.5
+
+    def items(self):
+        from .views import gallery_areas
+        return sorted({a.taxon_family.name for a in gallery_areas() if a.taxon_family})
+
+    def location(self, name):
+        return reverse('family-page', args=[name])
+
+
+class OrderPageSitemap(Sitemap):
+    """Each order group's public page (views.order_page, keyed by TaxonOrder pk) that has at
+    least one gallery species -- order_page() 404s otherwise."""
+    protocol = 'https'
+    changefreq = 'weekly'
+    priority = 0.5
+
+    def items(self):
+        from .views import gallery_areas
+        return sorted({a.taxon_order.pk for a in gallery_areas() if a.taxon_order})
+
+    def location(self, pk):
+        return reverse('order-page', args=[pk])
+
+
 SITEMAPS = {
     'static': StaticViewSitemap,
     'species': SpeciesPageSitemap,
     'genera': GenusPageSitemap,
+    'families': FamilyPageSitemap,
+    'orders': OrderPageSitemap,
 }

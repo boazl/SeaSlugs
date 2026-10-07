@@ -63,6 +63,10 @@ INSTALLED_APPS = [
 # localhost during development or from the real production host.
 SITE_ID = 1
 
+# Google Search Console ownership check (the "HTML tag" method): set the content value
+# Google gives you as this environment variable on Render; blank = no tag on the pages.
+GOOGLE_SITE_VERIFICATION = os.environ.get("GOOGLE_SITE_VERIFICATION", "").strip()
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',

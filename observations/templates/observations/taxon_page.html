@@ -1,4 +1,4 @@
-{% load seaslugs_i18n %}<!doctype html>
+{% load seaslugs_i18n seo %}<!doctype html>
 <html lang="{{ lang }}" dir="{% if lang == 'en' %}ltr{% else %}rtl{% endif %}">
 
 <head>
@@ -16,6 +16,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ latin_name }}{% if common_name %} — {{ common_name }}{% endif %} | SeaSlugs</title>
     <meta name="description" content="{% if description %}{{ description|truncatechars:160 }}{% else %}{{ latin_name }} — {{ "תצפיות, תמונות ומידע מאתר SeaSlugs, אתר חינניות הים."|t:lang }}{% endif %}">
+{% share_meta latin_name common_name description thumbnail|default:image_url %}
     <meta name="referrer" content="strict-origin-when-cross-origin">
     <link rel="icon" type="image/svg+xml"
         href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23091e28'/%3E%3Cpath d='M7 11c10-9 8 14 18 5M7 18c10-9 8 14 18 5' stroke='%235de0cb' stroke-width='3' fill='none'/%3E%3C/svg%3E">

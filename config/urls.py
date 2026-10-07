@@ -3,7 +3,7 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.contrib.sitemaps.views import sitemap
 from django.urls import path, include
-from .views import gallery_file, health, analytics_exclude, analytics_include
+from .views import gallery_file, health, analytics_exclude, analytics_include, robots_txt
 from observations.sitemaps import SITEMAPS
 from observations.transfer_views import transfer
 from observations.release_views import releases
@@ -37,6 +37,7 @@ urlpatterns = [
     # Must come before the catch-all gallery-file pattern below, or that route (which only
     # knows about the static dist/ files) would swallow this request first.
     path('sitemap.xml', sitemap, {'sitemaps': SITEMAPS}, name='sitemap'),
+    path('robots.txt', robots_txt, name='robots'),
     path('admin/', admin.site.urls),
     path('', gallery_file, name='gallery'),
     path('<str:filename>', gallery_file, name='gallery-file'),

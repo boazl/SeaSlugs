@@ -304,3 +304,28 @@ def analytics_include(request):
     response = HttpResponse('מעקב Google Analytics באתר הופעל מחדש עבור הדפדפן הזה.')
     response.delete_cookie(_EXCLUDE_ANALYTICS_COOKIE, path='/', samesite='Lax')
     return response
+
+
+# Paths a search engine has no business crawling: the admin and owner tools, the analytics
+# opt-out switches, and the signed-in community forms (login, sign-up, profile, the
+# observation forms and their autocomplete endpoints, and the members-only listing itself,
+# whose "$" keeps /observations/trips/ and the public /observations/<pk>/photo/ images --
+# the og:image of every species page -- crawlable).
+ROBOTS_DISALLOW = (
+    '/admin/', '/analytics/', '/observations/$', '/observations/new/', '/observations/trips/new/',
+    '/observations/species-search/', '/observations/species-area-status/',
+    '/observations/login/', '/observations/logout/', '/observations/signup/',
+    '/observations/profile/', '/observations/partners/',
+)
+
+
+def robots_txt(request):
+    """/robots.txt -- points crawlers at /sitemap.xml on the real domain (the Site row, as
+    the sitemap itself does) and keeps them out of the private and admin paths above."""
+    from django.contrib.sites.models import Site
+    from django.http import HttpResponse
+    lines = ['User-agent: *'] + [f'Disallow: {path}' for path in ROBOTS_DISALLOW]
+    lines += ['', f'Sitemap: https://{Site.objects.get_current().domain}/sitemap.xml', '']
+    response = HttpResponse('\n'.join(lines), content_type='text/plain; charset=utf-8')
+    response['Cache-Control'] = 'public, max-age=86400'
+    return response
