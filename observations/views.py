@@ -259,8 +259,8 @@ def taxon_edit_url(request, kind, taxon):
     """Link to the edit page of the order/family/genus observation behind this taxon page, for
     a visitor who may edit it -- a manager (any observation) or the observation's own owner
     (not deleted), exactly edit()'s rule. The taxon's defining sample comes first, then the
-    newest other observation of that kind and name; failing that, for an admin, the taxon row's
-    admin page. None when the visitor can edit neither. After saving, the edit page returns to this page."""
+    newest other observation of that kind and name; failing that, for a manager, a new observation of
+    that kind and name. None otherwise. After saving, the edit page returns to this page."""
     user = request.user
     if not user.is_authenticated:
         return None
@@ -271,12 +271,10 @@ def taxon_edit_url(request, kind, taxon):
     for sample in candidates:
         if sample.kind == kind and getattr(sample, field) == taxon.name and (manager or (sample.owner_id == user.id and not sample.deleted_at)):
             return reverse('observation-edit', args=[sample.pk]) + '?' + urlencode({'next': request.get_full_path()})
-    # No observation of its own (the page's picture is then borrowed from one of its species):
-    # an admin who may change the taxonomy row gets that row's admin page instead, where the
-    # same texts live.
-    opts = type(taxon)._meta
-    if user.is_staff and user.has_perm(f'{opts.app_label}.change_{opts.model_name}'):
-        return reverse(f'admin:{opts.app_label}_{opts.model_name}_change', args=[taxon.pk])
+    # No observation of this taxon yet: a manager gets a new one with its kind and name filled in
+    # (its picture, until it has its own, is borrowed from an observation one level below).
+    if manager:
+        return reverse('observation-new') + '?' + urlencode({'kind': kind, 'name': taxon.name, 'next': request.get_full_path()})
     return None
 
 
@@ -646,6 +644,12 @@ def edit(request,pk=None):
     initial={}
     trip_param=request.GET.get('trip')
     if trip_param and request.method!='POST': initial['trip']=trip_param
+    # Opened from a taxon page that has no observation of its own yet: a new order/family/genus
+    # observation with its kind and name filled in (managers -- they are the ones who edit taxon pages).
+    kind_param=request.GET.get('kind')
+    if not pk and request.method!='POST' and is_manager(request.user) and kind_param in ('order','family','genus'):
+        initial['kind']=kind_param
+        initial[kind_param]=request.GET.get('name','')[:150]
     # Where to return to after saving -- normally the observations list URL the user
     # followed the "עריכה" link from, filters/sort/page and all, carried through the
     # POST as a hidden field (see form.html) since it isn't otherwise part of this URL.

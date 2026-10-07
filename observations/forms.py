@@ -259,12 +259,16 @@ class SampleForm(forms.ModelForm):
         self.fields['taxon_identification_source'] = forms.CharField(required=False, max_length=300, label='מקור קובץ הזיהוי',
             widget=forms.TextInput(attrs={'data-taxon-file': 'genus'}))
         instance = self.instance
-        taxon = self.taxon_for(instance.kind, instance.order, instance.family, instance.genus) if instance.pk else None
+        if instance.pk:
+            kind, order, family, genus = instance.kind, instance.order, instance.family, instance.genus
+        else:   # a new observation opened from a taxon page: kind and name arrive as initial values
+            kind, order, family, genus = (self.initial.get(k) or '' for k in ('kind', 'order', 'family', 'genus'))
+        taxon = self.taxon_for(kind, order, family, genus)
         if taxon is not None:
             for attr, _label, _rows in self.TAXON_TEXT_FIELDS:
                 self.initial['taxon_' + attr] = getattr(taxon, attr)
             self.initial['taxon_article_pdf'] = taxon.article_pdf or None
-            if instance.kind == Sample.Kind.GENUS:
+            if kind == Sample.Kind.GENUS:
                 self.initial['taxon_identification_file'] = taxon.identification_file or None
                 self.initial['taxon_identification_caption'] = taxon.identification_caption
                 self.initial['taxon_identification_caption_en'] = taxon.identification_caption_en
@@ -272,7 +276,7 @@ class SampleForm(forms.ModelForm):
                 self.fields['taxon_identification_file'].widget.link_url = reverse('genus-identification', args=[taxon.name])
                 self.fields['taxon_identification_file'].widget.show_image = taxon.identification_is_image
                 self.fields['taxon_article_pdf'].widget.link_url = reverse('genus-article', args=[taxon.name])
-            elif instance.kind == Sample.Kind.FAMILY:
+            elif kind == Sample.Kind.FAMILY:
                 self.fields['taxon_article_pdf'].widget.link_url = reverse('family-article', args=[taxon.name])
             else:
                 self.fields['taxon_article_pdf'].widget.link_url = reverse('order-article', args=[taxon.pk])

@@ -805,7 +805,9 @@ class Sample(models.Model):
         # legacy rows that predate this check, e.g. two samples that intentionally share one photo
         # showing two different species).
         original = Sample.objects.filter(pk=self.pk).values('image', 'video_url').first() if self.pk else None
-        if not self.video_url and not self.image:
+        # An order/family/genus observation may have no media of its own: its page and gallery card
+        # then borrow the picture of one of the observations a level below.
+        if not self.video_url and not self.image and self.kind not in (self.Kind.ORDER, self.Kind.FAMILY, self.Kind.GENUS):
             errors['video_url'] = 'יש לספק קישור YouTube או להעלות תמונה, או את שניהם.'
         if self.kind == self.Kind.COLLECTION:
             if self.species_id or self.species_other: errors['species'] = 'סרטון אוסף אינו משויך למין יחיד. נקה את בחירת המין.'

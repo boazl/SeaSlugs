@@ -105,14 +105,43 @@ class GenusPageTests(TestCase):
         self.client.force_login(owner)
         self.assertNotContains(self.client.get(url), 'class="edit-button"')
 
-    def test_without_an_observation_of_its_own_an_admin_gets_the_taxon_rows_admin_page(self):
-        from django.urls import reverse
-        self.client.force_login(self.owner)                          # superuser
-        for url, route, row in ((f'/family/{self.family.name}/', 'admin:observations_taxonfamily_change', self.family),
-                                (f'/order/{self.order.pk}/', 'admin:observations_taxonorder_change', self.order)):
-            response = self.client.get(url + '?lang=he')
-            self.assertContains(response, f'<a class="edit-button" href="{reverse(route, args=[row.pk])}">')
-            self.assertEqual(self.client.get(reverse(route, args=[row.pk])).status_code, 200)
+    def test_without_an_observation_of_its_own_a_manager_gets_a_new_one_for_the_taxon(self):
+        from urllib.parse import urlencode
+        self.client.force_login(self.owner)                          # superuser = manager
+        self.family.description_he = 'תיאור קיים'; self.family.save()
+        url = f'/family/{self.family.name}/'
+        edit_url = self.client.get(url + '?lang=he').context['edit_url']
+        self.assertEqual(edit_url, '/observations/new/?' + urlencode({'kind': 'family', 'name': 'Chromodorididae', 'next': url + '?lang=he'}))
+        form = self.client.get(edit_url).context['form']             # kind and name filled in, with the family's current texts
+        self.assertEqual((form.initial['kind'], form.initial['family']), ('family', 'Chromodorididae'))
+        self.assertEqual(form.initial['taxon_description_he'], 'תיאור קיים')
+        # saving it WITHOUT any picture or video of its own works, edits the family's texts and returns to the page
+        data = {'kind': 'family', 'family': 'Chromodorididae', 'trip': str(self.trip.pk), 'site': '', 'taxon_description_he': 'תיאור חדש', 'next': url}
+        response = self.client.post(edit_url, data)
+        self.assertEqual(response.status_code, 302, getattr(response, 'context', None) and response.context['form'].errors)
+        self.assertTrue(response.url.startswith(url + '#obs-'))
+        self.family.refresh_from_db()
+        self.assertEqual(self.family.description_he, 'תיאור חדש')
+        sample = Sample.objects.get(kind=Sample.Kind.FAMILY, family='Chromodorididae')
+        self.assertFalse(sample.image or sample.video_url)
+        # from now on the button leads to that observation
+        self.assertTrue(self.client.get(url + '?lang=he').context['edit_url'].startswith(f'/observations/{sample.pk}/edit/'))
+        self.assertEqual(self.client.get(f'/observations/?kind=family').status_code, 200)
+
+    def test_species_without_media_still_requires_it(self):
+        self.client.force_login(self.owner)
+        response = self.client.post('/observations/new/', {'kind': 'species', 'species': 'Chromodoris annae', 'trip': str(self.trip.pk), 'site': ''})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('video_url', response.context['form'].errors)
+
+    def test_new_taxon_observation_link_ignores_other_kinds_and_non_managers(self):
+        photographer = User.objects.create_user('photographer', password='x')
+        self.client.force_login(photographer)
+        initial = self.client.get('/observations/new/?kind=family&name=Chromodorididae').context['form'].initial
+        self.assertEqual((initial['kind'], initial['family']), ('species', ''))
+        self.client.force_login(self.owner)
+        initial = self.client.get('/observations/new/?kind=collection&name=x').context['form'].initial
+        self.assertEqual(initial['kind'], 'species')
 
     def test_no_edit_button_without_an_observation_for_a_non_admin(self):
         photographer = User.objects.create_user('photographer', password='x')
