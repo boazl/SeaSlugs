@@ -8,7 +8,7 @@ from django.http import Http404, FileResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
 from django.urls import reverse
-from django.utils.http import url_has_allowed_host_and_scheme
+from django.utils.http import url_has_allowed_host_and_scheme, urlencode
 from .models import Sample, Profile, Region, Site, DiveTrip, SiteImage, Species, Country, SpeciesArea, SampleKind, KIND_EN_NAMES, TaxonGenus, TaxonFamily, TaxonOrder, full_name_for
 from .forms import SignupForm, SampleForm, ProfileForm, DiveTripForm, taxonomy_for_form, species_name_options
 from .notifications import notify_new_user_registered
@@ -205,6 +205,7 @@ def genus_page(request, name):
         'identification_caption': (genus.identification_caption_en or genus.identification_caption) if lang == 'en' else (genus.identification_caption or genus.identification_caption_en),
         'sources': parse_sources(genus.sources),
         'canonical_url': request.build_absolute_uri(request.path),
+        'edit_url': taxon_edit_url(request, Sample.Kind.GENUS, genus),
     })
 
 
@@ -240,6 +241,25 @@ def gallery_areas():
     return out
 
 
+def taxon_edit_url(request, kind, taxon):
+    """Link to the edit page of the order/family/genus observation behind this taxon page, for
+    a visitor who may edit it -- a manager (any observation) or the observation's own owner
+    (not deleted), exactly edit()'s rule. The taxon's defining sample comes first, then the
+    newest other observation of that kind and name. None when there is no such observation or
+    the visitor can't edit it. After saving, the edit page returns to this page."""
+    user = request.user
+    if not user.is_authenticated:
+        return None
+    field = {Sample.Kind.ORDER: 'order', Sample.Kind.FAMILY: 'family', Sample.Kind.GENUS: 'genus'}[kind]
+    candidates = [taxon.defining_sample] if taxon.defining_sample_id else []
+    candidates += list(Sample.objects.filter(kind=kind, deleted_at__isnull=True, **{field: taxon.name}).order_by('-created_at', '-pk'))
+    manager = is_manager(user)
+    for sample in candidates:
+        if sample.kind == kind and getattr(sample, field) == taxon.name and (manager or (sample.owner_id == user.id and not sample.deleted_at)):
+            return reverse('observation-edit', args=[sample.pk]) + '?' + urlencode({'next': request.get_full_path()})
+    return None
+
+
 def _taxon_page(request, rank, obj, areas, children, parent, parent_url):
     lang = get_lang(request)
     pick = lambda he, en: (en or he) if lang == 'en' else (he or en)
@@ -257,6 +277,7 @@ def _taxon_page(request, rank, obj, areas, children, parent, parent_url):
         'parent_url': parent_url,
         'image_url': image_url, 'video_id': video_id, 'thumbnail': thumbnail,
         'canonical_url': request.build_absolute_uri(request.path),
+        'edit_url': taxon_edit_url(request, getattr(Sample.Kind, rank.upper()), obj),
     })
 
 

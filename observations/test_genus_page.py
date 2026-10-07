@@ -64,6 +64,52 @@ class GenusPageTests(TestCase):
         response = self.client.get(url + '?lang=en')
         self.assertContains(response, '<a class="back-button" href="/?lang=en">Back to all orders</a>')
 
+    def _taxon_sample(self, kind, owner=None, **names):
+        self._video = getattr(self, '_video', 60000000000) + 1
+        sample = Sample(owner=owner or self.owner, kind=kind, trip=self.trip, video_url=f'https://youtu.be/{self._video}', **names)
+        sample.save_reviewed(actor=self.owner, approve=True)
+        return sample
+
+    def test_edit_button_for_those_who_may_edit_the_taxon_observation(self):
+        from django.urls import reverse
+        family_sample = self._taxon_sample(Sample.Kind.FAMILY, family='Chromodorididae')
+        order_sample = self._taxon_sample(Sample.Kind.ORDER, order='Nudibranchia')
+        pages = [(f'/genus/{self.genus.name}/', self.genus_sample), (f'/family/{self.family.name}/', family_sample),
+                 (f'/order/{self.order.pk}/', order_sample)]
+        for url, sample in pages:                                   # a visitor sees no edit button
+            self.assertNotContains(self.client.get(url), 'class="edit-button"')
+        self.client.force_login(self.owner)                          # a manager sees it, next to the back button
+        for url, sample in pages:
+            response = self.client.get(url + '?lang=he')     # the language persists in a cookie
+            edit = reverse('observation-edit', args=[sample.pk])
+            self.assertContains(response, f'<a class="edit-button" href="{edit}?next=')
+            self.assertContains(response, 'עריכה</a>')
+            self.assertContains(self.client.get(url + '?lang=en'), '>Edit</a>')
+        # ... and the edit page really opens, returning to the taxon page after saving
+        edit_url = self.client.get(f'/genus/{self.genus.name}/').context['edit_url']
+        self.assertEqual(self.client.get(edit_url).status_code, 200)
+        self.assertIn('next=%2Fgenus%2FChromodoris%2F', edit_url)
+
+    def test_edit_button_only_for_the_observations_own_owner_or_a_manager(self):
+        owner = User.objects.create_user('photographer', password='x')
+        stranger = User.objects.create_user('stranger', password='x')
+        own = self._taxon_sample(Sample.Kind.FAMILY, owner=owner, family='Chromodorididae')
+        self.family.defining_sample = own; self.family.save()
+        url = f'/family/{self.family.name}/'
+        self.client.force_login(owner)
+        self.assertContains(self.client.get(url), 'class="edit-button"')
+        self.client.force_login(stranger)
+        self.assertNotContains(self.client.get(url), 'class="edit-button"')
+        own.soft_delete(self.owner)                                  # a deleted observation can't be edited by its owner
+        self.family.refresh_from_db()
+        self.client.force_login(owner)
+        self.assertNotContains(self.client.get(url), 'class="edit-button"')
+
+    def test_no_edit_button_without_an_observation_of_the_taxons_kind(self):
+        self.client.force_login(self.owner)
+        self.assertNotContains(self.client.get(f'/family/{self.family.name}/'), 'class="edit-button"')
+        self.assertNotContains(self.client.get(f'/order/{self.order.pk}/'), 'class="edit-button"')
+
     def test_card_shows_the_observation_count_when_the_species_has_several(self):
         url = f'/genus/{self.genus.name}/'
         self.assertNotContains(self.client.get(url), 'count-badge" aria-hidden')      # one observation: no badge
