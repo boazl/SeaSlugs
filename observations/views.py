@@ -4,13 +4,13 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group
 from django.db.models import Q
-from django.http import Http404, FileResponse
+from django.http import Http404, FileResponse, JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme, urlencode
 from .models import Sample, Profile, Region, Site, DiveTrip, SiteImage, Species, Country, SpeciesArea, SampleKind, KIND_EN_NAMES, TaxonGenus, TaxonFamily, TaxonOrder, full_name_for
-from .forms import SignupForm, SampleForm, ProfileForm, DiveTripForm, taxonomy_for_form, species_name_options
+from .forms import SignupForm, SampleForm, ProfileForm, DiveTripForm, TripQuickForm, taxonomy_for_form, species_name_options
 from .notifications import notify_new_user_registered
 from .gallery_data import TaxonResolver, taxon_media, area_samples
 from .i18n import get_lang
@@ -765,6 +765,77 @@ def trip_new(request):
         return redirect(f'{next_url}{sep}trip={trip.pk}')
     return render(request,'observations/form.html',{'form':form,'title':'מסע צלילה חדש / New dive trip','trip_form':True,'next':next_url,
         'locations':{'regions':list(Region.objects.values('id','country_id'))}})
+
+
+def _int(value):
+    try: return int(value)
+    except (TypeError, ValueError): return None
+
+
+def _trip_filters(params):
+    """region / site / year picked on the trips page (GET), as objects; a site implies its region."""
+    site = Site.objects.select_related('region').filter(pk=_int(params.get('site'))).first()
+    region = site.region if site else Region.objects.select_related('country', 'sea').filter(pk=_int(params.get('region'))).first()
+    return region, site, _int(params.get('year'))
+
+
+@login_required
+def trips_manage(request):
+    """Every dive trip with filters (region/site, year) and an add button that carries the filters
+    into the add form, which suggests the trip's name and code from them."""
+    from datetime import date
+    from django.db.models import Count
+    region, site, year = _trip_filters(request.GET)
+    rows = DiveTrip.objects.select_related('country', 'region', 'site').annotate(
+        sample_count=Count('samples', filter=Q(samples__deleted_at__isnull=True), distinct=True))
+    if site: rows = rows.filter(site=site)
+    elif region: rows = rows.filter(region=region)
+    if year: rows = rows.filter(year=year)
+    years = sorted({y for y in DiveTrip.objects.exclude(year__isnull=True).values_list('year', flat=True)} | {date.today().year}, reverse=True)
+    query = {k: v for k, v in (('region', region.pk if region else ''), ('site', site.pk if site else ''), ('year', year or '')) if v}
+    return render(request, 'observations/trips_manage.html', {
+        'trips': rows.order_by('-year', '-month', '-start_day', 'title'), 'regions': Region.objects.select_related('country').order_by('country__name', 'name'),
+        'sites': Site.objects.select_related('region').order_by('name'), 'years': years, 'region': region, 'site': site, 'year': year,
+        'add_url': reverse('trip-add') + ('?' + urlencode(query) if query else ''), 'manager': is_manager(request.user),
+        'site_regions': {s.pk: s.region_id for s in Site.objects.all()}})
+
+
+@login_required
+def trip_add(request):
+    """Quick dive-trip form. Opened from the trips page with the page's filters as the starting point;
+    year and month default to now; name and code are suggested and can be overwritten."""
+    from datetime import date
+    next_url = request.POST.get('next') or request.GET.get('next') or reverse('trips-manage')
+    if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+        next_url = reverse('trips-manage')
+    if request.method == 'POST':
+        form = TripQuickForm(request.POST, user=request.user)
+        if form.is_valid():
+            trip = form.save()
+            messages.success(request, f'המסע נוסף: {trip.title} ({trip.code}).')
+            return redirect(next_url)
+    else:
+        region, site, year = _trip_filters(request.GET)
+        today = date.today()
+        form = TripQuickForm(user=request.user, initial={'region': region, 'site': site, 'year': year or today.year,
+            'month': today.month, 'photographer': request.user})
+    return render(request, 'observations/trip_add.html', {'form': form, 'next': next_url,
+        'site_regions': {s.pk: s.region_id for s in Site.objects.all()}})
+
+
+@login_required
+def trip_suggest(request):
+    """The suggested name and code for the add form's current choices (JSON), so they follow the
+    form as it changes -- the same rules the server applies on save."""
+    from .trip_naming import suggest_title, suggest_code
+    region, site, year = _trip_filters(request.GET)
+    month, day = _int(request.GET.get('month')), _int(request.GET.get('day'))
+    if not (region and year and month and 1 <= month <= 12):
+        return JsonResponse({'title': '', 'code': ''})
+    user = get_user_model().objects.filter(pk=_int(request.GET.get('photographer'))).first() if is_manager(request.user) else None
+    user = user or request.user
+    if day is not None and not 1 <= day <= 31: day = None
+    return JsonResponse({'title': suggest_title(user, region, site, year, month, day), 'code': suggest_code(user, region, year, month, day)})
 
 
 @login_required

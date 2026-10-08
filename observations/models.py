@@ -74,7 +74,13 @@ class Sea(Named):
 class Region(Named):
     country = models.ForeignKey(Country, on_delete=models.PROTECT, verbose_name='מדינה')
     sea = models.ForeignKey(Sea, on_delete=models.PROTECT, verbose_name='ים')
+    trip_code = models.CharField('אות/ות האזור בסימון מסעות', max_length=6, blank=True,
+        help_text='משמשת בסימון המסע (למשל I26Aug). אם נשאר ריק, נקבעת אוטומטית בהוספת המסע הראשון באזור.')
     class Meta(Named.Meta): verbose_name = 'אזור'; verbose_name_plural = 'אזורים'
+    def clean(self):
+        super().clean()
+        if self.trip_code and Region.objects.filter(trip_code=self.trip_code).exclude(pk=self.pk).exists():
+            raise ValidationError({'trip_code': 'האות/ות האלה כבר משמשות אזור אחר.'})
 
 
 class Site(Named):
@@ -420,6 +426,8 @@ class Profile(models.Model):
     regions = models.ManyToManyField(Region, blank=True, verbose_name='אזורי צלילה')
     countries = models.ManyToManyField(Country, blank=True, verbose_name='מדינות צלילה')
     bio = models.TextField('על עצמי', blank=True, max_length=1500)
+    trip_code = models.CharField('אות הצלם בסימון מסעות', max_length=4, blank=True,
+        help_text='האות שמופיעה בתחילת סימון מסע של הצלם. ריק = בלי אות (בעל האתר).')
     class Meta: verbose_name = 'פרופיל'; verbose_name_plural = 'פרופילים'
     def __str__(self): return self.user.get_full_name() or self.user.username
 

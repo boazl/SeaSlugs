@@ -80,6 +80,7 @@ TRANSLATIONS = {
     'צפייה בתמונה המלאה': 'View full image',
     'עריכה': 'Edit',
     'הצגה בגלריה': 'Show in gallery',
+    'ניהול מסעות': 'Manage trips',
     'הסרה מהאתר': 'Remove from site',
     'בדיקה בניהול': 'Review in admin',
     'עדיין אין תצפיות להצגה. אפשר להוסיף את התצפית הראשונה.':

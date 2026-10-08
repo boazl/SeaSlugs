@@ -1,0 +1,47 @@
+{% extends 'observations/base.html' %}{% block content %}
+<h1>הוספת מסע צלילה</h1>
+<p>בחרו מקום, שנה וחודש (ברירת המחדל: החודש הנוכחי) ואפשר להוסיף יום. השם והסימון מוצעים אוטומטית ואפשר לשנות אותם.</p>
+<form method="post" id="trip-add-form">{% csrf_token %}<input type="hidden" name="next" value="{{ next }}">
+{{ form.non_field_errors }}
+<p>{{ form.region.errors }}<label for="id_region">{{ form.region.label }}</label>{{ form.region }}</p>
+<p>{{ form.site.errors }}<label for="id_site">{{ form.site.label }}</label>{{ form.site }}<span class="helptext">רשימת האתרים מסוננת לפי האזור. בלי אתר השם נבנה לפי האזור.</span></p>
+<div class="filter-row" style="margin-top:0">
+<label>{{ form.year.label }}{{ form.year.errors }}{{ form.year }}</label>
+<label>{{ form.month.label }}{{ form.month.errors }}{{ form.month }}</label>
+<label>{{ form.day.label }}{{ form.day.errors }}{{ form.day }}</label>
+<label>{{ form.duration_days.label }}{{ form.duration_days.errors }}{{ form.duration_days }}</label>
+<label>{{ form.photographer.label }}{{ form.photographer.errors }}{{ form.photographer }}</label>
+</div>
+<p>{{ form.title.errors }}<label for="id_title">{{ form.title.label }}</label>{{ form.title }}<span class="helptext">מוצע לפי הבחירות. אם תשנו אותו ידנית הוא יפסיק להשתנות לבד.</span></p>
+<p>{{ form.code.errors }}<label for="id_code">{{ form.code.label }}</label><bdi dir="ltr">{{ form.code }}</bdi><span class="helptext">צלם (אות, אם זה לא בעל האתר) + אזור + שנה + חודש, למשל I26Aug. בלי יום, אלא אם הסימון כבר תפוס.</span></p>
+<div class="actions"><button type="submit">שמירת המסע</button><a href="{{ next }}">ביטול</a></div>
+</form>
+{{ site_regions|json_script:'site-regions' }}
+<script>
+const siteRegions = JSON.parse(document.getElementById('site-regions').textContent);
+const $ = id => document.getElementById('id_' + id);
+// sites follow the region; picking a site fills in its region
+function filterSites(){for(const o of $('site').options){if(!o.value)continue;const hide=$('region').value&&String(siteRegions[o.value])!==$('region').value;o.hidden=hide;o.disabled=hide;}
+  if($('site').selectedOptions[0]&&$('site').selectedOptions[0].disabled)$('site').value='';}
+// title and code are suggested by the server and follow the form until typed over by hand
+const dirty = {title: !!$('title').value, code: !!$('code').value};
+for(const n of ['title','code'])$(n).addEventListener('input',()=>{dirty[n]=$(n).value!==''; if(!dirty[n])refresh();});
+let pending = 0;
+async function refresh(){
+  const q = new URLSearchParams();
+  for(const n of ['region','site','year','month','day','photographer']) if($(n)&&$(n).value) q.set(n,$(n).value);
+  const mine = ++pending;
+  try{
+    const r = await fetch("{% url 'trip-suggest' %}?" + q); if(!r.ok||mine!==pending) return;
+    const s = await r.json();
+    if(!dirty.title) $('title').value = s.title;
+    if(!dirty.code) $('code').value = s.code;
+  }catch(e){}
+}
+$('region').addEventListener('change',()=>{filterSites();refresh();});
+$('site').addEventListener('change',()=>{if($('site').value)$('region').value=siteRegions[$('site').value]||$('region').value;filterSites();refresh();});
+for(const n of ['year','month','day','photographer'])if($(n))$(n).addEventListener('change',refresh);
+for(const n of ['year','day'])if($(n))$(n).addEventListener('input',refresh);
+filterSites();refresh();
+</script>
+{% endblock %}

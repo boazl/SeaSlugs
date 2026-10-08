@@ -494,3 +494,70 @@ class DiveTripForm(forms.ModelForm):
         if trip.region_id: trip.region_name = trip.region.name_en or trip.region.name
         if commit: trip.save()
         return trip
+
+
+class TripQuickForm(forms.ModelForm):
+    """The fast dive-trip form: place (a site, or just a region), year, month, optional day, and a
+    suggested name and code (trip_naming) that the server fills in whenever they are left empty.
+    `photographer` only feeds the name and code -- a trip has no photographer of its own."""
+    region = forms.ModelChoiceField(Region.objects.select_related('country').all(), label='אזור')
+    site = forms.ModelChoiceField(Site.objects.all(), required=False, label='אתר צלילה (לא חובה)')
+    photographer = forms.ModelChoiceField(User.objects.none(), required=False, label='צלם')
+    day = forms.IntegerField(required=False, min_value=1, max_value=31, label='יום (לא חובה)')
+    title = forms.CharField(required=False, max_length=400, label='שם המסע')
+    code = forms.CharField(required=False, max_length=40, label='סימון המסע (קוד)')
+
+    class Meta:
+        model = DiveTrip
+        fields = ['region', 'site', 'year', 'month', 'duration_days', 'title', 'code']
+
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.user = user
+        self.fields['year'].required = True
+        self.fields['month'].required = True
+        self.fields['duration_days'].label = 'מספר ימים (לא חובה)'
+        manager = bool(user and user.is_staff and user.has_perm('observations.change_sample'))
+        self.fields['photographer'].queryset = User.objects.filter(is_active=True).order_by('first_name', 'username') if manager else User.objects.filter(pk=getattr(user, 'pk', None))
+        self.fields['photographer'].label_from_instance = lambda u: (u.get_full_name() or u.username)
+        self.fields['photographer'].required = False
+
+    def clean(self):
+        from .trip_naming import suggest_title, suggest_code
+        data = super().clean()
+        region, site = data.get('region'), data.get('site')
+        if site and region and site.region_id != region.id:
+            self.add_error('site', 'האתר אינו שייך לאזור שנבחר.')
+        if data.get('month') and not 1 <= data['month'] <= 12:
+            self.add_error('month', 'חודש בין 1 ל-12.')
+        if not (region and data.get('year') and data.get('month')) or self.errors:
+            return data
+        photographer = data.get('photographer') or self.user
+        day = data.get('day')
+        if day:
+            try:
+                from datetime import date
+                date(data['year'], data['month'], day)
+            except ValueError:
+                self.add_error('day', 'תאריך לא תקין.')
+                return data
+        if not (data.get('title') or '').strip():
+            data['title'] = suggest_title(photographer, region, site, data['year'], data['month'], day)
+        if not (data.get('code') or '').strip():
+            data['code'] = suggest_code(photographer, region, data['year'], data['month'], day)
+        data['title'], data['code'] = data['title'].strip(), data['code'].strip()
+        return data
+
+    def save(self, commit=True):
+        from .trip_naming import photographer_letter, region_code
+        trip = super().save(commit=False)
+        trip.country = trip.region.country
+        trip.country_name = trip.country.name_en or trip.country.name
+        trip.region_name = trip.region.name_en or trip.region.name
+        trip.start_day = self.cleaned_data.get('day')
+        if commit:
+            # a derived letter becomes permanent the first time a trip uses it
+            region_code(trip.region, persist=True)
+            photographer_letter(self.cleaned_data.get('photographer') or self.user, persist=True)
+            trip.save()
+        return trip

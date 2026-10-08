@@ -13,14 +13,22 @@ from .forms import SampleForm, SampleChangelistForm, taxonomy_for_form, species_
 from .reference_links import link_kind
 from .models import Country, Sea, Region, Site, Species, Profile, Sample, DiveTrip, SiteImage, SpeciesArea, TaxonOrder, TaxonFamily, TaxonGenus, SampleKind, IdentificationQualifier, LifeStage
 
-for model in [Country,Sea,Region,Site,Profile,SiteImage,SampleKind]: admin.site.register(model)
+for model in [Country,Sea,Site,Profile,SiteImage,SampleKind]: admin.site.register(model)
+
+
+@admin.register(Region)
+class RegionAdmin(admin.ModelAdmin):
+    # trip_code is the region's letter(s) in a dive trip's code (e.g. the I in I26Aug).
+    list_display = ['name', 'name_en', 'country', 'sea', 'trip_code']
+    list_editable = ['trip_code']
+    search_fields = ['name', 'name_en']
 
 
 class ProfileInline(admin.StackedInline):
     model = Profile
     can_delete = False
     verbose_name_plural = 'פרופיל'
-    fields = ['first_name_en','last_name_en','phone','macro_diver','visible_to_members','countries','regions','bio']
+    fields = ['first_name_en','last_name_en','phone','macro_diver','visible_to_members','countries','regions','bio','trip_code']
     filter_horizontal = ['countries','regions']
 
 
@@ -84,7 +92,7 @@ class SpeciesAdmin(admin.ModelAdmin):
             return '—'
         label = {'photo': '🖼 תמונות', 'worms': 'WoRMS'}.get(link_kind(obj.reference_link), 'קישור')
         return format_html('<a href="{}" target="_blank" rel="noopener">{}</a>', obj.reference_link, label)
-    list_display = ['phylogenetic_order','scientific_name','is_migrant','name_he','name_en','first_observed_year','last_observed_year','genus','species','author','family','order','reference_link_view']
+    list_display = ['phylogenetic_order','scientific_name','reference_link_view','is_migrant','name_he','name_en','first_observed_year','last_observed_year','genus','species','author','family','order']
     # Migrant status is checked far more often than any other field is edited here, so it's
     # editable straight from the changelist (a checkbox + one "Save" for the whole page) --
     # no need to open a species' full change form just to flag it as migrant.
