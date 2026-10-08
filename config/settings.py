@@ -165,6 +165,9 @@ LOGIN_REDIRECT_URL = "/observations/"
 LOGOUT_REDIRECT_URL = "/observations/"
 
 # Folder import accepts up to 500 images and one species selector per image.
+# Table transfer carries the previewed file back in a signed form field (compressed; ~0.4MB for the
+# 5MB species table), which counts against this limit -- the Django default of 2.5MB is too tight.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
 DATA_UPLOAD_MAX_NUMBER_FILES = 500
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 2000
 

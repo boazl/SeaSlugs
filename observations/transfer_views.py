@@ -13,6 +13,10 @@ class UploadForm(forms.Form):
     file=forms.FileField(label='קובץ טבלה (JSON)')
     synchronize=forms.BooleanField(required=False, label='סנכרון מלא לאזורים/אתרים: הצגת מיזוגים ומחיקת רשומות שאינן בקובץ')
 
+# The species table alone is ~5MB (5,000+ rows with all their texts) and grows as texts are written.
+MAX_JSON_BYTES=15*1024*1024
+
+
 @staff_member_required
 def transfer(request):
     # Reference transfer can modify several domain records; reserve it for superusers.
@@ -32,7 +36,7 @@ def transfer(request):
                 form=UploadForm(request.POST,request.FILES);context['form']=form
                 if form.is_valid():
                     upload=form.cleaned_data['file']
-                    if upload.size>5*1024*1024:raise ValidationError('קובץ JSON גדול מ־5MB.')
+                    if upload.size>MAX_JSON_BYTES:raise ValidationError(f'קובץ JSON גדול מ־{MAX_JSON_BYTES//(1024*1024)}MB.')
                     doc=json.loads(upload.read().decode('utf-8'))
                     if isinstance(doc,dict):
                         doc.pop('_media_names',None)

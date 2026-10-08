@@ -123,3 +123,22 @@ class TaxonTransferTests(TestCase):
             self.client.post('/admin/table-transfer/', {'action': 'apply', 'confirm': 'yes', 'token': preview.context['token']})
         self.genus.refresh_from_db()
         self.assertEqual(self.genus.description_en, 'From file')
+
+
+class TransferSizeLimitTests(TestCase):
+    def upload(self, pad):
+        import json
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        doc = {'format': 'seaslugs-reference-v1', 'table': 'genera', 'rows': [], 'pad': 'x' * pad}
+        return self.client.post('/admin/table-transfer/', {'action': 'preview', 'file': SimpleUploadedFile('g.json', json.dumps(doc).encode(), content_type='application/json')})
+
+    def setUp(self):
+        self.client.force_login(User.objects.create_superuser('root', 'root@example.com', 'test-pass'))
+
+    def test_a_file_over_5mb_is_accepted_the_whole_species_table_is_about_that_big(self):
+        response = self.upload(6 * 1024 * 1024)
+        self.assertNotContains(response, 'גדול מ')
+        self.assertIn('token', response.context)
+
+    def test_a_huge_file_is_still_refused(self):
+        self.assertContains(self.upload(16 * 1024 * 1024), 'קובץ JSON גדול מ־15MB')
