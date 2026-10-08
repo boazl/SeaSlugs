@@ -151,3 +151,15 @@ class AdminAndTransferTests(TestCase):
         for row in old['rows']:
             del row['reference_link']
         self.assertTrue(all(i['action'] == 'same' for i in plan(old)))
+
+
+class BundledCacheTests(TestCase):
+    def test_the_bundled_cache_is_well_formed_and_only_points_at_the_two_sources(self):
+        from .management.commands.fill_reference_links import DEFAULT_CACHE, load_cache
+        cache = load_cache(DEFAULT_CACHE)
+        self.assertGreater(len(cache['worms']), 4000)
+        self.assertGreater(len(cache['inat']), 4000)
+        for key, found in cache['worms'].items():
+            self.assertTrue(found is None or isinstance(found, int), key)
+            self.assertTrue(rl.is_full_name(*key.split(' ', 1)), key)       # never a 'sp.' name
+        self.assertTrue(all(found is None or isinstance(found, int) for found in cache['inat'].values()))

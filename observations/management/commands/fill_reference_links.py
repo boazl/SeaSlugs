@@ -6,7 +6,8 @@ observations/reference_links.py). Existing links are never overwritten.
 
 Two resumable steps, so a long run can be stopped and continued:
   --fetch   query WoRMS (batches of 50) and iNaturalist (one request per species, ~1/s) and
-            append every answer to a JSON-lines cache file (default: ~/reference_links_cache.jsonl)
+            append every answer to a JSON-lines cache file (default: the one kept in the repository,
+            management/commands/data/species_reference_links.jsonl)
   --apply   write links from the cache into the LOCAL database (then move them to the live site
             with the species table export/import)
 Without either flag it only reports what the cache would change.
@@ -19,6 +20,8 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from observations.models import Species
 from observations import reference_links as rl
+
+DEFAULT_CACHE = Path(__file__).resolve().parent / 'data' / 'species_reference_links.jsonl'
 
 
 def load_cache(path):
@@ -58,7 +61,7 @@ class Command(BaseCommand):
     help = 'Fill the species reference link (iNaturalist photo page, else WoRMS) from the web.'
 
     def add_arguments(self, parser):
-        parser.add_argument('--cache', default=str(Path.home() / 'reference_links_cache.jsonl'))
+        parser.add_argument('--cache', default=str(DEFAULT_CACHE))
         parser.add_argument('--fetch', action='store_true')
         parser.add_argument('--apply', action='store_true')
         parser.add_argument('--limit', type=int, default=0, help='fetch at most N iNaturalist lookups (for trials)')
