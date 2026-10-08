@@ -87,10 +87,11 @@ gtag('config', 'G-CPGTC09P2P');</script>
 
         <article class="species-hero">
             <div class="species-media">
-                {% if video_id %}
-                <div class="species-video"><iframe src="https://www.youtube-nocookie.com/embed/{{ video_id }}" title="{{ latin_name }}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
-                {% elif image_url %}
+{# a photo is preferred over a video when the page has both #}
+                {% if image_url %}
                 <img src="{{ image_url }}" alt="{{ latin_name }}" width="800" height="600">
+                {% elif video_id %}
+                <div class="species-video"><iframe src="https://www.youtube-nocookie.com/embed/{{ video_id }}" title="{{ latin_name }}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
                 {% endif %}
             </div>
             <div class="species-summary">
