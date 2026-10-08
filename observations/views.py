@@ -14,6 +14,7 @@ from .forms import SignupForm, SampleForm, ProfileForm, DiveTripForm, TripQuickF
 from .notifications import notify_new_user_registered
 from .gallery_data import TaxonResolver, taxon_media, area_samples
 from .i18n import get_lang
+from .species_redirects import historical_species_redirect
 
 
 def is_manager(user): return user.is_authenticated and user.is_staff and user.has_perm('observations.change_sample')
@@ -102,14 +103,20 @@ def species_page(request, slug):
     since the same species observed in two different areas gets two different defining
     photos/pages there too). Only reachable once the area has a valid published defining
     sample, same rule the gallery feed itself uses to decide whether to show a card at all."""
-    area = get_object_or_404(
-        SpeciesArea.objects.select_related('species', 'country', 'sea', 'defining_sample'), slug=slug)
-    thumbnail, image_url, video_id = taxon_media(area.defining_sample)
-    if not (image_url or video_id):
-        raise Http404
-    samples = list(area_samples(area).select_related('species', 'trip', 'trip__region', 'site', 'owner', 'owner__profile').order_by('created_at', 'pk'))
-    if not samples:
-        raise Http404
+    try:
+        area = get_object_or_404(
+            SpeciesArea.objects.select_related('species', 'country', 'sea', 'defining_sample'), slug=slug)
+        thumbnail, image_url, video_id = taxon_media(area.defining_sample)
+        if not (image_url or video_id):
+            raise Http404
+        samples = list(area_samples(area).select_related('species', 'trip', 'trip__region', 'site', 'owner', 'owner__profile').order_by('created_at', 'pk'))
+        if not samples:
+            raise Http404
+    except Http404:
+        response = historical_species_redirect(request, slug)
+        if response is not None:
+            return response
+        raise
     order_obj, family_obj, genus_obj = TaxonResolver().resolve(area.species)
     lang = get_lang(request)
 
