@@ -122,6 +122,10 @@ class Species(models.Model):
     description_he = models.TextField('תיאור בעברית', blank=True)
     description_en = models.TextField('תיאור באנגלית', blank=True)
     link = models.URLField('קישור', blank=True)
+    # For the site manager only (admin table): a page to glance at what the species looks like --
+    # an iNaturalist taxon page with photos when one exists, otherwise its WoRMS page. Never shown
+    # on the public site; filled by the fill_reference_links command and editable by hand.
+    reference_link = models.URLField('קישור עזר (תמונה / WoRMS)', max_length=300, blank=True)
     article_pdf = models.FileField('מאמר (PDF)', upload_to='articles/species/', blank=True, validators=[FileExtensionValidator(['pdf'])])
     # Species-page content in both languages. habitat / food above hold the Hebrew text;
     # their English counterparts are habitat_en / food_en.

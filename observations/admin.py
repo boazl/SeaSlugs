@@ -10,6 +10,7 @@ from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django.urls import reverse
 from .forms import SampleForm, SampleChangelistForm, taxonomy_for_form, species_name_options
+from .reference_links import link_kind
 from .models import Country, Sea, Region, Site, Species, Profile, Sample, DiveTrip, SiteImage, SpeciesArea, TaxonOrder, TaxonFamily, TaxonGenus, SampleKind, IdentificationQualifier, LifeStage
 
 for model in [Country,Sea,Region,Site,Profile,SiteImage,SampleKind]: admin.site.register(model)
@@ -76,7 +77,14 @@ class SpeciesAdmin(admin.ModelAdmin):
     @admin.display(description='שם מלא כולל מחבר (נגזר)')
     def full_name_display(self, obj):
         return obj.full_name if obj and obj.pk else '—'
-    list_display = ['phylogenetic_order','scientific_name','is_migrant','name_he','name_en','first_observed_year','last_observed_year','genus','species','author','family','order']
+    @admin.display(description='קישור עזר', ordering='reference_link')
+    def reference_link_view(self, obj):
+        # Admin-only reference: opens a page showing what the species looks like.
+        if not obj.reference_link:
+            return '—'
+        label = {'photo': '🖼 תמונות', 'worms': 'WoRMS'}.get(link_kind(obj.reference_link), 'קישור')
+        return format_html('<a href="{}" target="_blank" rel="noopener">{}</a>', obj.reference_link, label)
+    list_display = ['phylogenetic_order','scientific_name','is_migrant','name_he','name_en','first_observed_year','last_observed_year','genus','species','author','family','order','reference_link_view']
     # Migrant status is checked far more often than any other field is edited here, so it's
     # editable straight from the changelist (a checkbox + one "Save" for the whole page) --
     # no need to open a species' full change form just to flag it as migrant.
@@ -87,7 +95,7 @@ class SpeciesAdmin(admin.ModelAdmin):
         ('זיהוי מדעי', {'fields':['phylogenetic_order','genus','species','author','scientific_name','full_name_display','formatted_author','reference_author','full_species_name_with_order']}),
         ('סיווג טקסונומי', {'fields':['order','superfamily','family','accepted_genus','accepted_species']}),
         ('שמות ותפוצה', {'fields':['name_he','name_en','common_name','transliteration','language','distribution']}),
-        ('תוכן לעמוד המין', {'fields':['description_he','description_en','identification_he','identification_en','similar_species_he','similar_species_en','size_from','size_to','size_max','link','article_pdf']}),
+        ('תוכן לעמוד המין', {'fields':['description_he','description_en','identification_he','identification_en','similar_species_he','similar_species_en','size_from','size_to','size_max','link','reference_link','article_pdf']}),
         ('בית גידול ותזונה', {'fields':['habitat','habitat_en','food','food_en','depth_min','depth_max','native_range_he','native_range_en']}),
         ('מין מהגר — הים התיכון', {'fields':['is_migrant','first_observed_year','first_record_place_he','first_record_place_en','last_observed_year','last_record_place_he','last_record_place_en','med_status_he','med_status_en','introduction_route_he','introduction_route_en']}),
         ('מקורות', {'fields':['sources']}),
