@@ -34,6 +34,20 @@ class DiveTripTests(TestCase):
         sample.save_reviewed(actor=self.user,approve=True)
         self.assertEqual(sample.status,'published')
 
+    def test_public_trip_filters_and_english_labels(self):
+        sample = self.collection(); sample.save_reviewed(actor=self.user, approve=True)
+        response = self.client.get('/observations/trips/', {'country': self.country.pk, 'region': self.region.pk, 'year': 2026, 'lang': 'en'})
+        self.assertEqual([t.pk for t in response.context['trips']], [self.trip.pk])
+        self.assertContains(response, 'All countries')
+        self.assertContains(response, 'All regions')
+        self.assertContains(response, 'value="en"')
+        self.assertEqual(list(self.client.get('/observations/trips/?year=2025').context['trips']), [])
+        other = Country.objects.create(name='Israel')
+        self.assertEqual(list(self.client.get('/observations/trips/', {'country': other.pk}).context['trips']), [])
+        self.assertEqual(self.client.get('/observations/trips/?country=bad&region=bad&year=bad&sort=bad').status_code, 200)
+        sample.soft_delete(self.user)
+        self.assertEqual(list(self.client.get('/observations/trips/').context['trips']), [])
+
     def test_public_separation_and_soft_delete(self):
         # species_count (the field) is deliberately left at 153 (set in setUp) to prove the
         # displayed/catalog count ignores it and reflects only real published species samples.

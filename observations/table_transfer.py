@@ -187,12 +187,20 @@ def plan(document):
             if model is Region:lookup['country']=values['country']
             if model is Site:lookup['region']=values['region']
             obj=unique(model,**lookup)
+            # A site's parent can change. Match a unique same-name site in the
+            # same country; never guess across countries or duplicate names.
+            if obj is None and model is Site:
+                matches = list(Site.objects.filter(name=values['name'], region__country=values['region'].country)[:2])
+                if len(matches) == 1: obj = matches[0]
+                elif matches: raise ValidationError('כמה אתרים באותו שם; יש לפתור את השיוך ידנית לפני הייבוא.')
             identity=json.dumps({k:str(v) for k,v in lookup.items()},sort_keys=True)
         if identity in seen or (obj and obj.pk in targets): raise ValidationError('הקובץ מכיל רשומות כפולות לאותו יעד.')
         seen.add(identity)
         if obj: targets.add(obj.pk)
         before=row(obj,fields) if obj else {}
         candidate=model(pk=obj.pk if obj else None,**values)
+        if model is Region and obj:
+            candidate.trip_code = obj.trip_code
         if model is Species and obj:
             for field in TABLES['species'][1]:
                 if field not in values: setattr(candidate,field,getattr(obj,field))
@@ -207,7 +215,46 @@ def plan(document):
         after=row(candidate,fields)
         changes=[{'field':str(model._meta.get_field(f).verbose_name),'before':before.get(f,''),'after':after[f]} for f in fields if before.get(f)!=after[f]]
         result.append({'object':candidate,'label':str(candidate),'action':'new' if obj is None else 'update' if changes else 'same','changes':changes})
+    if document.get('sync_missing'):
+        if model not in (Region, Site): raise ValidationError('סנכרון מחיקות זמין רק לאזורים ולאתרי צלילה.')
+        if not result: raise ValidationError('לא ניתן לסנכרן קובץ ריק; הפעולה עלולה למחוק את כל הטבלה.')
+        kept = {item['object'].pk for item in result if item['object'].pk}
+        candidates = [item['object'] for item in result]
+        for old in model.objects.exclude(pk__in=kept):
+            # Collapse pre-existing duplicate sites only when the file has one clear
+            # same-name destination in the same country. Other removals require zero links.
+            matches = [c for c in candidates if model is Site and c.name == old.name
+                       and c.region.country_id == old.region.country_id]
+            refs = reference_counts(old)
+            target = matches[0] if len(matches) == 1 else None
+            action = 'merge' if target else 'blocked' if refs else 'delete'
+            result.append({'object': old, 'target': target, 'label': str(old), 'action': action,
+                'reason': 'יש רשומות מקושרות ואין יעד חד־משמעי. נדרש שיוך ידני לפני מחיקה.' if action == 'blocked' else '',
+                'changes': [{'field': 'סנכרון', 'before': reference(old),
+                    'after': reference(target) if target else 'מחיקה — הרשומה אינה בקובץ'},
+                    {'field': 'רשומות מקושרות', 'before': refs or 'אין', 'after': 'יועברו ליעד' if target else 'אין'}]})
     return result
+
+
+def reference_counts(obj):
+    """Show every reverse FK/M2M link, including protected records, before deletion."""
+    return {f'{rel.related_model._meta.verbose_name_plural} ({rel.field.name})': count
+            for rel in obj._meta.related_objects
+            if (count := rel.related_model.objects.filter(**{rel.field.name: obj}).distinct().count())}
+
+
+def merge_location(old, target):
+    """Move references before deleting a duplicate; no related observations are deleted."""
+    for rel in old._meta.related_objects:
+        rows = rel.related_model.objects.filter(**{rel.field.name: old})
+        if rel.many_to_many:
+            for owner in rows:
+                manager = getattr(owner, rel.field.name)
+                manager.add(target)
+                manager.remove(old)
+        else:
+            rows.update(**{rel.field.name: target})
+    old.delete()
 
 
 def create_backup():
@@ -219,13 +266,15 @@ def create_backup():
     return backup
 
 
-def apply(document, expected, actor=None):
-    backup = create_backup()
+def apply(document, expected, actor=None, backup=None):
+    backup = backup or create_backup()
     with transaction.atomic():
         # A write statement obtains SQLite's reservation before re-reading preview state.
         Species.objects.filter(pk=-1).update(scientific_name=F('scientific_name'))
         if fingerprint()!=expected:raise ValidationError('הנתונים השתנו מאז התצוגה המקדימה. יש ליצור תצוגה חדשה.')
         items=plan(document)
+        if any(i['action'] == 'blocked' for i in items):
+            raise ValidationError('הסנכרון נחסם: יש רשומות להסרה שעדיין מקושרות. יש לתקן את השיוכים ולבדוק מחדש.')
         if document['table'] == 'users':
             for item in items:
                 user = item['object']
@@ -234,8 +283,22 @@ def apply(document, expected, actor=None):
         for item in items:
             if item['action'] in ('new','update'):
                 item['object'].save()
+                if isinstance(item['object'], Site):
+                    site = item['object']
+                    # A moved site and its trips must agree on region/country.
+                    DiveTrip.objects.filter(site=site).update(region=site.region, country=site.region.country)
                 for field, values in item.get('many', {}).items():
                     getattr(item['object'],field).set(values)
+        for item in items:
+            if item['action'] == 'merge':
+                merge_location(item['object'], item['target'])
+                if isinstance(item['target'], Site):
+                    site = item['target']
+                    DiveTrip.objects.filter(site=site).update(region=site.region, country=site.region.country)
+            elif item['action'] == 'delete':
+                # Recheck after merging/saving; PROTECT remains the final safety net.
+                if reference_counts(item['object']): raise ValidationError('נוצר קשר חדש לרשומה להסרה; יש לבדוק שוב.')
+                item['object'].delete()
         if document['table'] == 'samples':
             # Mirror Sample.save_reviewed()'s own side effect: a transferred sample that is
             # already published must register itself in SpeciesArea exactly like one saved
@@ -258,3 +321,19 @@ def apply(document, expected, actor=None):
                             sample.species_id, sample.trip.country_id, sample.trip.sea_id, sample.undetermined_variant)},
                     )
     return items,backup.name
+
+
+def apply_location_sync(regions, sites, expected):
+    """Atomic two-file sync: import region destinations, reconcile sites, then remove regions.
+
+    One backup covers the complete operation; a blocked removal rolls every stage back.
+    """
+    if regions.get('table') != 'regions' or sites.get('table') != 'sites':
+        raise ValidationError('נדרשים קובץ אזורים וקובץ אתרים.')
+    backup = create_backup()
+    with transaction.atomic():
+        initial = dict(regions, sync_missing=False)
+        apply(initial, expected, backup=backup)
+        site_items, _ = apply(dict(sites, sync_missing=True), fingerprint(), backup=backup)
+        region_items, _ = apply(dict(regions, sync_missing=True), fingerprint(), backup=backup)
+    return {'sites': site_items, 'regions': region_items}, backup

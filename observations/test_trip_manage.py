@@ -114,6 +114,31 @@ class TripsPageTests(Fixture):
         self.client.force_login(self.manager)
         self.assertContains(self.client.get('/observations/trips/manage/'), f'/admin/observations/divetrip/{self.t1.pk}/change/')
 
+    def test_separate_country_filter_and_conflicting_region(self):
+        other = Country.objects.create(name='Philippines')
+        away = Region.objects.create(name='Romblon', country=other, sea=self.med)
+        foreign = DiveTrip.objects.create(title='Romblon', code='V', country=other, region=away, year=2026)
+        self.client.force_login(self.boaz)
+        response = self.client.get('/observations/trips/manage/', {'country': other.pk, 'region': self.akhziv.pk, 'site': self.canyon.pk})
+        self.assertEqual(list(response.context['trips']), [foreign])
+        self.assertIsNone(response.context['region'])
+        self.assertIsNone(response.context['site'])
+        self.assertContains(response, 'name="country"')
+        self.assertContains(response, 'name="region"')
+
+    def test_column_sorting_both_directions_preserves_filters(self):
+        self.client.force_login(self.boaz)
+        for sort, expected in [('code', [self.t3, self.t1]), ('-code', [self.t1, self.t3]),
+                               ('date', [self.t3, self.t1]), ('-date', [self.t1, self.t3])]:
+            page = self.client.get('/observations/trips/manage/', {'region': self.akhziv.pk, 'sort': sort})
+            self.assertEqual(list(page.context['trips']), expected)
+            for header in page.context['sort_headers']:
+                self.assertIn(f'region={self.akhziv.pk}', header['url'])
+            self.assertContains(page, 'aria-sort=')
+        page = self.client.get('/observations/trips/manage/', {'sort': 'invalid-field'})
+        self.assertEqual(page.context['sort'], '-date')
+        self.assertEqual(self.client.get('/observations/trips/manage/?sort=count').status_code, 200)
+
     def test_nav_has_the_link(self):
         self.client.force_login(self.boaz)
         self.assertContains(self.client.get('/observations/trips/manage/'), 'href="/observations/trips/manage/"')

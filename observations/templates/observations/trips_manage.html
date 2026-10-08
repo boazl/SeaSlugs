@@ -1,15 +1,10 @@
 {% extends 'observations/base.html' %}{% block content %}
 <h1>ניהול מסעות צלילה</h1>
-<p>בחרו אזור (או אתר) ושנה כדי לראות את המסעות שלהם. כפתור ההוספה מציע שם וסימון למסע חדש לפי הבחירה.</p>
-<form method="get" class="filter-row" id="trip-filter">
-<label>אזור<select name="region" id="f-region"><option value="">כל האזורים</option>{% for r in regions %}<option value="{{ r.pk }}"{% if region and r.pk == region.pk %} selected{% endif %}>{{ r.name }} · {{ r.country.name }}</option>{% endfor %}</select></label>
-<label>אתר<select name="site" id="f-site"><option value="">כל האתרים</option>{% for s in sites %}<option value="{{ s.pk }}" data-region="{{ s.region_id }}"{% if site and s.pk == site.pk %} selected{% endif %}>{{ s.name }}</option>{% endfor %}</select></label>
-<label>שנה<select name="year" id="f-year"><option value="">כל השנים</option>{% for y in years %}<option value="{{ y }}"{% if y == year %} selected{% endif %}>{{ y }}</option>{% endfor %}</select></label>
-<div class="filter-actions"><button type="submit">סינון</button><a href="{% url 'trips-manage' %}">ניקוי מסננים</a><a class="button" id="add-trip" href="{{ add_url }}">+ הוספת מסע</a></div>
-</form>
+<p>בחרו מדינה, אזור, אתר ושנה כדי לסנן מסעות. לחיצה על כותרת עמודה ממיינת; לחיצה נוספת הופכת את הסדר.</p>
+{% include 'observations/_trip_filters.html' %}
 <p><strong>{{ trips|length }}</strong> מסעות{% if region %} · {{ region.name }}{% endif %}{% if site %} · {{ site.name }}{% endif %}{% if year %} · {{ year }}{% endif %}</p>
 <table class="trips-table">
-<thead><tr><th>סימון</th><th>שם המסע</th><th>מקום</th><th>תאריך</th><th>תצפיות</th><th></th></tr></thead>
+<thead><tr>{% for header in sort_headers %}<th scope="col" aria-sort="{{ header.aria }}"><a href="{{ header.url }}">{{ header.label }}{{ header.arrow }}</a></th>{% endfor %}<th scope="col">פעולות</th></tr></thead>
 <tbody>
 {% for trip in trips %}<tr>
 <td><bdi dir="ltr"><code>{{ trip.code }}</code></bdi></td>
@@ -21,21 +16,4 @@
 </tr>{% empty %}<tr><td colspan="6">אין מסעות לפי המסננים האלה.</td></tr>{% endfor %}
 </tbody></table>
 <style>.trips-table{width:100%;border-collapse:collapse}.trips-table th,.trips-table td{padding:8px 10px;border-bottom:1px solid #36515a;text-align:start;vertical-align:top}.filter-actions .button{text-decoration:none;margin-inline-start:auto}</style>
-{{ site_regions|json_script:'site-regions' }}
-<script>
-// Picking a site selects its region; picking a region hides the other regions' sites.
-const siteRegions = JSON.parse(document.getElementById('site-regions').textContent);
-const regionEl = document.getElementById('f-region'), siteEl = document.getElementById('f-site');
-function filterSites(){for(const o of siteEl.options){if(!o.value)continue;const hide=regionEl.value&&o.dataset.region!==regionEl.value;o.hidden=hide;o.disabled=hide;}
-  if(siteEl.selectedOptions[0]&&siteEl.selectedOptions[0].disabled)siteEl.value='';}
-regionEl.addEventListener('change',()=>{filterSites();});
-siteEl.addEventListener('change',()=>{if(siteEl.value)regionEl.value=siteRegions[siteEl.value]||regionEl.value;});
-filterSites();
-// the add button follows the current (unsubmitted) filter choices
-const addEl = document.getElementById('add-trip');
-function syncAdd(){const q=new URLSearchParams();for(const [k,el] of [['region',regionEl],['site',siteEl],['year',document.getElementById('f-year')]])if(el.value)q.set(k,el.value);
-  addEl.href="{% url 'trip-add' %}"+(q.toString()?'?'+q:'');}
-for(const el of document.querySelectorAll('#trip-filter select'))el.addEventListener('change',syncAdd);
-syncAdd();
-</script>
 {% endblock %}

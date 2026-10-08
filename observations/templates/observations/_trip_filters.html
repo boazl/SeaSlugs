@@ -1,0 +1,37 @@
+{% load seaslugs_i18n %}
+<form method="get" class="filter-row trip-filters" id="trip-filter">
+<input type="hidden" name="lang" value="{{ lang }}"><input type="hidden" name="sort" value="{{ sort }}">
+<label>{{ "מדינה"|t:lang }}<select name="country" id="f-country"><option value="">{{ "כל המדינות"|t:lang }}</option>{% for c in countries %}<option value="{{ c.pk }}"{% if country.pk == c.pk %} selected{% endif %}>{{ c|loc:lang }}</option>{% endfor %}</select></label>
+<label>{{ "אזור"|t:lang }}<select name="region" id="f-region"><option value="">{{ "כל האזורים"|t:lang }}</option>{% for r in regions %}<option value="{{ r.pk }}" data-country="{{ r.country_id }}"{% if region.pk == r.pk %} selected{% endif %}>{{ r|loc:lang }}</option>{% endfor %}</select></label>
+<label>{{ "אתר"|t:lang }}<select name="site" id="f-site"><option value="">{{ "כל האתרים"|t:lang }}</option>{% for s in sites %}<option value="{{ s.pk }}" data-region="{{ s.region_id }}" data-country="{{ s.region.country_id }}"{% if site.pk == s.pk %} selected{% endif %}>{{ s|loc:lang }}</option>{% endfor %}</select></label>
+<label>{{ "שנה"|t:lang }}<select name="year" id="f-year"><option value="">{{ "כל השנים"|t:lang }}</option>{% for y in years %}<option value="{{ y }}"{% if y == year %} selected{% endif %}>{{ y }}</option>{% endfor %}</select></label>
+<div class="filter-actions"><button type="submit">{{ "סינון"|t:lang }}</button><a href="{{ reset_url }}">{{ "איפוס סינון"|t:lang }}</a>{% if trip_management %}<a class="button" id="add-trip" href="{{ add_url }}">+ הוספת מסע</a>{% endif %}</div>
+</form>
+<style>.trip-filters{display:flex;flex-wrap:wrap;gap:12px 16px}.trip-filters label{flex:0 1 170px;width:170px;max-width:100%}.trip-filters select{width:170px;max-width:100%;min-width:0}.trip-filters .filter-actions{flex-basis:100%}.trip-filters #f-year{width:125px}</style>
+<script>
+(() => {
+  const country = document.getElementById('f-country'), region = document.getElementById('f-region'), site = document.getElementById('f-site');
+  function limitOptions(select, predicate) {
+    for (const option of select.options) {
+      if (!option.value) continue;
+      option.hidden = option.disabled = !predicate(option);
+    }
+    if (select.selectedOptions[0]?.disabled) select.value = '';
+  }
+  function refresh() {
+    limitOptions(region, o => !country.value || o.dataset.country === country.value);
+    limitOptions(site, o => (!country.value || o.dataset.country === country.value) && (!region.value || o.dataset.region === region.value));
+    const add = document.getElementById('add-trip');
+    if (add) {
+      const query = new URLSearchParams();
+      for (const el of [country, region, site, document.getElementById('f-year')]) if (el.value) query.set(el.name, el.value);
+      add.href = "{% url 'trip-add' %}" + (query.size ? '?' + query : '');
+    }
+  }
+  country.addEventListener('change', refresh);
+  region.addEventListener('change', () => { if (region.value) country.value = region.selectedOptions[0].dataset.country; refresh(); });
+  site.addEventListener('change', () => { if (site.value) { region.value = site.selectedOptions[0].dataset.region; country.value = site.selectedOptions[0].dataset.country; } refresh(); });
+  document.getElementById('f-year').addEventListener('change', refresh);
+  refresh();
+})();
+</script>

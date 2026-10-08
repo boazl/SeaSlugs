@@ -24,7 +24,9 @@ def trips(request):
     published = Sample.objects.filter(status='published', deleted_at__isnull=True, trip__isnull=False,
         trip__country__isnull=False, trip__region__isnull=False, trip__year__isnull=False,
         species_other='', site_other='').filter(Q(kind='collection', species__isnull=True) | Q(kind='species',species__isnull=False)).select_related('species','trip','owner','owner__profile')
-    rows = list(DiveTrip.objects.filter(samples__in=published).distinct().select_related('country', 'region', 'site')
+    available = DiveTrip.objects.filter(samples__in=published).distinct()
+    rows, filters = _trip_list_context(request, available)
+    rows = list(rows.select_related('country', 'region', 'site')
                 .prefetch_related(Prefetch('samples',queryset=published,to_attr='public_samples')))
     lang = get_lang(request)
     for trip in rows:
@@ -41,7 +43,7 @@ def trips(request):
         # The free-text reserve/site name is usually typed in Hebrew -- left out in English.
         hebrew = any('\u0590' <= ch <= '\u05ff' for ch in trip.reserve)
         trip.display_reserve = '' if lang == 'en' and hebrew else trip.reserve
-    return render(request, 'observations/trips.html', {'trips':rows})
+    return render(request, 'observations/trips.html', {'trips':rows, **filters})
 
 
 def sample_edit_url(request, samples):
@@ -779,25 +781,66 @@ def _trip_filters(params):
     return region, site, _int(params.get('year'))
 
 
+def _trip_list_context(request, available, management=False):
+    """Shared, validated location filters and allow-listed sorting for both trip pages."""
+    from datetime import date
+    region, site, year = _trip_filters(request.GET)
+    country = Country.objects.filter(pk=_int(request.GET.get('country'))).first()
+    if country and region and region.country_id != country.pk:
+        region = site = None
+    if not country and region:
+        country = region.country
+    rows = available
+    if country: rows = rows.filter(country=country)
+    if region: rows = rows.filter(region=region)
+    if site: rows = rows.filter(site=site)
+    if year: rows = rows.filter(year=year)
+    sorts = {
+        'code': ('code',), 'title': ('title',),
+        'place': ('country__name', 'region__name', 'site__name', 'region_name'),
+        'date': ('year', 'month', 'start_day'),
+    }
+    if management: sorts['count'] = ('sample_count',)
+    sort = request.GET.get('sort', '-date')
+    key = sort.lstrip('-')
+    if key not in sorts or sort not in (key, '-' + key):
+        sort, key = '-date', 'date'
+    rows = rows.order_by(*[('-' if sort.startswith('-') else '') + f for f in sorts[key]], 'title', 'pk')
+    query = {k: v for k, v in (('country', country.pk if country and request.GET.get('country') else ''),
+        ('region', region.pk if region else ''), ('site', site.pk if site else ''), ('year', year or '')) if v}
+    if request.GET.get('lang') in ('en', 'he'): query['lang'] = request.GET['lang']
+    headers = []
+    for field, label in [('code', 'סימון'), ('title', 'שם המסע'), ('place', 'מקום'), ('date', 'תאריך'), ('count', 'תצפיות')]:
+        if field not in sorts: continue
+        active = key == field
+        target = field if active and sort.startswith('-') else '-' + field if active else field
+        headers.append({'label': label, 'url': '?' + urlencode({**query, 'sort': target}),
+            'aria': ('descending' if sort.startswith('-') else 'ascending') if active else 'none',
+            'arrow': (' ↓' if sort.startswith('-') else ' ↑') if active else ''})
+    years = {y for y in available.exclude(year__isnull=True).values_list('year', flat=True)}
+    if management: years.add(date.today().year)
+    # Management can create a trip in a location which has no trips yet.
+    countries = Country.objects.all() if management else Country.objects.filter(dive_trips__in=available).distinct()
+    regions = Region.objects.all() if management else Region.objects.filter(dive_trips__in=available).distinct()
+    sites = Site.objects.all() if management else Site.objects.filter(dive_trips__in=available).distinct()
+    return rows, {'countries': countries.order_by('name'), 'regions': regions.select_related('country').order_by('name'),
+        'sites': sites.select_related('region').order_by('name'), 'years': sorted(years, reverse=True),
+        'country': country, 'region': region, 'site': site, 'year': year, 'sort': sort,
+        'sort_headers': headers, 'reset_url': reverse('trips-manage' if management else 'dive-trips') +
+            ('?' + urlencode({'lang': query['lang']}) if 'lang' in query else ''),
+        'add_url': reverse('trip-add') + ('?' + urlencode(query) if query else '')}
+
+
 @login_required
 def trips_manage(request):
     """Every dive trip with filters (region/site, year) and an add button that carries the filters
     into the add form, which suggests the trip's name and code from them."""
-    from datetime import date
     from django.db.models import Count
-    region, site, year = _trip_filters(request.GET)
     rows = DiveTrip.objects.select_related('country', 'region', 'site').annotate(
         sample_count=Count('samples', filter=Q(samples__deleted_at__isnull=True), distinct=True))
-    if site: rows = rows.filter(site=site)
-    elif region: rows = rows.filter(region=region)
-    if year: rows = rows.filter(year=year)
-    years = sorted({y for y in DiveTrip.objects.exclude(year__isnull=True).values_list('year', flat=True)} | {date.today().year}, reverse=True)
-    query = {k: v for k, v in (('region', region.pk if region else ''), ('site', site.pk if site else ''), ('year', year or '')) if v}
+    rows, filters = _trip_list_context(request, rows, management=True)
     return render(request, 'observations/trips_manage.html', {
-        'trips': rows.order_by('-year', '-month', '-start_day', 'title'), 'regions': Region.objects.select_related('country').order_by('country__name', 'name'),
-        'sites': Site.objects.select_related('region').order_by('name'), 'years': years, 'region': region, 'site': site, 'year': year,
-        'add_url': reverse('trip-add') + ('?' + urlencode(query) if query else ''), 'manager': is_manager(request.user),
-        'site_regions': {s.pk: s.region_id for s in Site.objects.all()}})
+        'trips': rows, **filters, 'manager': is_manager(request.user), 'trip_management': True})
 
 
 @login_required
