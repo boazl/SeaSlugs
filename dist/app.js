@@ -1381,15 +1381,13 @@ dialog.addEventListener('close', () => {
 const translations = [
     ['.brand-he', 'Sea slugs'],
     ['.credit', 'Macro photography · Stills and video'],
-    ['.eyebrow', 'Through the lens, beneath the sea'],
-    ['.intro-copy', 'Search, watch and publish new species here — and find macro diving partners too.'],
     ['.search > span', 'Search'],
     ['.sort-order > span', 'Sort'],
     ['#empty h3', 'No items found'],
     ['#empty p', 'Try a different name or choose another region.'],
     ['#reset', 'Clear search and filters'],
     ['footer p', 'Photography: Boaz Liebes · Videos hosted on YouTube'],
-    ['footer > span:last-child', 'Sea slugs, up close.'],
+    ['.footer-tagline', 'Sea slugs, up close.'],
     ['.player-bottom > span', 'If the video does not load, watch it on YouTube.'],
     ['#youtubeLink', 'Watch on YouTube ↗'],
     ['#filterSidebarTitle', 'Filters'],
@@ -1410,8 +1408,37 @@ const translations = [
     const element = document.querySelector(selector);
     return { element, he: element.cloneNode(true), en };
 });
-const heading = document.querySelector('h1');
-const originalHeading = heading.cloneNode(true);
+// The home page's text sections (hero, "what are sea slugs", the project, how to contribute, the
+// numbers line, the link block, the footer invitation) are rendered by the server in the language of the
+// URL; both languages are embedded as JSON so the language button can swap them without a reload
+// (observations/home_content.py). A section is only replaced when it is in the other language.
+const homeContent = JSON.parse(document.getElementById('home-content').textContent);
+function applyHomeSections() {
+    document.querySelectorAll('[data-home-section]').forEach(element => {
+        if (element.dataset.lang !== language) {
+            const html = (homeContent[language] || {})[element.dataset.homeSection];
+            if (html != null) {
+                element.innerHTML = html;
+                element.dataset.lang = language;
+            }
+        }
+        element.querySelectorAll('[data-js-only]').forEach(item => { item.hidden = false; });
+    });
+}
+document.addEventListener('click', event => {
+    const link = event.target.closest('[data-home-action="migrant"]');
+    if (!link) return;
+    // The link also jumps to the gallery (its href); here the migrant-species view is switched on.
+    document.querySelector('#areaFilters button[data-area="migrant"]')?.click();
+});
+document.addEventListener('submit', event => {
+    if (event.target.id !== 'heroSearch') return;
+    event.preventDefault();
+    const value = event.target.elements.q.value.trim();
+    search.value = value;
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    document.querySelector('#collectionTitle').scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
 const collectionHeading = document.querySelector('#collectionTitle').firstChild;
 const originalCollectionHeading = collectionHeading.textContent;
 const description = document.querySelector('meta[name="description"]');
@@ -1430,12 +1457,7 @@ function setLanguage(value) {
         if (en) item.element.textContent = item.en;
         else item.element.replaceChildren(...Array.from(item.he.childNodes, node => node.cloneNode(true)));
     });
-    heading.replaceChildren();
-    if (en) {
-        heading.append('Home for sea slug enthusiasts');
-    } else {
-        heading.append(...Array.from(originalHeading.childNodes, node => node.cloneNode(true)));
-    }
+    applyHomeSections();
     collectionHeading.textContent = en ? 'Gallery ' : originalCollectionHeading;
     search.placeholder = en ? 'Species or video name…' : 'שם המין או הסרטון…';
     search.setAttribute('aria-label', en ? 'Search by species or video name' : 'חיפוש לפי שם המין או הסרטון');

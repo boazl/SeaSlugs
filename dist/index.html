@@ -18,6 +18,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
     <meta name="description" content="{{ home.description }}">
 {% if has_site_image %}{% share_meta home.share_title description=home.description image="/site-image/intro_photo.jpg" %}{% else %}{% share_meta home.share_title description=home.description image="/intro-photo.jpg" %}{% endif %}
 {{ home_text|json_script:"seo-text" }}
+{{ sections_both|json_script:"home-content" }}
     <meta name="referrer" content="strict-origin-when-cross-origin">
     <link rel="icon" type="image/svg+xml"
         href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23091e28'/%3E%3Cpath d='M7 11c10-9 8 14 18 5M7 18c10-9 8 14 18 5' stroke='%235de0cb' stroke-width='3' fill='none'/%3E%3C/svg%3E">
@@ -31,16 +32,16 @@ gtag('config', 'G-CPGTC09P2P');</script>
                 dir="ltr">SeaSlugs<span class="brand-dot">.</span></span><span class="brand-he">חינניות
                 ים</span></a><span class="credit">צילומי מאקרו - סטילס ווידאו</span>{% include 'observations/account_menu.html' %}</header>
     <main>
-        <section class="intro">
-            <div>
-                <p class="eyebrow">מבעד לעדשה, מתחת לפני הים</p>
-                <h1>הבית של חובבי חינניות הים</h1>
-                <p class="intro-copy">כאן תוכלו לחפש, לצפות ולפרסם מינים חדשים, וגם למצוא שותפים לצלילות מקרו.
-                </p>
-            </div>
-            <div class="intro-index"><img src="{% if has_site_image %}/site-image/intro_photo.jpg{% else %}/intro-photo.jpg{% endif %}" alt="חינניית ים, צילום: בועז ליבס" width="520" height="346"></div>
+        <section class="intro" aria-label="{% if lang == 'en' %}About SeaSlugs{% else %}על האתר{% endif %}">
+            <div data-home-section="hero" data-lang="{{ lang }}">{{ sections.hero|safe }}</div>
         </section>
+        <div class="home-text">
+            <section class="home-section" data-home-section="what" data-lang="{{ lang }}">{{ sections.what|safe }}</section>
+            <section class="home-section" data-home-section="project" data-lang="{{ lang }}">{{ sections.project|safe }}</section>
+            <section class="home-section" data-home-section="contribute" data-lang="{{ lang }}">{{ sections.contribute|safe }}</section>
+        </div>
         <section class="collection" aria-labelledby="collectionTitle">
+            <p class="collection-note" data-home-section="collection_note" data-lang="{{ lang }}">{{ sections.collection_note|safe }}</p>
             <div class="collection-head">
                 <h2 id="collectionTitle">אוסף הסרטונים <span id="total"></span></h2><label
                     class="search"><span>חיפוש</span><input type="search" id="search" placeholder="שם המין או הסרטון…"
@@ -129,9 +130,11 @@ gtag('config', 'G-CPGTC09P2P');</script>
                 <p>להצגת האוסף ולחיפוש יש להפעיל JavaScript בדפדפן.</p>
             </noscript>
         </section>
+        <div class="home-links" data-home-section="browse" data-lang="{{ lang }}">{{ sections.browse|safe }}</div>
     </main>
     <footer><span class="brand-name" dir="ltr">SeaSlugs.</span>
-        <p>צילום: בועז ליבס · הסרטונים מוצגים דרך YouTube</p><span>חינניות ים, מקרוב.</span>
+        <p>צילום: בועז ליבס · הסרטונים מוצגים דרך YouTube</p><span class="footer-tagline">חינניות ים, מקרוב.</span>
+        <p class="footer-invite" data-home-section="footer_invite" data-lang="{{ lang }}">{{ sections.footer_invite|safe }}</p>
     </footer>
     <dialog id="player" aria-labelledby="playerTitle">
         <div class="player-head">
