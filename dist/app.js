@@ -1414,9 +1414,8 @@ const heading = document.querySelector('h1');
 const originalHeading = heading.cloneNode(true);
 const collectionHeading = document.querySelector('#collectionTitle').firstChild;
 const originalCollectionHeading = collectionHeading.textContent;
-const originalTitle = document.title;
 const description = document.querySelector('meta[name="description"]');
-const originalDescription = description.content;
+const seoText = JSON.parse(document.getElementById('seo-text').textContent);
 const languageButton = document.createElement('button');
 languageButton.type = 'button';
 languageButton.className = 'language-switch';
@@ -1456,8 +1455,10 @@ function setLanguage(value) {
     languageButton.textContent = en ? 'עברית' : 'English';
     languageButton.lang = en ? 'he' : 'en';
     languageButton.setAttribute('aria-label', en ? 'Switch to Hebrew' : 'מעבר לאנגלית');
-    document.title = en ? 'SeaSlugs — Sea slugs | Boaz Liebes' : originalTitle;
-    description.content = en ? 'Sea slug videos by Boaz Liebes. Explore Romblon, the Red Sea and the Mediterranean.' : originalDescription;
+    // The title and description of each language come from the page itself (observations/home_text.py),
+    // so what the server rendered and what the button swaps in are the same text.
+    document.title = seoText[language].title;
+    description.content = seoText[language].description;
     const url = new URL(window.location.href);
     url.searchParams.set('lang', language);
     window.history.replaceState(null, '', url);

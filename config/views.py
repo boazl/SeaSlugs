@@ -21,8 +21,12 @@ def gallery_file(request, filename='index.html'):
         from django.http import HttpResponse
         from observations.models import SiteImage
         has_site_image = SiteImage.objects.filter(key='intro_photo').exclude(image='').exists()
+        from observations.home_text import HOME_TEXT, home_lang
+        lang = home_lang(request)
         template = engines['django'].from_string((settings.BASE_DIR / 'dist' / filename).read_text())
-        response = HttpResponse(template.render({'has_site_image': has_site_image}, request))
+        response = HttpResponse(template.render({
+            'has_site_image': has_site_image, 'lang': lang, 'home': HOME_TEXT[lang], 'home_text': HOME_TEXT,
+        }, request))
         response['Cache-Control'] = 'private, no-store'
         return response
     if filename == 'catalog.js':

@@ -145,3 +145,56 @@ class SpeciesTitleAndDescriptionTests(SeoFixture):
         self.assertTrue(description.startswith('Chromodoris annae'))
         self.assertIn('A sea slug of the family Chromodorididae', description)
         self.assertIn('1 observation in Israel', description)
+
+
+class HomePageLanguageTests(SeoFixture):
+    """Phase 2: the home page's language, title, description, canonical and hreflang are in the HTML the
+    server sends -- not only what app.js produces afterwards."""
+
+    def tag(self, html, pattern):
+        import re
+        return re.search(pattern, html, re.S).group(1)
+
+    def test_hebrew_home(self):
+        html = self.page('/')
+        self.assertIn('<html lang="he" dir="rtl">', html)
+        title = self.tag(html, r'<title>(.*?)</title>')
+        self.assertTrue(title.startswith('חינניות ים'))
+        self.assertTrue(title.endswith('| SeaSlugs'))
+        self.assertIn('חינניות ים (Sea Slugs)', self.tag(html, r'<meta name="description" content="(.*?)">'))
+        self.assertIn('<meta property="og:locale" content="he_IL">', html)
+
+    def test_english_home_is_server_rendered_in_english(self):
+        html = self.page('/?lang=en')
+        self.assertIn('<html lang="en" dir="ltr">', html)
+        self.assertIn('<title>Sea Slugs &amp; Nudibranchs: Mediterranean Research Project and Photo Collection | SeaSlugs</title>', html)
+        self.assertIn('Israeli research on sea slugs and nudibranchs', self.tag(html, r'<meta name="description" content="(.*?)">'))
+        self.assertIn('<meta property="og:locale" content="en_US">', html)
+
+    def test_a_remembered_language_cookie_does_not_change_the_address_into_english(self):
+        self.client.cookies['seaslugs_lang'] = 'en'
+        html = self.page('/')
+        self.assertIn('<html lang="he" dir="rtl">', html)
+        self.assertIn(f'<link rel="canonical" href="{BASE}/">', html)
+
+    def test_explicit_hebrew_parameter_keeps_the_root_canonical(self):
+        html = self.page('/?lang=he')
+        self.assertIn('<html lang="he" dir="rtl">', html)
+        self.assertIn(f'<link rel="canonical" href="{BASE}/">', html)
+
+    def test_both_languages_are_available_to_the_language_button(self):
+        import json
+        html = self.page('/')
+        data = json.loads(self.tag(html, r'<script id="seo-text" type="application/json">(.*?)</script>'))
+        self.assertEqual(set(data), {'he', 'en'})
+        self.assertTrue(data['he']['title'].startswith('חינניות ים'))
+        self.assertTrue(data['en']['title'].startswith('Sea Slugs'))
+
+    def test_the_old_description_naming_romblon_first_is_gone(self):
+        for url in ('/', '/?lang=en'):
+            self.assertNotIn('רומבלון', self.page(url).split('<body>')[0])
+
+    def test_the_gallery_application_is_still_served(self):
+        html = self.page('/')
+        for needle in ('/catalog.js', '/app.js', '/styles.css', 'id="collectionTitle"'):
+            self.assertIn(needle, html)

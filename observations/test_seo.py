@@ -72,12 +72,16 @@ class ShareMetaTests(SeoFixture):
         html = self.page(f'/genus/{self.genus.name}/')
         self.assertIn('<meta property="og:description" content="Chromodoris — תצפיות, תמונות ומידע', html)
 
-    def test_gallery_home_has_share_tags_but_no_hreflang(self):
+    def test_gallery_home_has_share_tags_and_its_own_canonical_and_hreflang_per_language(self):
         html = self.page('/')
         self.assertIn(f'<link rel="canonical" href="{BASE}/">', html)
         self.assertIn(f'<meta property="og:image" content="{BASE}/intro-photo.jpg">', html)
-        self.assertNotIn('hreflang', html)
-        self.assertNotIn(f'<link rel="canonical" href="{BASE}/?lang=en">', self.page('/?lang=en'))
+        self.assertIn(f'<link rel="alternate" hreflang="he" href="{BASE}/">', html)
+        self.assertIn(f'<link rel="alternate" hreflang="en" href="{BASE}/?lang=en">', html)
+        self.assertIn(f'<link rel="alternate" hreflang="x-default" href="{BASE}/">', html)
+        english = self.page('/?lang=en')
+        self.assertIn(f'<link rel="canonical" href="{BASE}/?lang=en">', english)
+        self.assertNotIn(f'<link rel="canonical" href="{BASE}/">', english)
 
     def test_dive_trips_page_has_share_tags(self):
         html = self.page('/observations/trips/')
