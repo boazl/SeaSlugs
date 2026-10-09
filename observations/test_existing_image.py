@@ -16,7 +16,8 @@ STORAGES = {'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'
 @override_settings(STORAGES=STORAGES)
 class ExistingImageTests(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user('owner', password='a-valid-password-927')
+        self.user = User.objects.create_superuser('owner', 'o@example.com', 'a-valid-password-927')
+        self.member = User.objects.create_user('member', password='a-valid-password-927')
         country = Country.objects.create(name='Israel')
         region = Region.objects.create(name='Akhziv', country=country, sea=Sea.objects.create(name='Mediterranean'))
         self.trip = DiveTrip.objects.create(title='Akhziv dive', code='I26Aug', year=2026, month=2, country=country, region=region)
@@ -34,6 +35,16 @@ class ExistingImageTests(TestCase):
 
     def data(self, **extra):
         return dict({'species': 'Target species', 'trip': str(self.trip.pk), 'site': '', 'kind': 'species'}, **extra)
+
+    def test_a_regular_user_cannot_use_a_gallery_image(self):
+        self.client.force_login(self.member)
+        page = self.client.get('/observations/new/')
+        self.assertNotIn('existing_image', page.context['form'].fields)
+        self.assertNotContains(page, 'name="existing_image"')
+        # a posted reference is ignored, so with no image or video of their own nothing is created
+        response = self.client.post('/observations/new/', self.data(existing_image=f'/observations/{self.source.pk}/photo/'))
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Sample.objects.filter(species=self.target_species).exists())
 
     def test_the_observation_points_at_the_same_file_as_the_chosen_gallery_image(self):
         response = self.client.post('/observations/new/', self.data(existing_image=f'https://seaslugs.org.il/observations/{self.source.pk}/photo/'))
@@ -81,7 +92,8 @@ class ExistingImageTests(TestCase):
 @override_settings(STORAGES=STORAGES)
 class ImageSearchTests(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user('owner', password='a-valid-password-927')
+        self.user = User.objects.create_superuser('owner', 'o@example.com', 'a-valid-password-927')
+        self.member = User.objects.create_user('member', password='a-valid-password-927')
         country = Country.objects.create(name='Israel')
         region = Region.objects.create(name='Akhziv', country=country, sea=Sea.objects.create(name='Mediterranean'))
         self.trip = DiveTrip.objects.create(title='Akhziv dive', code='I26Aug', year=2026, country=country, region=region)
@@ -97,8 +109,10 @@ class ImageSearchTests(TestCase):
     def ids(self, **params):
         return [r['id'] for r in self.client.get('/observations/image-search/', params).json()['results']]
 
-    def test_requires_login(self):
+    def test_requires_login_and_a_manager(self):
         self.assertEqual(self.client.get('/observations/image-search/').status_code, 302)
+        self.client.force_login(self.member)
+        self.assertEqual(self.client.get('/observations/image-search/').status_code, 404)
 
     def test_lists_only_published_observations_with_an_image(self):
         self.client.force_login(self.user)
@@ -119,8 +133,9 @@ class ImageSearchTests(TestCase):
         self.assertEqual(row['trip'], 'Akhziv dive')
         self.assertIn('Chromodoris', row['label'])
 
-    def test_copy_address_button_is_for_signed_in_users_only(self):
+    def test_copy_address_button_is_for_managers_only(self):
         self.assertNotContains(self.client.get('/observations/trips/'), 'data-copy-url')
+        self.client.force_login(self.member)
+        self.assertNotContains(self.client.get('/observations/'), 'data-copy-url')
         self.client.force_login(self.user)
-        page = self.client.get('/observations/')
-        self.assertContains(page, f'data-copy-url="/observations/{self.a.pk}/photo/"')
+        self.assertContains(self.client.get('/observations/'), f'data-copy-url="/observations/{self.a.pk}/photo/"')

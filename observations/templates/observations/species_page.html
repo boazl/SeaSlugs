@@ -157,7 +157,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
                 {# Hero is a video: a small thumbnail of the main observation's photo under the name; a click opens it large. #}
                 <button type="button" class="species-thumb" data-full="{% url 'observation-photo' main_sample.pk %}" aria-label="{{ "הגדלת התמונה"|t:lang }}"><img src="{% url 'observation-photo' main_sample.pk %}" alt="{{ species_label }}" width="160" height="107" loading="lazy"><span aria-hidden="true">⤢</span></button>
                 {% endif %}
-                {% if user.is_authenticated and main_sample.image %}<button type="button" class="copy-photo-url" data-copy-url="{% url 'observation-photo' main_sample.pk %}" data-done="{{ "הכתובת הועתקה"|t:lang }}" style="margin-top:8px;padding:4px 10px;font-size:13px">{{ "העתקת כתובת התמונה"|t:lang }}</button>{% endif %}
+                {% if can_copy_image and main_sample.image %}<button type="button" class="copy-photo-url" data-copy-url="{% url 'observation-photo' main_sample.pk %}" data-done="{{ "הכתובת הועתקה"|t:lang }}" style="margin-top:8px;padding:4px 10px;font-size:13px">{{ "העתקת כתובת התמונה"|t:lang }}</button>{% endif %}
                 {% if species.link or species.article_pdf %}
                 <div class="species-links">
                     {% if species.link %}<a href="{{ species.link }}" target="_blank" rel="noopener">{{ "קישור נוסף ↗"|t:lang }}</a>{% endif %}
@@ -230,14 +230,14 @@ gtag('config', 'G-CPGTC09P2P');</script>
                             {% with photog=s|photographer_name:lang %}{% if photog %}<span class="photographer">{{ "צילום:"|t:lang }} {{ photog }}</span>{% endif %}{% endwith %}
                         </span>
                     </a>
-                    {% if user.is_authenticated and s.image %}<button type="button" class="copy-photo-url" data-copy-url="{% url 'observation-photo' s.pk %}" data-done="{{ "הכתובת הועתקה"|t:lang }}" style="margin-top:8px;padding:4px 10px;font-size:13px">{{ "העתקת כתובת התמונה"|t:lang }}</button>{% endif %}
+                    {% if can_copy_image and s.image %}<button type="button" class="copy-photo-url" data-copy-url="{% url 'observation-photo' s.pk %}" data-done="{{ "הכתובת הועתקה"|t:lang }}" style="margin-top:8px;padding:4px 10px;font-size:13px">{{ "העתקת כתובת התמונה"|t:lang }}</button>{% endif %}
                 </article>
                 {% endfor %}
             </div>
         </section>
         {% endif %}
     </main>
-    {% if user.is_authenticated %}{% include 'observations/_copy_url.html' %}{% endif %}
+    {% if can_copy_image %}{% include 'observations/_copy_url.html' %}{% endif %}
     <dialog class="lightbox" id="lightbox" aria-label="{{ "הגדלת התמונה"|t:lang }}"><button type="button" class="close" id="lightbox-close" aria-label="{{ "סגירה"|t:lang }}">✕</button><img id="lightbox-img" alt="{{ species_label }}"><div id="lightbox-video" class="lightbox-video" hidden></div></dialog>
     <script>
     (function(){

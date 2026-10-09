@@ -200,6 +200,7 @@ def species_page(request, slug):
         species_label, common_name, taxon_label(family_obj), taxon_label(order_obj), len(samples), place, lang,
         migrant=species.is_migrant and seo_text.is_mediterranean(area), migrant_year=species.first_observed_year))
     return render(request, 'observations/species_page.html', {
+        'can_copy_image': is_manager(request.user),
         'meta_title': meta_title, 'meta_description': meta_description, 'place_label': place,
         'area': area, 'species': species, 'species_label': species_label, 'samples': samples,
         'main_sample': main_sample, 'other_samples': other_samples,
@@ -756,6 +757,8 @@ def edit(request,pk=None):
     old_image_name=item.image.name if item.pk and item.image else ''
     form=SampleForm(request.POST or None,request.FILES or None,instance=item,initial=initial)
     manager=is_manager(request.user)
+    if not manager:
+        del form.fields['existing_image']      # re-using a gallery image is for managers only
     if manager and not item.species_other:
         # A manager adds the species to the catalog (link below the species field) instead of typing a free-text "other species".
         form.fields['species_other'].widget=forms.HiddenInput()
@@ -820,6 +823,8 @@ def edit(request,pk=None):
 def image_search(request):
     """Published observations that have an image, for the picker on the observation form (JSON). `q` matches the
     species / taxon name, title or trip (every word must match); `trip` limits it to one trip. 48 per page."""
+    if not is_manager(request.user):
+        raise Http404
     q = (request.GET.get('q') or '').strip()
     offset = max(_int(request.GET.get('offset')) or 0, 0)
     rows = Sample.objects.filter(status=Sample.Status.PUBLISHED, deleted_at__isnull=True).exclude(image='').select_related('species', 'trip')
