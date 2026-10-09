@@ -1,19 +1,88 @@
-{% extends 'observations/base.html' %}{% load seaslugs_i18n %}{% block html_lang %}{{ lang }}{% endblock %}{% block html_dir %}{% if lang == 'en' %}ltr{% else %}rtl{% endif %}{% endblock %}{% load seaslugs_i18n seo %}{% block share_meta %}{% share_meta "מסעות צלילה"|t:lang "SeaSlugs" "סרטוני אוסף ממסעות צלילה, לצד הדגימות המשויכות לכל מסע."|t:lang %}{% endblock %}{% block content %}<style>.trip-species summary{cursor:pointer;margin:12px 0}.trip-thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px;margin-top:12px}.trip-thumb{display:flex;flex-direction:column;gap:4px;text-decoration:none;color:inherit;font-size:14px}.trip-thumb i{color:#64dfce;font-family:Georgia,"Times New Roman",serif;font-size:15px;overflow-wrap:anywhere}.trip-thumb small{font-size:12px}.trip-thumb-img{position:relative;display:block;aspect-ratio:4/3;border-radius:6px;overflow:hidden;background:#0d2732}.trip-thumb-img img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .3s}.trip-thumb:hover img{transform:scale(1.05)}.trip-thumb-play{position:absolute;bottom:6px;inset-inline-start:6px;width:26px;height:26px;border-radius:50%;background:#05141dcc;display:grid;place-items:center;font-size:11px;color:#fff}</style>
+{% extends 'observations/base.html' %}{% load seaslugs_i18n %}{% block html_lang %}{{ lang }}{% endblock %}{% block html_dir %}{% if lang == 'en' %}ltr{% else %}rtl{% endif %}{% endblock %}{% load seaslugs_i18n seo %}{% block share_meta %}{% share_meta "מסעות צלילה"|t:lang "SeaSlugs" "סרטוני אוסף ממסעות צלילה, לצד הדגימות המשויכות לכל מסע."|t:lang %}{% endblock %}{% block content %}<style>.trip-thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px;margin-top:12px}.trip-thumb{display:flex;flex-direction:column;gap:4px;text-decoration:none;color:inherit;font-size:14px}.trip-thumb i{color:#64dfce;font-family:Georgia,"Times New Roman",serif;font-size:15px;overflow-wrap:anywhere}.trip-thumb small{font-size:12px}.trip-thumb-img{position:relative;display:block;aspect-ratio:4/3;border-radius:6px;overflow:hidden;background:#0d2732}.trip-thumb-img img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .3s}.trip-thumb:hover img{transform:scale(1.05)}.trip-thumb-play{position:absolute;bottom:6px;inset-inline-start:6px;width:26px;height:26px;border-radius:50%;background:#05141dcc;display:grid;place-items:center;font-size:11px;color:#fff}.trips-table{width:100%;border-collapse:collapse;margin:16px 0 32px}.trips-table th,.trips-table td{padding:10px 12px;border-bottom:1px solid #36515a;text-align:start;vertical-align:top}.trips-table thead th{white-space:nowrap}.trips-table .col-toggle{width:34px;padding-inline-end:0}.trips-table .col-count{text-align:center;white-space:nowrap}
+.trip-sort{all:unset;box-sizing:border-box;cursor:pointer;font-weight:700;color:#64dfce}.trip-sort:hover,.trip-sort:focus-visible{text-decoration:underline}.trip-sort::after{content:" \2195";opacity:.4;font-weight:400}th[aria-sort=ascending] .trip-sort::after{content:" \2191";opacity:1}th[aria-sort=descending] .trip-sort::after{content:" \2193";opacity:1}
+.trip-row.expandable{cursor:pointer}.trip-row.expandable:hover td{background:#0d2732}.trip-row.open td{background:#0d2732;border-bottom-color:transparent}
+.trip-toggle{all:unset;box-sizing:border-box;cursor:pointer;display:inline-grid;place-items:center;width:24px;height:24px;border-radius:5px;color:#64dfce}.trip-toggle:focus-visible{outline:2px solid #61dfcc}
+.trip-arrow{display:block;font-size:14px;line-height:1;transition:transform .15s}html[dir=rtl] .trip-arrow{transform:scaleX(-1)}html .trip-row.open .trip-arrow{transform:rotate(90deg)}
+.trip-detail>td{padding:4px 12px 22px;background:#0b222d}.trip-detail p{margin:6px 0}.trip-detail h3{font-size:16px;margin:14px 0 0}.trip-name a{color:inherit;text-decoration:none}
+@media (prefers-reduced-motion:reduce){.trip-arrow{transition:none}}
+</style>
 <h1>{{ "מסעות צלילה"|t:lang }}</h1>
 <p>{{ "סרטוני אוסף ממסעות צלילה, לצד הדגימות המשויכות לכל מסע."|t:lang }}</p>
 {% include 'observations/_trip_filters.html' %}
-{% for trip in trips %}
-<section style="margin:32px 0;border-top:1px solid #36515a;padding-top:20px">
-<h2>{{ trip.display_title }}</h2>
-<p>{% if trip.country %}{{ trip.country|loc:lang }}{% else %}{{ trip.country_name }}{% endif %} · {% if trip.region %}{{ trip.region|loc:lang }}{% else %}{{ trip.region_name }}{% endif %}{% if trip.site %} · {{ trip.site|loc:lang }}{% elif trip.display_reserve %} · {{ trip.display_reserve }}{% endif %}{% if trip.year %} · {% if trip.month %}{{ trip.month }}/{% endif %}{{ trip.year }}{% endif %}</p>
-{% if trip.display_description %}<p>{{ trip.display_description|linebreaksbr }}</p>{% endif %}
-<p>{{ "מספר מינים בגלריה:"|t:lang }} <strong>{{ trip.display_species_count }}</strong></p>
+{% if trips_with_video %}
+<h2>{{ "סרטוני המסעות"|t:lang }}</h2>
 <div class="cards">
-{% for item in trip.public_samples %}{% if item.kind == 'collection' %}
-<article><a href="{% if item.video_url %}{{item.video_url}}{% else %}{% url 'observation-photo' item.pk %}{% endif %}" target="_blank" rel="noopener">{% if item.image %}<img src="{% url 'observation-photo' item.pk %}" alt="" loading="lazy">{% else %}<img src="{{item.thumbnail}}" alt="" loading="lazy">{% endif %}<h3>{% if lang == 'en' %}{{ trip.display_title }}{% else %}{{ item.title }}{% endif %}</h3><small>{{ "צילום:"|t:lang }} {{ item|photographer_name:lang }}</small><span>{% if item.video_url %}{{ "צפייה בסרטון המסע ב־YouTube ↗"|t:lang }}{% else %}{{ "צפייה בתמונה המלאה ↗"|t:lang }}{% endif %}</span></a></article>
-{% endif %}{% endfor %}</div>
-<details class="trip-species"><summary>{{ "דגימות מינים מהמסע"|t:lang }}</summary><div class="trip-thumbs">{% for item in trip.public_samples %}{% if item.kind == 'species' %}<a class="trip-thumb" href="{% if item.video_url %}{{item.video_url}}{% else %}{% url 'observation-photo' item.pk %}{% endif %}" target="_blank" rel="noopener"><span class="trip-thumb-img">{% if item.image %}<img src="{% url 'observation-photo' item.pk %}" alt="" loading="lazy">{% else %}<img src="{{item.thumbnail}}" alt="" loading="lazy">{% endif %}{% if item.video_url %}<span class="trip-thumb-play" aria-hidden="true">▶</span>{% endif %}</span><i dir="ltr">{{item.species}}</i><small>{{ "צילום:"|t:lang }} {{ item|photographer_name:lang }}</small></a>{% endif %}{% endfor %}</div></details>
-
-</section>
-{% empty %}<p>{{ "עדיין אין מסעות עם סרטונים מפורסמים."|t:lang }}</p>{% endfor %}
+{% for trip in trips_with_video %}{% for item in trip.video_cards %}<article><a href="{% if item.video_url %}{{item.video_url}}{% else %}{% url 'observation-photo' item.pk %}{% endif %}" target="_blank" rel="noopener">{% if item.image %}<img src="{% url 'observation-photo' item.pk %}" alt="" loading="lazy">{% else %}<img src="{{item.thumbnail}}" alt="" loading="lazy">{% endif %}<h3>{% if lang == 'en' %}{{ trip.display_title }}{% else %}{{ item.title }}{% endif %}</h3><small>{{ trip.display_place }}{% if trip.date_text %} · {{ trip.date_text }}{% endif %}</small><small>{{ "צילום:"|t:lang }} {{ item|photographer_name:lang }}</small><span>{% if item.video_url %}{{ "צפייה בסרטון המסע ב־YouTube ↗"|t:lang }}{% else %}{{ "צפייה בתמונה המלאה ↗"|t:lang }}{% endif %}</span></a></article>{% endfor %}{% endfor %}</div>
+{% endif %}
+{% if trips %}
+<h2>{{ "טבלת המסעות"|t:lang }}</h2>
+<table class="trips-table" id="trips-table" data-initial-sort="{{ sort }}" data-lang="{{ lang }}">
+<thead><tr><th scope="col" class="col-toggle"><span class="visually-hidden" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">{{ "פתיחה או סגירה של דגימות המסע"|t:lang }}</span></th>
+<th scope="col" data-key="title"><button type="button" class="trip-sort">{{ "שם המסע"|t:lang }}</button></th>
+<th scope="col" data-key="place"><button type="button" class="trip-sort">{{ "מקום"|t:lang }}</button></th>
+<th scope="col" data-key="date" data-type="number"><button type="button" class="trip-sort">{{ "תאריך"|t:lang }}</button></th>
+<th scope="col" class="col-count" data-key="species" data-type="number"><button type="button" class="trip-sort">{{ "מינים בגלריה"|t:lang }}</button></th></tr></thead>
+{% for trip in trips %}<tbody class="trip-group" id="trip-{{ trip.pk }}">
+<tr class="trip-row{% if trip.species_samples or trip.display_description %} expandable{% endif %}" data-title="{{ trip.display_title }}" data-place="{{ trip.display_place }}" data-date="{{ trip.date_key }}" data-species="{{ trip.species_total }}">
+<td class="col-toggle">{% if trip.species_samples or trip.display_description %}<button type="button" class="trip-toggle" aria-expanded="true" aria-controls="trip-detail-{{ trip.pk }}" aria-label="{{ 'פתיחה או סגירה של דגימות המסע'|t:lang }}: {{ trip.display_title }}"><span class="trip-arrow" aria-hidden="true">&#9656;</span></button>{% endif %}</td>
+<td class="trip-name">{{ trip.display_title }}</td><td>{{ trip.display_place }}</td><td>{{ trip.date_text }}</td><td class="col-count">{{ trip.species_total }}</td></tr>
+{% if trip.species_samples or trip.display_description %}<tr class="trip-detail" id="trip-detail-{{ trip.pk }}"><td colspan="5">
+{% if trip.display_description %}<p>{{ trip.display_description|linebreaksbr }}</p>{% endif %}
+{% if trip.species_samples %}<h3>{{ "דגימות מינים מהמסע"|t:lang }}</h3><div class="trip-thumbs">{% for item in trip.species_samples %}<a class="trip-thumb" href="{% if item.video_url %}{{item.video_url}}{% else %}{% url 'observation-photo' item.pk %}{% endif %}" target="_blank" rel="noopener"><span class="trip-thumb-img">{% if item.image %}<img src="{% url 'observation-photo' item.pk %}" alt="" loading="lazy">{% else %}<img src="{{item.thumbnail}}" alt="" loading="lazy">{% endif %}{% if item.video_url %}<span class="trip-thumb-play" aria-hidden="true">&#9654;</span>{% endif %}</span><i dir="ltr">{{item.species}}</i><small>{{ "צילום:"|t:lang }} {{ item|photographer_name:lang }}</small></a>{% endfor %}</div>{% endif %}
+</td></tr>{% endif %}
+</tbody>{% endfor %}
+</table>
+<script>
+(() => {
+  const table = document.getElementById('trips-table');
+  if (!table) return;
+  const collator = new Intl.Collator(table.dataset.lang === 'en' ? 'en' : 'he', {numeric: true, sensitivity: 'base'});
+  const groups = () => [...table.querySelectorAll('tbody.trip-group')];
+  const original = groups();
+  function setOpen(group, open) {
+    const row = group.querySelector('.trip-row'), detail = group.querySelector('.trip-detail'), button = row.querySelector('.trip-toggle');
+    if (!detail) return;
+    detail.hidden = !open;
+    row.classList.toggle('open', open);
+    button.setAttribute('aria-expanded', String(open));
+  }
+  // Without JavaScript the samples stay visible; with it they start closed.
+  for (const group of original) setOpen(group, false);
+  table.addEventListener('click', event => {
+    if (event.target.closest('a')) return;
+    const row = event.target.closest('tr.trip-row.expandable');
+    if (row && table.contains(row)) setOpen(row.closest('tbody'), !row.classList.contains('open'));
+  });
+  const value = (group, key, numeric) => {
+    const raw = group.querySelector('.trip-row').dataset[key] || '';
+    return numeric ? Number(raw) : raw;
+  };
+  function sortBy(th, direction) {
+    const key = th.dataset.key, numeric = th.dataset.type === 'number';
+    const sorted = original.slice().sort((a, b) => {
+      const x = value(a, key, numeric), y = value(b, key, numeric);
+      const result = numeric ? x - y : collator.compare(x, y);
+      return (result || original.indexOf(a) - original.indexOf(b)) * (result ? direction : 1);
+    });
+    for (const group of sorted) table.appendChild(group);
+    for (const other of table.querySelectorAll('thead th[data-key]')) other.setAttribute('aria-sort', other === th ? (direction > 0 ? 'ascending' : 'descending') : 'none');
+  }
+  const headers = [...table.querySelectorAll('thead th[data-key]')];
+  for (const th of headers) {
+    th.setAttribute('aria-sort', 'none');
+    // First click: text and place A-Z, date and species count from the largest/newest.
+    th.querySelector('button').addEventListener('click', () => {
+      const current = th.getAttribute('aria-sort');
+      const first = th.dataset.type === 'number' ? -1 : 1;
+      sortBy(th, current === 'none' ? first : current === 'ascending' ? -1 : 1);
+    });
+  }
+  const initial = table.dataset.initialSort || '-date';
+  const initialTh = headers.find(th => th.dataset.key === initial.replace('-', ''));
+  if (initialTh) initialTh.setAttribute('aria-sort', initial.startsWith('-') ? 'descending' : 'ascending');
+  const target = location.hash.match(/^#trip-(\d+)$/);
+  if (target) { const group = document.getElementById('trip-' + target[1]); if (group) { setOpen(group, true); group.scrollIntoView(); } }
+})();
+</script>
+{% else %}<p>{{ "עדיין אין מסעות עם תמונות או סרטונים מפורסמים."|t:lang }}</p>{% endif %}
 {% endblock %}

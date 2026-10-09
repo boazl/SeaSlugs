@@ -92,7 +92,7 @@ class DiveTripTests(TestCase):
         self.assertNotContains(self.client.get('/observations/trips/'),'Trip collection')
         sample.save_reviewed(actor=self.user,approve=True)
         response=self.client.get('/observations/trips/')
-        self.assertContains(response,'Trip collection');self.assertContains(response,'<strong>4</strong>')
+        self.assertContains(response,'Trip collection');self.assertContains(response,'class="col-count">4</td>')
         catalog=json.loads(self.client.get('/catalog.js').content.decode().split('=',1)[1].strip().removesuffix(';'))
         self.assertEqual(len(catalog['species']), 4)
         self.assertEqual(len(catalog['collections']), 1)
@@ -102,6 +102,47 @@ class DiveTripTests(TestCase):
         self.assertNotContains(self.client.get('/observations/trips/'),'Trip collection')
         catalog=json.loads(self.client.get('/catalog.js').content.decode().split('=',1)[1].strip().removesuffix(';'))
         self.assertEqual(catalog['collections'], [])
+
+    def test_trips_page_is_videos_then_a_sortable_table_with_expandable_rows(self):
+        species = Sample(owner=self.user, kind='species', trip=self.trip, species=self.species, video_url='https://youtu.be/abcdefghijk')
+        species.save_reviewed()
+        video = self.collection(); video.save_reviewed(actor=self.user, approve=True)
+        html = self.client.get('/observations/trips/').content.decode()
+        # Videos first, then the table; one row per trip, each column header sortable.
+        self.assertLess(html.index('סרטוני המסעות'), html.index('id="trips-table"'))
+        self.assertEqual(html.count('<tr class="trip-row'), 1)
+        for key in ('title', 'place', 'date', 'species'):
+            self.assertIn(f'data-key="{key}"', html)
+        self.assertIn('class="trip-row expandable"', html)
+        self.assertIn('aria-expanded="true" aria-controls="trip-detail-%d"' % self.trip.pk, html)
+        # The toggle is the first cell of the row and the species samples are in the detail row.
+        row = html[html.index('<tr class="trip-row'):html.index('<tr class="trip-detail"')]
+        self.assertLess(row.index('trip-toggle'), row.index('trip-name'))
+        detail = html[html.index('<tr class="trip-detail"'):html.index('</tbody>')]
+        self.assertIn('Test species', detail)
+        self.assertIn('data-date="202600"', html)
+        self.assertIn('Philippines · Romblon', html)
+
+    def test_trips_page_in_english_is_ltr_with_translated_headers(self):
+        video = self.collection(); video.save_reviewed(actor=self.user, approve=True)
+        html = self.client.get('/observations/trips/', {'lang': 'en'}).content.decode()
+        self.assertIn('dir="ltr"', html)
+        for text in ('Trip videos', 'Table of trips', 'Location', 'Date', 'Species in the gallery'):
+            self.assertIn(text, html)
+
+    def test_a_trip_without_species_or_description_has_no_toggle_and_no_detail_row(self):
+        video = self.collection(); video.save_reviewed(actor=self.user, approve=True)
+        html = self.client.get('/observations/trips/').content.decode()
+        self.assertEqual(html.count('<tr class="trip-row"'), 1)
+        self.assertNotIn('id="trip-detail-', html)
+        self.assertNotIn('class="trip-toggle"', html)
+
+    def test_a_trip_with_only_species_photos_is_in_the_table_but_not_in_the_video_section(self):
+        species = Sample(owner=self.user, kind='species', trip=self.trip, species=self.species, video_url='https://youtu.be/abcdefghijk')
+        species.save_reviewed()
+        html = self.client.get('/observations/trips/').content.decode()
+        self.assertIn('id="trips-table"', html)
+        self.assertNotIn('סרטוני המסעות', html.split('<table')[0].split('</form>')[-1])
 
     def test_collection_form_and_transfer(self):
         data={'title':'Collection','kind':'collection','trip':self.trip.pk,'species':'','video_url':'https://youtu.be/abcdefghijk'}

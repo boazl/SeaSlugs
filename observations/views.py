@@ -15,6 +15,7 @@ from .notifications import notify_new_user_registered
 from . import seo_text
 from .gallery_data import TaxonResolver, taxon_media, area_samples
 from .i18n import get_lang
+from .templatetags.seaslugs_i18n import loc
 from .species_redirects import historical_species_redirect
 
 
@@ -47,7 +48,18 @@ def trips(request):
         # The free-text reserve/site name is usually typed in Hebrew -- left out in English.
         hebrew = any('\u0590' <= ch <= '\u05ff' for ch in trip.reserve)
         trip.display_reserve = '' if lang == 'en' and hebrew else trip.reserve
-    return render(request, 'observations/trips.html', {'trips':rows, **filters})
+        # The table row: one place string, a sortable date key and the two kinds of media.
+        trip.display_place = ' · '.join(x for x in (
+            loc(trip.country, lang) if trip.country_id else trip.country_name,
+            loc(trip.region, lang) if trip.region_id else trip.region_name,
+            loc(trip.site, lang) if trip.site_id else trip.display_reserve) if x)
+        trip.date_key = (trip.year or 0) * 100 + (trip.month or 0)
+        trip.date_text = (f'{trip.month}/{trip.year}' if trip.month else str(trip.year)) if trip.year else ''
+        trip.video_cards = [x for x in trip.public_samples if x.kind == 'collection']
+        trip.species_samples = [x for x in trip.public_samples if x.kind == 'species']
+        trip.species_total = trip.display_species_count
+    return render(request, 'observations/trips.html', {'trips':rows, **filters,
+        'trips_with_video': [t for t in rows if t.video_cards]})
 
 
 def sample_edit_url(request, samples):
