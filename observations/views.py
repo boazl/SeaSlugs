@@ -25,7 +25,9 @@ def trips(request):
     from django.db.models import Prefetch
     published = Sample.objects.filter(status='published', deleted_at__isnull=True, trip__isnull=False,
         trip__country__isnull=False, trip__region__isnull=False, trip__year__isnull=False,
-        species_other='', site_other='').filter(Q(kind='collection', species__isnull=True) | Q(kind='species',species__isnull=False)).select_related('species','trip','owner','owner__profile')
+        species_other='', site_other='').filter(Q(kind='collection', species__isnull=True) | Q(kind='species',species__isnull=False)
+        ).filter(Q(image__gt='') | Q(video_url__gt='')   # the public list shows only trips that have media (photo or video)
+        ).select_related('species','trip','owner','owner__profile')
     available = DiveTrip.objects.filter(samples__in=published).distinct()
     rows, filters = _trip_list_context(request, available)
     rows = list(rows.select_related('country', 'region', 'site')

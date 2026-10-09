@@ -48,6 +48,38 @@ class DiveTripTests(TestCase):
         sample.soft_delete(self.user)
         self.assertEqual(list(self.client.get('/observations/trips/').context['trips']), [])
 
+    def test_public_list_shows_only_trips_with_a_photo_or_a_video(self):
+        # A published observation with neither media must not put its trip on the public list;
+        # a photo alone, or a video alone, is enough.
+        sample = self.collection(); sample.save_reviewed(actor=self.user, approve=True)
+        Sample.objects.filter(pk=sample.pk).update(video_url='', image='')
+        listed = lambda: [t.pk for t in self.client.get('/observations/trips/').context['trips']]
+        self.assertEqual(listed(), [])
+        Sample.objects.filter(pk=sample.pk).update(image='observations/photo.jpg')
+        self.assertEqual(listed(), [self.trip.pk])
+        Sample.objects.filter(pk=sample.pk).update(image='', video_url='https://youtu.be/abcdefghijk')
+        self.assertEqual(listed(), [self.trip.pk])
+
+    def test_public_list_hides_the_trip_without_media_but_keeps_the_one_with(self):
+        other = DiveTrip.objects.create(code='W', title='Anilao', year=2025, country=self.country, region=self.region)
+        with_media = self.collection(); with_media.save_reviewed(actor=self.user, approve=True)
+        bare = Sample(owner=self.user, kind='collection', trip=other, title='Bare', video_url='https://youtu.be/zzzzzzzzzzz')
+        bare.save_reviewed(actor=self.user, approve=True)
+        Sample.objects.filter(pk=bare.pk).update(video_url='')
+        response = self.client.get('/observations/trips/')
+        self.assertEqual([t.pk for t in response.context['trips']], [self.trip.pk])
+        self.assertNotContains(response, 'Anilao')
+
+    def test_a_species_observation_without_media_is_not_listed_under_its_trip(self):
+        with_video = Sample(owner=self.user, kind='species', trip=self.trip, species=self.species, video_url='https://youtu.be/abcdefghijk')
+        with_video.save_reviewed()
+        bare_species = Species.objects.create(scientific_name='Bare species')
+        bare = Sample(owner=self.user, kind='species', trip=self.trip, species=bare_species, video_url='https://youtu.be/bbbbbbbbbbb')
+        bare.save_reviewed()
+        Sample.objects.filter(pk=bare.pk).update(video_url='')
+        trip = self.client.get('/observations/trips/').context['trips'][0]
+        self.assertEqual([x.pk for x in trip.public_samples], [with_video.pk])
+
     def test_public_separation_and_soft_delete(self):
         # species_count (the field) is deliberately left at 153 (set in setUp) to prove the
         # displayed/catalog count ignores it and reflects only real published species samples.
