@@ -14,6 +14,9 @@ from .species_redirects import HISTORICAL_SPECIES_REDIRECTS, validate_mappings
 
 OLD = 'diniatys-dentifer-phillipines-indo-pacific'
 CURRENT = 'diniatys-dentifer-phillipines-indo-pacific-south-china-sea'
+# The one redirect added after the 37 verified on 2026-10-08: the duplicate "Coryphellina sp. B"
+# page that migration 0062 merged into the "sp. B" population's page.
+MERGED = 'coryphellina-sp-b-phillipines-indo-pacific-south-china-sea-2'
 UNRESOLVED = ('doto-sp', 'eubranchus-mandapamensis', 'nakamigawaia-sp', 'tenellia-sp')
 
 
@@ -22,8 +25,10 @@ class MappingValidationTests(SimpleTestCase):
         return {'old_slug': old, 'current_slug': current,
                 'sample_transfer_id': sample_id or str(uuid4())}
 
-    def test_manifest_has_only_37_approved_sources_and_no_unresolved_species(self):
-        self.assertEqual(len(HISTORICAL_SPECIES_REDIRECTS), 37)
+    def test_manifest_has_only_the_37_approved_sources_plus_the_merged_page_and_no_unresolved_species(self):
+        self.assertEqual(len(set(HISTORICAL_SPECIES_REDIRECTS) - {MERGED}), 37)
+        self.assertEqual(set(HISTORICAL_SPECIES_REDIRECTS) & {MERGED}, {MERGED})
+        self.assertEqual(len(HISTORICAL_SPECIES_REDIRECTS), 38)
         self.assertEqual(HISTORICAL_SPECIES_REDIRECTS[OLD][0], CURRENT)
         for stem in UNRESOLVED:
             self.assertNotIn(stem + '-phillipines-indo-pacific', HISTORICAL_SPECIES_REDIRECTS)
@@ -67,16 +72,20 @@ class SpeciesRedirectTests(TestCase):
 
     def make_destination(self, old, index):
         current, sample_id = HISTORICAL_SPECIES_REDIRECTS[old]
-        species = Species.objects.create(scientific_name=f'Redirectfixture species{index}')
+        # Two historical sources can share one destination (the retired and the merged "sp. B" pages):
+        # the second one's verified sample then belongs to the destination that already exists.
+        existing = SpeciesArea.objects.filter(slug=current).first()
+        species = existing.species if existing else Species.objects.create(scientific_name=f'Redirectfixture species{index}')
         sample = Sample(owner=self.owner, trip=self.trip, species=species,
                         transfer_id=sample_id, video_url=f'https://youtu.be/{index:011d}')
         sample.save_reviewed()
         area = SpeciesArea.objects.get(species=species)
-        area.slug = current
-        area.save(update_fields=['slug'])
+        if area.slug != current:
+            area.slug = current
+            area.save(update_fields=['slug'])
         return area, sample
 
-    def test_all_37_exact_mappings_redirect_once_to_live_current_pages(self):
+    def test_all_exact_mappings_redirect_once_to_live_current_pages(self):
         for index, (old, (current, _)) in enumerate(HISTORICAL_SPECIES_REDIRECTS.items(), 1):
             if old != OLD:
                 self.make_destination(old, index)
