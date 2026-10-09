@@ -3,7 +3,7 @@
 .trip-row.expandable{cursor:pointer}.trip-row.expandable:hover td{background:#0d2732}.trip-row.open td{background:#0d2732;border-bottom-color:transparent}
 .trip-toggle{all:unset;box-sizing:border-box;cursor:pointer;display:inline-grid;place-items:center;width:24px;height:24px;border-radius:5px;color:#64dfce}.trip-toggle:focus-visible{outline:2px solid #61dfcc}
 .trip-arrow{display:block;font-size:14px;line-height:1;transition:transform .15s}html[dir=rtl] .trip-arrow{transform:scaleX(-1)}html .trip-row.open .trip-arrow{transform:rotate(90deg)}
-.trip-detail>td{padding:4px 12px 22px;background:#0b222d}.trip-detail p{margin:6px 0}.trip-detail h3{font-size:16px;margin:14px 0 0}.trip-name a{color:inherit;text-decoration:none}
+.trip-detail>td{padding:4px 12px 22px;background:#0b222d}.trip-detail p{margin:6px 0}.trip-detail h3{font-size:16px;margin:14px 0 0}.trip-name a{color:inherit;text-decoration:none}.card-species{margin:10px 0 0;font-size:15px}
 @media (prefers-reduced-motion:reduce){.trip-arrow{transition:none}}
 </style>
 <h1>{{ "מסעות צלילה"|t:lang }}</h1>
@@ -12,7 +12,7 @@
 {% if trips_with_video %}
 <h2>{{ "סרטוני המסעות"|t:lang }}</h2>
 <div class="cards">
-{% for trip in trips_with_video %}{% for item in trip.video_cards %}<article><a href="{% if item.video_url %}{{item.video_url}}{% else %}{% url 'observation-photo' item.pk %}{% endif %}" target="_blank" rel="noopener">{% if item.image %}<img src="{% url 'observation-photo' item.pk %}" alt="" loading="lazy">{% else %}<img src="{{item.thumbnail}}" alt="" loading="lazy">{% endif %}<h3>{% if lang == 'en' %}{{ trip.display_title }}{% else %}{{ item.title }}{% endif %}</h3><small>{{ trip.display_place }}{% if trip.date_text %} · {{ trip.date_text }}{% endif %}</small><small>{{ "צילום:"|t:lang }} {{ item|photographer_name:lang }}</small><span>{% if item.video_url %}{{ "צפייה בסרטון המסע ב־YouTube ↗"|t:lang }}{% else %}{{ "צפייה בתמונה המלאה ↗"|t:lang }}{% endif %}</span></a></article>{% endfor %}{% endfor %}</div>
+{% for trip in trips_with_video %}{% for item in trip.video_cards %}<article><a href="{% if item.video_url %}{{item.video_url}}{% else %}{% url 'observation-photo' item.pk %}{% endif %}" target="_blank" rel="noopener">{% if item.image %}<img src="{% url 'observation-photo' item.pk %}" alt="" loading="lazy">{% else %}<img src="{{item.thumbnail}}" alt="" loading="lazy">{% endif %}<h3>{% if lang == 'en' %}{{ trip.display_title }}{% else %}{{ item.title }}{% endif %}</h3><small>{{ trip.display_place }}{% if trip.date_text %} · {{ trip.date_text }}{% endif %}</small><small>{{ "צילום:"|t:lang }} {{ item|photographer_name:lang }}</small><span>{% if item.video_url %}{{ "צפייה בסרטון המסע ב־YouTube ↗"|t:lang }}{% else %}{{ "צפייה בתמונה המלאה ↗"|t:lang }}{% endif %}</span></a>{% if forloop.first and trip.species_samples %}<p class="card-species"><a href="#trip-{{ trip.pk }}">{{ "רשימת המינים במסע"|t:lang }} ({{ trip.species_total }}) &#8595;</a></p>{% endif %}</article>{% endfor %}{% endfor %}</div>
 {% endif %}
 {% if trips %}
 <h2>{{ "טבלת המסעות"|t:lang }}</h2>
@@ -80,8 +80,21 @@
   const initial = table.dataset.initialSort || '-date';
   const initialTh = headers.find(th => th.dataset.key === initial.replace('-', ''));
   if (initialTh) initialTh.setAttribute('aria-sort', initial.startsWith('-') ? 'descending' : 'ascending');
-  const target = location.hash.match(/^#trip-(\d+)$/);
-  if (target) { const group = document.getElementById('trip-' + target[1]); if (group) { setOpen(group, true); group.scrollIntoView(); } }
+  function openFromHash() {
+    const match = location.hash.match(/^#trip-(\d+)$/);
+    const group = match && document.getElementById('trip-' + match[1]);
+    if (group && group.classList.contains('trip-group')) { setOpen(group, true); group.scrollIntoView({block: 'start'}); }
+  }
+  // A link on a video card ("the species of this trip") opens that trip's row in the table, even when the address already has that hash.
+  document.addEventListener('click', event => {
+    const link = event.target.closest('a.card-species');
+    if (!link) return;
+    event.preventDefault();
+    history.replaceState(null, '', link.getAttribute('href'));
+    openFromHash();
+  });
+  window.addEventListener('hashchange', openFromHash);
+  openFromHash();
 })();
 </script>
 {% else %}<p>{{ "עדיין אין מסעות עם תמונות או סרטונים מפורסמים."|t:lang }}</p>{% endif %}

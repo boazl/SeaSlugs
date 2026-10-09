@@ -1,10 +1,15 @@
 {% extends 'observations/base.html' %}{% block content %}
 <h1>הוספת מסע צלילה</h1>
 <p>בחרו מקום, שנה וחודש (ברירת המחדל: החודש הנוכחי) ואפשר להוסיף יום. השם והסימון מוצעים אוטומטית ואפשר לשנות אותם.</p>
-<form method="post" id="trip-add-form">{% csrf_token %}<input type="hidden" name="next" value="{{ next }}">
+<form method="post" id="trip-add-form">{% csrf_token %}<input type="hidden" name="next" value="{{ next }}">{% if select_trip %}<input type="hidden" name="select_trip" value="1">{% endif %}
 {{ form.non_field_errors }}
 <p>{{ form.region.errors }}<label for="id_region">{{ form.region.label }}</label>{{ form.region }}</p>
 <p>{{ form.site.errors }}<label for="id_site">{{ form.site.label }}</label>{{ form.site }}<span class="helptext">רשימת האתרים מסוננת לפי האזור. בלי אתר השם נבנה לפי האזור.</span></p>
+<div class="filter-row" style="margin-top:0">
+<label>{{ form.new_site.label }}{{ form.new_site.errors }}{{ form.new_site }}</label>
+<label>{{ form.new_site_en.label }}{{ form.new_site_en.errors }}{{ form.new_site_en }}</label>
+<small style="grid-column:1/-1">האתר לא ברשימה? הקלידו כאן את שמו והוא יתווסף לרשימת אתרי הצלילה באזור שנבחר (אם כבר יש שם אתר כזה, ישמש האתר הקיים).</small>
+</div>
 <div class="filter-row" style="margin-top:0">
 <label>{{ form.year.label }}{{ form.year.errors }}{{ form.year }}</label>
 <label>{{ form.month.label }}{{ form.month.errors }}{{ form.month }}</label>
@@ -29,7 +34,7 @@ for(const n of ['title','code'])$(n).addEventListener('input',()=>{dirty[n]=$(n)
 let pending = 0;
 async function refresh(){
   const q = new URLSearchParams();
-  for(const n of ['region','site','year','month','day','photographer']) if($(n)&&$(n).value) q.set(n,$(n).value);
+  for(const n of ['region','site','year','month','day','photographer','new_site']) if($(n)&&$(n).value) q.set(n,$(n).value);
   const mine = ++pending;
   try{
     const r = await fetch("{% url 'trip-suggest' %}?" + q); if(!r.ok||mine!==pending) return;
@@ -39,7 +44,8 @@ async function refresh(){
   }catch(e){}
 }
 $('region').addEventListener('change',()=>{filterSites();refresh();});
-$('site').addEventListener('change',()=>{if($('site').value)$('region').value=siteRegions[$('site').value]||$('region').value;filterSites();refresh();});
+$('site').addEventListener('change',()=>{if($('site').value){$('region').value=siteRegions[$('site').value]||$('region').value;$('new_site').value='';$('new_site_en').value='';}filterSites();refresh();});
+$('new_site').addEventListener('input',()=>{if($('new_site').value)$('site').value='';refresh();});
 for(const n of ['year','month','day','photographer'])if($(n))$(n).addEventListener('change',refresh);
 for(const n of ['year','day'])if($(n))$(n).addEventListener('input',refresh);
 filterSites();refresh();

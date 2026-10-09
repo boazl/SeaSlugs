@@ -150,6 +150,53 @@ class AddTripTests(Fixture):
         base.update({k: str(v) for k, v in data.items()})
         return self.client.post('/observations/trips/add/', base)
 
+    def test_a_site_that_is_not_listed_is_created_in_the_region_with_the_trip(self):
+        self.client.force_login(self.boaz)
+        response = self.post(new_site='חוף הבונים הצפוני', new_site_en='North Habonim', year=2026, month=8)
+        self.assertEqual(response.status_code, 302)
+        site = Site.objects.get(name='חוף הבונים הצפוני')
+        self.assertEqual((site.region, site.name_en), (self.akhziv, 'North Habonim'))
+        trip = DiveTrip.objects.get(site=site)
+        self.assertEqual(trip.title, 'בעז ליבס חוף הבונים הצפוני 2026')
+
+    def test_a_typed_site_name_that_already_exists_reuses_it(self):
+        self.client.force_login(self.boaz)
+        before = Site.objects.count()
+        self.post(new_site='  קניון אכזיב ', year=2026, month=8)
+        self.post(new_site='akhziv canyon', year=2025, month=8)
+        self.assertEqual(Site.objects.count(), before)
+        self.assertEqual(DiveTrip.objects.filter(site=self.canyon).count(), 2)
+
+    def test_a_listed_site_and_a_new_site_together_is_an_error_and_creates_nothing(self):
+        self.client.force_login(self.boaz)
+        before = (Site.objects.count(), DiveTrip.objects.count())
+        response = self.post(site=self.canyon.pk, new_site='אתר אחר', year=2026, month=8)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual((Site.objects.count(), DiveTrip.objects.count()), before)
+
+    def test_nothing_is_created_when_the_trip_itself_is_invalid(self):
+        self.client.force_login(self.boaz)
+        before = Site.objects.count()
+        response = self.post(new_site='אתר חדש לגמרי', year=2026, month=13)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Site.objects.count(), before)
+
+    def test_from_the_observation_form_the_new_trip_comes_back_selected(self):
+        self.client.force_login(self.boaz)
+        response = self.client.post('/observations/trips/add/', {'region': str(self.akhziv.pk), 'year': '2026', 'month': '8',
+            'next': '/observations/new/', 'select_trip': '1'})
+        trip = DiveTrip.objects.get(year=2026)
+        self.assertEqual(response.url, f'/observations/new/?trip={trip.pk}')
+        page = self.client.get('/observations/trips/add/?next=/observations/new/&select_trip=1')
+        self.assertContains(page, 'name="select_trip"')
+
+    def test_suggest_names_a_new_site_without_creating_it(self):
+        self.client.force_login(self.boaz)
+        before = Site.objects.count()
+        data = self.client.get('/observations/trips/suggest/', {'region': self.akhziv.pk, 'new_site': 'חוף חדש', 'year': 2026, 'month': 8}).json()
+        self.assertEqual(data['title'], 'בעז ליבס חוף חדש 2026')
+        self.assertEqual(Site.objects.count(), before)
+
     def test_form_starts_from_filters_and_the_current_month(self):
         self.client.force_login(self.boaz)
         form = self.client.get(f'/observations/trips/add/?site={self.canyon.pk}').context['form']

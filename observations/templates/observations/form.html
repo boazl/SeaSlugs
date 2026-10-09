@@ -7,7 +7,8 @@
 <form method="post" action="{% url 'observation-action' form.instance.pk %}"><input type="hidden" name="action" value="delete_image">{% csrf_token %}<button type="submit" id="delete-image-btn" data-has-image="{% if form.instance.image %}1{% endif %}" {% if not form.instance.image %}disabled{% endif %}>מחיקת התמונה</button></form>
 <form method="post" action="{% url 'observation-action' form.instance.pk %}"><input type="hidden" name="action" value="delete_video">{% csrf_token %}<button type="submit" id="delete-video-btn" data-has-video="{% if form.instance.video_url %}1{% endif %}" {% if not form.instance.video_url %}disabled{% endif %}>מחיקת קישור הסרטון</button></form>
 </div>{% endif %}
-{% if observation_form and trip_new_url %}<p><a href="{{ trip_new_url }}?next={{ request.path|urlencode }}">מסע הצלילה לא ברשימה? הוספת מסע חדש</a></p>{% endif %}
+{% if observation_form and species_add_url %}<p id="species-add-holder"><a id="species-add-link" href="{{ species_add_url }}?next={{ request.path|urlencode }}">המין לא ברשימה? הוספת מין חדש לרשימה</a></p>{% endif %}
+{% if observation_form and trip_add_url %}<p id="trip-add-holder"><a id="trip-add-link" href="{{ trip_add_url }}?next={{ request.path|urlencode }}&amp;select_trip=1">המסע או אתר הצלילה לא ברשימה? הוספת מסע חדש (אפשר להוסיף בו גם אתר חדש)</a></p>{% endif %}
 {% if observation_form %}{{ locations|json_script:'locations' }}<script>
 const locations=JSON.parse(document.getElementById('locations').textContent);
 const otherFields=['site'];
@@ -25,8 +26,54 @@ function updateSites(reset){
   }
   if(reset&&siteField.selectedOptions[0]?.disabled)siteField.value='';
 }
+// The "add a new species" link sits right under the species field.
+(function(){const holder=document.getElementById('species-add-holder'),field=document.getElementById('id_species');
+  if(holder&&field&&field.closest('p'))field.closest('p').after(holder);})();
 const tripEl=document.getElementById('id_trip');
 if(tripEl)tripEl.addEventListener('change',()=>updateSites(true));
+// The trip list keeps growing: filters (not submitted) narrow it to the relevant trips.
+(function tripFilters(){
+  if(!tripEl||!locations.filters)return;
+  const f=locations.filters;
+  const wrap=document.createElement('div');wrap.className='filter-row trip-picker-filters';
+  const make=(id,label,all,items)=>{const l=document.createElement('label');l.textContent=label;const s=document.createElement('select');s.id=id;
+    const first=document.createElement('option');first.value='';first.textContent=all;s.appendChild(first);
+    for(const it of items){const o=document.createElement('option');o.value=it.id;o.textContent=it.name;for(const k of ['country_id','region_id'])if(it[k]!=null)o.dataset[k==='country_id'?'country':'region']=it[k];s.appendChild(o);}
+    l.appendChild(s);wrap.appendChild(l);return s;};
+  const country=make('tf-country','מדינה','כל המדינות',f.countries),region=make('tf-region','אזור','כל האזורים',f.regions),
+    site=make('tf-site','אתר','כל האתרים',f.sites),year=make('tf-year','שנה','כל השנים',f.years.map(y=>({id:y,name:y})));
+  const row=tripEl.closest('p');row.parentNode.insertBefore(wrap,row);
+  const count=document.createElement('small');count.id='trip-filter-count';row.appendChild(count);
+  // The "add a trip" link sits right under the trip field and carries the current filters into the add form.
+  const addHolder=document.getElementById('trip-add-holder'),addLink=document.getElementById('trip-add-link');
+  if(addHolder)row.after(addHolder);
+  function syncAddLink(){if(!addLink)return;const q=new URLSearchParams({next:location.pathname,select_trip:'1'});
+    for(const [name,el] of [['region',region],['site',site],['year',year]])if(el.value)q.set(name,el.value);
+    addLink.href=addLink.pathname+'?'+q;}
+  const shown=t=>(!country.value||String(t.country_id)===country.value)&&(!region.value||String(t.region_id)===region.value)
+    &&(!site.value||String(t.site_id)===site.value)&&(!year.value||String(t.year)===year.value);
+  function narrowChoices(){
+    for(const o of region.options)if(o.value)o.hidden=o.disabled=!!country.value&&o.dataset.country!==country.value;
+    for(const o of site.options)if(o.value){const r=f.regions.find(x=>String(x.id)===o.dataset.region);
+      o.hidden=o.disabled=(!!region.value&&o.dataset.region!==region.value)||(!!country.value&&!!r&&String(r.country_id)!==country.value);}
+    for(const s of [region,site])if(s.selectedOptions[0]?.disabled)s.value='';
+  }
+  function apply(userChange){
+    narrowChoices();
+    for(const o of tripEl.options){if(!o.value)continue;const t=locations.trips.find(x=>String(x.id)===o.value);o.hidden=o.disabled=!!t&&!shown(t);}
+    if(tripEl.selectedOptions[0]?.disabled){tripEl.value='';tripEl.dispatchEvent(new Event('change'));}
+    const any=country.value||region.value||site.value||year.value;
+    if(userChange&&any&&!tripEl.value){const open=[...tripEl.options].filter(o=>o.value&&!o.disabled);
+      if(open.length===1){tripEl.value=open[0].value;tripEl.dispatchEvent(new Event('change'));}}
+    syncAddLink();
+    const n=[...tripEl.options].filter(o=>o.value&&!o.disabled).length;count.textContent=any?(n===0?'אין מסע שמתאים למסננים.':'מסעות שמתאימים למסננים: '+n):'';
+  }
+  country.addEventListener('change',()=>apply(true));
+  region.addEventListener('change',()=>{if(region.value){const r=f.regions.find(x=>String(x.id)===region.value);if(r)country.value=r.country_id;}apply(true);});
+  site.addEventListener('change',()=>{if(site.value){const x=f.sites.find(y=>String(y.id)===site.value);if(x){region.value=x.region_id;const r=f.regions.find(z=>z.id===x.region_id);if(r)country.value=r.country_id;}}apply(true);});
+  year.addEventListener('change',()=>apply(true));
+  apply(false);
+})();
 for(const name of otherFields){const el=document.getElementById('id_'+name);if(el)el.addEventListener('change',updateOther);}
 updateSites(false);updateOther();
 

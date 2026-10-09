@@ -1,0 +1,28 @@
+{% extends 'observations/base.html' %}{% block content %}
+<h1>הוספת מין חדש לרשימה</h1>
+<p>המין יתווסף לרשימת המינים ותחזרו לטופס התצפית כשהוא כבר נבחר. כל מין חייב מחבר ושנת תיאור (רק sp. שטרם תואר פטור), ואם הסוג כבר קיים המשפחה והסדרה יתמלאו לבד.</p>
+<form method="post" id="species-add-form">{% csrf_token %}<input type="hidden" name="next" value="{{ next }}">
+{{ form.non_field_errors }}
+<div class="filter-row" style="margin-top:0">
+{% for field in form %}<label>{{ field.label }}{{ field.errors }}{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}</label>{% endfor %}
+</div>
+<div class="actions"><button type="submit">הוספת המין</button><a href="{{ next }}">ביטול</a></div>
+</form>
+<datalist id="dl-orders">{% for o in taxonomy.orders %}<option value="{{ o }}">{% endfor %}</datalist>
+<datalist id="dl-families">{% for f in taxonomy.families %}<option value="{{ f.0 }}">{% endfor %}</datalist>
+<datalist id="dl-genera">{% for g in taxonomy.genera %}<option value="{{ g.0 }}">{% endfor %}</datalist>
+{{ taxonomy|json_script:'taxonomy' }}
+<script>
+const tax = JSON.parse(document.getElementById('taxonomy').textContent);
+const $ = id => document.getElementById('id_' + id);
+$('genus').setAttribute('list', 'dl-genera'); $('family').setAttribute('list', 'dl-families'); $('order').setAttribute('list', 'dl-orders');
+$('species').setAttribute('dir', 'ltr'); $('genus').setAttribute('dir', 'ltr'); $('author').setAttribute('dir', 'ltr');
+// A known genus fills in its family and order (only into empty fields).
+$('genus').addEventListener('change', () => {
+  const known = tax.genera.find(g => g[0].toLowerCase() === $('genus').value.trim().toLowerCase());
+  if (!known) return;
+  if (!$('family').value) $('family').value = known[1];
+  if (!$('order').value) $('order').value = known[2];
+});
+</script>
+{% endblock %}

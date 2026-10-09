@@ -74,6 +74,7 @@ TRANSLATIONS = {
     'דגימות מינים מהמסע': 'Species observations from this trip',
     'עדיין אין מסעות עם תמונות או סרטונים מפורסמים.': 'No trips with published photos or videos yet.',
     'סרטוני המסעות': 'Trip videos',
+    'רשימת המינים במסע': 'Species list of this trip',
     'טבלת המסעות': 'Table of trips',
     'שם המסע': 'Trip',
     'מקום': 'Location',

@@ -7,6 +7,7 @@ urlpatterns=[
  path('new/',views.edit,name='observation-new'),
  path('species-search/',views.species_search,name='species-search'),
  path('species-area-status/',views.species_area_status,name='species-area-status'),
+ path('species/new/',views.species_new,name='species-new'),
  path('trips/new/',views.trip_new,name='trip-new'),
  path('trips/manage/',views.trips_manage,name='trips-manage'),
  path('trips/add/',views.trip_add,name='trip-add'),

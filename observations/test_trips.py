@@ -144,6 +144,25 @@ class DiveTripTests(TestCase):
         self.assertIn('id="trips-table"', html)
         self.assertNotIn('סרטוני המסעות', html.split('<table')[0].split('</form>')[-1])
 
+    def test_video_card_links_to_the_species_row_of_its_trip(self):
+        Sample(owner=self.user, kind='species', trip=self.trip, species=self.species, video_url='https://youtu.be/abcdefghijk').save_reviewed()
+        video = self.collection(); video.save_reviewed(actor=self.user, approve=True)
+        html = self.client.get('/observations/trips/').content.decode()
+        self.assertIn('class="card-species"><a href="#trip-%d">' % self.trip.pk, html)
+        self.assertIn('id="trip-%d"' % self.trip.pk, html)
+
+    def test_observation_form_gets_trip_filter_data(self):
+        site_trip = DiveTrip.objects.create(code='W', title='Anilao', year=2025, country=self.country, region=self.region)
+        self.client.force_login(self.user)
+        response = self.client.get('/observations/new/')
+        data = response.context['locations']
+        self.assertEqual({t['id'] for t in data['trips']}, {self.trip.pk, site_trip.pk})
+        self.assertEqual([c['id'] for c in data['filters']['countries']], [self.country.pk])
+        self.assertEqual([r['id'] for r in data['filters']['regions']], [self.region.pk])
+        self.assertEqual(data['filters']['years'], [2026, 2025])
+        self.assertIn({'id': self.trip.pk, 'region_id': self.region.pk, 'country_id': self.country.pk, 'site_id': None, 'year': 2026}, data['trips'])
+        self.assertContains(response, 'tripFilters')
+
     def test_collection_form_and_transfer(self):
         data={'title':'Collection','kind':'collection','trip':self.trip.pk,'species':'','video_url':'https://youtu.be/abcdefghijk'}
         form=SampleForm(data,instance=Sample(owner=self.user))

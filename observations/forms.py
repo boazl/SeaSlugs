@@ -1,7 +1,9 @@
+import re
 from io import BytesIO
 from uuid import uuid4
 from PIL import Image, ImageOps, UnidentifiedImageError
 from django import forms
+from django.db.models import Q
 from django.urls import reverse
 from django.utils.html import format_html
 from django.core.files.base import ContentFile
@@ -496,12 +498,74 @@ class DiveTripForm(forms.ModelForm):
         return trip
 
 
+def site_for_new_name(region, name, name_en=''):
+    """The Site a typed-in site name stands for in this region: the existing one when the name (Hebrew or
+    English, any case) is already there -- so typing a known site never duplicates it -- otherwise a new,
+    unsaved Site. None when no name or no region was given."""
+    name, name_en = (name or '').strip(), (name_en or '').strip()
+    if not (name and region):
+        return None
+    existing = Site.objects.filter(region=region).filter(Q(name__iexact=name) | Q(name_en__iexact=name)).first()
+    return existing or Site(name=name, name_en=name_en, region=region)
+
+
+class SpeciesQuickForm(forms.Form):
+    """A manager adds a species that is not in the catalog yet, from the observation form. Follows the
+    catalog rules: no duplicates (a name already there is refused), an author for every species except
+    an undescribed "sp." one, and the family/order/superfamily filled in from the taxonomy tables."""
+    genus = forms.CharField(max_length=150, label='סוג (Genus)')
+    species = forms.CharField(max_length=150, label='מין (Species)', help_text='שם המין בלבד, למשל strigata. אפשר גם cf. strigata או sp. 7.')
+    author = forms.CharField(required=False, max_length=200, label='מחבר ושנת תיאור', help_text='למשל Rudman, 1982. חובה לכל מין מלבד sp. שטרם תואר.')
+    family = forms.CharField(required=False, max_length=150, label='משפחה (Family)', help_text='נשלף אוטומטית כשהסוג כבר קיים. לסוג חדש יש למלא.')
+    order = forms.CharField(required=False, max_length=150, label='סדרה (Order)')
+    name_he = forms.CharField(required=False, max_length=200, label='שם בעברית (לא חובה)')
+    name_en = forms.CharField(required=False, max_length=200, label='שם באנגלית (לא חובה)')
+
+    def clean(self):
+        data = super().clean()
+        genus, epithet = ' '.join((data.get('genus') or '').split()), ' '.join((data.get('species') or '').split())
+        if not genus or not epithet:
+            return data
+        data['genus'], data['species'] = genus, epithet
+        if ' ' in genus:
+            self.add_error('genus', 'הסוג הוא מילה אחת.')
+        elif Species.find_by_name(f'{genus} {epithet}'):
+            self.add_error('species', 'המין כבר קיים ברשימה.')
+        if not (data.get('author') or '').strip() and not re.match(r'^sp(\.|\s|$)', epithet, re.I):
+            self.add_error('author', 'חובה לציין מחבר ושנה (רק sp. שטרם תואר פטור).')
+        family, order, superfamily = (data.get('family') or '').strip(), (data.get('order') or '').strip(), ''
+        known = TaxonGenus.objects.select_related('family__order').filter(name__iexact=genus).first()
+        if known and known.family_id:
+            family = family or known.family.name
+            order = order or (known.family.order.name if known.family.order_id else '')
+        row = TaxonFamily.objects.select_related('order').filter(name=family).exclude(order=None).first() if family else None
+        if row:
+            order = order or row.order.name
+            superfamily = row.superfamily
+        if not family:
+            self.add_error('family', 'הסוג חדש ברשימה — יש לציין את המשפחה.')
+        data.update(family=family, order=order, superfamily=superfamily, author=(data.get('author') or '').strip())
+        return data
+
+    def save(self):
+        d = self.cleaned_data
+        species = Species.objects.create(genus=d['genus'], species=d['species'], author=d['author'], family=d['family'],
+            order=d['order'], superfamily=d['superfamily'], name_he=d['name_he'].strip(), name_en=d['name_en'].strip())
+        # A new genus also gets its taxonomy row, so the gallery can show it.
+        if not TaxonGenus.objects.filter(name__iexact=d['genus']).exists():
+            family = TaxonFamily.objects.filter(name=d['family'], sub_family='').first()
+            TaxonGenus.objects.create(name=d['genus'], family=family)
+        return species
+
+
 class TripQuickForm(forms.ModelForm):
     """The fast dive-trip form: place (a site, or just a region), year, month, optional day, and a
     suggested name and code (trip_naming) that the server fills in whenever they are left empty.
     `photographer` only feeds the name and code -- a trip has no photographer of its own."""
     region = forms.ModelChoiceField(Region.objects.select_related('country').all(), label='אזור')
     site = forms.ModelChoiceField(Site.objects.all(), required=False, label='אתר צלילה (לא חובה)')
+    new_site = forms.CharField(required=False, max_length=180, label='אתר חדש — אם האתר לא ברשימה (לא חובה)')
+    new_site_en = forms.CharField(required=False, max_length=180, label='שם האתר החדש באנגלית (לא חובה)')
     photographer = forms.ModelChoiceField(User.objects.none(), required=False, label='צלם')
     day = forms.IntegerField(required=False, min_value=1, max_value=31, label='יום (לא חובה)')
     title = forms.CharField(required=False, max_length=400, label='שם המסע')
@@ -526,6 +590,16 @@ class TripQuickForm(forms.ModelForm):
         from .trip_naming import suggest_title, suggest_code
         data = super().clean()
         region, site = data.get('region'), data.get('site')
+        self._new_site = None
+        if (data.get('new_site') or '').strip():
+            if site:
+                self.add_error('new_site', 'בחרו אתר מהרשימה או הקלידו אתר חדש, לא את שניהם.')
+            else:
+                found = site_for_new_name(region, data['new_site'], data.get('new_site_en'))
+                if found and found.pk:
+                    site = data['site'] = found            # already in the list: use it
+                elif found:
+                    site, self._new_site = found, found    # created on save
         if site and region and site.region_id != region.id:
             self.add_error('site', 'האתר אינו שייך לאזור שנבחר.')
         if data.get('month') and not 1 <= data['month'] <= 12:
@@ -556,6 +630,9 @@ class TripQuickForm(forms.ModelForm):
         trip.region_name = trip.region.name_en or trip.region.name
         trip.start_day = self.cleaned_data.get('day')
         if commit:
+            if self._new_site:
+                self._new_site.save()
+                trip.site = self._new_site
             # a derived letter becomes permanent the first time a trip uses it
             region_code(trip.region, persist=True)
             photographer_letter(self.cleaned_data.get('photographer') or self.user, persist=True)

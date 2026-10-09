@@ -4,13 +4,14 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group
 from django.db.models import Q
+from django import forms
 from django.http import Http404, FileResponse, JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme, urlencode
 from .models import Sample, Profile, Region, Site, DiveTrip, SiteImage, Species, Country, SpeciesArea, SampleKind, KIND_EN_NAMES, TaxonGenus, TaxonFamily, TaxonOrder, full_name_for
-from .forms import SignupForm, SampleForm, ProfileForm, DiveTripForm, TripQuickForm, taxonomy_for_form, species_name_options
+from .forms import SpeciesQuickForm, SignupForm, SampleForm, ProfileForm, DiveTripForm, TripQuickForm, taxonomy_for_form, species_name_options
 from .notifications import notify_new_user_registered
 from . import seo_text
 from .gallery_data import TaxonResolver, taxon_media, area_samples
@@ -703,6 +704,24 @@ def divetrip_locations(request):
     })
 
 
+def trip_picker_data():
+    """What the observation form's trip filters (country / region / site / year) need: every trip's
+    place and year, and the names of the places that have a trip, so the browser can narrow the long
+    trip list without a round trip. Also keeps the region->site mapping the site field already uses."""
+    trips = list(DiveTrip.objects.values('id', 'region_id', 'country_id', 'site_id', 'year'))
+    used = lambda key: {t[key] for t in trips if t[key]}
+    return {
+        'trips': trips,
+        'sites': list(Site.objects.values('id', 'region_id')),
+        'filters': {
+            'countries': [{'id': c.pk, 'name': str(c)} for c in Country.objects.filter(pk__in=used('country_id')).order_by('name')],
+            'regions': [{'id': r.pk, 'name': str(r), 'country_id': r.country_id} for r in Region.objects.filter(pk__in=used('region_id')).order_by('name')],
+            'sites': [{'id': x.pk, 'name': str(x), 'region_id': x.region_id} for x in Site.objects.filter(pk__in=used('site_id')).order_by('name')],
+            'years': sorted(used('year'), reverse=True),
+        },
+    }
+
+
 @login_required
 def edit(request,pk=None):
     if pk:
@@ -716,6 +735,9 @@ def edit(request,pk=None):
     initial={}
     trip_param=request.GET.get('trip')
     if trip_param and request.method!='POST': initial['trip']=trip_param
+    # Back from "add a new species": the species just added is already chosen.
+    added=Species.objects.filter(pk=_int(request.GET.get('new_species'))).first() if request.method!='POST' and not pk else None
+    if added: initial.update(genus=added.genus,species=added.species,family=added.family,order=added.order)
     # Opened from a taxon page that has no observation of its own yet: a new order/family/genus
     # observation with its kind and name filled in (managers -- they are the ones who edit taxon pages).
     kind_param=request.GET.get('kind')
@@ -732,6 +754,10 @@ def edit(request,pk=None):
     else:
         next_url=reverse('observations')
     form=SampleForm(request.POST or None,request.FILES or None,instance=item,initial=initial)
+    manager=is_manager(request.user)
+    if manager and not item.species_other:
+        # A manager adds the species to the catalog (link below the species field) instead of typing a free-text "other species".
+        form.fields['species_other'].widget=forms.HiddenInput()
     if request.user.is_staff: form.enable_add_links()
     if is_manager(request.user): form.enable_taxon_files()
     if request.method=='POST' and form.is_valid():
@@ -778,10 +804,27 @@ def edit(request,pk=None):
             extra_tags='new-observation' if is_new_observation else '')
         return redirect(f'{next_url}#obs-{item.pk}')
     return render(request,'observations/form.html',{'form':form,'title':'תצפית / Sample','observation_form':True,
-        'trip_new_url':reverse('trip-new'),'next':next_url,
+        'trip_new_url':reverse('trip-new'),'trip_add_url':reverse('trip-add'),'species_add_url':reverse('species-new') if manager else '','next':next_url,
         'species_options':species_name_options(),
         'taxonomy':taxonomy_for_form(),
-        'locations':{'trips':list(DiveTrip.objects.values('id','region_id')),'sites':list(Site.objects.values('id','region_id'))}})
+        'locations':trip_picker_data()})
+
+
+@login_required
+def species_new(request):
+    """A manager adds a species that is not in the catalog (genus, species, author, family...), then
+    returns to the observation form with it already chosen."""
+    if not is_manager(request.user):
+        raise Http404
+    next_url = request.POST.get('next') or request.GET.get('next') or reverse('observation-new')
+    if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
+        next_url = reverse('observation-new')
+    form = SpeciesQuickForm(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        species = form.save()
+        messages.success(request, f'המין נוסף לרשימה: {species.full_name}.')
+        return redirect(next_url + ('&' if '?' in next_url else '?') + urlencode({'new_species': species.pk}))
+    return render(request, 'observations/species_add.html', {'form': form, 'next': next_url, 'taxonomy': taxonomy_for_form()})
 
 
 @login_required
@@ -879,18 +922,22 @@ def trip_add(request):
     next_url = request.POST.get('next') or request.GET.get('next') or reverse('trips-manage')
     if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
         next_url = reverse('trips-manage')
+    # Coming from the observation form: go back to it with the new trip already selected.
+    select_trip = bool(request.POST.get('select_trip') or request.GET.get('select_trip'))
     if request.method == 'POST':
         form = TripQuickForm(request.POST, user=request.user)
         if form.is_valid():
             trip = form.save()
             messages.success(request, f'המסע נוסף: {trip.title} ({trip.code}).')
+            if select_trip:
+                next_url += ('&' if '?' in next_url else '?') + urlencode({'trip': trip.pk})
             return redirect(next_url)
     else:
         region, site, year = _trip_filters(request.GET)
         today = date.today()
         form = TripQuickForm(user=request.user, initial={'region': region, 'site': site, 'year': year or today.year,
             'month': today.month, 'photographer': request.user})
-    return render(request, 'observations/trip_add.html', {'form': form, 'next': next_url,
+    return render(request, 'observations/trip_add.html', {'form': form, 'next': next_url, 'select_trip': select_trip,
         'site_regions': {s.pk: s.region_id for s in Site.objects.all()}})
 
 
@@ -906,6 +953,9 @@ def trip_suggest(request):
     user = get_user_model().objects.filter(pk=_int(request.GET.get('photographer'))).first() if is_manager(request.user) else None
     user = user or request.user
     if day is not None and not 1 <= day <= 31: day = None
+    if not site:        # a site typed in by hand (an existing one is matched, a new one is only named)
+        from .forms import site_for_new_name
+        site = site_for_new_name(region, request.GET.get('new_site'))
     return JsonResponse({'title': suggest_title(user, region, site, year, month, day), 'code': suggest_code(user, region, year, month, day)})
 
 
