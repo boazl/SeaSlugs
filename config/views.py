@@ -11,6 +11,11 @@ FILES = {
 }
 
 def gallery_file(request, filename='index.html'):
+    if filename == 'index.html' and request.path != '/':
+        # /index.html is the same page as / -- one address per page. The static assets keep their own paths.
+        from django.http import HttpResponsePermanentRedirect
+        query = request.META.get('QUERY_STRING', '')
+        return HttpResponsePermanentRedirect('/' + (f'?{query}' if query else ''))
     if filename == 'index.html':
         from django.template import engines
         from django.http import HttpResponse
@@ -308,6 +313,7 @@ ROBOTS_DISALLOW = (
     '/observations/species-search/', '/observations/species-area-status/',
     '/observations/login/', '/observations/logout/', '/observations/signup/',
     '/observations/profile/', '/observations/partners/',
+    '/observations/trips/manage/', '/observations/trips/add/', '/observations/trips/suggest/',
 )
 
 

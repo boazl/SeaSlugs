@@ -12,6 +12,7 @@ from django.utils.http import url_has_allowed_host_and_scheme, urlencode
 from .models import Sample, Profile, Region, Site, DiveTrip, SiteImage, Species, Country, SpeciesArea, SampleKind, KIND_EN_NAMES, TaxonGenus, TaxonFamily, TaxonOrder, full_name_for
 from .forms import SignupForm, SampleForm, ProfileForm, DiveTripForm, TripQuickForm, taxonomy_for_form, species_name_options
 from .notifications import notify_new_user_registered
+from . import seo_text
 from .gallery_data import TaxonResolver, taxon_media, area_samples
 from .i18n import get_lang
 from .species_redirects import historical_species_redirect
@@ -178,7 +179,13 @@ def species_page(request, slug):
     # A common name is shown only in its own language (no Hebrew name in the English view).
     common_name = species.name_en if lang == 'en' else species.name_he
     description = (species.description_en or species.description_he) if lang == 'en' else (species.description_he or species.description_en)
+    place = seo_text.area_label(area, lang, seo_text.multi_sea_country_ids())
+    meta_title = seo_text.species_title(species_label, common_name, place)
+    meta_description = (description or seo_text.species_description(
+        species_label, common_name, taxon_label(family_obj), taxon_label(order_obj), len(samples), place, lang,
+        migrant=species.is_migrant and seo_text.is_mediterranean(area), migrant_year=species.first_observed_year))
     return render(request, 'observations/species_page.html', {
+        'meta_title': meta_title, 'meta_description': meta_description, 'place_label': place,
         'area': area, 'species': species, 'species_label': species_label, 'samples': samples,
         'main_sample': main_sample, 'other_samples': other_samples,
         'info': info, 'size_short': size_short, 'depth_short': depth_short, 'sources': sources,

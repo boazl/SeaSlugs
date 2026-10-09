@@ -8,6 +8,17 @@ from django import template
 
 register = template.Library()
 
+
+@register.filter
+def with_lang(url, lang):
+    """Keep the visitor's language across an internal link: '/x/' -> '/x/?lang=en' on an English
+    page, unchanged on a Hebrew one (the default). Used by every navigation link that would
+    otherwise drop the language."""
+    if lang != 'en' or not url or 'lang=' in str(url):
+        return url
+    base, sep, fragment = str(url).partition('#')
+    return f"{base}{'&' if '?' in base else '?'}lang=en{sep}{fragment}"
+
 # Hebrew UI string -> English equivalent. Only entries actually used by the two
 # bilingual templates need to be here; `t` falls back to the Hebrew original for
 # anything missing, so a forgotten entry degrades gracefully instead of breaking.

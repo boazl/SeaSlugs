@@ -55,18 +55,15 @@ class SpeciesPageSitemap(Sitemap):
 
 
 class GenusPageSitemap(Sitemap):
-    """Each genus's dedicated public page (views.genus_page) -- only ones that are actually
-    live. genus_page() 404s when either check below fails (no defining photo/video of its
-    own, or no species actually shown under it), so the sitemap mirrors both."""
+    """Each genus's dedicated public page (views.genus_page) -- exactly the ones that answer 200.
+    genus_page() 404s only when no species is shown under the genus; a genus without a photo of
+    its own still gets a hero from one of its species (views.taxon_hero_media), so it is live and
+    listed. The sitemap therefore applies the same single rule as the page."""
     protocol = 'https'
     changefreq = 'weekly'
     priority = 0.5
 
     def items(self):
-        genera = list(TaxonGenus.objects.select_related('defining_sample'))
-        live = [g for g in genera if any(taxon_media(g.defining_sample)[1:])]
-        if not live:
-            return []
         resolver = TaxonResolver()
         genus_ids_with_species = set()
         for area in SpeciesArea.objects.select_related('species', 'defining_sample'):
@@ -76,7 +73,7 @@ class GenusPageSitemap(Sitemap):
             _, _, genus_obj = resolver.resolve(area.species)
             if genus_obj:
                 genus_ids_with_species.add(genus_obj.pk)
-        return [g for g in live if g.pk in genus_ids_with_species]
+        return list(TaxonGenus.objects.filter(pk__in=genus_ids_with_species).order_by('name'))
 
     def location(self, genus):
         return reverse('genus-page', args=[genus.name])

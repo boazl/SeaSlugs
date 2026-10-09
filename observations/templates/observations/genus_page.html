@@ -64,13 +64,13 @@ gtag('config', 'G-CPGTC09P2P');</script>
 </head>
 
 <body>
-    <header class="masthead"><a class="brand" href="/" aria-label="SeaSlugs — דף הבית"><span class="brand-name"
+    <header class="masthead"><a class="brand" href="{{ '/'|with_lang:lang }}" aria-label="SeaSlugs — דף הבית"><span class="brand-name"
                 dir="ltr">SeaSlugs<span class="brand-dot">.</span></span><span class="brand-he">חינניות
                 ים</span></a>{% include 'observations/account_menu.html' %}<a class="language-switch" href="{{ lang_toggle_url }}">{% if lang == 'en' %}עברית{% else %}English{% endif %}</a></header>
     <main class="species-page">
         {% for message in messages %}<p class="notice{% if message.extra_tags %} {{ message.extra_tags }}{% endif %}">{{ message|t:lang }}</p>{% endfor %}
         <nav class="breadcrumb" aria-label="מיקום בטקסונומיה">
-            <a href="/">{{ "הגלריה"|t:lang }}</a>
+            <a href="{{ '/'|with_lang:lang }}">{{ "הגלריה"|t:lang }}</a>
             {% if taxon_order_label %}<span>›</span><a href="{% url 'order-page' taxon_order.pk %}{% if lang == 'en' %}?lang=en{% endif %}">{{ taxon_order_label }}</a>{% endif %}
             {% if taxon_family_label %}<span>›</span><a href="{% url 'family-page' taxon_family.name %}{% if lang == 'en' %}?lang=en{% endif %}">{{ taxon_family_label }}</a>{% endif %}
             <span>›</span><span aria-current="page" dir="ltr">{{ genus.name }}</span>
