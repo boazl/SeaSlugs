@@ -11,7 +11,7 @@ from django.views.decorators.http import require_POST
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme, urlencode
 from .models import Sample, Profile, Region, Site, DiveTrip, SiteImage, Species, Country, SpeciesArea, SampleKind, KIND_EN_NAMES, TaxonGenus, TaxonFamily, TaxonOrder, full_name_for
-from .forms import SpeciesQuickForm, SignupForm, SampleForm, ProfileForm, DiveTripForm, TripQuickForm, taxonomy_for_form, species_name_options
+from .forms import SiteQuickForm, SpeciesQuickForm, SignupForm, SampleForm, ProfileForm, DiveTripForm, TripQuickForm, taxonomy_for_form, species_name_options
 from .notifications import notify_new_user_registered
 from . import seo_text
 from .gallery_data import TaxonResolver, taxon_media, area_samples
@@ -753,6 +753,7 @@ def edit(request,pk=None):
         next_url=requested_next
     else:
         next_url=reverse('observations')
+    old_image_name=item.image.name if item.pk and item.image else ''
     form=SampleForm(request.POST or None,request.FILES or None,instance=item,initial=initial)
     manager=is_manager(request.user)
     if manager and not item.species_other:
@@ -786,7 +787,9 @@ def edit(request,pk=None):
             undetermined_variant=item.undetermined_variant,
         ).first() if (item.pk is None and item.kind==Sample.Kind.SPECIES and item.species_id and item.trip_id) else None
         if existing:
-            if item.image: existing.image = canonical_image_write(item, existing)
+            if getattr(item,'_shared_image',False):
+                existing.image = item.image.name; existing._shared_image = True   # the chosen gallery image itself, not a copy
+            elif item.image: existing.image = canonical_image_write(item, existing)
             if item.video_url: existing.video_url = item.video_url
             existing.save_reviewed()
             messages.success(request,'תצפית של מין זה כבר קיימת במסע זה — התמונה/הסרטון עודכנו בתצפית הקיימת במקום יצירת כפילות.')
@@ -799,6 +802,9 @@ def edit(request,pk=None):
         # base.html, which renders it with its own highlighted style.
         is_new_observation = item.pk is None
         item.save_reviewed()
+        if getattr(item,'_shared_image',False) and old_image_name and old_image_name!=item.image.name:
+            from .media_transfer import delete_image_if_unused
+            delete_image_if_unused(old_image_name)        # the file this observation used to have, if nothing else uses it
         form.save_taxon_files(item)
         messages.success(request,'התצפית פורסמה.' if item.status=='published' else 'התצפית נשמרה וממתינה להשלמת נתונים ולאישור מנהל.',
             extra_tags='new-observation' if is_new_observation else '')
@@ -808,6 +814,43 @@ def edit(request,pk=None):
         'species_options':species_name_options(),
         'taxonomy':taxonomy_for_form(),
         'locations':trip_picker_data()})
+
+
+@login_required
+def image_search(request):
+    """Published observations that have an image, for the picker on the observation form (JSON). `q` matches the
+    species / taxon name, title or trip (every word must match); `trip` limits it to one trip. 48 per page."""
+    q = (request.GET.get('q') or '').strip()
+    offset = max(_int(request.GET.get('offset')) or 0, 0)
+    rows = Sample.objects.filter(status=Sample.Status.PUBLISHED, deleted_at__isnull=True).exclude(image='').select_related('species', 'trip')
+    if _int(request.GET.get('trip')):
+        rows = rows.filter(trip_id=_int(request.GET.get('trip')))
+    for term in q.split()[:5]:
+        rows = rows.filter(Q(species__scientific_name__icontains=term) | Q(species_other__icontains=term) | Q(genus__icontains=term)
+            | Q(family__icontains=term) | Q(order__icontains=term) | Q(title__icontains=term)
+            | Q(trip__title__icontains=term) | Q(trip__code__icontains=term))
+    page = list(rows.order_by('-created_at', '-pk')[offset:offset + 49])
+    return JsonResponse({'results': [{'id': x.pk, 'url': reverse('observation-photo', args=[x.pk]), 'label': x.taxon_label,
+                                      'trip': x.trip.title if x.trip_id else ''} for x in page[:48]],
+                         'next': offset + 48 if len(page) > 48 else None})
+
+
+@login_required
+def site_new(request):
+    """Add a dive site that is not in the list. Opened from the trip form's "+" in a small window (popup=1): on
+    success it tells the opener which site was created and closes itself; otherwise it returns to `next`."""
+    popup = bool(request.GET.get('popup') or request.POST.get('popup'))
+    next_url = request.POST.get('next') or request.GET.get('next') or reverse('trip-add')
+    if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
+        next_url = reverse('trip-add')
+    form = SiteQuickForm(request.POST or None, initial={'region': _int(request.GET.get('region'))})
+    if request.method == 'POST' and form.is_valid():
+        site = form.save()
+        if popup:
+            return render(request, 'observations/site_added.html', {'site': {'id': site.pk, 'name': site.name, 'region_id': site.region_id}, 'next': next_url})
+        messages.success(request, f'אתר הצלילה נוסף: {site.name}.')
+        return redirect(next_url)
+    return render(request, 'observations/site_add.html', {'form': form, 'popup': popup, 'next': next_url})
 
 
 @login_required
@@ -953,9 +996,6 @@ def trip_suggest(request):
     user = get_user_model().objects.filter(pk=_int(request.GET.get('photographer'))).first() if is_manager(request.user) else None
     user = user or request.user
     if day is not None and not 1 <= day <= 31: day = None
-    if not site:        # a site typed in by hand (an existing one is matched, a new one is only named)
-        from .forms import site_for_new_name
-        site = site_for_new_name(region, request.GET.get('new_site'))
     return JsonResponse({'title': suggest_title(user, region, site, year, month, day), 'code': suggest_code(user, region, year, month, day)})
 
 

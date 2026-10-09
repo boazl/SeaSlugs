@@ -1,0 +1,12 @@
+{% extends 'observations/base.html' %}{% block content %}
+{% if popup %}<style>nav{display:none}main{padding:12px}</style>{% endif %}
+<h1>הוספת אתר צלילה</h1>
+<p>בחרו את האזור והקלידו את שם האתר. אתר שכבר קיים באזור לא יתווסף שוב.</p>
+<form method="post">{% csrf_token %}<input type="hidden" name="next" value="{{ next }}">{% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
+{{ form.non_field_errors }}
+<p>{{ form.region.errors }}<label for="id_region">{{ form.region.label }}</label>{{ form.region }}</p>
+<p>{{ form.name.errors }}<label for="id_name">{{ form.name.label }}</label>{{ form.name }}</p>
+<p>{{ form.name_en.errors }}<label for="id_name_en">{{ form.name_en.label }}</label><bdi dir="ltr">{{ form.name_en }}</bdi></p>
+<div class="actions"><button type="submit">הוספת האתר</button>{% if popup %}<a href="#" onclick="window.close();return false">ביטול</a>{% else %}<a href="{{ next }}">ביטול</a>{% endif %}</div>
+</form>
+{% endblock %}

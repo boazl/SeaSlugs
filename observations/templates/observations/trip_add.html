@@ -4,12 +4,7 @@
 <form method="post" id="trip-add-form">{% csrf_token %}<input type="hidden" name="next" value="{{ next }}">{% if select_trip %}<input type="hidden" name="select_trip" value="1">{% endif %}
 {{ form.non_field_errors }}
 <p>{{ form.region.errors }}<label for="id_region">{{ form.region.label }}</label>{{ form.region }}</p>
-<p>{{ form.site.errors }}<label for="id_site">{{ form.site.label }}</label>{{ form.site }}<span class="helptext">רשימת האתרים מסוננת לפי האזור. בלי אתר השם נבנה לפי האזור.</span></p>
-<div class="filter-row" style="margin-top:0">
-<label>{{ form.new_site.label }}{{ form.new_site.errors }}{{ form.new_site }}</label>
-<label>{{ form.new_site_en.label }}{{ form.new_site_en.errors }}{{ form.new_site_en }}</label>
-<small style="grid-column:1/-1">האתר לא ברשימה? הקלידו כאן את שמו והוא יתווסף לרשימת אתרי הצלילה באזור שנבחר (אם כבר יש שם אתר כזה, ישמש האתר הקיים).</small>
-</div>
+<p>{{ form.site.errors }}<label for="id_site">{{ form.site.label }}</label>{{ form.site }} <a href="{% url 'site-new' %}?popup=1" id="add-site" class="button" target="_blank" title="הוספת אתר צלילה חדש" aria-label="הוספת אתר צלילה חדש" style="padding:4px 12px;font-weight:700">+</a><span class="helptext">רשימת האתרים מסוננת לפי האזור. בלי אתר השם נבנה לפי האזור.</span></p>
 <div class="filter-row" style="margin-top:0">
 <label>{{ form.year.label }}{{ form.year.errors }}{{ form.year }}</label>
 <label>{{ form.month.label }}{{ form.month.errors }}{{ form.month }}</label>
@@ -34,7 +29,7 @@ for(const n of ['title','code'])$(n).addEventListener('input',()=>{dirty[n]=$(n)
 let pending = 0;
 async function refresh(){
   const q = new URLSearchParams();
-  for(const n of ['region','site','year','month','day','photographer','new_site']) if($(n)&&$(n).value) q.set(n,$(n).value);
+  for(const n of ['region','site','year','month','day','photographer']) if($(n)&&$(n).value) q.set(n,$(n).value);
   const mine = ++pending;
   try{
     const r = await fetch("{% url 'trip-suggest' %}?" + q); if(!r.ok||mine!==pending) return;
@@ -44,10 +39,24 @@ async function refresh(){
   }catch(e){}
 }
 $('region').addEventListener('change',()=>{filterSites();refresh();});
-$('site').addEventListener('change',()=>{if($('site').value){$('region').value=siteRegions[$('site').value]||$('region').value;$('new_site').value='';$('new_site_en').value='';}filterSites();refresh();});
-$('new_site').addEventListener('input',()=>{if($('new_site').value)$('site').value='';refresh();});
+$('site').addEventListener('change',()=>{if($('site').value){$('region').value=siteRegions[$('site').value]||$('region').value;}filterSites();refresh();});
 for(const n of ['year','month','day','photographer'])if($(n))$(n).addEventListener('change',refresh);
 for(const n of ['year','day'])if($(n))$(n).addEventListener('input',refresh);
+// "+": the site-add page opens in a small window; the site it creates is added to the list and chosen here.
+$('site').closest('p').querySelector('.helptext').textContent='רשימת האתרים מסוננת לפי האזור. בלי אתר השם נבנה לפי האזור. האתר לא ברשימה? לחצו על + כדי להוסיף אותו.';
+document.getElementById('add-site').addEventListener('click', event => {
+  const url = new URL(event.currentTarget.href); if ($('region').value) url.searchParams.set('region', $('region').value);
+  const win = window.open(url, 'add-site', 'width=620,height=560');
+  if (win) event.preventDefault();       // popup blocked: the link simply opens in a new tab
+});
+window.addEventListener('message', event => {
+  if (event.origin !== location.origin || !event.data || event.data.type !== 'site-added') return;
+  const site = event.data.site;
+  siteRegions[site.id] = site.region_id;
+  if (![...$('site').options].some(o => o.value === String(site.id))) $('site').add(new Option(site.name, site.id));
+  $('region').value = site.region_id; $('site').value = site.id;
+  filterSites(); refresh();
+});
 filterSites();refresh();
 </script>
 {% endblock %}

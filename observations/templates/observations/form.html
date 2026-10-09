@@ -26,6 +26,48 @@ function updateSites(reset){
   }
   if(reset&&siteField.selectedOptions[0]?.disabled)siteField.value='';
 }
+// Image picker: instead of uploading a file, use an image that is already in the gallery -- paste its address
+// or pick it from a window of thumbnails (searchable by species / taxon / trip).
+(function imagePicker(){
+  const input=document.getElementById('id_existing_image');if(!input)return;
+  const fileInput=document.getElementById('id_image'),row=input.closest('p');
+  if(fileInput&&fileInput.closest('p'))fileInput.closest('p').after(row);
+  const preview=document.createElement('img');preview.alt='';preview.hidden=true;preview.style.cssText='display:block;max-width:220px;max-height:160px;object-fit:contain;margin:6px 0';
+  const pick=document.createElement('button');pick.type='button';pick.textContent='בחירה מתמונות הגלריה';pick.style.marginInlineStart='10px';
+  input.after(pick);row.appendChild(preview);
+  const photoOf=v=>{const m=/\/observations\/(\d+)\/photo\/?(?:[?#].*)?$/.exec((v||'').trim());return m?'/observations/'+m[1]+'/photo/':'';};
+  function showPreview(){const u=photoOf(input.value);preview.hidden=!u;if(u)preview.src=u;}
+  input.addEventListener('input',()=>{if(input.value&&fileInput)fileInput.value='';showPreview();});
+  if(fileInput)fileInput.addEventListener('change',()=>{if(fileInput.value){input.value='';showPreview();}});
+  showPreview();
+  const dlg=document.createElement('dialog');dlg.style.cssText='width:min(960px,94vw);max-height:90vh;background:#081c25;color:#e4f3f4;border:1px solid #36515a;border-radius:10px;padding:18px';
+  dlg.innerHTML='<form method="dialog" style="margin:0;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><input type="search" id="ip-q" placeholder="חיפוש לפי מין, סוג, משפחה, כותרת או מסע" style="flex:1;min-width:220px"><label style="display:flex;gap:6px;align-items:center" id="ip-trip-label"><input type="checkbox" id="ip-trip">רק ממסע זה</label><button value="cancel">סגירה</button></form><p id="ip-status" style="margin:10px 0"></p><div id="ip-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;overflow:auto;max-height:62vh"></div><p><button type="button" id="ip-more" hidden>טעינת עוד</button></p>';
+  document.body.appendChild(dlg);
+  const q=dlg.querySelector('#ip-q'),tripOnly=dlg.querySelector('#ip-trip'),grid=dlg.querySelector('#ip-grid'),status=dlg.querySelector('#ip-status'),more=dlg.querySelector('#ip-more');
+  let next=0,token=0;
+  async function load(reset){
+    if(reset){next=0;grid.replaceChildren();}
+    const mine=++token,params=new URLSearchParams({q:q.value.trim(),offset:next});
+    const trip=document.getElementById('id_trip');if(tripOnly.checked&&trip&&trip.value)params.set('trip',trip.value);
+    status.textContent='טוען…';
+    try{
+      const r=await fetch('{% url "image-search" %}?'+params);if(!r.ok||mine!==token)return;const data=await r.json();
+      for(const it of data.results){
+        const b=document.createElement('button');b.type='button';b.style.cssText='all:unset;cursor:pointer;display:flex;flex-direction:column;gap:4px;font-size:13px';
+        const img=document.createElement('img');img.src=it.url;img.alt='';img.loading='lazy';img.style.cssText='width:100%;height:110px;object-fit:cover;border-radius:6px';
+        const cap=document.createElement('span');cap.textContent=it.label;const sub=document.createElement('small');sub.textContent=it.trip;
+        b.append(img,cap,sub);
+        b.addEventListener('click',()=>{input.value=location.origin+it.url;if(fileInput)fileInput.value='';showPreview();dlg.close();});
+        grid.appendChild(b);
+      }
+      next=data.next;more.hidden=next==null;status.textContent=grid.children.length?'':'לא נמצאו תמונות.';
+    }catch(e){status.textContent='שגיאה בטעינת התמונות.';}
+  }
+  let debounce=null;q.addEventListener('input',()=>{clearTimeout(debounce);debounce=setTimeout(()=>load(true),300);});
+  tripOnly.addEventListener('change',()=>load(true));more.addEventListener('click',()=>load(false));
+  q.addEventListener('keydown',e=>{if(e.key==='Enter')e.preventDefault();});
+  pick.addEventListener('click',()=>{const trip=document.getElementById('id_trip'),lbl=dlg.querySelector('#ip-trip-label');lbl.hidden=!(trip&&trip.value);if(lbl.hidden)tripOnly.checked=false;dlg.showModal();if(!grid.children.length)load(true);q.focus();});
+})();
 // The "add a new species" link sits right under the species field.
 (function(){const holder=document.getElementById('species-add-holder'),field=document.getElementById('id_species');
   if(holder&&field&&field.closest('p'))field.closest('p').after(holder);})();

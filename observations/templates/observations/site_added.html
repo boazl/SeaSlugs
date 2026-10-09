@@ -1,0 +1,11 @@
+{% extends 'observations/base.html' %}{% block content %}
+<style>nav{display:none}main{padding:12px}</style>
+<h1>האתר נוסף</h1>
+<p>האתר "{{ site.name }}" נוסף לרשימת אתרי הצלילה. אפשר לסגור את החלון.</p>
+<p><button type="button" onclick="window.close()">סגירה</button> <a href="{{ next }}">חזרה</a></p>
+{{ site|json_script:"added-site" }}
+<script>
+const site = JSON.parse(document.getElementById('added-site').textContent);
+if (window.opener) { window.opener.postMessage({type: 'site-added', site: site}, location.origin); window.close(); }
+</script>
+{% endblock %}

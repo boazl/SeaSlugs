@@ -89,8 +89,6 @@ def photographer_letter(user, persist=False):
 
 
 def _same_place(trips, region, site):
-    if site and not site.pk:        # a site about to be created has no trips yet
-        return trips.none()
     return trips.filter(site=site) if site else trips.filter(region=region)
 
 

@@ -884,7 +884,7 @@ class Sample(models.Model):
                 image_changed = not original or original['image'] != self.image.name
                 if image_changed:
                     duplicate = Sample.objects.exclude(pk=self.pk).filter(deleted_at__isnull=True, image_hash=digest).first()
-                    if duplicate: errors['image'] = f'התמונה הזו כבר קיימת בתצפית אחרת ({duplicate}). לא ניתן להשתמש באותה תמונה פעמיים.'
+                    if duplicate and not getattr(self, '_shared_image', False): errors['image'] = f'התמונה הזו כבר קיימת בתצפית אחרת ({duplicate}). לא ניתן להשתמש באותה תמונה פעמיים.'
         else:
             self.image_hash = ''
         if self.video_url:

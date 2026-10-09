@@ -1,0 +1,13 @@
+<script>
+// "Copy image address": puts the absolute address of an observation's image on the clipboard, to paste into the
+// "existing gallery image" field of the observation form.
+document.addEventListener('click', function (event) {
+  var button = event.target.closest('[data-copy-url]');
+  if (!button) return;
+  event.preventDefault();
+  var url = new URL(button.dataset.copyUrl, location.origin).href, label = button.textContent;
+  var done = function () { button.textContent = button.dataset.done; setTimeout(function () { button.textContent = label; }, 1800); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, function () { window.prompt(label, url); });
+  else window.prompt(label, url);
+});
+</script>

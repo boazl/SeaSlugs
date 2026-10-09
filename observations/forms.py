@@ -186,6 +186,8 @@ class SampleForm(forms.ModelForm):
     # depends on the kind (form.html's script enables/disables them live, and
     # Sample.sync_taxonomy() normalises on the server). Each is a text input with a <datalist>
     # that the script narrows by the level above it.
+    existing_image = forms.CharField(required=False, label='או: תמונה קיימת בגלריה', widget=forms.TextInput(attrs={'dir': 'ltr', 'placeholder': '/observations/123/photo/'}),
+        help_text='במקום להעלות קובץ אפשר להשתמש בתמונה שכבר קיימת בגלריה: הדביקו את כתובת התמונה (כפתור "העתקת כתובת התמונה"), או בחרו מהגלריה. התצפית תצביע על אותו קובץ, בלי להעתיק אותו.')
     full_name = forms.CharField(label='השם המדעי המלא (כולל מחבר ותוספות)', required=False, disabled=True,
         widget=forms.TextInput(attrs={'size': 60}),
         help_text='מתעדכן אוטומטית לפי הסדרה/המשפחה/הסוג/המין שנבחרו, סימון הזהות (cf./aff.) ושלב החיים.')
@@ -366,6 +368,20 @@ class SampleForm(forms.ModelForm):
         data = super().clean()
         data['kind'] = data.get('kind') or Sample.Kind.SPECIES
 
+        # An existing gallery image chosen instead of an upload: the sample points at the very same stored
+        # file (images are shared between records -- see media_transfer.delete_image_if_unused), and the
+        # "one image, one observation" rule is waived because the choice is deliberate.
+        reference = (data.get('existing_image') or '').strip()
+        if reference:
+            match = re.search(r'/observations/(\d+)/photo/?(?:[?#].*)?$', reference)
+            source = Sample.objects.filter(pk=int(match.group(1)), status=Sample.Status.PUBLISHED, deleted_at__isnull=True).exclude(image='').first() if match else None
+            if not source:
+                self.add_error('existing_image', 'הכתובת אינה כתובת של תמונה קיימת בגלריה. בחרו תמונה מהרשימה, או הדביקו את כתובת התמונה כפי שהועתקה מהאתר.')
+            elif self.files.get(self.add_prefix('image')):
+                self.add_error('existing_image', 'בחרו העלאת קובץ או תמונה קיימת, לא את שניהם.')
+            else:
+                data['image'] = source.image.name
+                self.instance._shared_image = True
         # species_other, if filled in, always wins -- it's a deliberate manual override.
         # Otherwise, whatever was typed into species must match an existing species
         # exactly (case-insensitively); if it doesn't, that's a validation error rather
@@ -498,17 +514,6 @@ class DiveTripForm(forms.ModelForm):
         return trip
 
 
-def site_for_new_name(region, name, name_en=''):
-    """The Site a typed-in site name stands for in this region: the existing one when the name (Hebrew or
-    English, any case) is already there -- so typing a known site never duplicates it -- otherwise a new,
-    unsaved Site. None when no name or no region was given."""
-    name, name_en = (name or '').strip(), (name_en or '').strip()
-    if not (name and region):
-        return None
-    existing = Site.objects.filter(region=region).filter(Q(name__iexact=name) | Q(name_en__iexact=name)).first()
-    return existing or Site(name=name, name_en=name_en, region=region)
-
-
 class SpeciesQuickForm(forms.Form):
     """A manager adds a species that is not in the catalog yet, from the observation form. Follows the
     catalog rules: no duplicates (a name already there is refused), an author for every species except
@@ -558,14 +563,34 @@ class SpeciesQuickForm(forms.Form):
         return species
 
 
+class SiteQuickForm(forms.ModelForm):
+    """A dive site that is not in the list yet: its region and name (Hebrew, English optional). A name that is
+    already in the region (Hebrew or English, any case) is refused, so the list never gets a duplicate."""
+    region = forms.ModelChoiceField(Region.objects.select_related('country').order_by('name'), label='אזור')
+
+    class Meta:
+        model = Site
+        fields = ['region', 'name', 'name_en']
+        labels = {'name': 'שם האתר', 'name_en': 'שם האתר באנגלית (לא חובה)'}
+
+    def clean(self):
+        data = super().clean()
+        region, name, name_en = data.get('region'), (data.get('name') or '').strip(), (data.get('name_en') or '').strip()
+        if region and name:
+            wanted = {n.lower() for n in (name, name_en) if n}
+            same = next((x for x in Site.objects.filter(region=region) if wanted & ({x.name.lower(), x.name_en.lower()} - {''})), None)
+            if same:
+                self.add_error('name', f'האתר "{same.name}" כבר קיים באזור הזה. בחרו אותו מרשימת האתרים.')
+        data['name'], data['name_en'] = name, name_en
+        return data
+
+
 class TripQuickForm(forms.ModelForm):
     """The fast dive-trip form: place (a site, or just a region), year, month, optional day, and a
     suggested name and code (trip_naming) that the server fills in whenever they are left empty.
     `photographer` only feeds the name and code -- a trip has no photographer of its own."""
     region = forms.ModelChoiceField(Region.objects.select_related('country').all(), label='אזור')
     site = forms.ModelChoiceField(Site.objects.all(), required=False, label='אתר צלילה (לא חובה)')
-    new_site = forms.CharField(required=False, max_length=180, label='אתר חדש — אם האתר לא ברשימה (לא חובה)')
-    new_site_en = forms.CharField(required=False, max_length=180, label='שם האתר החדש באנגלית (לא חובה)')
     photographer = forms.ModelChoiceField(User.objects.none(), required=False, label='צלם')
     day = forms.IntegerField(required=False, min_value=1, max_value=31, label='יום (לא חובה)')
     title = forms.CharField(required=False, max_length=400, label='שם המסע')
@@ -590,16 +615,6 @@ class TripQuickForm(forms.ModelForm):
         from .trip_naming import suggest_title, suggest_code
         data = super().clean()
         region, site = data.get('region'), data.get('site')
-        self._new_site = None
-        if (data.get('new_site') or '').strip():
-            if site:
-                self.add_error('new_site', 'בחרו אתר מהרשימה או הקלידו אתר חדש, לא את שניהם.')
-            else:
-                found = site_for_new_name(region, data['new_site'], data.get('new_site_en'))
-                if found and found.pk:
-                    site = data['site'] = found            # already in the list: use it
-                elif found:
-                    site, self._new_site = found, found    # created on save
         if site and region and site.region_id != region.id:
             self.add_error('site', 'האתר אינו שייך לאזור שנבחר.')
         if data.get('month') and not 1 <= data['month'] <= 12:
@@ -630,9 +645,6 @@ class TripQuickForm(forms.ModelForm):
         trip.region_name = trip.region.name_en or trip.region.name
         trip.start_day = self.cleaned_data.get('day')
         if commit:
-            if self._new_site:
-                self._new_site.save()
-                trip.site = self._new_site
             # a derived letter becomes permanent the first time a trip uses it
             region_code(trip.region, persist=True)
             photographer_letter(self.cleaned_data.get('photographer') or self.user, persist=True)

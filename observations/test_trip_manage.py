@@ -144,42 +144,61 @@ class TripsPageTests(Fixture):
         self.assertContains(self.client.get('/observations/trips/manage/'), 'href="/observations/trips/manage/"')
 
 
+class AddSiteTests(Fixture):
+    url = '/observations/sites/new/'
+
+    def test_login_is_required(self):
+        self.assertEqual(self.client.get(self.url).status_code, 302)
+
+    def test_the_form_starts_from_the_region_it_is_opened_for(self):
+        self.client.force_login(self.bart)
+        page = self.client.get(f'{self.url}?popup=1&region={self.akhziv.pk}')
+        self.assertEqual(page.context['form'].initial['region'], self.akhziv.pk)
+        self.assertContains(page, 'name="popup"')
+
+    def test_creates_the_site_in_the_region_and_tells_the_opener_in_popup_mode(self):
+        self.client.force_login(self.bart)
+        response = self.client.post(self.url, {'region': self.akhziv.pk, 'name': 'חוף הבונים הצפוני', 'name_en': 'North Habonim', 'popup': '1'})
+        site = Site.objects.get(name='חוף הבונים הצפוני')
+        self.assertEqual((site.region, site.name_en), (self.akhziv, 'North Habonim'))
+        self.assertContains(response, 'window.opener.postMessage')
+        self.assertEqual(response.context['site'], {'id': site.pk, 'name': site.name, 'region_id': self.akhziv.pk})
+
+    def test_without_popup_it_returns_to_next(self):
+        self.client.force_login(self.bart)
+        response = self.client.post(self.url, {'region': self.akhziv.pk, 'name': 'אתר חדש', 'next': '/observations/trips/add/'})
+        self.assertRedirects(response, '/observations/trips/add/', fetch_redirect_response=False)
+
+    def test_a_name_already_in_the_region_is_refused_in_hebrew_english_and_any_case(self):
+        self.client.force_login(self.bart)
+        before = Site.objects.count()
+        for name, name_en in (('קניון אכזיב', ''), ('  קניון אכזיב ', 'x'), ('akhziv CANYON', ''), ('אחר', 'akhziv canyon')):
+            response = self.client.post(self.url, {'region': self.akhziv.pk, 'name': name, 'name_en': name_en})
+            self.assertEqual(response.status_code, 200, (name, name_en))
+        self.assertEqual(Site.objects.count(), before)
+
+    def test_the_same_name_in_another_region_is_fine(self):
+        self.client.force_login(self.bart)
+        self.assertEqual(self.client.post(self.url, {'region': self.dor.pk, 'name': 'קניון אכזיב'}).status_code, 302)
+
+    def test_next_is_not_an_open_redirect(self):
+        self.client.force_login(self.bart)
+        response = self.client.post(self.url, {'region': self.akhziv.pk, 'name': 'עוד אתר', 'next': 'https://evil.example/'})
+        self.assertEqual(response.url, '/observations/trips/add/')
+
+    def test_the_trip_form_has_a_plus_that_opens_it(self):
+        self.client.force_login(self.bart)
+        page = self.client.get('/observations/trips/add/')
+        self.assertContains(page, 'id="add-site"')
+        self.assertContains(page, '/observations/sites/new/?popup=1')
+        self.assertNotContains(page, 'new_site')
+
+
 class AddTripTests(Fixture):
     def post(self, **data):
         base = {'region': str(self.akhziv.pk), 'year': str(NOW.year), 'month': str(NOW.month)}
         base.update({k: str(v) for k, v in data.items()})
         return self.client.post('/observations/trips/add/', base)
-
-    def test_a_site_that_is_not_listed_is_created_in_the_region_with_the_trip(self):
-        self.client.force_login(self.boaz)
-        response = self.post(new_site='חוף הבונים הצפוני', new_site_en='North Habonim', year=2026, month=8)
-        self.assertEqual(response.status_code, 302)
-        site = Site.objects.get(name='חוף הבונים הצפוני')
-        self.assertEqual((site.region, site.name_en), (self.akhziv, 'North Habonim'))
-        trip = DiveTrip.objects.get(site=site)
-        self.assertEqual(trip.title, 'בעז ליבס חוף הבונים הצפוני 2026')
-
-    def test_a_typed_site_name_that_already_exists_reuses_it(self):
-        self.client.force_login(self.boaz)
-        before = Site.objects.count()
-        self.post(new_site='  קניון אכזיב ', year=2026, month=8)
-        self.post(new_site='akhziv canyon', year=2025, month=8)
-        self.assertEqual(Site.objects.count(), before)
-        self.assertEqual(DiveTrip.objects.filter(site=self.canyon).count(), 2)
-
-    def test_a_listed_site_and_a_new_site_together_is_an_error_and_creates_nothing(self):
-        self.client.force_login(self.boaz)
-        before = (Site.objects.count(), DiveTrip.objects.count())
-        response = self.post(site=self.canyon.pk, new_site='אתר אחר', year=2026, month=8)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual((Site.objects.count(), DiveTrip.objects.count()), before)
-
-    def test_nothing_is_created_when_the_trip_itself_is_invalid(self):
-        self.client.force_login(self.boaz)
-        before = Site.objects.count()
-        response = self.post(new_site='אתר חדש לגמרי', year=2026, month=13)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(Site.objects.count(), before)
 
     def test_from_the_observation_form_the_new_trip_comes_back_selected(self):
         self.client.force_login(self.boaz)
@@ -189,13 +208,6 @@ class AddTripTests(Fixture):
         self.assertEqual(response.url, f'/observations/new/?trip={trip.pk}')
         page = self.client.get('/observations/trips/add/?next=/observations/new/&select_trip=1')
         self.assertContains(page, 'name="select_trip"')
-
-    def test_suggest_names_a_new_site_without_creating_it(self):
-        self.client.force_login(self.boaz)
-        before = Site.objects.count()
-        data = self.client.get('/observations/trips/suggest/', {'region': self.akhziv.pk, 'new_site': 'חוף חדש', 'year': 2026, 'month': 8}).json()
-        self.assertEqual(data['title'], 'בעז ליבס חוף חדש 2026')
-        self.assertEqual(Site.objects.count(), before)
 
     def test_form_starts_from_filters_and_the_current_month(self):
         self.client.force_login(self.boaz)
