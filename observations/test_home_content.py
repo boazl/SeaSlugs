@@ -27,7 +27,7 @@ class HomeContentTests(SeoFixture):
     def test_hebrew_home_has_the_content_without_javascript(self):
         html = self.page('/')
         for text in ('חינניות ים: מידע, תמונות ומיזם מחקר בים התיכון', 'מה הן חינניות ים?',
-                     'המיזם: חינניות ים בים התיכון של ישראל', 'איך תורמים תצפית?', 'תרמו תצפית',
+                     'המיזם: חינניות ים בים התיכון של ישראל', 'איך תורמים תצפית?', 'הוסיפו תצפית',
                      'בעיקר מהפיליפינים'):
             self.assertIn(text, html)
         self.assertEqual(html.count('<h1>'), 1)

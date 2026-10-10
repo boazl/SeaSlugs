@@ -14,10 +14,10 @@ DEFAULTS = {
     'hero': {
         'he': """~ מבעד לעדשה, מתחת לפני הים
 # חינניות ים: מידע, תמונות ומיזם מחקר בים התיכון
-הבית של חובבי חינניות הים (Sea slugs): אוסף תמונות וסרטונים מרחבי העולם, וקהילה שמתעדת את חינניות הים בים התיכון של ישראל. צילמתם חיננית ים? תרמו תצפית.""",
+הבית של חובבי חינניות הים (Sea slugs): אוסף תמונות וסרטונים מרחבי העולם, וקהילה שמתעדת את חינניות הים בים התיכון של ישראל. צילמתם חיננית ים? הוסיפו תצפית.""",
         'en': """~ Through the lens, beneath the sea
 # Sea slugs: information, photos and a Mediterranean research project
-A home for sea slug enthusiasts: an international collection of photos and videos, and a community documenting the sea slugs of the Israeli Mediterranean. Photographed a sea slug? Contribute an observation.""",
+A home for sea slug enthusiasts: an international collection of photos and videos, and a community documenting the sea slugs of the Israeli Mediterranean. Photographed a sea slug? Add an observation.""",
     },
     'what': {
         'he': """## מה הן חינניות ים?
@@ -58,7 +58,7 @@ The eastern Mediterranean is warming and becoming more tropical. Species that en
         'en': 'The collection currently holds {species} species and {observations} observations, mostly from the Philippines and other regions around the world; {israeli} of the species have been recorded in the Israeli Mediterranean. Use the search and filters below to explore it.',
     },
     'footer_invite': {
-        'he': 'SeaSlugs – תיעוד ומחקר חינניות ים. יש לכם תמונה של חיננית ים? [תרמו תצפית](contribute)',
-        'en': 'SeaSlugs – documenting and researching sea slugs. Have a photo of a sea slug? [Contribute an observation](contribute)',
+        'he': 'SeaSlugs – תיעוד ומחקר חינניות ים. יש לכם תמונה של חיננית ים? [הוסיפו תצפית](contribute)',
+        'en': 'SeaSlugs – documenting and researching sea slugs. Have a photo of a sea slug? [Add an observation](contribute)',
     },
 }
