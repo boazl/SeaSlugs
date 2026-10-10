@@ -1,17 +1,18 @@
 {% extends 'observations/base.html' %}{% block site_hero %}{% endblock %}
 {% block content %}<a href="{% url 'admin:index' %}">חזרה לניהול האתר</a>
-<h1>קבצי מאמרים</h1>
-<p>כל קובצי ה־PDF של מאמרים שעל השרת: {{ rows|length }} קבצים, {{ total_mb }}MB. {% if orphans %}<strong>{{ orphans|length }} מהם יתומים</strong> (אף שורה לא משתמשת בהם, {{ orphan_mb }}MB) ואפשר למחוק אותם.{% else %}אין קבצים יתומים.{% endif %}</p>
+<h1>קבצי מאמרים וקובצי זיהוי</h1>
+<p>כל קובצי המאמרים (PDF) וקובצי הזיהוי של הסוגים (PDF או תמונה) שעל השרת: {{ rows|length }} קבצים, {{ total_mb }}MB. {% if orphans %}<strong>{{ orphans|length }} מהם יתומים</strong> (אף שורה לא משתמשת בהם, {{ orphan_mb }}MB) ואפשר למחוק אותם.{% else %}אין קבצים יתומים.{% endif %}</p>
 <p>קובץ שבשימוש לא נמחק מכאן: להסרתו מסמנים "לסלק" בעמוד העריכה של השורה (או את תיבת הניקוי בטופס התצפית) ושומרים — הקובץ נמחק גם מהדיסק.</p>
 <table class="article-files">
-<thead><tr><th>קובץ</th><th>גודל</th><th>הועלה</th><th>בשימוש אצל</th><th></th></tr></thead>
+<thead><tr><th>קובץ</th><th>סוג</th><th>גודל</th><th>הועלה</th><th>בשימוש אצל</th><th></th></tr></thead>
 <tbody>{% for r in rows %}<tr{% if not r.uses %} class="orphan"{% endif %}>
 <td dir="ltr"><a href="{% url 'article-file-open' %}?name={{ r.name|urlencode }}" target="_blank" rel="noopener">{{ r.name }}</a></td>
+<td>{{ r.what }}</td>
 <td>{{ r.size_mb }}MB</td>
 <td>{{ r.modified|date:"d.m.Y H:i" }}</td>
 <td>{% for kind, text, url in r.uses %}{{ kind }}: {% if url %}<a href="{{ url }}">{{ text }}</a>{% else %}{{ text }}{% endif %}{% if not forloop.last %}<br>{% endif %}{% empty %}<strong>יתום</strong>{% endfor %}</td>
 <td>{% if not r.uses %}<form method="post" action="{% url 'article-file-delete' %}" onsubmit="return confirm('למחוק לצמיתות את הקובץ?')">{% csrf_token %}<input type="hidden" name="name" value="{{ r.name }}"><button class="danger">מחיקה</button></form>{% endif %}</td>
-</tr>{% empty %}<tr><td colspan="5">אין קובצי מאמרים בשרת.</td></tr>{% endfor %}</tbody></table>
+</tr>{% empty %}<tr><td colspan="6">אין קובצי מאמרים או זיהוי בשרת.</td></tr>{% endfor %}</tbody></table>
 {% if missing %}<h2>שורות שהקובץ שלהן חסר בדיסק</h2>
 <p>השורה מצביעה על קובץ שלא קיים בשרת (למשל אחרי החלפת מסד נתונים בלי תיקיית ה־media). יש להעלות אותו מחדש או לסלק את ההפניה.</p>
 <ul>{% for name, uses in missing %}<li dir="ltr">{{ name }} — {% for kind, text, url in uses %}{{ kind }}: {% if url %}<a href="{{ url }}">{{ text }}</a>{% else %}{{ text }}{% endif %}{% if not forloop.last %}; {% endif %}{% endfor %}</li>{% endfor %}</ul>{% endif %}

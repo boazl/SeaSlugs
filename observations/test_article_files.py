@@ -33,7 +33,7 @@ class ArticleFilesPageTests(TestCase):
         self.assertContains(response, self.family.article_pdf.name)
         self.assertContains(response, 'Phyllidiidae')
         self.assertContains(response, f'/admin/observations/taxonfamily/{self.family.pk}/change/')
-        self.assertContains(response, '1 מהם יתומים')
+        self.assertContains(response, "1 מהם יתומים")
         # exactly one delete form: the orphan's
         self.assertEqual(response.content.decode().count('action="/admin/article-files/delete/"'), 1)
 
@@ -83,3 +83,48 @@ class TestsNeverTouchTheRealMediaFolderTests(TestCase):
     def test_media_root_is_a_throw_away_folder_while_testing(self):
         from django.conf import settings
         self.assertIn('seaslugs-test-media-', str(settings.MEDIA_ROOT))
+
+
+class IdentificationFilesOnThePageTests(TestCase):
+    """The genus identification file lives under media/identification/genera and must show up on the page too."""
+
+    def setUp(self):
+        self.media = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.media, True)
+        override = override_settings(MEDIA_ROOT=self.media)
+        override.enable()
+        self.addCleanup(override.disable)
+        self.client.force_login(User.objects.create_superuser('boss', 'b@example.org', 'x'))
+        self.genus = TaxonGenus.objects.create(name='Coryphellina')
+        self.genus.identification_file.save('key.pdf', ContentFile(b'%PDF-1.4 key'), save=True)
+        self.genus.article_pdf.save('art.pdf', ContentFile(b'%PDF-1.4 art'), save=True)
+        os.makedirs(os.path.join(self.media, 'identification/genera'), exist_ok=True)
+        self.orphan = 'identification/genera/old.png'
+        with open(os.path.join(self.media, self.orphan), 'wb') as f:
+            f.write(b'\x89PNG fake')
+
+    def test_identification_and_article_files_are_both_listed_with_their_kind_and_row(self):
+        page = self.client.get('/admin/article-files/').content.decode()
+        self.assertIn(self.genus.identification_file.name, page)
+        self.assertIn(self.genus.article_pdf.name, page)
+        self.assertIn(self.orphan, page)
+        self.assertIn('זיהוי', page)
+        self.assertIn(f'/admin/observations/taxongenus/{self.genus.pk}/change/', page)
+        self.assertIn('1 מהם יתומים', page)
+
+    def test_an_identification_image_opens_with_its_content_type_and_an_orphan_one_can_be_deleted(self):
+        opened = self.client.get('/admin/article-files/open/', {'name': self.orphan})
+        self.assertEqual(opened['Content-Type'], 'image/png')
+        self.client.post('/admin/article-files/delete/', {'name': self.orphan})
+        self.assertFalse(os.path.exists(os.path.join(self.media, self.orphan)))
+
+    def test_an_identification_file_in_use_is_not_deleted_here(self):
+        path = self.genus.identification_file.path
+        self.client.post('/admin/article-files/delete/', {'name': self.genus.identification_file.name})
+        self.assertTrue(os.path.exists(path))
+
+    def test_the_public_identification_file_is_revalidated_by_the_browser(self):
+        first = self.client.get('/genus/Coryphellina/identification/')
+        self.assertEqual(first.status_code, 200)
+        self.assertIn('no-cache', first['Cache-Control'])
+        self.assertEqual(self.client.get('/genus/Coryphellina/identification/', HTTP_IF_NONE_MATCH=first['ETag']).status_code, 304)

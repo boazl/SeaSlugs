@@ -217,7 +217,7 @@ def species_page(request, slug):
     })
 
 
-def _article_response(request, field_file, label):
+def _article_response(request, field_file, label, content_type='application/pdf', filename=None):
     """Streams an article PDF. The browser must re-check with the server each time (no-cache + ETag):
     a replaced file keeps the same address (.../article.pdf), so a plain max-age would keep showing the
     old PDF for up to the cache lifetime. An unchanged file costs only a 304."""
@@ -232,10 +232,10 @@ def _article_response(request, field_file, label):
         for key, value in headers.items():
             response[key] = value
         return response
-    response = FileResponse(field_file.open('rb'), content_type='application/pdf')
+    response = FileResponse(field_file.open('rb'), content_type=content_type)
     for key, value in headers.items():
         response[key] = value
-    response['Content-Disposition'] = 'inline; filename="%s.pdf"' % label.replace('"', "'")
+    response['Content-Disposition'] = 'inline; filename="%s"' % (filename or '%s.pdf' % label).replace('"', "'")
     return response
 
 
@@ -470,11 +470,8 @@ def genus_identification(request, name):
     if not genus.identification_file:
         raise Http404
     content_type = mimetypes.guess_type(genus.identification_file.name)[0] or 'application/octet-stream'
-    response = FileResponse(genus.identification_file.open('rb'), content_type=content_type)
-    response['Cache-Control'] = 'public, max-age=3600'
     extension = genus.identification_file.name.rsplit('.', 1)[-1].lower()
-    response['Content-Disposition'] = 'inline; filename="%s-identification.%s"' % (genus.name.replace('"', "'"), extension)
-    return response
+    return _article_response(request, genus.identification_file, genus.name, content_type, '%s-identification.%s' % (genus.name, extension))
 
 SORT_OPTIONS = {
     'newest': ('-created_at',),
