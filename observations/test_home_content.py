@@ -432,7 +432,7 @@ class SiteHeaderCssTests(SeoFixture):
         squash = lambda text: re.sub(r'\s+', '', text)
         home = {(squash(s), squash(b)) for s, b in self.rules((settings.BASE_DIR / 'dist/styles.css').read_text())}
         copied = self.rules((settings.BASE_DIR / 'dist/site-header.css').read_text())
-        own = ('.intro .intro-title', '.hero-wrap', ':root', '.masthead a.brand')  # rules that exist only in site-header.css
+        own = ('.intro .intro-title', '.hero-wrap', ':root', '.masthead a.brand', '.masthead,.hero-wrap', '.masthead a', '.masthead,.masthead *,.hero-wrap,.hero-wrap *')  # rules that exist only in site-header.css
         checked = 0
         for selector, body in copied:
             if selector in own:
@@ -457,3 +457,15 @@ class MobileMenuScriptTests(SeoFixture):
             response = self.client.get(url)
             self.assertEqual(response.status_code, 200, url)
             self.assertIn('.account-menu-toggle', response.content.decode(), url)
+
+
+class CommunityPageLanguageAttributesTests(SeoFixture):
+    def test_every_community_page_declares_its_language_and_direction(self):
+        for url, lang, direction in (('/observations/login/?lang=en', 'en', 'ltr'), ('/observations/signup/?lang=en', 'en', 'ltr'),
+                                     ('/observations/login/?lang=he', 'he', 'rtl'), ('/observations/trips/?lang=en', 'en', 'ltr')):
+            self.client.cookies.clear()
+            html = self.client.get(url).content.decode()
+            self.assertIn(f'<html lang="{lang}" dir="{direction}">', html, url)
+        # and the brand is drawn the way the home page draws it: the Latin wordmark in English, the Hebrew one in Hebrew
+        self.client.cookies.clear()
+        self.assertIn('<html lang="en"', self.client.get('/observations/login/?lang=en').content.decode())
