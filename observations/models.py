@@ -322,7 +322,7 @@ class TaxonFamily(models.Model):
 
 IDENTIFICATION_FILE_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png', 'webp', 'gif']
 IDENTIFICATION_IMAGE_EXTENSIONS = {'jpg', 'jpeg', 'png', 'webp', 'gif'}
-IDENTIFICATION_FILE_MAX_BYTES = 15 * 1024 * 1024
+IDENTIFICATION_FILE_MAX_BYTES = 20 * 1024 * 1024
 
 
 def validate_identification_file_size(value):
@@ -333,7 +333,7 @@ def validate_identification_file_size(value):
     except (OSError, ValueError):
         return
     if size > IDENTIFICATION_FILE_MAX_BYTES:
-        raise ValidationError('קובץ הזיהוי גדול מדי (עד 15MB).')
+        raise ValidationError('קובץ הזיהוי גדול מדי (עד 20MB).')
 
 
 class TaxonGenus(models.Model):
@@ -355,7 +355,7 @@ class TaxonGenus(models.Model):
     # for telling its species apart: a PDF or an image (see IDENTIFICATION_FILE_EXTENSIONS).
     identification_file = models.FileField('קובץ זיהוי (PDF או תמונה)', upload_to='identification/genera/', blank=True,
         validators=[FileExtensionValidator(IDENTIFICATION_FILE_EXTENSIONS), validate_identification_file_size],
-        help_text='תרשים, לוח תמונות או מפתח לזיהוי המינים בסוג: PDF או תמונה (JPG, PNG, WebP, GIF), עד 15MB.')
+        help_text='תרשים, לוח תמונות או מפתח לזיהוי המינים בסוג: PDF או תמונה (JPG, PNG, WebP, GIF), עד 20MB.')
     identification_caption = models.CharField('כיתוב לקובץ הזיהוי', max_length=300, blank=True)
     identification_caption_en = models.CharField('כיתוב לקובץ הזיהוי (אנגלית)', max_length=300, blank=True)
     identification_source = models.CharField('מקור קובץ הזיהוי', max_length=300, blank=True,

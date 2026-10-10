@@ -14,7 +14,7 @@ class UploadForm(forms.Form):
     synchronize=forms.BooleanField(required=False, label='סנכרון מלא לאזורים/אתרים: הצגת מיזוגים ומחיקת רשומות שאינן בקובץ')
 
 # The species table alone is ~5MB (5,000+ rows with all their texts) and grows as texts are written.
-MAX_JSON_BYTES=15*1024*1024
+MAX_JSON_BYTES=20*1024*1024
 
 
 @staff_member_required

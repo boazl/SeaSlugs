@@ -498,7 +498,7 @@ class GenusIdentificationFileTests(TestCase):
         from .models import validate_identification_file_size
         validate_identification_file_size(SimpleUploadedFile('a.pdf', b'x' * 1024))
         with self.assertRaises(ValidationError):
-            validate_identification_file_size(SimpleUploadedFile('a.pdf', b'x' * (15 * 1024 * 1024 + 1)))
+            validate_identification_file_size(SimpleUploadedFile('a.pdf', b'x' * (20 * 1024 * 1024 + 1)))
 
     def test_a_stored_file_missing_from_disk_does_not_break_saving_the_genus(self):
         # e.g. right after a database replace brought the row but not the media file

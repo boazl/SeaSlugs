@@ -92,7 +92,7 @@ class TaxonFileInput(forms.ClearableFileInput):
         return context
 
 
-TAXON_FILE_MAX_BYTES = 15 * 1024 * 1024      # identification diagram / key (PDF or image)
+TAXON_FILE_MAX_BYTES = 20 * 1024 * 1024      # identification diagram / key (PDF or image)
 TAXON_ARTICLE_MAX_BYTES = 20 * 1024 * 1024   # article PDF of an order / family / genus
 
 
@@ -271,7 +271,7 @@ class SampleForm(forms.ModelForm):
         self.fields['taxon_identification_file'] = forms.FileField(required=False, label='קובץ זיהוי של הסוג (PDF או תמונה)',
             widget=TaxonFileInput(attrs={'data-taxon-file': 'genus'}),
             validators=[FileExtensionValidator(IDENTIFICATION_FILE_EXTENSIONS), validate_taxon_file_size],
-            help_text='תרשים, לוח תמונות או מפתח לזיהוי המינים בסוג: PDF או תמונה (JPG, PNG, WebP, GIF), עד 15MB.')
+            help_text='תרשים, לוח תמונות או מפתח לזיהוי המינים בסוג: PDF או תמונה (JPG, PNG, WebP, GIF), עד 20MB.')
         self.fields['taxon_identification_caption'] = forms.CharField(required=False, max_length=300, label='כיתוב לקובץ הזיהוי',
             widget=forms.TextInput(attrs={'data-taxon-file': 'genus'}))
         self.fields['taxon_identification_caption_en'] = forms.CharField(required=False, max_length=300, label='כיתוב לקובץ הזיהוי (אנגלית)',

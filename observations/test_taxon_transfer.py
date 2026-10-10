@@ -141,4 +141,4 @@ class TransferSizeLimitTests(TestCase):
         self.assertIn('token', response.context)
 
     def test_a_huge_file_is_still_refused(self):
-        self.assertContains(self.upload(16 * 1024 * 1024), 'קובץ JSON גדול מ־15MB')
+        self.assertContains(self.upload(21 * 1024 * 1024), 'קובץ JSON גדול מ־20MB')
