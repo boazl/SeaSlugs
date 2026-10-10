@@ -1454,6 +1454,13 @@ function setLanguage(value) {
         else item.element.replaceChildren(...Array.from(item.he.childNodes, node => node.cloneNode(true)));
     });
     applyHomeSections();
+    // The main navigation (observations/templates/observations/account_menu.html) carries both languages.
+    document.querySelectorAll('.account-menu [data-he][data-en]').forEach(element => {
+        element.textContent = en ? element.dataset.en : element.dataset.he;
+    });
+    document.querySelectorAll('.account-menu [data-aria-he][data-aria-en]').forEach(element => {
+        element.setAttribute('aria-label', en ? element.dataset.ariaEn : element.dataset.ariaHe);
+    });
     collectionHeading.textContent = en ? 'Gallery ' : originalCollectionHeading;
     search.placeholder = en ? 'Species or video name…' : 'שם המין או הסרטון…';
     search.setAttribute('aria-label', en ? 'Search by species or video name' : 'חיפוש לפי שם המין או הסרטון');

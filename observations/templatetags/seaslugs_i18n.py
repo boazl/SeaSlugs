@@ -131,8 +131,12 @@ TRANSLATIONS = {
     'העתקה': 'Copy',
     'הועתק!': 'Copied!',
     # shared nav / account menu (base.html + account_menu.html)
-    'שלום': 'Hi',
+    'שלום': 'Hello',
     'יציאה': 'Logout',
+    'גלריה': 'Gallery',
+    'חשבון': 'Account',
+    'תפריט חשבון': 'Account menu',
+    'עריכת טקסטים בדף הבית': 'Edit home texts',
     'כניסה': 'Login',
     'הרשמה': 'Sign up',
     'חבר/ת הקהילה': 'Community member',
@@ -227,3 +231,33 @@ def photographer_name(sample, lang):
     if callable(method):
         return method(lang)
     return getattr(sample, 'photographer_name', '')
+
+
+NAV_ICONS = {
+    'gallery': '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/>',
+    'trips': '<path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
+    'observations': '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>',
+    'profile': '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+    'edit': '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+    'logout': '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
+    'login': '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="m10 17 5-5-5-5"/><path d="M15 12H3"/>',
+    'signup': '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/>',
+}
+
+
+@register.simple_tag
+def nav_icon(name):
+    """A small decorative line icon (inline SVG, drawn in the link's colour) for the main navigation."""
+    from django.utils.safestring import mark_safe
+    return mark_safe('<svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" '
+                     f'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">{NAV_ICONS[name]}</svg>')
+
+
+@register.simple_tag
+def nav_label(hebrew, lang):
+    """The label of a navigation item in the page's language, carrying both languages so the home page's
+    language button can swap it without a reload (see app.js, setLanguage)."""
+    from django.utils.html import format_html
+    english = TRANSLATIONS.get(hebrew, hebrew)
+    return format_html('<span class="nav-label" data-he="{}" data-en="{}">{}</span>',
+                       hebrew, english, english if lang == 'en' else hebrew)

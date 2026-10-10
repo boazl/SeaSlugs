@@ -1,16 +1,17 @@
-{% load seaslugs_i18n %}<nav class="account-menu" aria-label="חשבון / Account">
-<button type="button" class="account-menu-toggle" id="accountMenuToggle" aria-haspopup="true" aria-controls="accountMenuList" aria-expanded="false" aria-label="תפריט חשבון / Account menu">☰</button>
+{% load seaslugs_i18n %}<nav class="account-menu" aria-label="{{ 'חשבון'|t:lang }}" data-aria-he="חשבון" data-aria-en="Account">
+<button type="button" class="account-menu-toggle" id="accountMenuToggle" aria-haspopup="true" aria-controls="accountMenuList" aria-expanded="false" aria-label="{{ 'תפריט חשבון'|t:lang }}" data-aria-he="תפריט חשבון" data-aria-en="Account menu">☰</button>
 <div class="account-menu-list" id="accountMenuList">
-<a href="{% url 'dive-trips' as menu_url %}{{ menu_url|with_lang:lang }}">מסעות צלילה / Dive trips</a>
+<a class="nav-item" href="{{ '/'|with_lang:lang }}">{% nav_icon 'gallery' %}{% nav_label 'גלריה' lang %}</a>
+<a class="nav-item" href="{% url 'dive-trips' as menu_url %}{{ menu_url|with_lang:lang }}">{% nav_icon 'trips' %}{% nav_label 'מסעות צלילה' lang %}</a>
 {% if user.is_authenticated %}
-    <span class="account-name">{{ "שלום"|t:lang }}, <bdi>{{ user|account_name:lang|default:"חבר/ת הקהילה"|t:lang }}</bdi></span>
-    <a class="community-link" href="{% url 'observations' as menu_url %}{{ menu_url|with_lang:lang }}">תצפיות / Observations</a>
-    {% if user.is_staff and perms.observations.change_sample %}<a href="{% url 'home-text-edit' %}">עריכת טקסטים בדף הבית</a>{% endif %}
-    <a href="{% url 'profile' as menu_url %}{{ menu_url|with_lang:lang }}">הפרופיל שלי / Profile</a>
-    <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit">{{ "יציאה"|t:lang }}</button></form>
+    <a class="nav-item community-link" href="{% url 'observations' as menu_url %}{{ menu_url|with_lang:lang }}">{% nav_icon 'observations' %}{% nav_label 'תצפיות' lang %}</a>
+    <a class="nav-item" href="{% url 'profile' as menu_url %}{{ menu_url|with_lang:lang }}">{% nav_icon 'profile' %}{% nav_label 'הפרופיל שלי' lang %}</a>
+    {% if user.is_staff and perms.observations.change_sample %}<a class="nav-item" href="{% url 'home-text-edit' %}">{% nav_icon 'edit' %}{% nav_label 'עריכת טקסטים בדף הבית' lang %}</a>{% endif %}
+    <span class="account-name"><span data-he="שלום, {{ user|account_name:'he'|default:'חבר/ת הקהילה' }}" data-en="Hello, {{ user|account_name:'en'|default:'Community member' }}">{{ "שלום"|t:lang }}, <bdi>{{ user|account_name:lang|default:"חבר/ת הקהילה"|t:lang }}</bdi></span></span>
+    <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit" class="nav-item">{% nav_icon 'logout' %}{% nav_label 'יציאה' lang %}</button></form>
 {% else %}
-    <a href="{% url 'login' as menu_url %}{{ menu_url|with_lang:lang }}">{{ "כניסה"|t:lang }}</a>
-    <a href="{% url 'signup' as menu_url %}{{ menu_url|with_lang:lang }}">{{ "הרשמה"|t:lang }}</a>
+    <a class="nav-item" href="{% url 'login' as menu_url %}{{ menu_url|with_lang:lang }}">{% nav_icon 'login' %}{% nav_label 'כניסה' lang %}</a>
+    <a class="nav-item" href="{% url 'signup' as menu_url %}{{ menu_url|with_lang:lang }}">{% nav_icon 'signup' %}{% nav_label 'הרשמה' lang %}</a>
 {% endif %}
 </div>
 </nav>

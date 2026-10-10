@@ -279,3 +279,42 @@ class LanguageLinksTests(SeoFixture):
         self.client.cookies.clear()
         hebrew = self.page('/observations/login/')
         self.assertIn('<a href="/">', hebrew)
+
+
+class MainNavigationTests(SeoFixture):
+    """The main navigation shows one language at a time (the page's), with an icon on each item; the home page's
+    language button swaps it using the data-he / data-en attributes."""
+
+    def menu(self, url):
+        html = self.client.get(url).content.decode()
+        return html.split('<nav class="account-menu"')[1].split('</nav>')[0].partition('>')[2]
+
+    def test_hebrew_menu_has_no_english_labels(self):
+        self.client.force_login(self.owner)
+        visible = re.sub(r'<[^>]+>', ' ', self.menu('/'))
+        for hebrew in ('גלריה', 'מסעות צלילה', 'תצפיות', 'הפרופיל שלי', 'שלום', 'יציאה'):
+            self.assertIn(hebrew, visible)
+        for english in ('Gallery', 'Dive trips', 'Observations', 'Profile', 'Hello', 'Logout', ' / '):
+            self.assertNotIn(english, visible)
+
+    def test_english_menu_has_no_hebrew_labels_and_greets_with_hello_and_logout(self):
+        self.client.force_login(self.owner)
+        menu = self.menu('/?lang=en')
+        visible = re.sub(r'<[^>]+>', ' ', menu)
+        for english in ('Gallery', 'Dive trips', 'Observations', 'My profile', 'Hello,', 'Logout'):
+            self.assertIn(english, visible)
+        self.assertNotRegex(visible, r'[֐-׿]')
+        self.assertIn('>Logout<', menu)
+
+    def test_every_item_has_an_icon_and_both_languages_for_the_language_button(self):
+        self.client.force_login(self.owner)
+        menu = self.menu('/')
+        self.assertEqual(menu.count('class="nav-icon"'), menu.count('nav-item'))
+        self.assertIn('data-he="מסעות צלילה" data-en="Dive trips"', menu)
+        self.assertIn('data-en="Hello, ', menu)
+
+    def test_signed_out_menu_is_one_language_too(self):
+        visible = re.sub(r'<[^>]+>', ' ', self.menu('/?lang=en'))
+        for english in ('Gallery', 'Dive trips', 'Login', 'Sign up'):
+            self.assertIn(english, visible)
+        self.assertNotRegex(visible, r'[֐-׿]')
