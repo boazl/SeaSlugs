@@ -12,12 +12,16 @@ from observations.image_manager import manager as image_manager, image_file
 from observations.folder_import import folder_import
 from observations.views import site_image, species_page, species_article, genus_page, genus_article, genus_identification, family_article, order_article, order_page, family_page, divetrip_locations
 from observations.db_replace import db_replace, db_replace_download
+from observations.article_files import article_files, article_file_open, article_file_delete
 
 urlpatterns = [
     path('admin/images/folder/',folder_import,name='folder-import'),
     path('admin/images/',image_manager,name='image-manager'),
     path('admin/images/file/',image_file,name='image-file'),
     path('admin/releases/', releases, name='releases'),
+    path('admin/article-files/', article_files, name='article-files'),
+    path('admin/article-files/open/', article_file_open, name='article-file-open'),
+    path('admin/article-files/delete/', article_file_delete, name='article-file-delete'),
     path('admin/table-transfer/', transfer, name='table-transfer'),
     path('admin/db-replace/', db_replace, name='db-replace'),
     path('admin/db-replace/download/', db_replace_download, name='db-replace-download'),
