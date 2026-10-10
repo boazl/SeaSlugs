@@ -274,11 +274,11 @@ class LanguageLinksTests(SeoFixture):
 
     def test_the_community_pages_menu_keeps_the_language(self):
         html = self.page('/observations/login/?lang=en')
-        self.assertIn('<a href="/?lang=en">', html)
+        self.assertIn('<a class="nav-item" href="/?lang=en" title="Home page">', html)
         self.assertIn('href="/observations/trips/?lang=en"', html)
         self.client.cookies.clear()
         hebrew = self.page('/observations/login/')
-        self.assertIn('<a href="/">', hebrew)
+        self.assertIn('<a class="nav-item" href="/" title="דף הבית">', hebrew)
 
 
 class MainNavigationTests(SeoFixture):
@@ -318,3 +318,41 @@ class MainNavigationTests(SeoFixture):
         for english in ('Gallery', 'Dive trips', 'Login', 'Sign up'):
             self.assertIn(english, visible)
         self.assertNotRegex(visible, r'[֐-׿]')
+
+
+class CommunityPagesNavigationTests(SeoFixture):
+    """Observations, trips, profile and partners pages share base.html's navigation: icon buttons, one language."""
+
+    PAGES = ('/observations/', '/observations/trips/', '/observations/profile/', '/observations/partners/')
+
+    def nav(self, url):
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200, url)
+        return response.content.decode().split('<body>')[1].split('</nav>')[0]
+
+    def test_every_nav_item_has_an_icon_on_each_page_in_both_languages(self):
+        self.client.force_login(self.owner)
+        for url in self.PAGES:
+            for suffix in ('', '?lang=en'):
+                self.client.cookies.clear()
+                self.client.force_login(self.owner)
+                nav = self.nav(url + suffix)
+                self.assertEqual(nav.count('class="nav-icon"'), nav.count('nav-item'), url + suffix)
+                self.assertGreaterEqual(nav.count('nav-item'), 8, url + suffix)
+
+    def test_english_pages_show_only_english_labels(self):
+        self.client.force_login(self.owner)
+        for url in self.PAGES:
+            self.client.cookies.clear()
+            self.client.force_login(self.owner)
+            visible = re.sub(r'<[^>]+>', ' ', self.nav(url + '?lang=en'))
+            self.assertIn('Hello,', visible)
+            self.assertIn('Logout', visible)
+            self.assertIn('Add observation', visible)
+            self.assertNotRegex(visible.replace('עברית', ''), r'[\u0590-\u05ff]', url)
+
+    def test_the_gallery_item_is_marked_as_the_home_page(self):
+        for lang, title in (('', 'דף הבית'), ('?lang=en', 'Home page')):
+            self.client.cookies.clear()
+            nav = self.nav('/observations/trips/' + lang)
+            self.assertRegex(nav, r'<a class="nav-item" href="/(\?lang=en)?" title="%s">' % title)

@@ -1,7 +1,7 @@
 {% load seaslugs_i18n %}<nav class="account-menu" aria-label="{{ 'חשבון'|t:lang }}" data-aria-he="חשבון" data-aria-en="Account">
 <button type="button" class="account-menu-toggle" id="accountMenuToggle" aria-haspopup="true" aria-controls="accountMenuList" aria-expanded="false" aria-label="{{ 'תפריט חשבון'|t:lang }}" data-aria-he="תפריט חשבון" data-aria-en="Account menu">☰</button>
 <div class="account-menu-list" id="accountMenuList">
-<a class="nav-item" href="{{ '/'|with_lang:lang }}">{% nav_icon 'gallery' %}{% nav_label 'גלריה' lang %}</a>
+<a class="nav-item" href="{{ '/'|with_lang:lang }}" title="{{ 'דף הבית'|t:lang }}" data-title-he="דף הבית" data-title-en="Home page">{% nav_icon 'gallery' %}{% nav_label 'גלריה' lang %}</a>
 <a class="nav-item" href="{% url 'dive-trips' as menu_url %}{{ menu_url|with_lang:lang }}">{% nav_icon 'trips' %}{% nav_label 'מסעות צלילה' lang %}</a>
 {% if user.is_authenticated %}
     <a class="nav-item community-link" href="{% url 'observations' as menu_url %}{{ menu_url|with_lang:lang }}">{% nav_icon 'observations' %}{% nav_label 'תצפיות' lang %}</a>

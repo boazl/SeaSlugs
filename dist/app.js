@@ -1461,6 +1461,9 @@ function setLanguage(value) {
     document.querySelectorAll('.account-menu [data-aria-he][data-aria-en]').forEach(element => {
         element.setAttribute('aria-label', en ? element.dataset.ariaEn : element.dataset.ariaHe);
     });
+    document.querySelectorAll('.account-menu [data-title-he][data-title-en]').forEach(element => {
+        element.title = en ? element.dataset.titleEn : element.dataset.titleHe;
+    });
     collectionHeading.textContent = en ? 'Gallery ' : originalCollectionHeading;
     search.placeholder = en ? 'Species or video name…' : 'שם המין או הסרטון…';
     search.setAttribute('aria-label', en ? 'Search by species or video name' : 'חיפוש לפי שם המין או הסרטון');
