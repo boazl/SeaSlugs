@@ -6,7 +6,7 @@
 {% if user.is_authenticated %}
     <a class="nav-item community-link" href="{% url 'observations' as menu_url %}{{ menu_url|with_lang:lang }}">{% nav_icon 'observations' %}{% nav_label 'תצפיות' lang %}</a>
     <a class="nav-item" href="{% url 'profile' as menu_url %}{{ menu_url|with_lang:lang }}">{% nav_icon 'profile' %}{% nav_label 'הפרופיל שלי' lang %}</a>
-    {% if user.is_staff and perms.observations.change_sample %}<a class="nav-item" href="{% url 'home-text-edit' %}">{% nav_icon 'edit' %}{% nav_label 'עריכת טקסטים בדף הבית' lang %}</a>{% endif %}
+    {% if user.is_staff and perms.observations.change_sample %}<a class="nav-item" href="{% url 'home-text-edit' as menu_url %}{{ menu_url|with_lang:lang }}">{% nav_icon 'edit' %}{% nav_label 'עריכת טקסטים בדף הבית' lang %}</a>{% endif %}
     <span class="account-name"><span data-he="שלום, {{ user|account_name:'he'|default:'חבר/ת הקהילה' }}" data-en="Hello, {{ user|account_name:'en'|default:'Community member' }}">{{ "שלום"|t:lang }}, <bdi>{{ user|account_name:lang|default:"חבר/ת הקהילה"|t:lang }}</bdi></span></span>
     <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit" class="nav-item">{% nav_icon 'logout' %}{% nav_label 'יציאה' lang %}</button></form>
 {% else %}

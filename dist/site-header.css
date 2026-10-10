@@ -1,0 +1,61 @@
+/* The site header and the opening panel, shared by the community pages (base.html: trips, observations, login,
+   sign-up, profile ...). Every rule below is copied verbatim from styles.css (the home page's stylesheet) so the
+   header looks the same everywhere; observations/test_home_content.py checks that none of them drifts. */
+:root{color-scheme:dark;--bg:#081a23;--panel:#102630;--ink:#edf4f3;--muted:#a9bdc4;--accent:#62ddc9;--line:#29404a}
+.masthead{max-width:max(1500px,min(1900px,96vw));margin:auto;padding:25px 5%;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:20px;text-decoration:none}
+.brand-name{font-size:29px;font-weight:800;letter-spacing:-1px}
+.brand-dot{color:var(--accent)}
+.brand-he{font-size:29px;font-weight:800;letter-spacing:-1px}
+.credit{font-size:14px;color:var(--muted)}
+.intro{display:flex;align-items:center;justify-content:space-between;padding:44px 0 36px}
+.eyebrow{color:var(--accent);font-size:14px;margin:0 0 12px}
+.intro-copy{color:var(--muted);margin:18px 0 0;line-height:1.75}
+.intro-index{flex-shrink:0}
+.intro-index img{display:block;width:200px;max-width:34vw;height:auto;border-radius:22px}
+@media(max-width:850px){
+  .intro{flex-direction:column;align-items:stretch;gap:22px}
+  .intro-index{align-self:center}
+  .intro-index img{width:100%;max-width:320px;max-height:230px;object-fit:cover}
+  .credit{max-width:125px;text-align:left}
+}
+@media(max-width:560px){
+  .masthead{padding:18px 5%}
+  .brand{gap:10px}
+  .brand-name{font-size:25px}
+  .brand-he{font-size:25px}
+  .credit{display:none}
+  .intro{padding:30px 0}
+  .intro-copy{font-size:16px}
+}
+.language-switch{background: transparent; color: var(--accent, #5de0cb); border: 1px solid currentColor; border-radius: 6px; padding: 10px 16px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; font: inherit; cursor: pointer; flex-shrink: 0;}
+.language-switch:focus-visible{outline: 3px solid #fff; outline-offset: 4px;}
+.masthead{gap: 20px; flex-wrap: wrap;}
+html[lang="he"] .masthead .brand-name{display: none;}
+html[lang="en"] .masthead .brand-he{display: none;}
+.account-menu{display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:14px;margin-inline-start:auto}
+.account-menu a,.account-menu button{color:var(--accent)}
+.account-menu form{margin:0}
+.account-menu button{background:none;border:0;padding:0;font:inherit;cursor:pointer}
+.account-name{color:var(--ink)}
+.account-menu .nav-item{display:inline-flex;align-items:center;gap:7px;padding:7px 13px;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--accent);text-decoration:none;line-height:1.2;white-space:nowrap}
+.account-menu .nav-item:hover,.account-menu .nav-item:focus-visible{border-color:var(--accent);background:var(--panel)}
+.account-menu .nav-icon{flex-shrink:0}
+.account-menu-toggle{display:none;align-items:center;justify-content:center;width:44px;height:44px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--ink);font-size:20px;flex-shrink:0}
+.account-menu-list{display:contents}
+@media(max-width:700px){
+  .account-menu{position:relative;flex-wrap:nowrap}
+  .account-menu-toggle{display:inline-flex}
+  .account-menu-list{display:none;position:absolute;top:calc(100% + 10px);inset-inline-end:0;flex-direction:column;align-items:flex-start;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;min-width:220px;z-index:40;box-shadow:0 12px 30px #00000080}
+  .account-menu-list.open{display:flex}
+}
+[data-home-section="hero"]{display:contents}
+.intro-text{flex:1;min-width:0;padding-inline-end:32px}
+.intro h1{font-size:clamp(26px,3.3vw,46px);letter-spacing:-1px}
+@media(max-width:850px){
+  .intro-text{padding-inline-end:0}
+}
+/* Only here: on the community pages the opening panel's title is a paragraph (each page has its own <h1>), drawn like the home page's h1. */
+.intro .intro-title{font-size:clamp(26px,3.3vw,46px);font-weight:500;letter-spacing:-1px;line-height:1.17;margin:0}
+.masthead a.brand{color:var(--ink)}
+.hero-wrap{max-width:max(1500px,min(1900px,96vw));margin:auto;padding:0 5%;color:var(--ink)}

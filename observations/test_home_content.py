@@ -274,11 +274,11 @@ class LanguageLinksTests(SeoFixture):
 
     def test_the_community_pages_menu_keeps_the_language(self):
         html = self.page('/observations/login/?lang=en')
-        self.assertIn('<a class="nav-item" href="/?lang=en" title="Home page">', html)
+        self.assertIn('<a class="nav-item" href="/?lang=en" title="Home page"', html)
         self.assertIn('href="/observations/trips/?lang=en"', html)
         self.client.cookies.clear()
         hebrew = self.page('/observations/login/')
-        self.assertIn('<a class="nav-item" href="/" title="דף הבית">', hebrew)
+        self.assertIn('<a class="nav-item" href="/" title="דף הבית"', hebrew)
 
 
 class MainNavigationTests(SeoFixture):
@@ -328,7 +328,7 @@ class CommunityPagesNavigationTests(SeoFixture):
     def nav(self, url):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200, url)
-        return response.content.decode().split('<body>')[1].split('</nav>')[0]
+        return response.content.decode().split('<body>')[1].split('<main')[0]  # header, opening panel, tools row
 
     def test_every_nav_item_has_an_icon_on_each_page_in_both_languages(self):
         self.client.force_login(self.owner)
@@ -355,7 +355,7 @@ class CommunityPagesNavigationTests(SeoFixture):
         for lang, title in (('', 'דף הבית'), ('?lang=en', 'Home page')):
             self.client.cookies.clear()
             nav = self.nav('/observations/trips/' + lang)
-            self.assertRegex(nav, r'<a class="nav-item" href="/(\?lang=en)?" title="%s">' % title)
+            self.assertRegex(nav, r'<a class="nav-item" href="/(\?lang=en)?" title="%s"' % title)
 
     def test_english_pages_link_every_nav_item_with_the_language_and_hebrew_pages_stay_plain(self):
         self.client.force_login(self.owner)
@@ -373,6 +373,87 @@ class CommunityPagesNavigationTests(SeoFixture):
     def test_the_chosen_language_is_remembered_across_pages_and_an_explicit_choice_replaces_it(self):
         self.client.force_login(self.owner)
         self.assertEqual(self.client.get('/observations/trips/?lang=en').cookies['seaslugs_lang'].value, 'en')
-        self.assertIn('Dive trips', self.client.get('/observations/profile/').content.decode())  # no ?lang: cookie
+        self.assertIn('>Dive trips<', self.client.get('/observations/profile/').content.decode())  # no ?lang: cookie
         self.assertEqual(self.client.get('/observations/trips/?lang=he').cookies['seaslugs_lang'].value, 'he')
-        self.assertNotIn('Dive trips', self.client.get('/observations/profile/').content.decode().split('</nav>')[0])
+        hebrew = self.client.get('/observations/profile/').content.decode().split('<main')[0]
+        self.assertNotIn('>Dive trips<', hebrew)
+        self.assertIn('>מסעות צלילה<', hebrew)
+
+
+class RedSeaNumbersTests(SeoFixture):
+    """{red_sea} {eilat} {sinai} in the editable texts count species by where they were recorded."""
+
+    def setUp(self):
+        super().setUp()
+        clear_cache()
+        self.addCleanup(clear_cache)
+        from .models import HomeText
+        sinai = Country.objects.create(name='סיני', name_en='Sinai')
+        red_sea = Sea.objects.get(name_en='Red Sea')
+        region = Region.objects.create(name='דהב', name_en='Dahab', country=sinai, sea=red_sea)
+        trip = DiveTrip.objects.create(title='Dahab', year=2024, country=sinai, region=region)
+        for name, video in (('Hypselodoris infucata', 'cdefghijklm'), ('Nembrotha cristata', 'defghijklmn')):
+            species = Species.objects.create(scientific_name=name, genus=name.split()[0])
+            Sample(owner=self.owner, trip=trip, species=species, video_url=f'https://youtu.be/{video}').save_reviewed()
+        HomeText.objects.create(key='collection_note', lang='he',
+                                content='ים סוף {red_sea}, אילת {eilat}, סיני {sinai}, ים תיכון {israeli}')
+
+    def test_each_variable_counts_its_own_place(self):
+        html = self.page('/')
+        note = re.search(r'collection-note[^>]*>(.*?)</p>', html, re.S).group(1)
+        # the fixture's Eilat species (Chromodoris annae) is in the Red Sea too; the two Sinai species only in Sinai
+        self.assertEqual(note, 'ים סוף 3, אילת 1, סיני 2, ים תיכון 0')
+
+
+class SiteHeaderCssTests(SeoFixture):
+    """dist/site-header.css (the header on the community pages) is a verbatim copy of rules in dist/styles.css."""
+
+    @staticmethod
+    def rules(css):
+        css = re.sub(r'/\*.*?\*/', '', css, flags=re.S)
+        out, i = [], 0
+        while True:
+            j = css.find('{', i)
+            if j < 0:
+                return out
+            depth, k = 1, j + 1
+            while depth:
+                depth += {'{': 1, '}': -1}.get(css[k], 0)
+                k += 1
+            selector, body = css[i:j].strip(), css[j + 1:k - 1]
+            if selector.startswith('@media'):
+                out += [(f'{selector} {s}', b) for s, b in SiteHeaderCssTests.rules(body)]
+            else:
+                out.append((selector, body))
+            i = k
+
+    def test_every_copied_rule_still_matches_the_home_page_stylesheet(self):
+        from django.conf import settings
+        squash = lambda text: re.sub(r'\s+', '', text)
+        home = {(squash(s), squash(b)) for s, b in self.rules((settings.BASE_DIR / 'dist/styles.css').read_text())}
+        copied = self.rules((settings.BASE_DIR / 'dist/site-header.css').read_text())
+        own = ('.intro .intro-title', '.hero-wrap', ':root', '.masthead a.brand')  # rules that exist only in site-header.css
+        checked = 0
+        for selector, body in copied:
+            if selector in own:
+                continue
+            checked += 1
+            self.assertIn((squash(selector), squash(body)), home, selector)
+        self.assertGreater(checked, 25)
+
+    def test_the_stylesheet_is_served(self):
+        response = self.client.get('/site-header.css')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'text/css; charset=utf-8')
+
+
+class MobileMenuScriptTests(SeoFixture):
+    """The narrow-screen menu button needs a script on every page that has the header (it was missing on the
+    species, genus and group pages, where the button did nothing)."""
+
+    def test_pages_with_the_header_carry_the_menu_script(self):
+        for url in ('/observations/trips/', '/observations/login/', f'/species/{self.area.slug}/',
+                    '/genus/Chromodoris/', f'/order/{self.order.pk}/', '/family/Chromodorididae/'):
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200, url)
+            self.assertIn('.account-menu-toggle', response.content.decode(), url)

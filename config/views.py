@@ -5,6 +5,7 @@ from django.http import FileResponse, Http404
 FILES = {
     'index.html': 'text/html; charset=utf-8',
     'styles.css': 'text/css; charset=utf-8',
+    'site-header.css': 'text/css; charset=utf-8',
     'app.js': 'text/javascript; charset=utf-8',
     'catalog.js': 'text/javascript; charset=utf-8',
     'intro-photo.jpg': 'image/jpeg',

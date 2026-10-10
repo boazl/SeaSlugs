@@ -1,4 +1,4 @@
-{% extends 'observations/base.html' %}
+{% extends 'observations/base.html' %}{% block site_hero %}{% endblock %}
 {% block content %}<a href="{% url 'image-manager' %}">ניהול והעברת תמונות</a> · <a href="{% url 'db-replace' %}">החלפה מלאה של מסד הנתונים</a>
 <h1>ניהול גרסאות וגיבויים</h1>
 <p class="notice">אתה עובד כעת על <strong>{% if local %}המק המקומי{% else %}האתר ב־Render{% endif %}</strong>. פרסום קוד והעברת נתונים הם שני שלבים נפרדים.</p>

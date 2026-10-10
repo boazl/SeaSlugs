@@ -1,4 +1,4 @@
-{% extends 'observations/base.html' %}{% block content %}
+{% extends 'observations/base.html' %}{% block site_hero %}{% endblock %}{% block content %}
 <h1>עריכת טקסטים בדף הבית</h1>
 <p>כאן עורכים את הטקסטים שבדף הבית, בעברית ובאנגלית. טקסט שמרוקנים (או שמחזירים לנוסח המקורי) חוזר לברירת המחדל. אחרי השמירה אפשר לראות את התוצאה ב<a href="/" target="_blank" rel="noopener">דף הבית</a> וב<a href="/?lang=en" target="_blank" rel="noopener">גרסה האנגלית</a>.</p>
 <details class="markup-help"><summary>איך כותבים (עיצוב פשוט)</summary>
@@ -8,7 +8,7 @@
 <li><code>**טקסט**</code> – הדגשה · <code>[טקסט](https://כתובת)</code> – קישור</li>
 <li>במקום כתובת אפשר לכתוב <code>contribute</code> (הוספת תצפית, או הרשמה למי שלא מחובר), <code>gallery</code> (קפיצה לאוסף) או <code>migrant</code> (קפיצה לאוסף עם סינון המינים המהגרים)</li>
 <li><code>[[טקסט]]</code> – כפתור "הוספת תצפית"</li>
-<li>מספרים חיים: <code>{species}</code> מספר המינים, <code>{observations}</code> מספר התצפיות, <code>{israeli}</code> מספר המינים שתועדו בים התיכון של ישראל</li>
+<li>מספרים חיים: <code>{species}</code> מספר המינים, <code>{observations}</code> מספר התצפיות, <code>{israeli}</code> מספר המינים שתועדו בים התיכון של ישראל, <code>{red_sea}</code> מספר המינים שתועדו בים סוף (בכל החופים), <code>{eilat}</code> באילת (חוף ישראל בים סוף), <code>{sinai}</code> בסיני</li>
 </ul></details>
 <form method="post" id="home-text-form">{% csrf_token %}
 {% for row in rows %}<section class="home-edit-row">

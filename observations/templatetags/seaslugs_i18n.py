@@ -4,6 +4,8 @@ side). `t` translates a small, fixed set of Hebrew UI strings written directly
 in those templates; `loc` picks the right name off a Country/Region/Site
 (or any other model with a name/name_en pair); `get_item` is a plain dict
 lookup for the per-item label maps the views build (kind/status)."""
+import re
+
 from django import template
 
 register = template.Library()
@@ -134,6 +136,10 @@ TRANSLATIONS = {
     'שלום': 'Hello',
     'יציאה': 'Logout',
     'גלריה': 'Gallery',
+    'כלי הקהילה': 'Community tools',
+    'צילומי מאקרו - סטילס ווידאו': 'Macro photography · Stills and video',
+    'חינניות ים': 'Sea slugs',
+    'SeaSlugs — דף הבית': 'SeaSlugs — Home',
     'דף הבית': 'Home page',
     'חשבון': 'Account',
     'תפריט חשבון': 'Account menu',
@@ -271,3 +277,17 @@ def nav_label(hebrew, lang):
     english = TRANSLATIONS.get(hebrew, hebrew)
     return format_html('<span class="nav-label" data-he="{}" data-en="{}">{}</span>',
                        hebrew, english, english if lang == 'en' else hebrew)
+
+
+@register.simple_tag(takes_context=True)
+def home_hero(context, lang):
+    """The home page's opening panel (the same text the manager edits on the home-text screen), for the community
+    pages' header. Its title is a <p>, not an <h1>: every page has its own <h1>."""
+    from django.utils.safestring import mark_safe
+    from ..home_content import home_sections
+    from ..models import SiteImage
+    request = context['request']
+    has_image = SiteImage.objects.filter(key='intro_photo').exclude(image='').exists()
+    hero = home_sections(lang, request, has_image)[0]['hero']
+    hero = re.sub(r'<h1>(.*?)</h1>', r'<p class="intro-title">\1</p>', hero, flags=re.S)
+    return mark_safe(hero)

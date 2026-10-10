@@ -16,7 +16,7 @@ from django.urls import reverse
 from .home_defaults import DEFAULTS
 from .home_markup import render_markup
 
-CACHE_KEY = 'home-content-data-v2'
+CACHE_KEY = 'home-content-data-v3'
 CACHE_SECONDS = 300
 
 
@@ -56,9 +56,18 @@ def _compute_data():
         group['families'] = sorted(group['families'].values(), key=lambda f: f['name'].lower())
         orders.append(group)
 
+    def species_where(match):
+        return len({a.species_id for a in areas if a.observation_count > 0 and match(a)})
+
+    def red_sea(a):
+        return a.sea.name_en.startswith('Red Sea')
+
     return {
         'species_count': len(species_ids), 'observation_count': observations,
         'israeli_count': len({row['name'] for row in israeli_rows}),
+        'red_sea_count': species_where(red_sea),
+        'eilat_count': species_where(lambda a: a.country.name_en == 'Israel' and red_sea(a)),
+        'sinai_count': species_where(lambda a: a.country.name_en == 'Sinai'),
         'israeli': israeli_rows, 'orders': orders,
     }
 
@@ -88,7 +97,9 @@ def current_text(key, lang, edited=None):
 
 
 def _sections_for(lang, data, contribute_url, has_site_image, edited):
-    numbers = {'species': data['species_count'], 'observations': data['observation_count'], 'israeli': data['israeli_count']}
+    numbers = {'species': data['species_count'], 'observations': data['observation_count'],
+               'israeli': data['israeli_count'], 'red_sea': data['red_sea_count'],
+               'eilat': data['eilat_count'], 'sinai': data['sinai_count']}
     text = lambda key: current_text(key, lang, edited)
     render = lambda key, **kw: render_markup(text(key), numbers, contribute_url, **kw)
     sections = {

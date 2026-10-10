@@ -1,4 +1,4 @@
-{% extends 'observations/base.html' %}{% block content %}<a href="{% url 'releases' %}">ניהול גרסאות וגיבויים</a> · <a href="{% url 'table-transfer' %}">העברת טבלאות</a> · <a href="{% url 'image-manager' %}">ניהול תמונות</a>
+{% extends 'observations/base.html' %}{% block site_hero %}{% endblock %}{% block content %}<a href="{% url 'releases' %}">ניהול גרסאות וגיבויים</a> · <a href="{% url 'table-transfer' %}">העברת טבלאות</a> · <a href="{% url 'image-manager' %}">ניהול תמונות</a>
 <h1>החלפה מלאה של מסד הנתונים</h1>
 <p class="notice">סביבה: <strong>{% if local %}המחשב המקומי{% else %}האתר ב־Render{% endif %}</strong> · מצב: <strong>{% if locked %}נעול לתחזוקה{% else %}פעיל{% endif %}</strong></p>
 <p>מיועד להחלפה מלאה של קובץ מסד הנתונים (למשל אחרי עבודה מקומית מקיפה), לא לעדכון נקודתי — לזה יש את העברת הטבלאות. התהליך: נעילת האתר ויצירת גיבוי, הורדת מסד הנתונים הנוכחי, העלאת הקובץ המעודכן ובדיקתו, השלמת תמונות חסרות, ולבסוף ביצוע ההחלפה ושחרור האתר — כל זה מכאן, בלי צורך במסוף או ב-Render.</p>

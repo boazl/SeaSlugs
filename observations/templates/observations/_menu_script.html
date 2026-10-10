@@ -1,0 +1,15 @@
+<script>
+(function(){
+    // the narrow-screen account menu (same behaviour as dist/app.js)
+    var toggle = document.querySelector('.account-menu-toggle'), list = document.querySelector('.account-menu-list');
+    if (!toggle || !list) return;
+    toggle.addEventListener('click', function(){ toggle.setAttribute('aria-expanded', String(list.classList.toggle('open'))); });
+    document.addEventListener('click', function(e){
+        if (!list.classList.contains('open') || list.contains(e.target) || toggle.contains(e.target)) return;
+        list.classList.remove('open'); toggle.setAttribute('aria-expanded', 'false');
+    });
+    document.addEventListener('keydown', function(e){
+        if (e.key === 'Escape' && list.classList.contains('open')) { list.classList.remove('open'); toggle.setAttribute('aria-expanded', 'false'); toggle.focus(); }
+    });
+})();
+</script>

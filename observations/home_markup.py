@@ -13,15 +13,16 @@ Everything is HTML-escaped first, then these are recognised:
                     gallery (jumps to the collection) and migrant (jumps to the collection and switches on
                     the migrant-species filter)
   [[text]]          the green "add observation" button
-  {species} {observations} {israeli}   live numbers (species in the collection, observations, species
-                    recorded in the Israeli Mediterranean)
+  {species} {observations} {israeli} {red_sea} {eilat} {sinai}   live numbers (species in the collection,
+                    observations, species recorded in the Israeli Mediterranean, in the Red Sea (any coast),
+                    in Eilat (Israel's Red Sea coast) and in Sinai)
 """
 import re
 
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
 
-NUMBER_NAMES = ('species', 'observations', 'israeli')
+NUMBER_NAMES = ('species', 'observations', 'israeli', 'red_sea', 'eilat', 'sinai')
 _NUMBER = re.compile(r'\{(' + '|'.join(NUMBER_NAMES) + r')\}')
 _BOLD = re.compile(r'\*\*(.+?)\*\*')
 _BUTTON = re.compile(r'\[\[(.+?)\]\]')

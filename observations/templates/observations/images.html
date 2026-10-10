@@ -1,4 +1,4 @@
-{% extends 'observations/base.html' %}{% block content %}
+{% extends 'observations/base.html' %}{% block site_hero %}{% endblock %}{% block content %}
 <h1>ניהול תמונות</h1><p><a href="{% url 'folder-import' %}">ייבוא תיקיית תמונות לפי מסע צלילה</a></p><p class="notice">סביבה: <strong>{% if local %}המק המקומי{% else %}האתר ב־Render{% endif %}</strong> · {{images|length}} קבצים · {{total_bytes|filesizeformat}}</p>
 <p>מיון: {% for key,label in sort_options.items %}{% if key == sort %}<strong>{{label}}</strong>{% else %}<a href="?sort={{key}}">{{label}}</a>{% endif %}{% if not forloop.last %} · {% endif %}{% endfor %}</p>
 <p><a href="http://127.0.0.1:8000/admin/images/">תמונות במק</a> · <a href="https://seaslugs.onrender.com/admin/images/" target="_blank" rel="noopener">תמונות באתר</a></p>
