@@ -229,3 +229,19 @@ class BeforeMigrationTests(SeoFixture):
             manager.all.side_effect = OperationalError('no such table')
             manager.filter.side_effect = OperationalError('no such table')
             self.assertIn('מה הן חינניות ים?', self.page('/'))
+
+
+class LanguageLinksTests(SeoFixture):
+    def test_the_species_list_of_an_english_genus_page_keeps_the_language(self):
+        html = self.page(f'/genus/{self.genus.name}/?lang=en')
+        self.assertIn(f'href="/species/{self.area.slug}/?lang=en"', html)
+        self.client.cookies.clear()  # the ?lang=en visit above is remembered in a cookie
+        self.assertIn(f'href="/species/{self.area.slug}/"', self.page(f'/genus/{self.genus.name}/'))
+
+    def test_the_community_pages_menu_keeps_the_language(self):
+        html = self.page('/observations/login/?lang=en')
+        self.assertIn('<a href="/?lang=en">', html)
+        self.assertIn('href="/observations/trips/?lang=en"', html)
+        self.client.cookies.clear()
+        hebrew = self.page('/observations/login/')
+        self.assertIn('<a href="/">', hebrew)

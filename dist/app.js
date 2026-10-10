@@ -722,7 +722,7 @@ function buildSpeciesCard(sp, index) {
     // (every species+area does, once slugs have been backfilled) -- otherwise (older
     // data without a slug, in theory) fall back to the in-page preview dialog.
     const button = sp.slug ? document.createElement('a') : document.createElement('button');
-    if (sp.slug) button.href = `/species/${sp.slug}/`;
+    if (sp.slug) button.href = `/species/${sp.slug}/` + (language === 'en' ? '?lang=en' : '');
     else button.type = 'button';
     button.className = 'video-button';
     const common = language === 'he' ? (sp.name_he || sp.name_en) : (sp.name_en || sp.name_he);

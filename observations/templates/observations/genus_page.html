@@ -129,7 +129,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
             <div class="grid">
                 {% for area in areas %}
                 <article class="card">
-                    <a class="video-button" href="{% url 'species-page' area.slug %}">
+                    <a class="video-button" href="{% url 'species-page' area.slug %}{% if lang == 'en' %}?lang=en{% endif %}">
                         <span class="image-wrap"><img src="{% if area.defining_sample.image %}{% url 'observation-photo' area.defining_sample.pk %}{% else %}{{ area.defining_sample.thumbnail }}{% endif %}" alt="" width="640" height="360" loading="lazy"><span class="play" aria-hidden="true">{% if area.defining_sample.video_url %}▶{% else %}⤢{% endif %}</span>{% if area.observation_count > 1 %}<span class="count-badge" aria-hidden="true">{{ area.observation_count }}</span>{% endif %}</span>
                         <span class="card-info">
                             <h3 class="hebrew" dir="ltr">{{ area.species.scientific_name|name_html }}{% if area.undetermined_variant %} {{ area.undetermined_variant }}{% endif %}{% if area.species.author %} <span class="card-author">{{ area.species.author }}</span>{% endif %}</h3>
