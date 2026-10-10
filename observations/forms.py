@@ -92,12 +92,19 @@ class TaxonFileInput(forms.ClearableFileInput):
         return context
 
 
-TAXON_FILE_MAX_BYTES = 15 * 1024 * 1024
+TAXON_FILE_MAX_BYTES = 15 * 1024 * 1024      # identification diagram / key (PDF or image)
+TAXON_ARTICLE_MAX_BYTES = 20 * 1024 * 1024   # article PDF of an order / family / genus
 
 
-def validate_taxon_file_size(value):
-    if getattr(value, 'size', 0) > TAXON_FILE_MAX_BYTES:
-        raise forms.ValidationError('הקובץ גדול מדי (עד 15MB).')
+def _size_validator(limit):
+    def validate(value):
+        if getattr(value, 'size', 0) > limit:
+            raise forms.ValidationError(f'הקובץ גדול מדי (עד {limit // (1024 * 1024)}MB).')
+    return validate
+
+
+validate_taxon_file_size = _size_validator(TAXON_FILE_MAX_BYTES)
+validate_taxon_article_size = _size_validator(TAXON_ARTICLE_MAX_BYTES)
 
 
 class ReferenceSelect(forms.Select):
@@ -258,7 +265,7 @@ class SampleForm(forms.ModelForm):
             self.fields['taxon_' + attr] = TaxonTextField(required=False, label=label,
                 widget=forms.Textarea(attrs={'rows': rows, 'data-taxon-file': 'any'}),
                 help_text='קישור בכל שורה (אפשר להוסיף טקסט לפני הקישור).' if attr == 'sources' else '')
-        pdf = [FileExtensionValidator(['pdf']), validate_taxon_file_size]
+        pdf = [FileExtensionValidator(['pdf']), validate_taxon_article_size]
         self.fields['taxon_article_pdf'] = forms.FileField(required=False, label='מאמר (PDF) של הסדרה / המשפחה / הסוג',
             widget=TaxonFileInput(attrs={'accept': 'application/pdf', 'data-taxon-file': 'any'}), validators=pdf)
         self.fields['taxon_identification_file'] = forms.FileField(required=False, label='קובץ זיהוי של הסוג (PDF או תמונה)',

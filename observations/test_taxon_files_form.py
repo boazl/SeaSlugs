@@ -113,6 +113,17 @@ class TaxonFilesOnObservationFormTests(TestCase):
         self.assertFalse(self.genus.article_pdf)
         self.assertFalse(self.genus.identification_file)
 
+    def test_article_pdf_limit_is_20mb_and_identification_file_limit_stays_15mb(self):
+        from .forms import validate_taxon_article_size, validate_taxon_file_size
+        from django import forms
+        mb = 1024 * 1024
+        validate_taxon_article_size(SimpleUploadedFile('a.pdf', b'x' * (19 * mb)))          # 19MB article: accepted
+        validate_taxon_article_size(SimpleUploadedFile('a.pdf', b'x' * (20 * mb)))          # exactly 20MB: accepted
+        with self.assertRaisesMessage(forms.ValidationError, 'עד 20MB'):
+            validate_taxon_article_size(SimpleUploadedFile('a.pdf', b'x' * (20 * mb + 1)))
+        with self.assertRaisesMessage(forms.ValidationError, 'עד 15MB'):
+            validate_taxon_file_size(SimpleUploadedFile('a.pdf', b'x' * (15 * mb + 1)))
+
     # --- the page texts (description, identification, sources) ---
     def test_texts_are_shown_prefilled_for_genus_family_and_order_and_not_for_members(self):
         self.genus.description_he = 'תיאור הסוג'; self.genus.sources = 'https://example.org/x'; self.genus.save()
