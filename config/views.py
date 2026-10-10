@@ -321,6 +321,7 @@ ROBOTS_DISALLOW = (
     '/observations/login/', '/observations/logout/', '/observations/signup/',
     '/observations/profile/', '/observations/partners/',
     '/observations/trips/manage/', '/observations/trips/add/', '/observations/trips/suggest/',
+    '/observations/home-text/', '/observations/image-search/', '/observations/sites/new/', '/observations/species/new/',
 )
 
 
