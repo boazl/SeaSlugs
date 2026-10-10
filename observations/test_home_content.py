@@ -356,3 +356,23 @@ class CommunityPagesNavigationTests(SeoFixture):
             self.client.cookies.clear()
             nav = self.nav('/observations/trips/' + lang)
             self.assertRegex(nav, r'<a class="nav-item" href="/(\?lang=en)?" title="%s">' % title)
+
+    def test_english_pages_link_every_nav_item_with_the_language_and_hebrew_pages_stay_plain(self):
+        self.client.force_login(self.owner)
+        for url in self.PAGES:
+            self.client.cookies.clear()
+            self.client.force_login(self.owner)
+            links = re.findall(r'<a class="nav-item" href="(/[^"]*)"', self.nav(url + '?lang=en'))
+            self.assertGreaterEqual(len(links), 8, url)
+            self.assertTrue(all('lang=en' in link for link in links), (url, links))
+            self.client.cookies.clear()
+            self.client.force_login(self.owner)
+            links = re.findall(r'<a class="nav-item" href="(/[^"]*)"', self.nav(url + '?lang=he'))
+            self.assertTrue(all('lang=' not in link for link in links), (url, links))
+
+    def test_the_chosen_language_is_remembered_across_pages_and_an_explicit_choice_replaces_it(self):
+        self.client.force_login(self.owner)
+        self.assertEqual(self.client.get('/observations/trips/?lang=en').cookies['seaslugs_lang'].value, 'en')
+        self.assertIn('Dive trips', self.client.get('/observations/profile/').content.decode())  # no ?lang: cookie
+        self.assertEqual(self.client.get('/observations/trips/?lang=he').cookies['seaslugs_lang'].value, 'he')
+        self.assertNotIn('Dive trips', self.client.get('/observations/profile/').content.decode().split('</nav>')[0])

@@ -1444,6 +1444,26 @@ languageButton.type = 'button';
 languageButton.className = 'language-switch';
 document.querySelector('.masthead').append(languageButton);
 
+// The visitor's language is remembered in the same cookie the server-rendered pages read (seaslugs_lang), so
+// moving between the gallery, the trips, the observations and the profile pages keeps the language whichever page
+// the button was pressed on. (localStorage is kept as a fallback for browsers that refuse cookies.)
+function readLanguageCookie() {
+    const match = document.cookie.match(/(?:^|;\s*)seaslugs_lang=(he|en)/);
+    return match ? match[1] : null;
+}
+function rememberLanguage(value) {
+    try { document.cookie = `seaslugs_lang=${value}; path=/; max-age=31536000; SameSite=Lax`; } catch (_) {}
+    try { localStorage.setItem('seaslugs-language', value); } catch (_) {}
+}
+// The links of the main navigation were rendered for the page's first language: point them at the current one.
+function keepMenuLinksInLanguage() {
+    document.querySelectorAll('.account-menu a[href^="/"]').forEach(link => {
+        const url = new URL(link.getAttribute('href'), window.location.origin);
+        if (language === 'en') url.searchParams.set('lang', 'en'); else url.searchParams.delete('lang');
+        link.setAttribute('href', url.pathname + url.search + url.hash);
+    });
+}
+
 function setLanguage(value) {
     language = value === 'en' ? 'en' : 'he';
     const en = language === 'en';
@@ -1490,11 +1510,12 @@ function setLanguage(value) {
     const url = new URL(window.location.href);
     url.searchParams.set('lang', language);
     window.history.replaceState(null, '', url);
-    try { localStorage.setItem('seaslugs-language', language); } catch (_) {}
+    rememberLanguage(language);
+    keepMenuLinksInLanguage();
     renderSidebar();
     render();
 }
 languageButton.addEventListener('click', () => setLanguage(language === 'he' ? 'en' : 'he'));
 let preferredLanguage = 'he';
 try { preferredLanguage = localStorage.getItem('seaslugs-language') || 'he'; } catch (_) {}
-setLanguage(new URLSearchParams(window.location.search).get('lang') || preferredLanguage);
+setLanguage(new URLSearchParams(window.location.search).get('lang') || readLanguageCookie() || preferredLanguage);
