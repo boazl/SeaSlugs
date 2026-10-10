@@ -2,15 +2,5 @@
     <p class="eyebrow">{% if lang == 'en' %}Through the lens, beneath the sea{% else %}מבעד לעדשה, מתחת לפני הים{% endif %}</p>
     <h1>{% if lang == 'en' %}Sea slugs: information, photos and a Mediterranean research project{% else %}חינניות ים: מידע, תמונות ומיזם מחקר בים התיכון{% endif %}</h1>
     <p class="intro-copy">{% if lang == 'en' %}A home for sea slug enthusiasts: an international collection of photos and videos, and a community documenting the sea slugs of the Israeli Mediterranean. Photographed a sea slug? Contribute an observation.{% else %}הבית של חובבי חינניות הים (Sea slugs): אוסף תמונות וסרטונים מרחבי העולם, וקהילה שמתעדת את חינניות הים בים התיכון של ישראל. צילמתם חיננית ים? תרמו תצפית.{% endif %}</p>
-    <div class="hero-actions">
-        <a class="btn btn-primary" href="{{ contribute_url }}">{% if lang == 'en' %}Contribute an observation{% else %}תרמו תצפית{% endif %}</a>
-        <a class="btn btn-secondary" href="#collectionTitle" data-home-action="migrant">{% if lang == 'en' %}Migrant species in the Mediterranean{% else %}מינים מהגרים בים התיכון{% endif %}</a>
-        <a class="btn btn-secondary" href="#collectionTitle" data-home-action="collection">{% if lang == 'en' %}Browse the collection{% else %}לאוסף התמונות והסרטונים{% endif %}</a>
-    </div>
-    <form class="hero-search" id="heroSearch" role="search" data-js-only hidden>
-        <label><span class="visually-hidden">{% if lang == 'en' %}Search for a species{% else %}חיפוש מין{% endif %}</span>
-        <input type="search" name="q" placeholder="{% if lang == 'en' %}Search a species or a name…{% else %}חפשו מין או שם…{% endif %}" autocomplete="off"></label>
-        <button type="submit" class="btn btn-primary">{% if lang == 'en' %}Search{% else %}חיפוש{% endif %}</button>
-    </form>
 </div>
 <div class="intro-index"><img src="{% if has_site_image %}/site-image/intro_photo.jpg{% else %}/intro-photo.jpg{% endif %}" alt="{% if lang == 'en' %}A sea slug, photo: Boaz Liebes{% else %}חינניית ים, צילום: בועז ליבס{% endif %}" width="520" height="346"></div>

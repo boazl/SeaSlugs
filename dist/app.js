@@ -162,7 +162,10 @@ function optionsForArea(area) {
             const inSelectedRegions = !state.regions.size || state.regions.has(sm.region);
             if (sm.site && inSelectedRegions) siteIds.add(sm.site);
             if (sm.photographer) photographers.add(sm.photographer);
-            if (sm.trip_id != null) trips.add(String(sm.trip_id));
+            // A trip is offered only when one of its observations fits the place (region, site)
+            // and year already chosen above it in the sidebar.
+            if (sm.trip_id != null && inSelectedRegions && (!state.sites.size || (sm.site && state.sites.has(sm.site)))
+                && (!state.years.size || state.years.has(String(sm.year)))) trips.add(String(sm.trip_id));
             if (sm.year != null && inSelectedRegions) years.add(String(sm.year));
         }
     }
@@ -170,8 +173,10 @@ function optionsForArea(area) {
         if (!collectionMatchesArea(c, area)) continue;
         regionIds.add(c.region);
         if (c.photographer) photographers.add(c.photographer);
-        if (c.trip_id != null) trips.add(String(c.trip_id));
-        if (c.year != null && (!state.regions.size || state.regions.has(c.region))) years.add(String(c.year));
+        const collectionInRegion = !state.regions.size || state.regions.has(c.region);
+        if (c.trip_id != null && collectionInRegion && !state.sites.size
+            && (!state.years.size || state.years.has(String(c.year)))) trips.add(String(c.trip_id));
+        if (c.year != null && collectionInRegion) years.add(String(c.year));
     }
     return { regionIds, siteIds, photographers, trips, years };
 }
@@ -399,7 +404,7 @@ function renderSidebar() {
     const siteEntries = [...opts.siteIds]
         .map(id => [id, labelFor(id, siteLabelsData), siteCount(area, id)])
         .sort((a, b) => a[1].localeCompare(b[1], language === 'he' ? 'he' : 'en'));
-    renderCheckboxGroup(document.querySelector('#siteOptions'), siteEntries, state.sites);
+    renderCheckboxGroup(document.querySelector('#siteOptions'), siteEntries, state.sites, () => { renderSidebar(); render(); });
     // Each photographer gets two count lines under the checkbox: species cards, then collections.
     const photographerEntries = [...opts.photographers]
         .map(name => [name, name, null])
@@ -428,7 +433,7 @@ function renderSidebar() {
     const yearEntries = [...opts.years]
         .map(year => [year, year, yearCount(area, year)])
         .sort((a, b) => Number(b[0]) - Number(a[0]));
-    renderCheckboxGroup(document.querySelector('#yearOptions'), yearEntries, state.years);
+    renderCheckboxGroup(document.querySelector('#yearOptions'), yearEntries, state.years, () => { renderSidebar(); render(); });
     const tripEntries = [...opts.trips]
         .map(id => {
             const label = labelFor(id, tripLabelsData) || id;
@@ -1422,7 +1427,6 @@ function applyHomeSections() {
                 element.dataset.lang = language;
             }
         }
-        element.querySelectorAll('[data-js-only]').forEach(item => { item.hidden = false; });
     });
 }
 document.addEventListener('click', event => {
@@ -1430,14 +1434,6 @@ document.addEventListener('click', event => {
     if (!link) return;
     // The link also jumps to the gallery (its href); here the migrant-species view is switched on.
     document.querySelector('#areaFilters button[data-area="migrant"]')?.click();
-});
-document.addEventListener('submit', event => {
-    if (event.target.id !== 'heroSearch') return;
-    event.preventDefault();
-    const value = event.target.elements.q.value.trim();
-    search.value = value;
-    search.dispatchEvent(new Event('input', { bubbles: true }));
-    document.querySelector('#collectionTitle').scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
 const collectionHeading = document.querySelector('#collectionTitle').firstChild;
 const originalCollectionHeading = collectionHeading.textContent;

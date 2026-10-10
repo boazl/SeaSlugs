@@ -141,11 +141,10 @@ def gallery_file(request, filename='index.html'):
             defining = area.defining_sample
             if not defining or defining.status != 'published' or defining.deleted_at or not (defining.image or defining.video_url):
                 continue  # a species shows in the gallery only through a valid defining sample
-            area_key = f'{area.country_id}-{area.sea_id}'
-            area_labels[area_key] = {
-                'label': f'{area.country.name} \u00b7 {area.sea.name}',
-                'label_en': f'{area.country.name_en or area.country.name} \u00b7 {area.sea.name_en or area.sea.name}',
-            }
+            # One area per SEA (not per country+sea): the Red Sea is one filter button however many
+            # countries' coasts it was observed from.
+            area_key = f'sea-{area.sea_id}'
+            area_labels[area_key] = {'label': area.sea.name, 'label_en': area.sea.name_en or area.sea.name}
             samples_qs = Sample.objects.filter(
                 kind='species', species_id=area.species_id, status='published', deleted_at__isnull=True,
                 trip__country_id=area.country_id, trip__region__sea_id=area.sea_id, trip__year__isnull=False,
@@ -240,7 +239,7 @@ def gallery_file(request, filename='index.html'):
         collections_out = []
         for item in collection_rows:
             region = item.trip.region
-            area_key = f'{item.trip.country_id}-{region.sea_id}'
+            area_key = f'sea-{region.sea_id}'
             region_out[str(region.pk)] = {'label': region.name, 'label_en': region.name_en or region.name, 'area': area_key}
             trip_out[str(item.trip_id)] = {'label': item.trip.title, 'area': area_key}
             trip_objects[item.trip_id] = item.trip

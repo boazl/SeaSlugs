@@ -9,7 +9,6 @@ from .home_content import clear_cache
 from .models import Country, Sea, Region, DiveTrip, Species, Sample, SpeciesArea
 from .test_seo import SeoFixture
 
-
 class HomeContentTests(SeoFixture):
     def setUp(self):
         super().setUp()
@@ -40,6 +39,21 @@ class HomeContentTests(SeoFixture):
         self.assertEqual(html.count('<h1>'), 1)
         self.assertNotIn('איך תורמים תצפית?', html.split('<body>')[1])
 
+    def test_the_hero_has_no_buttons_or_search_because_the_page_shows_them_right_below(self):
+        html = self.page('/')
+        hero = html.split('data-home-section="hero"')[1].split('</section>')[0]
+        for needle in ('class="btn', 'heroSearch', 'hero-actions'):
+            self.assertNotIn(needle, hero)
+        # the one contribute button is at the end of the how-to-contribute section
+        contribute = html.split('data-home-section="contribute"')[1].split('</section>')[0]
+        self.assertIn('class="btn btn-primary"', contribute)
+
+    def test_the_bottom_link_block_is_gone(self):
+        html = self.page('/')
+        self.assertNotIn('id="israel-species"', html)
+        self.assertNotIn('דפדוף לפי קבוצות', html)
+        self.assertNotIn('home-links', html)
+
     def test_numbers_line_is_built_from_the_data(self):
         html = self.page('/')
         note = re.search(r'collection-note[^>]*>(.*?)</p>', html, re.S).group(1)
@@ -47,32 +61,6 @@ class HomeContentTests(SeoFixture):
         self.assertIn('2 תצפיות', note)
         self.assertIn('1 מהמינים תועדו בים התיכון של ישראל', note)
         self.assertNotIn('בעיקר ישראל', note)
-
-    def test_the_israeli_mediterranean_list_has_only_mediterranean_species_and_links_to_their_pages(self):
-        html = self.page('/')
-        block = html.split('id="israel-species"')[1].split('</ul>')[0]
-        self.assertIn(f'href="/species/{self.med_area.slug}/"', block)
-        self.assertIn('Cuthona perca', block)
-        self.assertNotIn('Chromodoris annae', block)  # the Red Sea species is not an Israeli Mediterranean one
-        self.assertIn('(מהגר)', block)
-
-    def test_the_english_links_keep_the_language(self):
-        html = self.page('/?lang=en')
-        self.assertIn(f'href="/species/{self.med_area.slug}/?lang=en"', html)
-        self.assertIn(f'href="/order/{self.order.pk}/?lang=en"', html)
-        self.assertIn('href="/family/Chromodorididae/?lang=en"', html)
-
-    def test_the_hebrew_links_to_taxonomic_groups_are_plain(self):
-        html = self.page('/')
-        self.assertIn(f'href="/order/{self.order.pk}/"', html)
-        self.assertIn('href="/family/Chromodorididae/"', html)
-
-    def test_every_linked_page_answers_200(self):
-        html = self.page('/')
-        links = set(re.findall(r'href="(/(?:species|order|family)/[^"]+)"', html))
-        self.assertTrue(links)
-        for link in links:
-            self.assertEqual(self.client.get(link).status_code, 200, link)
 
     def test_contribute_button_depends_on_login(self):
         self.assertIn('href="/observations/signup/">תרמו תצפית', self.page('/'))
@@ -98,7 +86,7 @@ class HomeContentTests(SeoFixture):
 
     def test_the_gallery_hooks_the_script_needs_are_still_there(self):
         html = self.page('/')
-        for needle in ('id="collectionTitle"', 'id="search"', 'id="areaFilters"', 'id="heroSearch"',
+        for needle in ('id="collectionTitle"', 'id="search"', 'id="areaFilters"',
                        'data-home-action="migrant"', 'class="footer-tagline"'):
             self.assertIn(needle, html)
 
@@ -110,3 +98,23 @@ class HomeContentTests(SeoFixture):
         self.assertIn('2 מינים', self.page('/'))
         clear_cache()
         self.assertIn('3 מינים', self.page('/'))
+
+
+class AreaFilterTests(SeoFixture):
+    """The gallery's area buttons are per sea: the Red Sea is one button however many countries' coasts it was
+    observed from."""
+
+    def catalog(self):
+        text = self.client.get('/catalog.js').content.decode()
+        return json.loads(text[len('window.SEASLUGS = '):-1])
+
+    def test_two_countries_on_one_sea_make_one_area_named_after_the_sea(self):
+        sinai = Country.objects.create(name='סיני', name_en='Sinai')
+        red_sea = Sea.objects.get(name_en='Red Sea')
+        region = Region.objects.create(name='דהב', name_en='Dahab', country=sinai, sea=red_sea)
+        trip = DiveTrip.objects.create(title='Dahab', year=2024, country=sinai, region=region)
+        other = Species.objects.create(scientific_name='Hypselodoris infucata', genus='Hypselodoris')
+        Sample(owner=self.owner, trip=trip, species=other, video_url='https://youtu.be/cdefghijklm').save_reviewed()
+        data = self.catalog()
+        self.assertEqual(data['areas'], {f'sea-{red_sea.pk}': {'label': 'ים סוף', 'label_en': 'Red Sea'}})
+        self.assertEqual({sp['area'] for sp in data['species']}, {f'sea-{red_sea.pk}'})
