@@ -478,3 +478,48 @@ class GalleryHeadingTests(SeoFixture):
         self.assertIn('<h2 id="collectionTitle">', html)  # the "#collectionTitle" link target and the section's label
         css = (settings.BASE_DIR / 'dist/styles.css').read_text()
         self.assertIn('.collection-head h2{position:absolute;width:1px;height:1px', css)
+
+
+class LoginAndFormPagesLanguageTests(SeoFixture):
+    def body(self, url):
+        self.client.cookies.clear()
+        html = self.client.get(url).content.decode()
+        return html.split('<main')[1]
+
+    def test_login_is_in_one_language_without_a_second_sign_up_link(self):
+        english = self.body('/observations/login/?lang=en')
+        visible = re.sub(r'<[^>]+>', ' ', english)
+        self.assertIn('<h1>Login</h1>', english)
+        self.assertIn('Username:', visible)
+        self.assertIn('Password:', visible)
+        self.assertIn('<button>Login</button>', english)
+        self.assertNotRegex(visible, r'[֐-׿]')
+        self.assertNotIn('/observations/signup/', english)  # the menu's Sign up button is the way to sign up
+        hebrew = self.body('/observations/login/?lang=he')
+        self.assertIn('<h1>כניסה</h1>', hebrew)
+        self.assertIn('שם משתמש:', hebrew)
+        self.assertNotIn('Login', re.sub(r'<[^>]+>', ' ', hebrew))
+        self.assertNotIn('/observations/signup/', hebrew)
+
+    def test_a_wrong_password_is_reported_in_the_page_language(self):
+        self.client.cookies.clear()
+        response = self.client.post('/observations/login/?lang=en', {'username': 'nobody', 'password': 'wrong'})
+        self.assertContains(response, 'Please enter a correct username and password.')
+        self.client.cookies.clear()
+        response = self.client.post('/observations/login/?lang=he', {'username': 'nobody', 'password': 'wrong'})
+        self.assertContains(response, 'שם משתמש וסיסמה נכונים')
+
+    def test_sign_up_and_profile_titles_and_save_button_follow_the_language(self):
+        self.client.force_login(self.owner)
+        for url, title in (('/observations/signup/', 'Sign up'), ('/observations/profile/', 'My profile')):
+            self.client.cookies.clear()
+            self.client.force_login(self.owner)
+            english = self.client.get(url + '?lang=en').content.decode().split('<main')[1]
+            self.assertIn(f'<h1>{title}</h1>', english, url)
+            self.assertIn('>Save<', english, url)
+            self.assertNotIn(' / ', re.search(r'<h1>(.*?)</h1>', english).group(1))
+            self.client.cookies.clear()
+            self.client.force_login(self.owner)
+            hebrew = self.client.get(url + '?lang=he').content.decode().split('<main')[1]
+            self.assertIn('>שמירה<', hebrew, url)
+            self.assertNotIn('Save', hebrew, url)

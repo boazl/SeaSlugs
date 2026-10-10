@@ -136,6 +136,7 @@ TRANSLATIONS = {
     'שלום': 'Hello',
     'יציאה': 'Logout',
     'גלריה': 'Gallery',
+    'שמירה': 'Save',
     'כלי הקהילה': 'Community tools',
     'צילומי מאקרו - סטילס ווידאו': 'Macro photography · Stills and video',
     'חינניות ים': 'Sea slugs',
@@ -291,3 +292,10 @@ def home_hero(context, lang):
     hero = home_sections(lang, request, has_image)[0]['hero']
     hero = re.sub(r'<h1>(.*?)</h1>', r'<p class="intro-title">\1</p>', hero, flags=re.S)
     return mark_safe(hero)
+
+
+@register.filter
+def by_language(value, lang):
+    """'Hebrew / English' -> the half in the page's language (page titles that were written in both)."""
+    hebrew, separator, english = str(value).partition(' / ')
+    return (english if lang == 'en' else hebrew) if separator else value

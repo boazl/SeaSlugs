@@ -812,7 +812,7 @@ def edit(request,pk=None):
         messages.success(request,'התצפית פורסמה.' if item.status=='published' else 'התצפית נשמרה וממתינה להשלמת נתונים ולאישור מנהל.',
             extra_tags='new-observation' if is_new_observation else '')
         return redirect(f'{next_url}#obs-{item.pk}')
-    return render(request,'observations/form.html',{'form':form,'title':'תצפית / Sample','observation_form':True,
+    return render(request,'observations/form.html',{'form':form,'title':'תצפית / Observation','observation_form':True,
         'trip_new_url':reverse('trip-new'),'trip_add_url':reverse('trip-add'),'species_add_url':reverse('species-new') if manager else '','next':next_url,
         'species_options':species_name_options(),
         'taxonomy':taxonomy_for_form(),
