@@ -113,3 +113,8 @@ html[dir="ltr"] .card h3.hebrew{direction:ltr;text-align:left}
 .browse-block a:hover{text-decoration:underline}
 .browse-block small{color:var(--muted)}
 @media(max-width:850px){.intro-text{padding-inline-end:0}.browse-block ul ul,.browse-species{columns:1}}
+
+/* The gallery's heading and total stay in the page (screen readers, the "#collectionTitle" jump target) but are not drawn:
+   the area buttons and the result count already say what the list is. */
+.collection-head{position:relative}
+.collection-head h2{position:absolute;width:1px;height:1px;margin:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}

@@ -469,3 +469,12 @@ class CommunityPageLanguageAttributesTests(SeoFixture):
         # and the brand is drawn the way the home page draws it: the Latin wordmark in English, the Hebrew one in Hebrew
         self.client.cookies.clear()
         self.assertIn('<html lang="en"', self.client.get('/observations/login/?lang=en').content.decode())
+
+
+class GalleryHeadingTests(SeoFixture):
+    def test_the_gallery_heading_stays_for_screen_readers_but_is_not_drawn(self):
+        from django.conf import settings
+        html = self.page('/')
+        self.assertIn('<h2 id="collectionTitle">', html)  # the "#collectionTitle" link target and the section's label
+        css = (settings.BASE_DIR / 'dist/styles.css').read_text()
+        self.assertIn('.collection-head h2{position:absolute;width:1px;height:1px', css)
