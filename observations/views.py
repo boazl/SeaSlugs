@@ -5,7 +5,9 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group
 from django.db.models import Q
 from django import forms
-from django.http import Http404, FileResponse, JsonResponse
+import hashlib
+
+from django.http import Http404, FileResponse, HttpResponseNotModified, JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
 from django.urls import reverse
@@ -215,6 +217,28 @@ def species_page(request, slug):
     })
 
 
+def _article_response(request, field_file, label):
+    """Streams an article PDF. The browser must re-check with the server each time (no-cache + ETag):
+    a replaced file keeps the same address (.../article.pdf), so a plain max-age would keep showing the
+    old PDF for up to the cache lifetime. An unchanged file costs only a 304."""
+    try:
+        stat = field_file.storage.get_modified_time(field_file.name), field_file.size
+    except (OSError, NotImplementedError, ValueError):
+        stat = None
+    etag = '"%s"' % hashlib.md5(('%s|%s' % (field_file.name, stat)).encode('utf-8')).hexdigest()
+    headers = {'ETag': etag, 'Cache-Control': 'public, no-cache'}
+    if request.headers.get('If-None-Match') == etag:
+        response = HttpResponseNotModified()
+        for key, value in headers.items():
+            response[key] = value
+        return response
+    response = FileResponse(field_file.open('rb'), content_type='application/pdf')
+    for key, value in headers.items():
+        response[key] = value
+    response['Content-Disposition'] = 'inline; filename="%s.pdf"' % label.replace('"', "'")
+    return response
+
+
 def species_article(request, slug):
     """Streams a species' curated article PDF. Production never serves MEDIA_ROOT
     directly (same reason observation-photo/site-image exist as dedicated views rather
@@ -224,10 +248,7 @@ def species_article(request, slug):
     area = get_object_or_404(SpeciesArea.objects.select_related('species'), slug=slug)
     if not area.species.article_pdf:
         raise Http404
-    response = FileResponse(area.species.article_pdf.open('rb'), content_type='application/pdf')
-    response['Cache-Control'] = 'public, max-age=3600'
-    response['Content-Disposition'] = 'inline; filename="%s.pdf"' % area.species.scientific_name.replace('"', "'")
-    return response
+    return _article_response(request, area.species.article_pdf, area.species.scientific_name)
 
 
 def parse_sources(text):
@@ -422,10 +443,7 @@ def genus_article(request, name):
     genus = get_object_or_404(TaxonGenus, name=name)
     if not genus.article_pdf:
         raise Http404
-    response = FileResponse(genus.article_pdf.open('rb'), content_type='application/pdf')
-    response['Cache-Control'] = 'public, max-age=3600'
-    response['Content-Disposition'] = 'inline; filename="%s.pdf"' % genus.name.replace('"', "'")
-    return response
+    return _article_response(request, genus.article_pdf, genus.name)
 
 def family_article(request, name):
     """Streams a family's article PDF (the family page's own row -- see family_page)."""
@@ -433,10 +451,7 @@ def family_article(request, name):
     family = next((f for f in families if not f.sub_family), families[0] if families else None)
     if family is None or not family.article_pdf:
         raise Http404
-    response = FileResponse(family.article_pdf.open('rb'), content_type='application/pdf')
-    response['Cache-Control'] = 'public, max-age=3600'
-    response['Content-Disposition'] = 'inline; filename="%s.pdf"' % family.name.replace('"', "'")
-    return response
+    return _article_response(request, family.article_pdf, family.name)
 
 
 def order_article(request, pk):
@@ -444,10 +459,7 @@ def order_article(request, pk):
     order = get_object_or_404(TaxonOrder, pk=pk)
     if not order.article_pdf:
         raise Http404
-    response = FileResponse(order.article_pdf.open('rb'), content_type='application/pdf')
-    response['Cache-Control'] = 'public, max-age=3600'
-    response['Content-Disposition'] = 'inline; filename="%s.pdf"' % order.name.replace('"', "'")
-    return response
+    return _article_response(request, order.article_pdf, order.name)
 
 
 def genus_identification(request, name):

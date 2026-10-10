@@ -219,3 +219,51 @@ class TaxonFilesOnObservationFormTests(TestCase):
     def test_save_and_delete_button_rows_are_spaced_apart(self):
         html = self.client.get(f'/observations/{self.genus_sample.pk}/edit/').content.decode()
         self.assertIn('class="actions form-actions" style="margin:24px 0"', html)
+
+
+class ArticleFileHandlingTests(TestCase):
+    """Replacing or clearing an article PDF in the admin must not leave the old file on disk, and the
+    streamed article must always be re-validated by the browser (the address never changes)."""
+
+    def setUp(self):
+        import shutil
+        self.media = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.media, True)
+        override = override_settings(MEDIA_ROOT=self.media)
+        override.enable()
+        self.addCleanup(override.disable)
+        self.family = TaxonFamily.objects.create(name='Phyllidiidae')
+        self.family.article_pdf.save('old.pdf', ContentFile(b'%PDF-1.4 old'), save=True)
+
+    def test_replacing_the_file_removes_the_old_one(self):
+        import os
+        old_path = self.family.article_pdf.path
+        self.family.article_pdf = SimpleUploadedFile('new.pdf', b'%PDF-1.4 new', content_type='application/pdf')
+        self.family.save()
+        self.assertFalse(os.path.exists(old_path))
+        self.assertTrue(os.path.exists(self.family.article_pdf.path))
+
+    def test_clearing_the_file_removes_it_from_disk(self):
+        import os
+        old_path = self.family.article_pdf.path
+        self.family.article_pdf = ''
+        self.family.save()
+        self.assertFalse(os.path.exists(old_path))
+
+    def test_an_unrelated_save_keeps_the_file(self):
+        import os
+        path = self.family.article_pdf.path
+        self.family.description_he = 'x'
+        self.family.save()
+        self.assertTrue(os.path.exists(path))
+
+    def test_the_article_is_revalidated_by_the_browser_and_a_replaced_file_is_served_at_once(self):
+        first = self.client.get('/family/Phyllidiidae/article.pdf')
+        self.assertEqual(b''.join(first.streaming_content), b'%PDF-1.4 old')
+        self.assertIn('no-cache', first['Cache-Control'])
+        self.assertEqual(self.client.get('/family/Phyllidiidae/article.pdf', HTTP_IF_NONE_MATCH=first['ETag']).status_code, 304)
+        self.family.article_pdf = SimpleUploadedFile('new.pdf', b'%PDF-1.4 new', content_type='application/pdf')
+        self.family.save()
+        second = self.client.get('/family/Phyllidiidae/article.pdf', HTTP_IF_NONE_MATCH=first['ETag'])
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(b''.join(second.streaming_content), b'%PDF-1.4 new')

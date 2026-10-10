@@ -1093,3 +1093,35 @@ class SpeciesArea(models.Model):
                                                 undetermined_variant=variant, defining_sample=defining)
                     count += 1
         return count
+
+
+# --- uploaded files that are replaced or cleared must not stay on disk ---------------------------
+# The public observation form already deletes the old file itself; the Django admin ("לסלק" ticked,
+# or a new file chosen) only drops the reference and leaves the old PDF behind as an orphan. This
+# removes it for every save path. The file is kept when another row still points at the same name.
+_REPLACEABLE_FILES = ((Species, ('article_pdf',)), (TaxonOrder, ('article_pdf',)), (TaxonFamily, ('article_pdf',)),
+                      (TaxonGenus, ('article_pdf', 'identification_file')), (DiveTrip, ('article_pdf',)))
+
+
+def _delete_replaced_files(sender, instance, update_fields=None, **kwargs):
+    if not instance.pk:
+        return
+    previous = sender.objects.filter(pk=instance.pk).first()
+    if previous is None:
+        return
+    for field in dict(_REPLACEABLE_FILES)[sender]:
+        if update_fields is not None and field not in update_fields:
+            continue
+        old = getattr(previous, field)
+        if not old or old.name == (getattr(instance, field).name or ''):
+            continue
+        if sender.objects.filter(**{field: old.name}).exclude(pk=instance.pk).exists():
+            continue
+        try:
+            old.storage.delete(old.name)
+        except OSError:
+            pass
+
+
+for _model, _fields in _REPLACEABLE_FILES:
+    models.signals.pre_save.connect(_delete_replaced_files, sender=_model, dispatch_uid='delete_replaced_files_%s' % _model.__name__)
