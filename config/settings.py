@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import os
+import sys
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -40,6 +41,14 @@ if PRODUCTION:
     SECURE_HSTS_SECONDS = 3600
 DATA_DIR = Path(os.environ.get("SEASLUGS_DATA_DIR", "/var/data" if PRODUCTION else str(BASE_DIR)))
 MEDIA_ROOT = DATA_DIR / "media"
+if len(sys.argv) > 1 and sys.argv[1] == "test":
+    # Tests that upload files must never write into the real media folder (they used to leave hundreds
+    # of "%PDF-1.4 fake" files in media/articles/species): use a throw-away folder, removed on exit.
+    import atexit
+    import shutil
+    import tempfile
+    MEDIA_ROOT = Path(tempfile.mkdtemp(prefix="seaslugs-test-media-"))
+    atexit.register(shutil.rmtree, MEDIA_ROOT, True)
 MEDIA_URL = "/media/"
 
 

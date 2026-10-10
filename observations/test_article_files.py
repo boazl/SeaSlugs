@@ -77,3 +77,9 @@ class ArticleFilesPageTests(TestCase):
 
     def test_delete_requires_post(self):
         self.assertEqual(self.client.get('/admin/article-files/delete/').status_code, 405)
+
+
+class TestsNeverTouchTheRealMediaFolderTests(TestCase):
+    def test_media_root_is_a_throw_away_folder_while_testing(self):
+        from django.conf import settings
+        self.assertIn('seaslugs-test-media-', str(settings.MEDIA_ROOT))
