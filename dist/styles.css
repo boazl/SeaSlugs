@@ -88,7 +88,7 @@ html[dir="ltr"] .card h3.hebrew{direction:ltr;text-align:left}
 .btn{display:inline-block;padding:10px 20px;border-radius:8px;border:1px solid var(--accent);text-decoration:none;font-size:16px;line-height:1.4;cursor:pointer}
 .btn-primary{background:var(--accent);color:var(--bg);font-weight:600}
 .btn:hover{filter:brightness(1.12)}
-.home-text{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:28px;padding:34px 0 40px;border-top:1px solid var(--line)}
+.home-text{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:28px;margin-top:48px;padding:34px 0 10px;border-top:1px solid var(--line)}
 .home-section h2{font-size:22px;font-weight:600;margin:0 0 12px;color:var(--ink)}
 .home-section p{color:var(--muted);margin:0 0 12px;line-height:1.75}
 .home-section .quick-links a,.home-section p a:not(.btn){color:var(--accent)}

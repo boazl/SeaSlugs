@@ -1,6 +1,4 @@
 <div class="intro-text">
-    <p class="eyebrow">{% if lang == 'en' %}Through the lens, beneath the sea{% else %}מבעד לעדשה, מתחת לפני הים{% endif %}</p>
-    <h1>{% if lang == 'en' %}Sea slugs: information, photos and a Mediterranean research project{% else %}חינניות ים: מידע, תמונות ומיזם מחקר בים התיכון{% endif %}</h1>
-    <p class="intro-copy">{% if lang == 'en' %}A home for sea slug enthusiasts: an international collection of photos and videos, and a community documenting the sea slugs of the Israeli Mediterranean. Photographed a sea slug? Contribute an observation.{% else %}הבית של חובבי חינניות הים (Sea slugs): אוסף תמונות וסרטונים מרחבי העולם, וקהילה שמתעדת את חינניות הים בים התיכון של ישראל. צילמתם חיננית ים? תרמו תצפית.{% endif %}</p>
+{{ body }}
 </div>
 <div class="intro-index"><img src="{% if has_site_image %}/site-image/intro_photo.jpg{% else %}/intro-photo.jpg{% endif %}" alt="{% if lang == 'en' %}A sea slug, photo: Boaz Liebes{% else %}חינניית ים, צילום: בועז ליבס{% endif %}" width="520" height="346"></div>

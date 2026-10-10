@@ -35,11 +35,6 @@ gtag('config', 'G-CPGTC09P2P');</script>
         <section class="intro" aria-label="{% if lang == 'en' %}About SeaSlugs{% else %}על האתר{% endif %}">
             <div data-home-section="hero" data-lang="{{ lang }}">{{ sections.hero|safe }}</div>
         </section>
-        <div class="home-text">
-            <section class="home-section" data-home-section="what" data-lang="{{ lang }}">{{ sections.what|safe }}</section>
-            <section class="home-section" data-home-section="project" data-lang="{{ lang }}">{{ sections.project|safe }}</section>
-            <section class="home-section" data-home-section="contribute" data-lang="{{ lang }}">{{ sections.contribute|safe }}</section>
-        </div>
         <section class="collection" aria-labelledby="collectionTitle">
             <p class="collection-note" data-home-section="collection_note" data-lang="{{ lang }}">{{ sections.collection_note|safe }}</p>
             <div class="collection-head">
@@ -130,6 +125,11 @@ gtag('config', 'G-CPGTC09P2P');</script>
                 <p>להצגת האוסף ולחיפוש יש להפעיל JavaScript בדפדפן.</p>
             </noscript>
         </section>
+        <div class="home-text">
+            <section class="home-section" data-home-section="what" data-lang="{{ lang }}">{{ sections.what|safe }}</section>
+            <section class="home-section" data-home-section="project" data-lang="{{ lang }}">{{ sections.project|safe }}</section>
+            <section class="home-section" data-home-section="contribute" data-lang="{{ lang }}">{{ sections.contribute|safe }}</section>
+        </div>
     </main>
     <footer><span class="brand-name" dir="ltr">SeaSlugs.</span>
         <p>צילום: בועז ליבס · הסרטונים מוצגים דרך YouTube</p><span class="footer-tagline">חינניות ים, מקרוב.</span>

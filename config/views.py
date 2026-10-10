@@ -21,8 +21,9 @@ def gallery_file(request, filename='index.html'):
         from django.http import HttpResponse
         from observations.models import SiteImage
         has_site_image = SiteImage.objects.filter(key='intro_photo').exclude(image='').exists()
-        from observations.home_text import HOME_TEXT, home_lang
+        from observations.home_text import home_text_all, home_lang
         lang = home_lang(request)
+        HOME_TEXT = home_text_all()
         from observations.home_content import home_sections
         sections, sections_both = home_sections(lang, request, has_site_image)
         template = engines['django'].from_string((settings.BASE_DIR / 'dist' / filename).read_text())

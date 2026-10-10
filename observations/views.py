@@ -876,6 +876,46 @@ def species_new(request):
 
 
 @login_required
+def home_text_edit(request):
+    """Manager-only screen for the wording of the home page's text sections (and the Google title and
+    description), in both languages. A section left empty, or equal to the default, uses the default."""
+    if not is_manager(request.user):
+        raise Http404
+    from .home_defaults import DEFAULTS, SECTION_LABELS
+    from .home_content import overrides
+    from .home_text import HOME_TEXT
+    from .models import HomeText
+    items = [(key, label, DEFAULTS[key], 'text') for key, label in SECTION_LABELS.items()]
+    items += [('meta_title', 'כותרת הדף בגוגל (title)', {l: HOME_TEXT[l]['title'] for l in ('he', 'en')}, 'line'),
+              ('meta_description', 'תיאור הדף בגוגל (description)', {l: HOME_TEXT[l]['description'] for l in ('he', 'en')}, 'text')]
+    if request.method == 'POST':
+        errors = []
+        for key, label, defaults, kind in items:
+            for lang in ('he', 'en'):
+                value = request.POST.get(f'{key}__{lang}', '').replace('\r\n', '\n').strip()
+                if len(value) > 6000:
+                    errors.append(f'{label} ({lang}): הטקסט ארוך מדי.')
+                    continue
+                if not value or value == defaults[lang].strip():
+                    HomeText.objects.filter(key=key, lang=lang).delete()
+                else:
+                    HomeText.objects.update_or_create(key=key, lang=lang, defaults={'content': value})
+        for error in errors:
+            messages.error(request, error)
+        if not errors:
+            messages.success(request, 'הטקסטים נשמרו. אפשר לראות אותם בדף הבית.')
+        return redirect('home-text-edit')
+    edited = overrides()
+    rows = []
+    for key, label, defaults, kind in items:
+        rows.append({'key': key, 'label': label, 'kind': kind, 'fields': [
+            {'lang': lang, 'name': f'{key}__{lang}', 'value': edited.get((key, lang)) or defaults[lang],
+             'default': defaults[lang], 'is_default': not edited.get((key, lang))}
+            for lang in ('he', 'en')]})
+    return render(request, 'observations/home_text_edit.html', {'rows': rows})
+
+
+@login_required
 def trip_new(request):
     next_url=request.POST.get('next') or request.GET.get('next') or reverse('observation-new')
     form=DiveTripForm(request.POST or None)

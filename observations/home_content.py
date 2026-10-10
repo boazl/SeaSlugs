@@ -13,7 +13,9 @@ from django.core.cache import cache
 from django.template.loader import render_to_string
 from django.urls import reverse
 
-SECTIONS = ('hero', 'what', 'project', 'contribute', 'collection_note', 'footer_invite')
+from .home_defaults import DEFAULTS
+from .home_markup import render_markup
+
 CACHE_KEY = 'home-content-data-v1'
 CACHE_SECONDS = 300
 
@@ -46,17 +48,41 @@ def home_data():
     return data
 
 
-def _sections_for(lang, data, context):
-    context = dict(context, lang=lang, suffix='?lang=en' if lang == 'en' else '', **data)
-    return {name: render_to_string(f'observations/home/{name}.html', context).strip() for name in SECTIONS}
+def overrides():
+    """{(key, lang): text} of the sections edited on the edit screen."""
+    from django.db import DatabaseError
+    from .models import HomeText
+    try:
+        return {(row.key, row.lang): row.content for row in HomeText.objects.all()}
+    except DatabaseError:  # the table does not exist yet (migration not applied): the home page still works
+        return {}
+
+
+def current_text(key, lang, edited=None):
+    edited = overrides() if edited is None else edited
+    return edited.get((key, lang)) or DEFAULTS[key][lang]
+
+
+def _sections_for(lang, data, contribute_url, has_site_image, edited):
+    numbers = {'species': data['species_count'], 'observations': data['observation_count'], 'israeli': data['israeli_count']}
+    text = lambda key: current_text(key, lang, edited)
+    render = lambda key, **kw: render_markup(text(key), numbers, contribute_url, **kw)
+    sections = {
+        'hero': render_to_string('observations/home/hero.html', {
+            'lang': lang, 'has_site_image': has_site_image,
+            'body': render('hero', paragraph_class='intro-copy')}).strip(),
+        'collection_note': str(render('collection_note', inline=True)),
+        'footer_invite': str(render('footer_invite', inline=True)),
+    }
+    for key in ('what', 'project', 'contribute'):
+        sections[key] = str(render(key))
+    return sections
 
 
 def home_sections(lang, request, has_site_image):
     """(the sections in `lang` as HTML, {'he': {...}, 'en': {...}} for the language button)."""
     data = home_data()
-    context = {
-        'contribute_url': reverse('observation-new') if request.user.is_authenticated else reverse('signup'),
-        'has_site_image': has_site_image,
-    }
-    both = {code: _sections_for(code, data, context) for code in ('he', 'en')}
+    edited = overrides()
+    contribute_url = reverse('observation-new') if request.user.is_authenticated else reverse('signup')
+    both = {code: _sections_for(code, data, contribute_url, has_site_image, edited) for code in ('he', 'en')}
     return both[lang], both

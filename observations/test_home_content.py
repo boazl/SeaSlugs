@@ -3,6 +3,7 @@ HTML the server sends, in the language of the URL, and both languages are embedd
 import json
 import re
 
+from django.contrib.auth.models import User
 from django.core.cache import cache
 
 from .home_content import clear_cache
@@ -62,12 +63,13 @@ class HomeContentTests(SeoFixture):
         self.assertIn('1 מהמינים תועדו בים התיכון של ישראל', note)
         self.assertNotIn('בעיקר ישראל', note)
 
-    def test_contribute_button_depends_on_login(self):
-        self.assertIn('href="/observations/signup/">תרמו תצפית', self.page('/'))
+    def test_contribute_button_says_add_observation_and_depends_on_login(self):
+        self.assertIn('class="btn btn-primary" href="/observations/signup/">הוספת תצפית</a>', self.page('/'))
+        self.assertIn('class="btn btn-primary" href="/observations/signup/">Add an observation</a>', self.page('/?lang=en'))
         self.client.force_login(self.owner)
         html = self.page('/')
-        self.assertIn('href="/observations/new/">תרמו תצפית', html)
-        self.assertNotIn('/observations/signup/">תרמו', html)
+        self.assertIn('class="btn btn-primary" href="/observations/new/">הוספת תצפית</a>', html)
+        self.assertNotIn('/observations/signup/', html.split('<body>')[1].split('id="player"')[0])
 
     def test_footer_keeps_the_credit_and_adds_the_invitation(self):
         html = self.page('/')
@@ -118,3 +120,112 @@ class AreaFilterTests(SeoFixture):
         data = self.catalog()
         self.assertEqual(data['areas'], {f'sea-{red_sea.pk}': {'label': 'ים סוף', 'label_en': 'Red Sea'}})
         self.assertEqual({sp['area'] for sp in data['species']}, {f'sea-{red_sea.pk}'})
+
+
+class MarkupTests(SeoFixture):
+    def render(self, text, **kw):
+        from .home_markup import render_markup
+        return str(render_markup(text, {'species': 5, 'observations': 7, 'israeli': 2}, '/observations/new/', **kw))
+
+    def test_blocks(self):
+        html = self.render('~ small\n# Title\n## Head\nfirst line\nsecond line\n\n1. one\n2. two\n\n- a\n- b')
+        self.assertEqual(html, '<p class="eyebrow">small</p>\n<h1>Title</h1>\n<h2>Head</h2>\n<p>first line second line</p>\n'
+                               '<ol class="steps"><li>one</li><li>two</li></ol>\n<ul class="steps"><li>a</li><li>b</li></ul>')
+
+    def test_inline_links_button_numbers_and_escaping(self):
+        html = self.render('**bold** [x](contribute) [y](migrant) [z](https://e.org/?a=1&b=2) [bad](javascript:alert(1)) [[Go]] {species}/{observations}/{israeli} <script>')
+        self.assertIn('<strong>bold</strong>', html)
+        self.assertIn('<a href="/observations/new/">x</a>', html)
+        self.assertIn('<a href="#collectionTitle" data-home-action="migrant">y</a>', html)
+        self.assertIn('<a href="https://e.org/?a=1&amp;b=2">z</a>', html)
+        self.assertIn('<a href="#">bad</a>', html)
+        self.assertIn('<a class="btn btn-primary" href="/observations/new/">Go</a>', html)
+        self.assertIn('5/7/2', html)
+        self.assertIn('&lt;script&gt;', html)
+        self.assertNotIn('<script>', html)
+
+    def test_inline_mode_has_no_blocks(self):
+        self.assertEqual(self.render('a\nb **c**', inline=True), 'a b <strong>c</strong>')
+
+
+class HomeTextEditTests(SeoFixture):
+    def setUp(self):
+        super().setUp()
+        clear_cache()
+        self.addCleanup(clear_cache)
+        self.url = '/observations/home-text/'
+
+    def post(self, **values):
+        from .home_defaults import DEFAULTS
+        data = {f'{key}__{lang}': DEFAULTS[key][lang] for key in DEFAULTS for lang in ('he', 'en')}
+        data.update(values)
+        return self.client.post(self.url, data)
+
+    def test_only_managers_can_open_it(self):
+        self.assertEqual(self.client.get(self.url).status_code, 302)  # to the login page
+        User.objects.create_user('plain', password='pw')
+        self.client.login(username='plain', password='pw')
+        self.assertEqual(self.client.get(self.url).status_code, 404)
+        self.assertEqual(self.client.post(self.url, {'what__he': 'x'}).status_code, 404)
+
+    def test_the_screen_shows_every_section_in_both_languages_with_the_defaults(self):
+        self.client.force_login(self.owner)
+        html = self.page(self.url)
+        for key in ('hero', 'what', 'project', 'contribute', 'collection_note', 'footer_invite', 'meta_title', 'meta_description'):
+            for lang in ('he', 'en'):
+                self.assertIn(f'name="{key}__{lang}"', html)
+        self.assertIn('מה הן חינניות ים?', html)
+        self.assertIn('[[הוספת תצפית]]', html)
+
+    def test_an_edited_text_replaces_the_default_in_that_language_only(self):
+        self.client.force_login(self.owner)
+        response = self.post(what__he='## כותרת חדשה\nפסקה חדשה עם **הדגשה**.')
+        self.assertEqual(response.status_code, 302)
+        self.client.logout()
+        he = self.page('/')
+        self.assertIn('<h2>כותרת חדשה</h2>', he)
+        self.assertIn('<p>פסקה חדשה עם <strong>הדגשה</strong>.</p>', he)
+        self.assertNotIn('מה הן חינניות ים?', he.split('<body>')[1].split('<script')[0])
+        self.assertIn('What are sea slugs?', self.page('/?lang=en'))
+        import json, re
+        data = json.loads(re.search(r'id="home-content" type="application/json">(.*?)</script>', he, re.S).group(1))
+        self.assertIn('כותרת חדשה', data['he']['what'])
+
+    def test_clearing_or_restoring_the_default_removes_the_override(self):
+        from .models import HomeText
+        self.client.force_login(self.owner)
+        self.post(what__he='משהו אחר')
+        self.assertEqual(HomeText.objects.filter(key='what').count(), 1)
+        self.post(what__he='')
+        self.assertEqual(HomeText.objects.count(), 0)
+        self.assertIn('מה הן חינניות ים?', self.page('/'))
+
+    def test_saving_the_untouched_form_stores_nothing(self):
+        from .models import HomeText
+        self.client.force_login(self.owner)
+        self.post()
+        self.assertEqual(HomeText.objects.count(), 0)
+
+    def test_google_title_and_description_can_be_edited(self):
+        self.client.force_login(self.owner)
+        self.post(meta_title__he='כותרת חדשה | SeaSlugs', meta_description__en='My description')
+        self.client.logout()
+        he = self.page('/')
+        self.assertIn('<title>כותרת חדשה | SeaSlugs</title>', he)
+        self.assertIn('content="My description"', self.page('/?lang=en'))
+
+    def test_the_account_menu_links_the_screen_for_managers_only(self):
+        self.assertNotIn('/observations/home-text/', self.page('/'))
+        self.client.force_login(self.owner)
+        self.assertIn('/observations/home-text/', self.page('/'))
+
+
+class BeforeMigrationTests(SeoFixture):
+    def test_the_home_page_works_even_if_the_home_text_table_does_not_exist_yet(self):
+        from unittest import mock
+        from django.db import OperationalError
+        clear_cache()
+        with mock.patch('observations.models.HomeText.objects') as manager:
+            manager.all.side_effect = OperationalError('no such table')
+            manager.filter.side_effect = OperationalError('no such table')
+            self.assertIn('מה הן חינניות ים?', self.page('/'))

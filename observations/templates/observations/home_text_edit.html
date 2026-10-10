@@ -1,0 +1,31 @@
+{% extends 'observations/base.html' %}{% block content %}
+<h1>עריכת טקסטים בדף הבית</h1>
+<p>כאן עורכים את הטקסטים שבדף הבית, בעברית ובאנגלית. טקסט שמרוקנים (או שמחזירים לנוסח המקורי) חוזר לברירת המחדל. אחרי השמירה אפשר לראות את התוצאה ב<a href="/" target="_blank" rel="noopener">דף הבית</a> וב<a href="/?lang=en" target="_blank" rel="noopener">גרסה האנגלית</a>.</p>
+<details class="markup-help"><summary>איך כותבים (עיצוב פשוט)</summary>
+<ul>
+<li><code>~ טקסט</code> – שורה קטנה מעל הכותרת (בפתיחת הדף) · <code># טקסט</code> – כותרת הדף · <code>## טקסט</code> – כותרת של פסקה</li>
+<li>שורה ריקה מפרידה בין פסקאות. שורות שמתחילות ב־<code>1. </code> הן רשימה ממוספרת, וב־<code>- </code> רשימה עם נקודות.</li>
+<li><code>**טקסט**</code> – הדגשה · <code>[טקסט](https://כתובת)</code> – קישור</li>
+<li>במקום כתובת אפשר לכתוב <code>contribute</code> (הוספת תצפית, או הרשמה למי שלא מחובר), <code>gallery</code> (קפיצה לאוסף) או <code>migrant</code> (קפיצה לאוסף עם סינון המינים המהגרים)</li>
+<li><code>[[טקסט]]</code> – כפתור "הוספת תצפית"</li>
+<li>מספרים חיים: <code>{species}</code> מספר המינים, <code>{observations}</code> מספר התצפיות, <code>{israeli}</code> מספר המינים שתועדו בים התיכון של ישראל</li>
+</ul></details>
+<form method="post" id="home-text-form">{% csrf_token %}
+{% for row in rows %}<section class="home-edit-row">
+<h2>{{ row.label }}</h2>
+<div class="home-edit-pair">
+{% for f in row.fields %}<label><span>{% if f.lang == 'he' %}עברית{% else %}English{% endif %}{% if not f.is_default %} · נערך{% endif %}</span>
+{% if row.kind == 'line' %}<input type="text" name="{{ f.name }}" value="{{ f.value }}" dir="{% if f.lang == 'en' %}ltr{% else %}rtl{% endif %}">
+{% else %}<textarea name="{{ f.name }}" rows="{% if row.key == 'what' or row.key == 'contribute' or row.key == 'project' %}10{% else %}5{% endif %}" dir="{% if f.lang == 'en' %}ltr{% else %}rtl{% endif %}">{{ f.value }}</textarea>{% endif %}
+</label>{% endfor %}
+</div></section>{% endfor %}
+<div class="actions"><button type="submit">שמירה</button><a href="/">חזרה לדף הבית</a></div>
+</form>
+<style>
+.home-edit-row{margin:26px 0}.home-edit-row h2{margin:0 0 8px;font-size:20px}
+.home-edit-pair{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+.home-edit-pair label span{display:block;font-size:14px;margin-bottom:4px;color:var(--muted)}
+.home-edit-pair textarea,.home-edit-pair input{width:100%;line-height:1.6}
+.markup-help{margin:12px 0 20px}.markup-help code{direction:ltr;unicode-bidi:embed}
+</style>
+{% endblock %}

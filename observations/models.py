@@ -409,6 +409,19 @@ class SiteImage(models.Model):
     def __str__(self): return self.key
 
 
+class HomeText(models.Model):
+    """A home-page text edited on the edit screen (views.home_text_edit): one row per section and language,
+    replacing the default wording of observations/home_defaults.py. No row = the default."""
+    key = models.CharField('מזהה', max_length=40)
+    lang = models.CharField('שפה', max_length=2)
+    content = models.TextField('תוכן')
+    updated_at = models.DateTimeField('עודכן', auto_now=True)
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['key', 'lang'], name='unique_home_text')]
+        verbose_name = 'טקסט בדף הבית'; verbose_name_plural = 'טקסטים בדף הבית'
+    def __str__(self): return f'{self.key} ({self.lang})'
+
+
 PHONE_VALIDATOR = RegexValidator(r'^[0-9+\-()\s]{5,30}$', 'מספר טלפון לא תקין.')
 
 

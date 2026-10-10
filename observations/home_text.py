@@ -27,3 +27,19 @@ def home_lang(request):
     cookie must not turn / into English -- one address, one language -- the button and app.js still
     restore a returning visitor's choice in the browser.)"""
     return 'en' if request.GET.get('lang') == 'en' else 'he'
+
+
+def home_text_all():
+    """HOME_TEXT with the title/description edited on the edit screen (HomeText keys meta_title and
+    meta_description) in place of the defaults."""
+    from .models import HomeText
+    merged = {lang: dict(values) for lang, values in HOME_TEXT.items()}
+    from django.db import DatabaseError
+    try:
+        rows = list(HomeText.objects.filter(key__in=('meta_title', 'meta_description')))
+    except DatabaseError:  # migration not applied yet: the defaults
+        rows = []
+    for row in rows:
+        if row.lang in merged and row.content.strip():
+            merged[row.lang]['title' if row.key == 'meta_title' else 'description'] = row.content.strip()
+    return merged
