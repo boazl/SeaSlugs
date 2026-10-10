@@ -98,4 +98,15 @@ html[dir="ltr"] .card h3.hebrew{direction:ltr;text-align:left}
 .collection-note{color:var(--muted);margin:0 0 18px;line-height:1.75}
 .footer-invite{margin:0}
 .footer-invite a{color:var(--accent)}
-@media(max-width:850px){.intro-text{padding-inline-end:0}}
+.home-links{margin-top:0;padding:18px 0 34px;border-top:1px solid var(--line)}
+.browse-details summary{cursor:pointer;color:var(--accent);font-size:16px}
+.browse-columns{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:30px;margin-top:20px}
+.browse-block h2{font-size:20px;font-weight:600;margin:0 0 12px;color:var(--ink)}
+.browse-block ul{list-style:none;margin:0;padding:0}
+.browse-block ul ul{margin:4px 0 12px;padding-inline-start:18px;columns:2;column-gap:20px}
+.browse-species{columns:2;column-gap:24px}
+.browse-block li{margin-bottom:5px;break-inside:avoid;color:var(--muted)}
+.browse-block a{color:var(--accent);text-decoration:none}
+.browse-block a:hover{text-decoration:underline}
+.browse-block small{color:var(--muted)}
+@media(max-width:850px){.intro-text{padding-inline-end:0}.browse-block ul ul,.browse-species{columns:1}}

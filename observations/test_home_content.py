@@ -49,11 +49,12 @@ class HomeContentTests(SeoFixture):
         contribute = html.split('data-home-section="contribute"')[1].split('</section>')[0]
         self.assertIn('class="btn btn-primary"', contribute)
 
-    def test_the_bottom_link_block_is_gone(self):
-        html = self.page('/')
-        self.assertNotIn('id="israel-species"', html)
-        self.assertNotIn('דפדוף לפי קבוצות', html)
-        self.assertNotIn('home-links', html)
+    def test_the_links_block_is_collapsed_and_sits_after_the_text_panel(self):
+        html = self.page('/').split('<body>')[1]
+        block = html.split('data-home-section="browse"')[1].split('</main>')[0]
+        self.assertIn('<details class="browse-details">', block)  # no "open" attribute: closed until opened
+        self.assertIn('דפדוף לפי קבוצות ומינים מהים התיכון של ישראל', block)
+        self.assertGreater(html.index('data-home-section="browse"'), html.index('data-home-section="contribute"'))
 
     def test_numbers_line_is_built_from_the_data(self):
         html = self.page('/')
@@ -62,6 +63,39 @@ class HomeContentTests(SeoFixture):
         self.assertIn('2 תצפיות', note)
         self.assertIn('1 מהמינים תועדו בים התיכון של ישראל', note)
         self.assertNotIn('בעיקר ישראל', note)
+
+    def test_the_israeli_mediterranean_list_has_only_mediterranean_species_and_links_to_their_pages(self):
+        html = self.page('/')
+        block = html.split('id="israel-species"')[1].split('</ul>')[0]
+        self.assertIn(f'href="/species/{self.med_area.slug}/"', block)
+        self.assertIn('Cuthona perca', block)
+        self.assertNotIn('Chromodoris annae', block)  # the Red Sea species is not an Israeli Mediterranean one
+        self.assertIn('(מהגר)', block)
+
+    def test_the_english_links_keep_the_language(self):
+        html = self.page('/?lang=en')
+        self.assertIn(f'href="/species/{self.med_area.slug}/?lang=en"', html)
+        self.assertIn(f'href="/order/{self.order.pk}/?lang=en"', html)
+        self.assertIn('href="/family/Chromodorididae/?lang=en"', html)
+        self.assertIn('Browse by group and by Israeli Mediterranean species', html)
+
+    def test_the_hebrew_links_to_taxonomic_groups_are_plain(self):
+        html = self.page('/')
+        self.assertIn(f'href="/order/{self.order.pk}/"', html)
+        self.assertIn('href="/family/Chromodorididae/"', html)
+
+    def test_every_linked_page_answers_200(self):
+        html = self.page('/')
+        links = set(re.findall(r'href="(/(?:species|order|family)/[^"]+)"', html))
+        self.assertTrue(links)
+        for link in links:
+            self.assertEqual(self.client.get(link).status_code, 200, link)
+
+    def test_both_languages_of_the_links_block_are_embedded_for_the_language_button(self):
+        html = self.page('/')
+        data = json.loads(re.search(r'id="home-content" type="application/json">(.*?)</script>', html, re.S).group(1))
+        self.assertIn('Browse by group', data['en']['browse'])
+        self.assertIn('דפדוף לפי קבוצות', data['he']['browse'])
 
     def test_contribute_button_says_add_observation_and_depends_on_login(self):
         self.assertIn('class="btn btn-primary" href="/observations/signup/">הוספת תצפית</a>', self.page('/'))
