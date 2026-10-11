@@ -959,6 +959,18 @@ function taxonEntry(level, id) {
         : level === 'superfamily' ? taxaData.superfamilies : null;
     return dict ? dict[id] : null;
 }
+// The curated media of an order / sub-order card: an order card is keyed by the order NAME, its page
+// row (the one holding the defining sample) is found through order_pages; a sub-order card by the
+// sub_order value of its row. Nothing found -> the card falls back to its first species' photo.
+function orderRowEntry(level, key) {
+    const orders = taxaData.orders || {};
+    if (level === 'order') {
+        const id = (taxaData.order_pages || {})[key];
+        return id !== undefined ? orders[String(id)] : null;
+    }
+    if (level === 'suborder') return Object.values(orders).find(e => e.sub_value === key) || null;
+    return null;
+}
 const ORDER_COMMON = { Nudibranchia: ['חשופיות', 'Nudibranchs'] };
 function taxonLabel(level, key) {
     const e = taxonEntry(level, key);
@@ -1074,7 +1086,7 @@ function renderTaxonLevel(species, level, frag) {
     return n;
 }
 function buildTaxonCard(level, key, members, index, others) {
-    const entry = others ? {} : (taxonEntry(level, key) || {});
+    const entry = others ? {} : (taxonEntry(level, key) || orderRowEntry(level, key) || {});
     const count = members.length;
     const article = document.createElement('article');
     article.className = `card taxon-card taxon-level-${level}`;
