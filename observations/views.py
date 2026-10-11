@@ -16,7 +16,7 @@ from .models import Sample, Profile, Region, Site, DiveTrip, SiteImage, Species,
 from .forms import SiteQuickForm, SpeciesQuickForm, SignupForm, SampleForm, ProfileForm, DiveTripForm, TripQuickForm, taxonomy_for_form, species_name_options
 from .notifications import notify_new_user_registered
 from . import seo_text
-from .gallery_data import TaxonResolver, taxon_media, area_samples
+from .gallery_data import TaxonResolver, taxon_media, area_samples, annotate_area_cards
 from .i18n import get_lang
 from .templatetags.seaslugs_i18n import loc
 from .species_redirects import historical_species_redirect
@@ -291,7 +291,7 @@ def genus_page(request, name):
             continue  # same gate species_page/catalog.js use -- an area only counts once it can actually show something
         _, _, genus_obj = resolver.resolve(area.species)
         if genus_obj and genus_obj.pk == genus.pk:
-            area.observation_count = area_samples(area).count()   # same count the gallery card shows
+            annotate_area_cards(area)   # observation count (as the gallery card) + photo / video marks
             areas.append(area)
     if not areas:
         raise Http404
@@ -348,7 +348,7 @@ def gallery_areas():
         if not defining or defining.status != 'published' or defining.deleted_at or not (defining.image or defining.video_url):
             continue
         area.taxon_order, area.taxon_family, area.taxon_genus = resolver.resolve(area.species)
-        area.observation_count = area_samples(area).count()
+        annotate_area_cards(area)
         out.append(area)
     return out
 

@@ -563,6 +563,20 @@ function collectionSubtitle(c) {
     const credit = c.photographer ? `${language === 'he' ? 'צילום: ' : 'Photography: '}${photographerLabel(c)}` : '';
     return [regionText, credit].filter(Boolean).join(' · ');
 }
+// The marks on a species card: an arrows mark when any of its observations is a photo and a triangle
+// when any is a video -- both marks when it has both kinds.
+function mediaMarks(samples) {
+    const hasVideo = samples.some(s => s.video_id);
+    const hasPhoto = samples.some(s => s.image_url) || !hasVideo;
+    return [hasPhoto ? '⤢' : '', hasVideo ? '▶' : ''].filter(Boolean).map((glyph, position) => {
+        const mark = document.createElement('span');
+        mark.className = position ? 'play play-2' : 'play';
+        mark.textContent = glyph;
+        mark.setAttribute('aria-hidden', 'true');
+        return mark;
+    });
+}
+
 function showMedia(video_id, image_url, title, subtitle) {
     document.querySelector('#playerTitle').textContent = title;
     document.querySelector('#playerRegion').textContent = subtitle;
@@ -740,11 +754,7 @@ function buildSpeciesCard(sp, index) {
     img.width = 640; img.height = 360;
     img.loading = index < 6 ? 'eager' : 'lazy';
     img.decoding = 'async';
-    const icon = document.createElement('span');
-    icon.className = 'play';
-    icon.textContent = (pickSamples ? pickSamples[0] : sp).video_id ? '▶' : '⤢';
-    icon.setAttribute('aria-hidden', 'true');
-    wrap.append(img, icon);
+    wrap.append(img, ...mediaMarks(pickSamples || sp.samples));
     const displayCount = pickSamples ? pickSamples.length : sp.samples.length;
     if (displayCount > 1) {
         const badge = document.createElement('span');

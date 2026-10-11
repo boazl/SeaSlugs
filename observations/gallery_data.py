@@ -22,6 +22,19 @@ def area_samples(area):
         species_other='', site_other='', undetermined_variant=area.undetermined_variant)
 
 
+def annotate_area_cards(area):
+    """Sets, on a gallery area shown as a card, what the card's observations contain:
+    observation_count (the number the card shows), has_photo and has_video (any observation of the
+    area has a photo / a video), so the card can carry both the photo mark and the video mark."""
+    media = list(area_samples(area).values_list('image', 'video_url'))
+    defining = area.defining_sample
+    area.observation_count = len(media)
+    area.has_photo = any(image for image, _ in media) or bool(defining and defining.image)
+    area.has_video = any(video for _, video in media) or bool(defining and defining.video_url)
+    if not (area.has_photo or area.has_video):
+        area.has_photo = True
+
+
 def taxon_media(defining_sample):
     """(thumbnail, image_url, video_id) for a defining_sample, or (None, None, None) if it
     isn't a valid, published, publicly-showable sample. Same rule the gallery feed uses."""

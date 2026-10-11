@@ -223,7 +223,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
                 {% for s in other_samples %}
                 <article class="card" id="obs-{{ s.pk }}">
                     <a class="video-button lightbox-link" href="{% if s.video_url %}{{ s.video_url }}{% else %}{% url 'observation-photo' s.pk %}{% endif %}"{% if s.video_url %} data-video="1"{% endif %}>
-                        <span class="image-wrap"><img src="{% if s.image %}{% url 'observation-photo' s.pk %}{% else %}{{ s.thumbnail }}{% endif %}" alt="" width="640" height="360" loading="lazy"><span class="play" aria-hidden="true">{% if s.video_url %}▶{% else %}⤢{% endif %}</span></span>
+                        <span class="image-wrap"><img src="{% if s.image %}{% url 'observation-photo' s.pk %}{% else %}{{ s.thumbnail }}{% endif %}" alt="" width="640" height="360" loading="lazy">{% if s.image or not s.video_url %}<span class="play" aria-hidden="true">⤢</span>{% endif %}{% if s.video_url %}<span class="play{% if s.image %} play-2{% endif %}" aria-hidden="true">▶</span>{% endif %}</span>
                         {% if s.show_name %}<h3 class="sample-name" dir="ltr">{{ s.name_main|name_html }}{% if s.name_author %} <span class="sample-author">{{ s.name_author }}</span>{% endif %}{% if s.name_stage %} {{ s.name_stage }}{% endif %}</h3>{% endif %}
                         <span class="card-info">
                             <span class="card-meta"><span>{% if s.site %}{{ s.site|loc:lang }}{% endif %}{% if s.trip.year %}{% if s.site %} · {% endif %}{% if s.day and s.trip.month %}{{ s.day }}/{{ s.trip.month }}/{{ s.trip.year }}{% else %}{{ s.trip.year }}{% endif %}{% endif %}</span></span>
