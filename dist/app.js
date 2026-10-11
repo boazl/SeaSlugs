@@ -1060,7 +1060,7 @@ function buildTaxonCard(level, key, members, index, others) {
     const entry = others ? {} : (taxonEntry(level, key) || {});
     const count = members.length;
     const article = document.createElement('article');
-    article.className = 'card taxon-card';
+    article.className = `card taxon-card taxon-level-${level}`;
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'video-button';

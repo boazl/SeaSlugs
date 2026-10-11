@@ -118,3 +118,12 @@ html[dir="ltr"] .card h3.hebrew{direction:ltr;text-align:left}
    the area buttons and the result count already say what the list is. */
 .collection-head{position:relative}
 .collection-head h2{position:absolute;width:1px;height:1px;margin:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* Taxon cards of the taxonomic gallery are framed by rank: the frame gets lighter the lower the rank
+   (order darkest ... family / genus lightest) and species cards have none. The frame is an inset outline so the
+   picture keeps the same size on every card. */
+.taxon-card .image-wrap{outline:4px solid transparent;outline-offset:-4px}
+.taxon-card.taxon-level-order .image-wrap{outline-color:#1a7f6f}
+.taxon-card.taxon-level-suborder .image-wrap{outline-color:#2fa08e}
+.taxon-card.taxon-level-superfamily .image-wrap{outline-color:#5fc7b5}
+.taxon-card.taxon-level-family .image-wrap,.taxon-card.taxon-level-genus .image-wrap{outline-color:#b4efe5}
