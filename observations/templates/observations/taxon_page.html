@@ -86,7 +86,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
         {% if rank == 'family' and parent_url %}<p class="back-row"><a class="back-button" href="{{ parent_url }}{% if lang == 'en' %}?lang=en{% endif %}">{{ "חזרה לסדרה"|t:lang }} {{ parent_label }}</a>{% if edit_url %}<a class="edit-button" href="{{ edit_url }}">{{ "עריכה"|t:lang }}</a>{% endif %}</p>{% elif rank == 'order' %}<p class="back-row"><a class="back-button" href="/{% if lang == 'en' %}?lang=en{% endif %}">{{ "חזרה לכל הסדרות"|t:lang }}</a>{% if edit_url %}<a class="edit-button" href="{{ edit_url }}">{{ "עריכה"|t:lang }}</a>{% endif %}</p>{% endif %}
 
         <article class="species-hero">
-            <div class="species-media">
+            <div class="species-media{% if image_url or video_id %}{% if rank == 'order' %} frame-order{% else %} frame-family{% endif %}{% endif %}">
 {# a photo is preferred over a video when the page has both #}
                 {% if image_url %}
                 <img src="{{ image_url }}" alt="{{ latin_name }}" width="800" height="600">

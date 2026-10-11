@@ -534,13 +534,13 @@ class PhotoBeforeVideoTests(TestCase):
 
     def assert_photo_hero(self, url, sample):
         html = self.client.get(url).content.decode()
-        hero = html[html.index('class="species-media"'):html.index('class="species-summary"')]
+        hero = html[html.index('class="species-media'):html.index('class="species-summary"')]
         self.assertIn(f'<img src="/observations/{sample.pk}/photo/"', hero)
         self.assertNotIn('<iframe', hero)
 
     def test_genus_page(self):
         html = self.client.get(f'/genus/{self.genus.name}/').content.decode()
-        self.assertIn('<iframe', html[html.index('class="species-media"'):html.index('class="species-summary"')])   # video only: the video
+        self.assertIn('<iframe', html[html.index('class="species-media'):html.index('class="species-summary"')])   # video only: the video
         self._both(self.genus_sample)
         self.assert_photo_hero(f'/genus/{self.genus.name}/', self.genus_sample)
 
@@ -549,6 +549,6 @@ class PhotoBeforeVideoTests(TestCase):
         order = self._taxon_sample(Sample.Kind.ORDER, order='Nudibranchia')
         for url, sample in ((f'/family/{self.family.name}/', family), (f'/order/{self.order.pk}/', order)):
             html = self.client.get(url).content.decode()
-            self.assertIn('<iframe', html[html.index('class="species-media"'):html.index('class="species-summary"')])
+            self.assertIn('<iframe', html[html.index('class="species-media'):html.index('class="species-summary"')])
             self._both(sample)
             self.assert_photo_hero(url, sample)
