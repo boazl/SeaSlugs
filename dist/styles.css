@@ -124,11 +124,11 @@ html[dir="ltr"] .card h3.hebrew{direction:ltr;text-align:left}
    (species cards have no frame). Colours and widths are the variables below -- edit them here only.
    The frame is drawn inside the picture so every card keeps the same size. */
 :root{
-  --frame-order-color:#1a7f6f;       --frame-order-width:8px;
-  --frame-suborder-color:#2fa08e;    --frame-suborder-width:6px;
-  --frame-superfamily-color:#5fc7b5; --frame-superfamily-width:4px;
-  --frame-family-color:#b4efe5;      --frame-family-width:2px;
-  --frame-genus-color:#b4efe5;       --frame-genus-width:2px;
+  --frame-order-color:#5555ff;       --frame-order-width:8px;
+  --frame-suborder-color:#55aaff;    --frame-suborder-width:6px;
+  --frame-superfamily-color:#aaaaff; --frame-superfamily-width:4px;
+  --frame-family-color:#ffaaff;      --frame-family-width:2px;
+  --frame-genus-color:#ffffff;       --frame-genus-width:2px;
 }
 .taxon-card .image-wrap{outline:0 solid transparent;outline-offset:0}
 .frame-order,.taxon-card.taxon-level-order .image-wrap{--frame-color:var(--frame-order-color);--frame-width:var(--frame-order-width)}
