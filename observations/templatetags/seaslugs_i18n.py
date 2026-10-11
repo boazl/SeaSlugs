@@ -106,6 +106,8 @@ TRANSLATIONS = {
     'צפייה ב־YouTube': 'Watch on YouTube',
     'צפייה בתמונה המלאה': 'View full image',
     'עריכה': 'Edit',
+    'עריכת תצפית': 'Edit observation',
+    'עריכת מין': 'Edit species',
     'הצגה בגלריה': 'Show in gallery',
     'ניהול מסעות': 'Manage trips',
     'הסרה מהאתר': 'Remove from site',

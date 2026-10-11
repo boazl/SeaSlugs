@@ -78,6 +78,13 @@ def sample_edit_url(request, samples):
     return None
 
 
+def species_admin_url(user, species):
+    """The admin page of this species, for staff who may change species (the species table is edited there)."""
+    if user.is_authenticated and user.is_staff and user.has_perm('observations.change_species'):
+        return reverse('admin:observations_species_change', args=[species.pk])
+    return None
+
+
 def gallery_urls(samples, lang):
     """pk -> the public gallery page that shows each of these observations (the species page,
     anchored to the observation, or the genus/family/order page), for those that are actually
@@ -214,6 +221,7 @@ def species_page(request, slug):
         'common_name': common_name, 'description': description, 'size_text': species.size_text(lang),
         'canonical_url': request.build_absolute_uri(request.path),
         'edit_url': sample_edit_url(request, [main_sample] + other_samples),
+        'species_admin_url': species_admin_url(request.user, species),
     })
 
 
