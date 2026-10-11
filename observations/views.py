@@ -429,12 +429,22 @@ def order_base_rows():
     return out
 
 
+# Ids of the informal Nudibranchia group rows that migration 0065 deleted; their old public pages
+# live on in the page of the whole order.
+RETIRED_NUDIBRANCHIA_GROUP_IDS = {14, 16, 17}
+
+
 def order_page(request, pk):
     """Public page for one order. The page of an order's own row (see order_base_rows) is the page
     of the whole order: every gallery species whose order has that name, whichever sub-order row
     (TaxonOrder -- one order name such as Nudibranchia has a row per sub-order) it sits in. The
     sub-order rows' pages show just their own species."""
-    order = get_object_or_404(TaxonOrder.objects.select_related('defining_sample'), pk=pk)
+    order = TaxonOrder.objects.select_related('defining_sample').filter(pk=pk).first()
+    if order is None:
+        base_nudibranchia = order_base_rows().get('Nudibranchia')
+        if pk in RETIRED_NUDIBRANCHIA_GROUP_IDS and base_nudibranchia is not None:
+            return redirect('order-page', pk=base_nudibranchia.pk, permanent=True)
+        raise Http404
     base = order_base_rows().get(order.name)
     whole_order = base is not None and base.pk == order.pk
     if whole_order:

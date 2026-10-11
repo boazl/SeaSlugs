@@ -66,3 +66,16 @@ class WholeOrderPageTests(TestCase):
         from django.conf import settings
         js = (Path(settings.BASE_DIR) / 'dist' / 'app.js').read_text(encoding='utf-8')
         self.assertIn("(taxaData.order_pages || {})[key]", js)
+
+
+class RetiredNudibranchiaGroupRedirectTests(TestCase):
+    def test_old_group_pages_redirect_to_the_whole_order_page(self):
+        base = TaxonOrder.objects.create(name='Nudibranchia', sub_order='', taxonomic_order='3')
+        for pk in (14, 16, 17):
+            response = self.client.get(f'/order/{pk}/')
+            self.assertEqual(response.status_code, 301, pk)
+            self.assertEqual(response['Location'], f'/order/{base.pk}/')
+
+    def test_other_missing_orders_still_404(self):
+        TaxonOrder.objects.create(name='Nudibranchia', sub_order='', taxonomic_order='3')
+        self.assertEqual(self.client.get('/order/999/').status_code, 404)
