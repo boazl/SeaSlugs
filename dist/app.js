@@ -1111,8 +1111,13 @@ function buildTaxonCard(level, key, members, index, others) {
     if (others) href = '';
     else if ((level === 'family' || level === 'genus') && entry.name) href = `/${level}/${encodeURIComponent(entry.name)}/`;
     else if (level === 'order') {
-        const groups = new Set(members.map(sp => sp.taxon_order_id).filter(Boolean));
-        if (groups.size === 1) href = `/order/${[...groups][0]}/`;
+        // The order's own page lists every species of the order, whichever curated group they sit in.
+        const pageId = (taxaData.order_pages || {})[key];
+        if (pageId) href = `/order/${pageId}/`;
+        else {
+            const groups = new Set(members.map(sp => sp.taxon_order_id).filter(Boolean));
+            if (groups.size === 1) href = `/order/${[...groups][0]}/`;
+        }
     }
     if (href) {
         const page = document.createElement('a');

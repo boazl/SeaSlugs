@@ -6,6 +6,7 @@ from django.contrib.auth.models import Group
 from django.db.models import Q
 from django import forms
 import hashlib
+from types import SimpleNamespace
 
 from django.http import Http404, FileResponse, HttpResponseNotModified, JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
@@ -109,14 +110,15 @@ def gallery_urls(samples, lang):
         genera = {a.taxon_genus.name for a in areas if a.taxon_genus}
         families = {a.taxon_family.name for a in areas if a.taxon_family}
         order_rows = {a.taxon_order.pk: a.taxon_order for a in areas if a.taxon_order}
+        order_names = {r.name for r in order_rows.values()}
+        base_rows = order_base_rows()
         for x in taxon_samples:
             if x.kind == Sample.Kind.GENUS and x.genus in genera:
                 out[x.pk] = f'/genus/{x.genus}/{suffix}'
             elif x.kind == Sample.Kind.FAMILY and x.family in families:
                 out[x.pk] = f'/family/{x.family}/{suffix}'
             elif x.kind == Sample.Kind.ORDER:
-                rows = [r for r in order_rows.values() if r.name == x.order]
-                row = next((r for r in rows if r.defining_sample_id == x.pk), rows[0] if rows else None)
+                row = base_rows.get(x.order) if x.order in order_names else None
                 if row:
                     out[x.pk] = reverse('order-page', args=[row.pk]) + suffix
     return out
@@ -416,15 +418,44 @@ def _child_list(areas, attr, url_name, lang):
     return out
 
 
+# Common names of whole orders that are split into several curated groups (TaxonOrder rows).
+ORDER_COMMON_NAMES = {'Nudibranchia': ('חשופיות', 'Nudibranchs')}
+
+
+def order_base_rows():
+    """{order name: the TaxonOrder row that stands for the whole order} -- the row with no sub-order
+    (the order's base row), else the first row in taxonomic order. The order's public page is the page of
+    this row, and it holds every species of the order, not just those of that one curated group."""
+    out = {}
+    for row in TaxonOrder.objects.select_related('defining_sample'):
+        current = out.get(row.name)
+        if current is None or (row.sub_order == '' and current.sub_order != ''):
+            out[row.name] = row
+    return out
+
+
 def order_page(request, pk):
-    """Public page for one order group (TaxonOrder row -- keyed by pk, since one order name
-    such as Nudibranchia has several rows): its description and identification, the
-    families it holds and every gallery species in it."""
+    """Public page for one order. The page of an order's base row (see order_base_rows) is the page
+    of the whole order: every gallery species whose order has that name, whichever curated group
+    (TaxonOrder row -- one order name such as Nudibranchia has several) it sits in. The other rows are
+    the order's groups, and their pages keep showing just their own species."""
     order = get_object_or_404(TaxonOrder.objects.select_related('defining_sample'), pk=pk)
-    areas = [a for a in gallery_areas() if a.taxon_order and a.taxon_order.pk == order.pk]
+    base = order_base_rows().get(order.name)
+    whole_order = base is not None and base.pk == order.pk
+    if whole_order:
+        areas = [a for a in gallery_areas() if a.taxon_order and a.taxon_order.name == order.name]
+    else:
+        areas = [a for a in gallery_areas() if a.taxon_order and a.taxon_order.pk == order.pk]
     if not areas:
         raise Http404
     children = _child_list(areas, 'taxon_family', 'family-page', get_lang(request))
+    if whole_order and TaxonOrder.objects.filter(name=order.name).count() > 1:
+        # The base row's own texts describe its group, not the whole order: the page shows the order itself.
+        he, en = ORDER_COMMON_NAMES.get(order.name, ('', ''))
+        order = SimpleNamespace(
+            pk=order.pk, name=order.name, sub_order='', name_he=he, name_en=en, description_he='', description_en='',
+            identification_he='', identification_en='', sources='', link='', article_pdf=None,
+            defining_sample=order.defining_sample, defining_sample_id=order.defining_sample_id)
     return _taxon_page(request, 'order', order, areas, children, None, '')
 
 

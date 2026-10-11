@@ -265,7 +265,11 @@ def gallery_file(request, filename='index.html'):
         for trip_id, trip in trip_objects.items():
             trip_out[str(trip_id)]['species_count'] = trip.display_species_count
 
-        taxa = {'orders': taxa_orders, 'families': taxa_families, 'genera': taxa_genera}
+        # order name -> pk of the TaxonOrder row whose page holds the whole order (observations.views.order_base_rows):
+        # the gallery's order cards link there.
+        from observations.views import order_base_rows
+        order_pages = {name: row.pk for name, row in order_base_rows().items()}
+        taxa = {'orders': taxa_orders, 'families': taxa_families, 'genera': taxa_genera, 'order_pages': order_pages}
         data = {'species': species_out, 'collections': collections_out, 'areas': area_labels, 'regions': region_out, 'sites': site_out, 'trips': trip_out, 'taxa': taxa}
         response = HttpResponse('window.SEASLUGS = ' + json.dumps(data, ensure_ascii=False).replace('<', '\u003c') + ';', content_type='text/javascript; charset=utf-8')
         response['Cache-Control'] = 'no-store'
