@@ -568,13 +568,19 @@ function collectionSubtitle(c) {
 function mediaMarks(samples) {
     const hasVideo = samples.some(s => s.video_id);
     const hasPhoto = samples.some(s => s.image_url) || !hasVideo;
-    return [hasPhoto ? '⤢' : '', hasVideo ? '▶' : ''].filter(Boolean).map((glyph, position) => {
-        const mark = document.createElement('span');
-        mark.className = position ? 'play play-2' : 'play';
-        mark.textContent = glyph;
-        mark.setAttribute('aria-hidden', 'true');
-        return mark;
-    });
+    const mark = document.createElement('span');
+    mark.setAttribute('aria-hidden', 'true');
+    if (hasPhoto && hasVideo) {
+        // One circle for both kinds: the triangle top-left, the arrows bottom-right.
+        mark.className = 'play play-both';
+        const video = document.createElement('b'); video.textContent = '▶';
+        const photo = document.createElement('i'); photo.textContent = '⤢';
+        mark.append(video, photo);
+    } else {
+        mark.className = 'play';
+        mark.textContent = hasVideo ? '▶' : '⤢';
+    }
+    return [mark];
 }
 
 function showMedia(video_id, image_url, title, subtitle) {

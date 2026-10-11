@@ -1,5 +1,5 @@
 """Species cards on the genus / family / order pages: ⤢ when the species' observations are photos, ▶ when videos,
-and both marks when the species has both kinds."""
+and both glyphs inside a single circle when the species has both kinds."""
 import io
 
 from django.contrib.auth.models import User
@@ -70,8 +70,8 @@ class CardMediaMarksTests(TestCase):
         self.species('bothtwo', photos=1, videos=1, photos_first=True)   # the photo observation was first
         for url in self.urls:
             for name in ('both', 'bothtwo'):
-                self.assertEqual(self.marks(url, name), (True, True, 2), (url, name))
-                self.assertIn('play play-2', self.card(url, name))
+                self.assertEqual(self.marks(url, name), (True, True, 1), (url, name))
+                self.assertIn('play play-both', self.card(url, name))
 
     def test_a_second_video_does_not_add_a_second_triangle(self):
         self.species('videos', videos=2)
@@ -79,7 +79,7 @@ class CardMediaMarksTests(TestCase):
 
 
 class GalleryCardMarksSourceTests(TestCase):
-    """The gallery cards are built in dist/app.js: they must use the same two-mark rule, styled by .play-2."""
+    """The gallery cards are built in dist/app.js: they must use the same rule: one circle, with both glyphs inside it when the species has both kinds."""
 
     def test_gallery_cards_use_media_marks_and_the_second_mark_is_offset(self):
         from pathlib import Path
@@ -88,4 +88,6 @@ class GalleryCardMarksSourceTests(TestCase):
         css = (Path(settings.BASE_DIR) / 'dist' / 'styles.css').read_text(encoding='utf-8')
         self.assertIn('wrap.append(img, ...mediaMarks(pickSamples || sp.samples));', js)
         self.assertIn('hasVideo = samples.some(s => s.video_id)', js)
-        self.assertIn('.play.play-2{left:60px}', css)
+        self.assertIn('.play.play-both{', css)
+        self.assertIn("mark.className = 'play play-both';", js)
+        self.assertNotIn('play-2', css + js)
