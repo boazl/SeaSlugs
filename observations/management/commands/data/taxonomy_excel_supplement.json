@@ -117,68 +117,41 @@
   },
   {
    "order_name": "Nudibranchia",
-   "order_name_he": "גלויי זים",
-   "order_name_en": "phanerobranch doris",
+   "order_name_he": "חשופיות",
+   "order_name_en": "Nudibranchs",
    "sub_order": "",
    "taxonomic_order": "3",
-   "superfamilies": [
-    "Polyceroidea",
-    "Onchidoridoidea"
-   ]
+   "superfamilies": []
   },
   {
    "order_name": "Nudibranchia",
-   "order_name_he": "חשופיות נדן",
-   "order_name_en": "cryptobranch dorids",
+   "order_name_he": "",
+   "order_name_en": "",
    "sub_order": "Doridina",
    "taxonomic_order": "4",
    "superfamilies": [
+    "Bathydoridoidea",
     "Chromodoridoidea",
-    "Doridoidea"
+    "Doridoidea",
+    "Onchidoridoidea",
+    "Phyllidioidea",
+    "Polyceroidea"
    ]
   },
   {
    "order_name": "Nudibranchia",
-   "order_name_he": "חסרי שן",
-   "order_name_en": "radula-less dorids",
-   "sub_order": "Doridina",
-   "taxonomic_order": "5",
-   "superfamilies": [
-    "Phyllidioidea"
-   ]
-  },
-  {
-   "order_name": "Nudibranchia",
-   "order_name_he": "חשופיות מגן",
-   "order_name_en": "Armin nudibranch",
+   "order_name_he": "",
+   "order_name_en": "",
    "sub_order": "Cladobranchia",
    "taxonomic_order": "6",
    "superfamilies": [
+    "Aeolidioidea",
     "Arminoidea",
-    "Proctonotoidea"
-   ]
-  },
-  {
-   "order_name": "Nudibranchia",
-   "order_name_he": "חשופיות אילן",
-   "order_name_en": "Tree shape gills nudibranch",
-   "sub_order": "Cladobranchia",
-   "taxonomic_order": "7",
-   "superfamilies": [
     "Dendronotoidea",
     "Embletonioidea",
+    "Fionoidea",
+    "Proctonotoidea",
     "Tritonioidea"
-   ]
-  },
-  {
-   "order_name": "Nudibranchia",
-   "order_name_he": "חשופיות אונות",
-   "order_name_en": "Aeolid nudibranch",
-   "sub_order": "Cladobranchia",
-   "taxonomic_order": "8",
-   "superfamilies": [
-    "Aeolidioidea",
-    "Fionoidea"
    ]
   },
   {

@@ -21,7 +21,7 @@ class TaxonFiltersTests(TestCase):
         self.cla2 = TaxonOrder.objects.create(name='Nudibranchia', sub_order='Cladobranchia', taxonomic_order='8')
         self.other = TaxonOrder.objects.create(name='Nudibranchia', sub_order='', taxonomic_order='9')     # no sub-order at all
         self.f_sac = TaxonFamily.objects.create(name='Plakobranchidae', order=self.sac, superfamily='Plakobranchoidea')
-        self.f_bare = TaxonFamily.objects.create(name='Polyceridae', order=self.bare, superfamily='Polyceroidea')
+        self.f_bare = TaxonFamily.objects.create(name='Polyceridae', order=self.dor, superfamily='Polyceroidea')
         self.f_dor = TaxonFamily.objects.create(name='Chromodorididae', order=self.dor, superfamily='Chromodoridoidea')
         self.f_cla1 = TaxonFamily.objects.create(name='Tethydidae', order=self.cla1, superfamily='Dendronotoidea')
         self.f_cla2 = TaxonFamily.objects.create(name='Flabellinidae', order=self.cla2, superfamily='Fionoidea')
@@ -66,8 +66,7 @@ class TaxonFiltersTests(TestCase):
         self.assertEqual(html.count('>Cladobranchia<'), 1)                     # two rows, one option
         self.assertNotIn('\\N</span>', html)                                    # the import artifact never becomes an option
 
-    def test_phanerobranch_row_is_shown_under_doridina_not_others(self):
-        # Nudibranchia #3 has no sub-order in the table, but its species are Doridina (as in the gallery).
+    def test_polyceroidea_is_listed_under_doridina_and_the_no_sub_order_group_comes_last(self):
         html = self.page()
         doridina = html.index('<span class="depth0">Doridina</span>')
         self.assertLess(doridina, html.index('<span class="depth1">Polyceroidea</span>'))

@@ -362,15 +362,27 @@ class TaxonomicSortAndPanelTests(TestCase):
         self.assertIsNone(entry['taxon_order_id'])
         self.assertEqual(entry['sub_order'], '')
 
-    def test_phanerobranch_dorids_row_is_shown_as_doridina(self):
+    def test_sub_order_is_the_rows_sub_order_and_blank_on_the_orders_own_row(self):
         from .models import TaxonOrder, TaxonFamily
-        # Nudibranchia #3 ("גלויי זים") stays blank in the table (the resolver relies on that), but
-        # its species are Doridina and the gallery shows them there rather than under "Others".
+        # Families sit on the row of their WoRMS sub-order; a family on the order's own row (WoRMS gives it
+        # no sub-order, e.g. Doridoxidae) shows no sub-order and is reached through the "Others" card.
         order = TaxonOrder.objects.create(name='Nudibranchia', sub_order='', taxonomic_order='3')
-        TaxonFamily.objects.create(name='Polyceridae', order=order, superfamily='Polyceroidea')
+        doridina = TaxonOrder.objects.create(name='Nudibranchia', sub_order='Doridina', taxonomic_order='4')
+        TaxonFamily.objects.create(name='Polyceridae', order=doridina, superfamily='Polyceroidea')
+        TaxonFamily.objects.create(name='Doridoxidae', order=order, superfamily='Doridoxoidea')
         self.publish(Species.objects.create(scientific_name='Polycera test', order='Nudibranchia', family='Polyceridae'))
-        self.assertEqual(self.catalog()['species'][0]['sub_order'], 'Doridina')
-        self.assertEqual(order.sub_order, '')
+        self.publish(Species.objects.create(scientific_name='Doridoxa test', order='Nudibranchia', family='Doridoxidae'))
+        by_name = {e['title']: e for e in self.catalog()['species']}
+        self.assertEqual(by_name['Polycera test']['sub_order'], 'Doridina')
+        self.assertEqual(by_name['Doridoxa test']['sub_order'], '')
+
+    def test_catalog_has_superfamily_labels_with_their_hebrew_names(self):
+        from .models import TaxonSuperfamily
+        TaxonSuperfamily.objects.create(name='Phyllidioidea', name_he='חסרי שן')
+        TaxonSuperfamily.objects.create(name='Oxynooidea')
+        labels = self.catalog()['taxa']['superfamilies']
+        self.assertEqual(labels['Phyllidioidea']['label'], 'Phyllidioidea (חסרי שן)')
+        self.assertEqual(labels['Oxynooidea']['label'], 'Oxynooidea')
 
     def test_catalog_order_field_uses_the_curated_name_not_a_stale_raw_synonym(self):
         from .models import TaxonOrder, TaxonFamily

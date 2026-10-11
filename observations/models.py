@@ -252,12 +252,12 @@ class Species(models.Model):
 
 
 class TaxonOrder(models.Model):
-    # name is NOT unique on its own: a single order (e.g. "Nudibranchia") can have several rows,
-    # one per sub_order -- and even the same (name, sub_order) pair can repeat across several
-    # informal groups (e.g. Nudibranchia/Doridina covers both "cryptobranch" and "radula-less"
-    # dorids), disambiguated by taxonomic_order. build_taxonomy_tables seeds/updates these rows
-    # from the curated taxon_order_reference list in the supplement JSON; it never overwrites a
-    # value the user has since edited by hand in admin.
+    # name is NOT unique on its own: a single order (e.g. "Nudibranchia") has one row for the order
+    # itself (blank sub_order) plus one per sub-order (Doridina, Cladobranchia -- the WoRMS sub-orders),
+    # disambiguated by sub_order and taxonomic_order. Informal groups that are not WoRMS ranks are
+    # not rows here. build_taxonomy_tables seeds/updates these rows from the curated
+    # taxon_order_reference list in the supplement JSON; it never overwrites a value the user
+    # has since edited by hand in admin.
     name = models.CharField('סדרה', max_length=150)
     name_he = models.CharField('שם בעברית', max_length=150, blank=True)
     name_en = models.CharField('שם באנגלית', max_length=150, blank=True)
@@ -284,13 +284,21 @@ class TaxonOrder(models.Model):
     def __str__(self): return f'{self.name} ({self.sub_order})' if self.sub_order else self.name
     @property
     def display_sub_order(self):
-        """The sub-order the gallery and the admin filters show. The phanerobranch dorids' row
-        ("גלויי זים", Nudibranchia #3) is the order's blank-sub_order *base* row that
-        build_taxonomy_tables and the resolver rely on, so it must stay blank in the database --
-        but its species are Doridina, so they are shown there."""
-        if not self.sub_order and self.name == 'Nudibranchia' and self.taxonomic_order == '3':
-            return 'Doridina'
+        """The sub-order the gallery and the admin filters show (blank for the order's own row)."""
         return self.sub_order
+
+
+class TaxonSuperfamily(models.Model):
+    """A superfamily (WoRMS rank) with its Hebrew / English names. TaxonFamily.superfamily holds the
+    superfamily's Latin name as text; this table gives that name its common names."""
+    name = models.CharField('על-משפחה', max_length=150, unique=True)
+    name_he = models.CharField('שם בעברית', max_length=150, blank=True)
+    name_en = models.CharField('שם באנגלית', max_length=150, blank=True)
+    class Meta:
+        ordering = ['name']
+        verbose_name = 'על-משפחה (טקסונומיה)'
+        verbose_name_plural = 'על-משפחות (טקסונומיה)'
+    def __str__(self): return self.name
 
 
 class TaxonFamily(models.Model):

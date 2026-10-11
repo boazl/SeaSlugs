@@ -11,7 +11,7 @@ from django.utils.safestring import mark_safe
 from django.urls import reverse
 from .forms import SampleForm, SampleChangelistForm, taxonomy_for_form, species_name_options
 from .reference_links import link_kind
-from .models import Country, Sea, Region, Site, Species, Profile, Sample, DiveTrip, SiteImage, SpeciesArea, TaxonOrder, TaxonFamily, TaxonGenus, SampleKind, IdentificationQualifier, LifeStage
+from .models import Country, Sea, Region, Site, Species, Profile, Sample, DiveTrip, SiteImage, SpeciesArea, TaxonOrder, TaxonFamily, TaxonGenus, TaxonSuperfamily, SampleKind, IdentificationQualifier, LifeStage
 
 for model in [Country,Sea,Site,Profile,SiteImage,SampleKind]: admin.site.register(model)
 
@@ -270,6 +270,7 @@ class TaxonGroupFilter(TaxonSplitListFilter):
         choices = []
         for name in dict.fromkeys(n for n, _ in rows):
             subs = [sub for n, sub in rows if n == name]
+            subs = [sub for sub in subs if sub] + [sub for sub in subs if not sub]     # families with no sub-order: "Others", last
             has_subs = any(subs)
             for sub in subs:
                 depth = 0
@@ -315,6 +316,12 @@ class TaxonGenusGroupFilter(TaxonGroupFilter):
 class TaxonOrderAdmin(admin.ModelAdmin):
     list_display = ['taxonomic_order', 'name', 'name_he', 'name_en', 'sub_order', 'defining_sample']
     search_fields = ['name', 'name_he', 'name_en', 'sub_order']
+
+
+@admin.register(TaxonSuperfamily)
+class TaxonSuperfamilyAdmin(admin.ModelAdmin):
+    list_display = ['name', 'name_he', 'name_en']
+    search_fields = ['name', 'name_he', 'name_en']
 
 
 @admin.register(TaxonFamily)

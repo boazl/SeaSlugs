@@ -955,7 +955,8 @@ function cardKey(sp, level) {
     return { level: 'species', key: rankKey(sp, 'species') };
 }
 function taxonEntry(level, id) {
-    const dict = level === 'group' ? taxaData.orders : level === 'family' ? taxaData.families : level === 'genus' ? taxaData.genera : null;
+    const dict = level === 'group' ? taxaData.orders : level === 'family' ? taxaData.families : level === 'genus' ? taxaData.genera
+        : level === 'superfamily' ? taxaData.superfamilies : null;
     return dict ? dict[id] : null;
 }
 const ORDER_COMMON = { Nudibranchia: ['חשופיות', 'Nudibranchs'] };

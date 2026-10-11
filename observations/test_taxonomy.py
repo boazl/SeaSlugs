@@ -41,7 +41,7 @@ class TaxonomyTablesTests(TestCase):
         genus = TaxonGenus.objects.get(name='Chromodoris')
         self.assertEqual(genus.family, family)
         # The order's taxonomic_order comes from the curated taxon_order_reference (its display
-        # rank among the 16 order/suborder groups), NOT from Species.phylogenetic_order -- the
+        # rank among the 13 order/suborder rows), NOT from Species.phylogenetic_order -- the
         # reference row is seeded first and is authoritative, so the species-derived value never
         # overwrites it (sync() only fills BLANK fields). Family/genus have no such reference
         # table, so their taxonomic_order still derives from the species data as before.
@@ -58,9 +58,9 @@ class TaxonomyTablesTests(TestCase):
         self.build(scientific_name='A', order='Not assigned', family='Acteonidae', genus='Acteon')
         self.build(scientific_name='B', order='', family='', genus='')
         call_command('build_taxonomy_tables', '--apply')
-        # The 16 taxon_order_reference rows are seeded unconditionally, regardless of what
+        # The 13 taxon_order_reference rows are seeded unconditionally, regardless of what
         # order text (if any) appears in Species -- same pattern as SampleKind's fixed choices.
-        self.assertEqual(TaxonOrder.objects.count(), 16)
+        self.assertEqual(TaxonOrder.objects.count(), 13)
         family = TaxonFamily.objects.get(name='Acteonidae')
         self.assertEqual(family.superfamily, 'Acteonoidea')
         self.assertIsNotNone(family.order)
@@ -114,9 +114,9 @@ class TaxonomyTablesTests(TestCase):
         self.build(scientific_name='A', order='Nudibranchia', family='Chromodorididae', genus='Chromodoris', phylogenetic_order='313')
         call_command('build_taxonomy_tables', '--apply')
         call_command('build_taxonomy_tables', '--apply')
-        # All 16 taxon_order_reference rows are always seeded, regardless of the species data
-        # present -- see test_taxon_order_reference_seeds_all_16_rows_unconditionally below.
-        self.assertEqual(TaxonOrder.objects.count(), 16)
+        # All 13 taxon_order_reference rows are always seeded, regardless of the species data
+        # present -- see test_taxon_order_reference_seeds_all_13_rows_unconditionally below.
+        self.assertEqual(TaxonOrder.objects.count(), 13)
         self.assertEqual(TaxonFamily.objects.count(), 1)
         self.assertEqual(TaxonGenus.objects.count(), 1)
 
@@ -178,7 +178,7 @@ class TaxonomyTablesTests(TestCase):
         base.refresh_from_db()
         self.assertEqual(base.sub_order, '')
 
-    def test_taxon_order_reference_seeds_all_16_rows_unconditionally(self):
+    def test_taxon_order_reference_seeds_all_13_rows_unconditionally(self):
         # taxon_order_reference is the curated, authoritative order/suborder list the user
         # supplied -- it's seeded in full every run, the same way sync_sample_kinds() always
         # populates all 5 SampleKind rows, regardless of what happens to be in Species yet.
@@ -186,35 +186,29 @@ class TaxonomyTablesTests(TestCase):
         supplement = json.loads(self.SUPPLEMENT_PATH.read_text(encoding='utf-8'))
         reference = supplement['taxon_order_reference']
         self.assertEqual(TaxonOrder.objects.count(), len(reference))
-        self.assertEqual(len(reference), 16)
+        self.assertEqual(len(reference), 13)
         sacoglossa = TaxonOrder.objects.get(name='Sacoglossa', sub_order='')
         self.assertEqual(sacoglossa.name_he, 'עלעליות')
         self.assertEqual(sacoglossa.taxonomic_order, '12')
 
-    def test_taxon_order_reference_disambiguates_same_name_sub_order_pair_by_taxonomic_order(self):
-        # The real shape of the data the user supplied: Nudibranchia/Doridina alone covers TWO
-        # distinct informal groups (taxonomic_order 4 and 5), each with its own Hebrew/English
-        # name and superfamilies -- this is exactly why (name, sub_order) alone can no longer
-        # be the unique key.
+    def test_nudibranchia_has_its_own_row_and_the_two_worms_suborders_only(self):
+        # Nudibranchia follows WoRMS: the order itself plus its two accepted sub-orders. The old informal
+        # groups (phanerobranch / cryptobranch / radula-less dorids, Armin / tree-gill / aeolid nudibranchs)
+        # are not rows.
         call_command('build_taxonomy_tables', '--apply')
-        cryptobranch = TaxonOrder.objects.get(name='Nudibranchia', sub_order='Doridina', taxonomic_order='4')
-        radula_less = TaxonOrder.objects.get(name='Nudibranchia', sub_order='Doridina', taxonomic_order='5')
-        self.assertEqual(cryptobranch.name_he, 'חשופיות נדן')
-        self.assertEqual(radula_less.name_he, 'חסרי שן')
-        self.assertNotEqual(cryptobranch.pk, radula_less.pk)
-        # Same for the 3 Cladobranchia groups (armin/dendronotid/aeolid), taxonomic_order 6-8.
-        cladobranchia_rows = TaxonOrder.objects.filter(name='Nudibranchia', sub_order='Cladobranchia')
-        self.assertEqual(cladobranchia_rows.count(), 3)
+        rows = TaxonOrder.objects.filter(name='Nudibranchia')
+        self.assertEqual(sorted(rows.values_list('sub_order', flat=True)), ['', 'Cladobranchia', 'Doridina'])
+        self.assertEqual(TaxonOrder.objects.get(name='Nudibranchia', sub_order='').name_he, 'חשופיות')
 
     def test_rerun_does_not_duplicate_or_overwrite_taxon_order_reference_rows(self):
         call_command('build_taxonomy_tables', '--apply')
-        radula_less = TaxonOrder.objects.get(name='Nudibranchia', sub_order='Doridina', taxonomic_order='5')
-        radula_less.name_he = 'שם שהמשתמש קבע ידנית'
-        radula_less.save()
+        doridina = TaxonOrder.objects.get(name='Nudibranchia', sub_order='Doridina')
+        doridina.name_he = 'שם שהמשתמש קבע ידנית'
+        doridina.save()
         call_command('build_taxonomy_tables', '--apply')
-        self.assertEqual(TaxonOrder.objects.filter(name='Nudibranchia', sub_order='Doridina').count(), 2)
-        radula_less.refresh_from_db()
-        self.assertEqual(radula_less.name_he, 'שם שהמשתמש קבע ידנית')
+        self.assertEqual(TaxonOrder.objects.filter(name='Nudibranchia', sub_order='Doridina').count(), 1)
+        doridina.refresh_from_db()
+        self.assertEqual(doridina.name_he, 'שם שהמשתמש קבע ידנית')
 
     def test_family_can_have_several_rows_for_different_sub_families(self):
         self.build(scientific_name='A', order='Nudibranchia', family='Facelinidae', genus='Facelina')
@@ -243,32 +237,26 @@ class TaxonomyTablesTests(TestCase):
         b = TaxonOrder.objects.create(name='Nudibranchia', sub_order='Cladobranchia', taxonomic_order='7')
         self.assertNotEqual(a.pk, b.pk)
 
-    def test_family_superfamily_based_linking_disambiguates_among_shared_name_sub_order_rows(self):
-        # Chromodorididae and Phyllidiidae are both Nudibranchia/Doridina families, but belong
-        # to two DIFFERENT informal groups (taxonomic_order 4 vs 5) -- plain order-text majority
-        # voting (both would just say "Nudibranchia") could never tell them apart; superfamily
-        # can.
+    def test_family_superfamily_based_linking_puts_families_on_their_worms_suborder(self):
+        # Chromodorididae and Phyllidiidae are both Doridina families -- plain order-text majority voting
+        # (both would just say "Nudibranchia") could never place them; the superfamily does.
         self.build(scientific_name='A', order='Nudibranchia', family='Chromodorididae', genus='Chromodoris')
         self.build(scientific_name='B', order='Nudibranchia', family='Phyllidiidae', genus='Phyllidia')
         call_command('build_taxonomy_tables', '--apply')
         chromodorididae = TaxonFamily.objects.get(name='Chromodorididae')
         phyllidiidae = TaxonFamily.objects.get(name='Phyllidiidae')
-        self.assertEqual(chromodorididae.order.taxonomic_order, '4')
-        self.assertEqual(phyllidiidae.order.taxonomic_order, '5')
+        self.assertEqual(chromodorididae.order.sub_order, 'Doridina')
+        self.assertEqual(phyllidiidae.order, chromodorididae.order)
         self.assertEqual(chromodorididae.superfamily, 'Chromodoridoidea')
         self.assertEqual(phyllidiidae.superfamily, 'Phyllidioidea')
 
-    def test_family_superfamily_based_linking_across_cladobranchia_groups(self):
-        # Arminidae/Tritoniidae/Facelinidae are the 3 families standing in for the 3 old
-        # "classic" Nudibranchia suborders (Armin/Dendronotid/Aeolid) -- all share
-        # sub_order='Cladobranchia' but must resolve to 3 different taxonomic_order rows.
+    def test_family_superfamily_based_linking_puts_cladobranch_families_on_cladobranchia(self):
         self.build(scientific_name='A', order='Nudibranchia', family='Arminidae', genus='Armina')
         self.build(scientific_name='B', order='Nudibranchia', family='Tritoniidae', genus='Tritonia')
         self.build(scientific_name='C', order='Nudibranchia', family='Facelinidae', genus='Facelina')
         call_command('build_taxonomy_tables', '--apply')
-        self.assertEqual(TaxonFamily.objects.get(name='Arminidae').order.taxonomic_order, '6')
-        self.assertEqual(TaxonFamily.objects.get(name='Tritoniidae').order.taxonomic_order, '7')
-        self.assertEqual(TaxonFamily.objects.get(name='Facelinidae').order.taxonomic_order, '8')
+        for name in ('Arminidae', 'Tritoniidae', 'Facelinidae'):
+            self.assertEqual(TaxonFamily.objects.get(name=name).order.sub_order, 'Cladobranchia', name)
 
     def test_family_superfamily_prefers_species_data_over_crosswalk_and_is_never_overwritten(self):
         # Species.superfamily (when present) wins over the family_to_superfamily crosswalk --
@@ -378,7 +366,7 @@ class TaxonomyTablesTests(TestCase):
         migration_module.migrate_taxon_order_rows(django_apps, None)
         pre_existing.refresh_from_db()
         self.assertEqual(pre_existing.taxonomic_order, '3')
-        self.assertEqual(pre_existing.name_he, 'גלויי זים')
+        self.assertEqual(pre_existing.name_he, 'חשופיות')
         # And the row's pk is unchanged -- any pre-existing family FK pointing at it survives.
         self.assertEqual(TaxonOrder.objects.filter(name='Nudibranchia', sub_order='').count(), 1)
 

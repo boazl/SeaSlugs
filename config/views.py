@@ -269,7 +269,14 @@ def gallery_file(request, filename='index.html'):
         # the gallery's order cards link there.
         from observations.views import order_base_rows
         order_pages = {name: row.pk for name, row in order_base_rows().items()}
-        taxa = {'orders': taxa_orders, 'families': taxa_families, 'genera': taxa_genera, 'order_pages': order_pages}
+        # superfamily name -> its "Latin (Hebrew)" label, for the gallery's superfamily cards.
+        from observations.models import TaxonSuperfamily
+        taxa_superfamilies = {
+            sf.name: {'label': sf.name + (f' ({sf.name_he})' if sf.name_he else ''),
+                      'label_en': sf.name + (f' ({sf.name_en})' if sf.name_en else '')}
+            for sf in TaxonSuperfamily.objects.all()}
+        taxa = {'orders': taxa_orders, 'families': taxa_families, 'genera': taxa_genera,
+                'superfamilies': taxa_superfamilies, 'order_pages': order_pages}
         data = {'species': species_out, 'collections': collections_out, 'areas': area_labels, 'regions': region_out, 'sites': site_out, 'trips': trip_out, 'taxa': taxa}
         response = HttpResponse('window.SEASLUGS = ' + json.dumps(data, ensure_ascii=False).replace('<', '\u003c') + ';', content_type='text/javascript; charset=utf-8')
         response['Cache-Control'] = 'no-store'

@@ -1,4 +1,4 @@
-"""An order's page holds every species of the order, whichever curated group (TaxonOrder row) it sits in."""
+"""An order's page holds every species of the order, whichever sub-order row (TaxonOrder) it sits in."""
 import io
 import json
 
@@ -24,8 +24,8 @@ class WholeOrderPageTests(TestCase):
         sea = Sea.objects.create(name='ים סוף', name_en='Red Sea')
         region = Region.objects.create(name='אילת', name_en='Eilat', country=country, sea=sea)
         trip = DiveTrip.objects.create(title='Trip', year=2026, country=country, region=region)
-        self.base = TaxonOrder.objects.create(name='Nudibranchia', name_he='גלויי זים', description_he='טקסט של הקבוצה הראשונה')
-        self.group = TaxonOrder.objects.create(name='Nudibranchia', sub_order='Doridina', name_he='חשופיות נדן')
+        self.base = TaxonOrder.objects.create(name='Nudibranchia', name_he='חשופיות')
+        self.group = TaxonOrder.objects.create(name='Nudibranchia', sub_order='Doridina')
         self.single = TaxonOrder.objects.create(name='Sacoglossa', name_he='עלעליות')
         for i, (order, family, genus, sp) in enumerate([
                 (self.base, 'Hexabranchidae', 'Hexabranchus', 'sanguineus'),
@@ -46,9 +46,8 @@ class WholeOrderPageTests(TestCase):
         self.assertEqual(self.names(response), ['Hexabranchus', 'Chromodoris'])
         html = response.content.decode()
         self.assertIn('חשופיות', html)                    # the common name of the whole order
-        self.assertNotIn('טקסט של הקבוצה הראשונה', html)  # the base row's own text describes its group, not the order
 
-    def test_a_group_page_keeps_just_its_own_species(self):
+    def test_a_sub_order_page_keeps_just_its_own_species(self):
         response = self.client.get(reverse('order-page', args=[self.group.pk]))
         self.assertEqual(self.names(response), ['Chromodoris'])
 

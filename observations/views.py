@@ -6,7 +6,6 @@ from django.contrib.auth.models import Group
 from django.db.models import Q
 from django import forms
 import hashlib
-from types import SimpleNamespace
 
 from django.http import Http404, FileResponse, HttpResponseNotModified, JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
@@ -418,10 +417,6 @@ def _child_list(areas, attr, url_name, lang):
     return out
 
 
-# Common names of whole orders that are split into several curated groups (TaxonOrder rows).
-ORDER_COMMON_NAMES = {'Nudibranchia': ('חשופיות', 'Nudibranchs')}
-
-
 def order_base_rows():
     """{order name: the TaxonOrder row that stands for the whole order} -- the row with no sub-order
     (the order's base row), else the first row in taxonomic order. The order's public page is the page of
@@ -435,10 +430,10 @@ def order_base_rows():
 
 
 def order_page(request, pk):
-    """Public page for one order. The page of an order's base row (see order_base_rows) is the page
-    of the whole order: every gallery species whose order has that name, whichever curated group
-    (TaxonOrder row -- one order name such as Nudibranchia has several) it sits in. The other rows are
-    the order's groups, and their pages keep showing just their own species."""
+    """Public page for one order. The page of an order's own row (see order_base_rows) is the page
+    of the whole order: every gallery species whose order has that name, whichever sub-order row
+    (TaxonOrder -- one order name such as Nudibranchia has a row per sub-order) it sits in. The
+    sub-order rows' pages show just their own species."""
     order = get_object_or_404(TaxonOrder.objects.select_related('defining_sample'), pk=pk)
     base = order_base_rows().get(order.name)
     whole_order = base is not None and base.pk == order.pk
@@ -449,13 +444,6 @@ def order_page(request, pk):
     if not areas:
         raise Http404
     children = _child_list(areas, 'taxon_family', 'family-page', get_lang(request))
-    if whole_order and TaxonOrder.objects.filter(name=order.name).count() > 1:
-        # The base row's own texts describe its group, not the whole order: the page shows the order itself.
-        he, en = ORDER_COMMON_NAMES.get(order.name, ('', ''))
-        order = SimpleNamespace(
-            pk=order.pk, name=order.name, sub_order='', name_he=he, name_en=en, description_he='', description_en='',
-            identification_he='', identification_en='', sources='', link='', article_pdf=None,
-            defining_sample=order.defining_sample, defining_sample_id=order.defining_sample_id)
     return _taxon_page(request, 'order', order, areas, children, None, '')
 
 
