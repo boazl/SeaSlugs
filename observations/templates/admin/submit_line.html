@@ -1,0 +1,3 @@
+{% extends "admin/submit_line.html" %}
+{# Same save row as Django's; the species admin adds "view on the site" buttons (context: site_pages). #}
+{% block submit-row %}{{ block.super }}{% for label, url in site_pages %}<a href="{{ url }}" class="button site-page-link" style="padding:10px 15px;margin:0 5px;text-decoration:none">{{ label }}</a>{% endfor %}{% endblock %}

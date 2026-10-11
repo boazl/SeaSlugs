@@ -78,10 +78,28 @@ class SpeciesAdminForm(forms.ModelForm):
         self.fields['species'].help_text = 'אפשר לכלול סימון זהות פתוחה, למשל "cf. strigata" או "sp. 7".'
 
 
+def species_site_pages(species):
+    """[(button label, url)] for every public gallery page of the species -- areas whose defining
+    sample is a published, publicly showable one (the same rule the gallery itself uses)."""
+    from .gallery_data import taxon_media
+    areas = [a for a in species.areas.select_related('country', 'sea', 'defining_sample').order_by('country__name', 'sea__name', 'undetermined_variant', 'pk')
+             if a.slug and any(taxon_media(a.defining_sample))]
+    pages = []
+    for area in areas:
+        label = 'צפייה בדף המין' if len(areas) == 1 else f'צפייה בדף המין — {area.country} · {area.sea}' + (f' ({area.undetermined_variant})' if area.undetermined_variant else '')
+        pages.append((label, reverse('species-page', args=[area.slug])))
+    return pages
+
+
 @admin.register(Species)
 class SpeciesAdmin(admin.ModelAdmin):
     form = SpeciesAdminForm
     readonly_fields = ['scientific_name', 'full_name_display']
+    def render_change_form(self, request, context, add=False, change=False, form_url='', obj=None):
+        # "View on the site" buttons next to Save: one per public gallery page of this species
+        # (a species observed in several areas has a page for each).
+        context['site_pages'] = species_site_pages(obj) if obj is not None and obj.pk else []
+        return super().render_change_form(request, context, add=add, change=change, form_url=form_url, obj=obj)
     @admin.display(description='שם מלא כולל מחבר (נגזר)')
     def full_name_display(self, obj):
         return obj.full_name if obj and obj.pk else '—'
