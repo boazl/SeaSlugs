@@ -1025,28 +1025,38 @@ function drillParent(drill) {
 // order, with a heading for each order above it. Clicking a card drills into that taxon at
 // the next informative rank. Returns the number of cards drawn.
 function renderTaxonLevel(species, level, frag) {
+    // Only for ranks BELOW the drilled one: at the drilled rank itself (a picked genus shown at
+    // genus level) the card is the taxon itself, not a leftover.
+    const drillIndex = state.drill ? LEVELS.indexOf(state.drill.level) : -1;
+    // Inside a chosen taxon, a rank that none of its species has (e.g. the sub-order of Sacoglossa)
+    // is skipped: the next rank down is shown instead.
+    if (state.drill) {
+        while (level !== 'species' && LEVELS.indexOf(level) > drillIndex && !species.some(sp => rankKey(sp, level))) {
+            level = LEVELS[LEVELS.indexOf(level) + 1];
+        }
+    }
     const heading = document.createElement('h2');
     heading.className = 'gallery-group-title';
     heading.textContent = rankName(level);
     frag.append(heading);
     const groups = new Map();   // keeps first-seen (= taxonomic) order
-    // Inside a drilled-into taxon, a species with no value at this rank would fall back to a
-    // card for that very taxon (or one above it) -- the page the visitor is already on. Those
-    // species get an "Others" card instead, which drills on to the next rank (e.g. the
-    // superfamilies of nudibranchs that have no sub-order) so they stay reachable.
-    // Only for ranks BELOW the drilled one: at the drilled rank itself (a picked genus shown at
-    // genus level) the card is the taxon itself, not a leftover.
-    const drillIndex = state.drill ? LEVELS.indexOf(state.drill.level) : -1;
+    // Below the order, a species with no value at this rank gets an "Others" card (one per order
+    // when browsing every order, one in all inside a chosen taxon) instead of a card of some higher
+    // rank, so every order holds all of its species. The "Others" card drills on to the next rank.
     const below = LEVELS.indexOf(level) > drillIndex;
     for (const sp of species) {
         let ck = cardKey(sp, level);
-        if (state.drill && below && LEVELS.indexOf(ck.level) <= drillIndex) ck = { level, key: '', others: true };
-        const id = ck.others ? 'others' : ck.level + ':' + ck.key;
+        if (below && level !== 'order' && level !== 'species' && !rankKey(sp, level)) ck = { level, key: '', others: true };
+        const id = ck.others ? 'others:' + (state.drill ? '' : (sp.order || '')) : ck.level + ':' + ck.key;
         if (!groups.has(id)) groups.set(id, { ...ck, first: sp, members: [] });
         groups.get(id).members.push(sp);
     }
     // "Others" last: they are the leftovers of the taxon being browsed.
-    const ordered = [...groups.values()].sort((a, b) => (a.others ? 1 : 0) - (b.others ? 1 : 0));
+    // (inside its own order, when several orders are listed).
+    const orderRank = new Map();
+    for (const g of groups.values()) if (!orderRank.has(g.first.order || '')) orderRank.set(g.first.order || '', orderRank.size);
+    const ordered = [...groups.values()].sort((a, b) =>
+        (orderRank.get(a.first.order || '') - orderRank.get(b.first.order || '')) || ((a.others ? 1 : 0) - (b.others ? 1 : 0)));
     let prevOrder = null, n = 0;
     for (const g of ordered) {
         const order = g.first.order || '';
@@ -1098,7 +1108,8 @@ function buildTaxonCard(level, key, members, index, others) {
     info.append(h3, meta);
     button.append(wrap, info);
     button.addEventListener('click', () => {
-        if (others) state.drill = { ...state.drill, blanks: [...(state.drill.blanks || []), level] };
+        if (others && state.drill) state.drill = { ...state.drill, blanks: [...(state.drill.blanks || []), level] };
+        else if (others) state.drill = { level: 'order', id: members[0].order || '', blanks: [level] };
         else state.drill = { level, id: String(key) };
         setLevel(nextLevel(level, members));
         render();
