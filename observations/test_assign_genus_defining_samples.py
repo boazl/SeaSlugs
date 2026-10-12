@@ -97,10 +97,10 @@ class AssignGenusDefiningSamplesTests(TestCase):
         first = self.genus_sample()
         second = self.genus_sample()
         self.genus.refresh_from_db()
-        self.assertEqual(self.genus.defining_sample_id, first.pk)
-        first.soft_delete(self.user)
+        self.assertEqual(self.genus.defining_sample_id, second.pk)        # the newest genus observation shows
+        second.soft_delete(self.user)
         self.genus.refresh_from_db()
-        self.assertEqual(self.genus.defining_sample_id, second.pk)
+        self.assertEqual(self.genus.defining_sample_id, first.pk)
 
     def test_soft_delete_clears_defining_sample_when_no_replacement_exists(self):
         sample = self.genus_sample()

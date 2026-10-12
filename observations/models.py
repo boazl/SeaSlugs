@@ -379,33 +379,25 @@ class TaxonGenus(models.Model):
         return name.rsplit('.', 1)[-1].lower() in IDENTIFICATION_IMAGE_EXTENSIONS
     @staticmethod
     def pick_defining_sample(name):
-        """Best genus-kind sample to represent a genus by this exact name: prefer one with
-        an uploaded image over a video-only one, only among published/non-deleted genus-kind
-        samples identifying this genus, tie-broken by whichever was created first. Same
-        algorithm as SpeciesArea.pick_defining_sample above and the assign_genus_defining_
-        samples management command's own copy (kept separate on purpose -- see gallery_data.
-        py's note on this codebase's convention of small local copies over cross-module
-        coupling for this kind of picking logic)."""
+        """The genus-kind sample that represents a genus by this exact name: the NEWEST published,
+        non-deleted one that has a photo or a video (a purpose-built genus observation the
+        manager saved last is the one that should show)."""
         candidates = list(Sample.objects.filter(
             kind=Sample.Kind.GENUS, genus=name, status=Sample.Status.PUBLISHED, deleted_at__isnull=True,
-        ).order_by('created_at', 'pk'))
+        ).order_by('-created_at', '-pk'))
         candidates = [c for c in candidates if c.image or c.video_url]
-        if not candidates:
-            return None
-        with_image = [c for c in candidates if c.image]
-        return (with_image or candidates)[0]
+        return candidates[0] if candidates else None
 
 
 def taxon_kind_defining_sample(kind, name):
-    """Best published FAMILY- or ORDER-kind sample for the taxon of this name: one with an
-    uploaded image over a video-only one, oldest first -- the same rule as
+    """The FAMILY- or ORDER-kind sample that represents the taxon of this name: the NEWEST
+    published, non-deleted one that has a photo or a video -- the same rule as
     TaxonGenus.pick_defining_sample."""
     field = 'family' if kind == Sample.Kind.FAMILY else 'order'
     candidates = [c for c in Sample.objects.filter(
         kind=kind, **{field: name}, status=Sample.Status.PUBLISHED, deleted_at__isnull=True,
-    ).order_by('created_at', 'pk') if c.image or c.video_url]
-    with_image = [c for c in candidates if c.image]
-    return (with_image or candidates or [None])[0]
+    ).order_by('-created_at', '-pk') if c.image or c.video_url]
+    return candidates[0] if candidates else None
 
 
 class SiteImage(models.Model):

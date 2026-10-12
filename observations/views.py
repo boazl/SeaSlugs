@@ -85,6 +85,14 @@ def species_admin_url(user, species):
     return None
 
 
+def taxon_admin_url(user, taxon):
+    """The admin page of this order / family / genus row, for staff who may change it (names, texts, files are edited there)."""
+    model = type(taxon)._meta.model_name
+    if user.is_authenticated and user.is_staff and user.has_perm(f'observations.change_{model}'):
+        return reverse(f'admin:observations_{model}_change', args=[taxon.pk])
+    return None
+
+
 def gallery_urls(samples, lang):
     """pk -> the public gallery page that shows each of these observations (the species page,
     anchored to the observation, or the genus/family/order page), for those that are actually
@@ -319,6 +327,7 @@ def genus_page(request, name):
         'sources': parse_sources(genus.sources),
         'canonical_url': request.build_absolute_uri(request.path),
         'edit_url': taxon_edit_url(request, Sample.Kind.GENUS, genus),
+        'taxon_admin_url': taxon_admin_url(request.user, genus),
     })
 
 
@@ -395,6 +404,7 @@ def _taxon_page(request, rank, obj, areas, children, parent, parent_url):
         'image_url': image_url, 'video_id': video_id, 'thumbnail': thumbnail,
         'canonical_url': request.build_absolute_uri(request.path),
         'edit_url': taxon_edit_url(request, getattr(Sample.Kind, rank.upper()), obj),
+        'taxon_admin_url': taxon_admin_url(request.user, obj),
     })
 
 

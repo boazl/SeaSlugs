@@ -59,10 +59,10 @@ class GenusPageTests(TestCase):
     def test_order_page_has_a_back_button_to_the_gallery(self):
         url = f'/order/{self.order.pk}/'
         response = self.client.get(url)
-        self.assertContains(response, '<a class="back-button" href="/">חזרה לכל הסדרות</a>')
+        self.assertContains(response, '<a class="back-button" href="/">חזרה לגלריה</a>')
         self.assertNotContains(response, 'חזרה לסדרה')
         response = self.client.get(url + '?lang=en')
-        self.assertContains(response, '<a class="back-button" href="/?lang=en">Back to all orders</a>')
+        self.assertContains(response, '<a class="back-button" href="/?lang=en">Back to the gallery</a>')
 
     def _taxon_sample(self, kind, owner=None, **names):
         self._video = getattr(self, '_video', 60000000000) + 1
@@ -83,8 +83,18 @@ class GenusPageTests(TestCase):
             response = self.client.get(url + '?lang=he')     # the language persists in a cookie
             edit = reverse('observation-edit', args=[sample.pk])
             self.assertContains(response, f'<a class="edit-button" href="{edit}?next=')
-            self.assertContains(response, 'עריכה</a>')
-            self.assertContains(self.client.get(url + '?lang=en'), '>Edit</a>')
+            self.assertContains(response, 'עריכת תצפית</a>')
+            self.assertContains(self.client.get(url + '?lang=en'), '>Edit observation</a>')
+        # ... and, for staff, the taxon's own admin page: "edit the order / family / genus"
+        for url, label, model in ((f'/order/{self.order.pk}/', 'עריכת הסדרה', 'taxonorder'), (f'/family/{self.family.name}/', 'עריכת המשפחה', 'taxonfamily'),
+                                  (f'/genus/{self.genus.name}/', 'עריכת הסוג', 'taxongenus')):
+            page = self.client.get(url + '?lang=he')
+            self.assertContains(page, f'/admin/observations/{model}/')
+            self.assertContains(page, f'{label}</a>')
+        self.assertContains(self.client.get(f'/order/{self.order.pk}/?lang=en'), '>Edit order</a>')
+        self.client.logout()
+        self.assertNotContains(self.client.get(f'/order/{self.order.pk}/'), 'עריכת הסדרה')
+        self.client.force_login(self.owner)
         # ... and the edit page really opens, returning to the taxon page after saving
         edit_url = self.client.get(f'/genus/{self.genus.name}/').context['edit_url']
         self.assertEqual(self.client.get(edit_url).status_code, 200)
@@ -279,6 +289,13 @@ class GenusPageTests(TestCase):
         self.assertEqual(catalog['taxa']['order_pages']['Nudibranchia'], base.pk)
         entry = catalog['taxa']['orders'][str(base.pk)]               # the card's curated photo/video is findable
         self.assertTrue(entry['thumbnail'] or entry['video_id'])
+
+    def test_the_newest_order_observation_is_the_defining_sample(self):
+        older = self._taxon_sample(Sample.Kind.ORDER, order='Nudibranchia')
+        newer = self._taxon_sample(Sample.Kind.ORDER, order='Nudibranchia')
+        self.assertEqual(TaxonOrder.objects.get(name='Nudibranchia', sub_order='').defining_sample_id, newer.pk)
+        newer.soft_delete(self.owner)
+        self.assertEqual(TaxonOrder.objects.get(name='Nudibranchia', sub_order='').defining_sample_id, older.pk)
 
     def test_card_shows_the_observation_count_when_the_species_has_several(self):
         url = f'/genus/{self.genus.name}/'

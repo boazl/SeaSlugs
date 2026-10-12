@@ -76,7 +76,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
             <span>›</span><span aria-current="page" dir="ltr">{{ genus.name }}</span>
         </nav>
 
-        <p class="back-row"><a class="back-button" href="{% if taxon_family %}{% url 'family-page' taxon_family.name %}{% if lang == 'en' %}?lang=en{% endif %}{% else %}/{% if lang == 'en' %}?lang=en{% endif %}{% endif %}">{% if taxon_family %}{{ "חזרה למשפחה"|t:lang }} {{ taxon_family_label }}{% else %}{{ "חזרה לגלריה"|t:lang }}{% endif %}</a>{% if edit_url %}<a class="edit-button" href="{{ edit_url }}">{{ "עריכה"|t:lang }}</a>{% endif %}</p>
+        <p class="back-row"><a class="back-button" href="{% if taxon_family %}{% url 'family-page' taxon_family.name %}{% if lang == 'en' %}?lang=en{% endif %}{% else %}/{% if lang == 'en' %}?lang=en{% endif %}{% endif %}">{% if taxon_family %}{{ "חזרה למשפחה"|t:lang }} {{ taxon_family_label }}{% else %}{{ "חזרה לגלריה"|t:lang }}{% endif %}</a>{% if edit_url %}<a class="edit-button" href="{{ edit_url }}">{{ "עריכת תצפית"|t:lang }}</a>{% endif %}{% if taxon_admin_url %}<a class="edit-button" href="{{ taxon_admin_url }}">{{ "עריכת הסוג"|t:lang }}</a>{% endif %}</p>
 
         <article class="species-hero">
             <div class="species-media{% if image_url or video_id %} frame-genus{% endif %}">
