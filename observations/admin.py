@@ -455,6 +455,16 @@ class PublicationReasonListFilter(admin.SimpleListFilter):
         if not text: return queryset.none()
         return queryset.filter(pk__in=[obj.pk for obj in queryset if text in obj.publication_reasons()])
 
+class SampleStatusFilter(admin.ChoicesFieldListFilter):
+    """The status filter of the Samples list. A deleted observation is not waiting for anyone's approval,
+    so "pending" lists only the live ones (the deleted are still found under "all" and the deleted-at filter)."""
+    def queryset(self, request, queryset):
+        queryset = super().queryset(request, queryset)
+        if self.lookup_val in (Sample.Status.PENDING, [Sample.Status.PENDING]):
+            queryset = queryset.filter(deleted_at__isnull=True)
+        return queryset
+
+
 @admin.register(Sample)
 class SampleAdmin(admin.ModelAdmin):
     form = SampleForm
@@ -463,7 +473,7 @@ class SampleAdmin(admin.ModelAdmin):
     list_editable=['order','family','genus','species','identification_qualifier','life_stage']
     # Long lists of values (genera, publication reasons...) are compact dropdowns, not one link
     # per value, so the filter panel stays narrow (see templates/admin/observations/sample/change_list.html).
-    list_filter=['status','kind',('order',DropdownAllValuesFilter),('family',DropdownAllValuesFilter),('genus',DropdownAllValuesFilter),TripCodeListFilter,PublicationReasonListFilter,'deleted_at']
+    list_filter=[('status',SampleStatusFilter),'kind',('order',DropdownAllValuesFilter),('family',DropdownAllValuesFilter),('genus',DropdownAllValuesFilter),TripCodeListFilter,PublicationReasonListFilter,'deleted_at']
     list_per_page=100
     def get_changelist_form(self,request,**kwargs):
         # order/family/genus/species are plain inputs bound to ONE shared <datalist> each (rendered
