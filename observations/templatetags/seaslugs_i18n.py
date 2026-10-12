@@ -40,6 +40,8 @@ TRANSLATIONS = {
     'אזור': 'Region',
     'שנה': 'Year',
     'סדרה': 'Order',
+    'תת-סדרה': 'Sub-order',
+    'חזרה לתת-סדרה': 'Back to sub-order',
     'משפחה': 'Family',
     'סוג (Genus)': 'Genus',
     'צלם': 'Photographer',

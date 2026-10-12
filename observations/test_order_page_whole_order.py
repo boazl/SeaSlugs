@@ -76,6 +76,28 @@ class WholeOrderPageTests(TestCase):
         self.assertNotIn('עריכת תצפית', sub)
         self.assertIn('עריכת הסדרה', sub)
 
+    def test_a_sub_order_page_says_sub_order_and_links_back_to_the_whole_order(self):
+        sub = self.client.get(reverse('order-page', args=[self.group.pk])).content.decode()
+        whole = self.client.get(reverse('order-page', args=[self.base.pk])).content.decode()
+        self.assertIn('>תת-סדרה</span>', sub)
+        self.assertIn(f'<a class="back-button" href="/order/{self.base.pk}/">חזרה לסדרה חשופיות</a>', sub)
+        self.assertIn('>סדרה</span>', whole)
+        self.assertNotIn('חזרה לסדרה', whole)
+        english = self.client.get(reverse('order-page', args=[self.group.pk]) + '?lang=en').content.decode()
+        self.assertIn('>Sub-order</span>', english)
+
+    def test_a_family_page_links_back_to_its_sub_order_and_its_order(self):
+        family = self.client.get('/family/Chromodorididae/').content.decode()
+        row = family[family.index('class="back-row"'):]
+        row = row[:row.index('</p>')]
+        self.assertIn(f'href="/order/{self.group.pk}/">חזרה לתת-סדרה Doridina</a>', row)
+        self.assertIn(f'href="/order/{self.base.pk}/">חזרה לסדרה חשופיות</a>', row)
+        self.assertLess(row.index('חזרה לתת-סדרה'), row.index('חזרה לסדרה'))
+        hexa = self.client.get('/family/Hexabranchidae/').content.decode()    # in the order's own row: just the order
+        self.assertIn('חזרה לסדרה חשופיות', hexa)
+        self.assertNotIn('חזרה לתת-סדרה', hexa)
+        self.assertIn(f'href="/order/{self.group.pk}/?lang=en"', self.client.get('/family/Chromodorididae/?lang=en').content.decode())
+
 
 class RetiredNudibranchiaGroupRedirectTests(TestCase):
     def test_old_group_pages_redirect_to_the_whole_order_page(self):

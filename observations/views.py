@@ -320,6 +320,7 @@ def genus_page(request, name):
         'genus': genus, 'areas': areas,
         'image_url': image_url, 'video_id': video_id, 'thumbnail': thumbnail,
         'taxon_order': taxon_order, 'taxon_family': taxon_family,
+        'order_trail': order_trail(taxon_order, lang),
         'taxon_order_label': taxon_label(taxon_order), 'taxon_family_label': taxon_label(taxon_family),
         'common_name': common_name, 'description': description,
         'identification': (genus.identification_en or genus.identification_he) if lang == 'en' else (genus.identification_he or genus.identification_en),
@@ -401,6 +402,7 @@ def _taxon_page(request, rank, obj, areas, children, parent, parent_url):
         'areas': areas, 'children': children,
         'parent_label': ((parent.name_en if lang == 'en' else parent.name_he) or parent.name) if parent else '',
         'parent_url': parent_url,
+        'trail': (order_trail(obj, lang, include_self=False) if rank == 'order' else order_trail(parent, lang) if rank == 'family' else []),
         'image_url': image_url, 'video_id': video_id, 'thumbnail': thumbnail,
         'canonical_url': request.build_absolute_uri(request.path),
         # An order observation belongs to the whole order (its name has no sub-order), so a sub-order's
@@ -439,6 +441,26 @@ def order_base_rows():
         if current is None or (row.sub_order == '' and current.sub_order != ''):
             out[row.name] = row
     return out
+
+
+def order_trail(row, lang, include_self=True):
+    """The order levels above a taxon page, outermost first: the whole order, then -- when `row` is a
+    sub-order row -- that sub-order. [{'kind': 'order' | 'suborder', 'label', 'url'}]. `include_self`
+    False leaves `row` itself out (an order page's own trail)."""
+    if row is None:
+        return []
+    def label(o):
+        name = o.name_en if lang == 'en' else o.name_he
+        return name or (o.sub_order or o.name)
+    trail = []
+    base = order_base_rows().get(row.name)
+    if base is not None and base.pk != row.pk:
+        trail.append({'kind': 'order', 'label': (base.name_en if lang == 'en' else base.name_he) or base.name,
+                      'url': reverse('order-page', args=[base.pk])})
+    if include_self:
+        trail.append({'kind': 'suborder' if row.sub_order else 'order', 'label': label(row),
+                      'url': reverse('order-page', args=[row.pk])})
+    return trail
 
 
 # Ids of the informal Nudibranchia group rows that migration 0065 deleted; their old public pages

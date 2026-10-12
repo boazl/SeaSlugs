@@ -78,7 +78,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
         {% for message in messages %}<p class="notice{% if message.extra_tags %} {{ message.extra_tags }}{% endif %}">{{ message|t:lang }}</p>{% endfor %}
         <nav class="breadcrumb" aria-label="מיקום בטקסונומיה">
             <a href="{{ '/'|with_lang:lang }}">{{ "הגלריה"|t:lang }}</a>
-            {% if taxon_order_label %}<span>›</span><a href="{% url 'order-page' taxon_order.pk %}{% if lang == 'en' %}?lang=en{% endif %}">{{ taxon_order_label }}</a>{% endif %}
+            {% for t in order_trail %}<span>›</span><a href="{{ t.url }}{% if lang == 'en' %}?lang=en{% endif %}">{{ t.label }}</a>{% endfor %}
             {% if taxon_family_label %}<span>›</span><a href="{% url 'family-page' taxon_family.name %}{% if lang == 'en' %}?lang=en{% endif %}">{{ taxon_family_label }}</a>{% endif %}
             <span>›</span><span aria-current="page" dir="ltr">{{ genus.name }}</span>
         </nav>
