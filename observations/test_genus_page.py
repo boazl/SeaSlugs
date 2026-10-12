@@ -253,7 +253,20 @@ class GenusPageTests(TestCase):
             self.assertNotContains(self.client.get(url), 'class="notice')       # shown once, then gone
         family_sample = self._taxon_sample(Sample.Kind.FAMILY, family='Chromodorididae')
         self.client.post(f'/observations/{family_sample.pk}/edit/', {'kind': 'family', 'family': 'Chromodorididae', 'next': f'/family/{self.family.name}/'})
-        self.assertContains(self.client.get(f'/family/{self.family.name}/'), 'התצפית נשמרה')
+        self.assertContains(self.client.get(f'/family/{self.family.name}/'), 'התצפית פורסמה')   # a manager's save of a taxon observation publishes it
+
+    def test_manager_save_of_an_order_observation_publishes_it_and_sets_the_defining_sample(self):
+        # Saving an order / family / genus observation as a manager used to put it back to "pending", which the
+        # taxon page and the gallery card ignore -- so a newly chosen picture never showed up.
+        sample = self._taxon_sample(Sample.Kind.ORDER, order='Nudibranchia')
+        Sample.objects.filter(pk=sample.pk).update(status='pending')
+        self.client.force_login(self.owner)
+        response = self.client.post(f'/observations/{sample.pk}/edit/', {
+            'kind': 'order', 'order': 'Nudibranchia', 'video_url': sample.video_url, 'trip': '', 'site': '', 'next': '/'})
+        self.assertEqual(response.status_code, 302, getattr(response, 'context', None) and response.context['form'].errors)
+        sample.refresh_from_db()
+        self.assertEqual(sample.status, 'published')
+        self.assertEqual(TaxonOrder.objects.get(name='Nudibranchia').defining_sample_id, sample.pk)
 
     def test_card_shows_the_observation_count_when_the_species_has_several(self):
         url = f'/genus/{self.genus.name}/'
@@ -552,3 +565,4 @@ class PhotoBeforeVideoTests(TestCase):
             self.assertIn('<iframe', html[html.index('class="species-media'):html.index('class="species-summary"')])
             self._both(sample)
             self.assert_photo_hero(url, sample)
+

@@ -850,7 +850,11 @@ def edit(request,pk=None):
         # saved, trip added, etc.) -- extra_tags carries that distinction through to
         # base.html, which renders it with its own highlighted style.
         is_new_observation = item.pk is None
-        item.save_reviewed()
+        # An order / family / genus observation edited by a manager is the manager's own curated media
+        # for that taxon page: it is approved (published) by the save itself. Without this the save put it
+        # back to "pending", and a pending sample is ignored by the taxon page and the gallery.
+        approve_taxon = manager and item.kind in (Sample.Kind.ORDER, Sample.Kind.FAMILY, Sample.Kind.GENUS)
+        item.save_reviewed(actor=request.user if approve_taxon else None, approve=approve_taxon)
         if getattr(item,'_shared_image',False) and old_image_name and old_image_name!=item.image.name:
             from .media_transfer import delete_image_if_unused
             delete_image_if_unused(old_image_name)        # the file this observation used to have, if nothing else uses it
