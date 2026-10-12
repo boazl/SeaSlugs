@@ -104,7 +104,9 @@ def sample_plan(document, fields):
             # Plain table transfers never copy, remove, or replace target image references --
             # actual image files travel separately, through image management.
             values['image'] = obj.image.name if obj and obj.image else ''
-            if not values['video_url'] and not values['image']:
+            # An order / family / genus observation may legitimately have no media of its own (its
+            # page then borrows a species photo), so only the other kinds need one to be transferred.
+            if not values['video_url'] and not values['image'] and values['kind'] not in ('order', 'family', 'genus'):
                 result.append({'object':None,'label':values['title'] or incoming.get('species') or identity,
                                'action':'skipped','changes':[],
                                'reason':'התצפית לא הועברה: חסרה תמונה ביעד ואין סרטון. העבירו את התמונה דרך ניהול התמונות ואז ייבאו שוב.'})

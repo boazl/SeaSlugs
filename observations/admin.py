@@ -526,6 +526,14 @@ class SampleAdmin(admin.ModelAdmin):
             from .media_transfer import save_images
             raw=obj.image.read();name=obj.canonical_image_name()
             save_images({name:raw});obj.image=name
+        if obj.kind in (Sample.Kind.ORDER, Sample.Kind.FAMILY, Sample.Kind.GENUS):
+            # An order / family / genus observation saved by a manager is the manager's own curated media
+            # for that taxon page, so the save itself approves it (as on the public edit page) instead of
+            # putting it back to "pending", which the taxon page, the gallery and the transfer all treat as unpublished.
+            try:
+                obj.save_reviewed(actor=getattr(request,'user',None),approve=True)
+                return
+            except ValidationError: pass        # incomplete data (an "other" value): saved as pending below
         obj.save_reviewed()
     @admin.action(description='אישור פרסום לאחר השלמת הנתונים',permissions=['change'])
     def approve(self,request,queryset):
