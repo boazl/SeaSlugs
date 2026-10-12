@@ -312,31 +312,54 @@ class TaxonGenusGroupFilter(TaxonGroupFilter):
     prefix = 'family__'
 
 
+class TaxonSitePageMixin:
+    """A "view the page on the site" button next to Save -- as the species admin has -- when the row has a
+    public page (one with at least one gallery species; the page 404s otherwise)."""
+    def site_page(self, obj):
+        """(button label, url) or None."""
+        raise NotImplementedError
+
+    def render_change_form(self, request, context, add=False, change=False, form_url='', obj=None):
+        page = self.site_page(obj) if obj is not None and obj.pk else None
+        context['site_pages'] = [page] if page else []
+        return super().render_change_form(request, context, add=add, change=change, form_url=form_url, obj=obj)
+
+
 @admin.register(TaxonOrder)
-class TaxonOrderAdmin(admin.ModelAdmin):
+class TaxonOrderAdmin(TaxonSitePageMixin, admin.ModelAdmin):
     """Orders, sub-orders and superfamilies in one table; the "rank" column says which each row is."""
     list_display = ['taxonomic_order', 'name', 'sub_order', 'superfamily', 'rank', 'name_he', 'name_en', 'defining_sample']
     list_filter = ['rank']
     search_fields = ['name', 'name_he', 'name_en', 'sub_order', 'superfamily']
     readonly_fields = ['rank']
+    def site_page(self, obj):
+        from .views import order_row_areas
+        label = {'order': 'צפייה בדף הסדרה', 'suborder': 'צפייה בדף התת-סדרה', 'superfamily': 'צפייה בדף העל-משפחה'}[obj.rank]
+        return (label, reverse('order-page', args=[obj.pk])) if order_row_areas(obj) else None
 
 
 @admin.register(TaxonFamily)
-class TaxonFamilyAdmin(admin.ModelAdmin):
+class TaxonFamilyAdmin(TaxonSitePageMixin, admin.ModelAdmin):
     show_facets = admin.ShowFacets.ALWAYS     # the order filter's counts are the point of it
     list_display = ['taxonomic_order', 'name', 'name_he', 'name_en', 'sub_family', 'superfamily', 'order', 'defining_sample']
     list_filter = [TaxonFamilyOrderNameFilter, TaxonFamilyGroupFilter]
     search_fields = ['name', 'name_he', 'name_en', 'sub_family', 'superfamily']
     autocomplete_fields = ['order']
+    def site_page(self, obj):
+        from .views import gallery_areas
+        return ('צפייה בדף המשפחה', reverse('family-page', args=[obj.name])) if any(a.taxon_family and a.taxon_family.name == obj.name for a in gallery_areas()) else None
 
 
 @admin.register(TaxonGenus)
-class TaxonGenusAdmin(admin.ModelAdmin):
+class TaxonGenusAdmin(TaxonSitePageMixin, admin.ModelAdmin):
     show_facets = admin.ShowFacets.ALWAYS     # the order filter's counts are the point of it
     list_display = ['taxonomic_order', 'name', 'name_he', 'name_en', 'family', 'defining_sample']
     list_filter = [TaxonGenusOrderNameFilter, TaxonGenusGroupFilter]
     search_fields = ['name', 'name_he', 'name_en']
     autocomplete_fields = ['family']
+    def site_page(self, obj):
+        from .views import gallery_areas
+        return ('צפייה בדף הסוג', reverse('genus-page', args=[obj.name])) if any(a.taxon_genus and a.taxon_genus.pk == obj.pk for a in gallery_areas()) else None
     fieldsets = [
         ('זיהוי וסיווג', {'fields': ['name', 'name_he', 'name_en', 'family', 'taxonomic_order', 'defining_sample']}),
         ('תיאור וזיהוי', {'fields': ['description_he', 'description_en', 'identification_he', 'identification_en']}),

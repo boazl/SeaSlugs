@@ -141,6 +141,23 @@ class WholeOrderPageTests(TestCase):
     def test_only_an_order_row_can_be_a_familys_order(self):
         self.assertEqual(TaxonFamily._meta.get_field('order').remote_field.limit_choices_to, {'superfamily': ''})
 
+    def test_admin_has_a_view_the_page_button_for_each_level(self):
+        """As the species admin has: next to Save, a link to the public page of the order / sub-order / superfamily /
+        family / genus -- only when that page exists."""
+        self.client.login(username='manager', password='test-password')
+        empty = TaxonOrder.objects.create(name='Pteropoda', sub_order='Gymnosomata')      # no gallery species: no page
+        for row, label in ((self.base, 'צפייה בדף הסדרה'), (self.group, 'צפייה בדף התת-סדרה'), (self.superfamily, 'צפייה בדף העל-משפחה')):
+            html = self.client.get(reverse('admin:observations_taxonorder_change', args=[row.pk])).content.decode()
+            self.assertIn(f'href="{reverse("order-page", args=[row.pk])}" class="button site-page-link"', html)
+            self.assertIn(label, html)
+        self.assertNotIn('site-page-link', self.client.get(reverse('admin:observations_taxonorder_change', args=[empty.pk])).content.decode())
+        family = TaxonFamily.objects.get(name='Chromodorididae')
+        html = self.client.get(reverse('admin:observations_taxonfamily_change', args=[family.pk])).content.decode()
+        self.assertIn('href="/family/Chromodorididae/" class="button site-page-link"', html)
+        genus = TaxonGenus.objects.get(name='Chromodoris')
+        html = self.client.get(reverse('admin:observations_taxongenus_change', args=[genus.pk])).content.decode()
+        self.assertIn('href="/genus/Chromodoris/" class="button site-page-link"', html)
+
 
 class RetiredNudibranchiaGroupRedirectTests(TestCase):
     def test_old_group_pages_redirect_to_the_whole_order_page(self):
@@ -153,4 +170,5 @@ class RetiredNudibranchiaGroupRedirectTests(TestCase):
     def test_other_missing_orders_still_404(self):
         TaxonOrder.objects.create(name='Nudibranchia', sub_order='', taxonomic_order='3')
         self.assertEqual(self.client.get('/order/999/').status_code, 404)
+
 

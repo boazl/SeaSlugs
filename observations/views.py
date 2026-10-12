@@ -520,6 +520,18 @@ def children_title(children):
 RETIRED_NUDIBRANCHIA_GROUP_IDS = {14, 16, 17}
 
 
+def order_row_areas(order):
+    """The gallery species cards of a row of the orders table: the whole order's for the order's own row, a
+    sub-order's own, a superfamily's through its families. Empty when the row has no public page."""
+    base = order_base_rows().get(order.name)
+    gallery = [a for a in gallery_areas() if a.taxon_order and a.taxon_order.name == order.name]
+    if order.rank == TaxonOrder.Rank.SUPERFAMILY:
+        return [a for a in gallery if a.taxon_family and a.taxon_family.superfamily == order.superfamily]
+    if base is not None and base.pk == order.pk:
+        return gallery
+    return [a for a in gallery if a.taxon_order.pk == order.pk]
+
+
 def order_page(request, pk):
     """Public page for one row of the orders table -- an order, a sub-order or a superfamily. The page of
     an order's own row (see order_base_rows) is the page of the whole order: every gallery species whose
@@ -531,14 +543,7 @@ def order_page(request, pk):
         if pk in RETIRED_NUDIBRANCHIA_GROUP_IDS and base_nudibranchia is not None:
             return redirect('order-page', pk=base_nudibranchia.pk, permanent=True)
         raise Http404
-    base = order_base_rows().get(order.name)
-    gallery = [a for a in gallery_areas() if a.taxon_order and a.taxon_order.name == order.name]
-    if order.rank == TaxonOrder.Rank.SUPERFAMILY:
-        areas = [a for a in gallery if a.taxon_family and a.taxon_family.superfamily == order.superfamily]
-    elif base is not None and base.pk == order.pk:
-        areas = gallery
-    else:
-        areas = [a for a in gallery if a.taxon_order.pk == order.pk]
+    areas = order_row_areas(order)
     if not areas:
         raise Http404
     lang = get_lang(request)
