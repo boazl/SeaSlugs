@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
-from .models import TaxonOrder, TaxonFamily, TaxonGenus
+from .models import TaxonOrder, TaxonFamily, TaxonGenus, Sample, DiveTrip
 from .table_transfer import TABLES, export_table, plan, fingerprint, apply
 
 BACKUP = patch('observations.table_transfer.create_backup', return_value=Path('test.sqlite3'))
@@ -26,8 +26,63 @@ class TaxonTransferTests(TestCase):
         names = list(TABLES)
         for table in ('orders', 'families', 'genera'):
             self.assertLess(names.index(table), names.index('species'))
-            for forbidden in ('order', 'family', 'defining_sample', 'article_pdf', 'id'):
+            for forbidden in ('order', 'family', 'article_pdf', 'id'):
                 self.assertNotIn(forbidden, TABLES[table][1])
+
+    def sample(self, n=1):
+        owner = User.objects.get_or_create(username='owner')[0]
+        trip = DiveTrip.objects.get_or_create(title='Library', year=2026)[0]
+        return Sample.objects.create(owner=owner, kind=Sample.Kind.ORDER, order='Nudibranchia', trip=trip,
+                                     video_url=f'https://youtu.be/{str(n).zfill(11)}')
+
+    def test_defining_sample_travels_by_transfer_id_and_is_applied(self):
+        sample = self.sample()
+        source = export_table('orders')
+        rows = {r['sub_order']: r for r in source['rows']}
+        self.assertEqual(rows['Doridina']['defining_sample'], '')
+        rows['Doridina']['defining_sample'] = str(sample.transfer_id)
+        items = plan(source)
+        changed = [i for i in items if i['action'] == 'update']
+        self.assertEqual(len(changed), 1)
+        self.assertEqual([c['field'] for c in changed[0]['changes']], ['דגימה מגדירה'])
+        self.apply(source)
+        self.order.refresh_from_db(); self.other_order.refresh_from_db()
+        self.assertEqual(self.order.defining_sample_id, sample.pk)
+        self.assertIsNone(self.other_order.defining_sample_id)
+        again = export_table('orders')
+        self.assertEqual({r['sub_order']: r for r in again['rows']}['Doridina']['defining_sample'], str(sample.transfer_id))
+        self.assertTrue(all(i['action'] == 'same' for i in plan(again)))
+
+    def test_defining_sample_of_families_and_genera_travels_too(self):
+        sample = self.sample()
+        for table, obj in (('families', self.family), ('genera', self.genus)):
+            doc = export_table(table)
+            doc['rows'][0]['defining_sample'] = str(sample.transfer_id)
+            self.apply(doc)
+            obj.refresh_from_db()
+            self.assertEqual(obj.defining_sample_id, sample.pk)
+
+    def test_missing_or_empty_defining_sample_leaves_the_destination_choice_alone(self):
+        mine, other = self.sample(1), self.sample(2)
+        self.order.defining_sample = mine
+        self.order.save()
+        doc = export_table('orders')
+        row = {r['sub_order']: r for r in doc['rows']}['Doridina']
+        self.assertEqual(row['defining_sample'], str(mine.transfer_id))
+        row['defining_sample'] = ''
+        self.assertTrue(all(i['action'] == 'same' for i in plan(doc)))
+        row['defining_sample'] = '12345678-1234-5678-1234-567812345678'
+        items = plan(doc)
+        self.assertTrue(all(i['action'] == 'same' for i in items))
+        self.assertTrue(any('חסרה ביעד' in i['label'] for i in items))
+        self.apply(doc)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.defining_sample_id, mine.pk)
+        # a deleted sample counts as missing too
+        from django.utils import timezone
+        Sample.objects.filter(pk=other.pk).update(deleted_at=timezone.now())
+        row['defining_sample'] = str(other.transfer_id)
+        self.assertTrue(all(i['action'] == 'same' for i in plan(doc)))
 
     def test_export_has_no_ids_and_round_trips_as_same(self):
         for table, count in (('orders', 2), ('families', 1), ('genera', 1)):

@@ -55,6 +55,10 @@ def row(obj, fields):
             # Species' OWN 'species' field (the epithet, a plain string) shares a name with
             # SpeciesArea's 'species' FK -- only treat it as a reference on SpeciesArea itself.
             result[f] = reference(getattr(obj,f))
+        elif f == 'defining_sample':
+            # Taxon rows (orders/families/genera): the sample's fixed transfer id, '' for none.
+            sample = obj.defining_sample
+            result[f] = str(sample.transfer_id) if sample else ''
         else:
             value = getattr(obj,f)
             # Decimal isn't JSON-native -- the real export endpoint (transfer_views.py)

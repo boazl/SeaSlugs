@@ -6,15 +6,19 @@ identity (below), never created -- rows carry links to other taxa that this tran
 and a row with no counterpart is reported as skipped. The files themselves (article PDFs, the
 identification file) travel through the image manager, not here."""
 from django.core.exceptions import ValidationError
-from .models import TaxonOrder, TaxonFamily, TaxonGenus
+from .models import TaxonOrder, TaxonFamily, TaxonGenus, Sample
 
 PAGE_TEXTS = ['name_he', 'name_en', 'description_he', 'description_en', 'identification_he', 'identification_en', 'sources', 'link']
+# The defining sample travels as the sample's fixed transfer id (never its numeric id), '' when
+# the row has none. It is applied only when that sample exists at the destination; an empty value
+# or a sample that has not arrived yet leaves the destination's own choice untouched.
+DEFINING = 'defining_sample'
 
 # table -> (model, identity fields, all transferred fields)
 TAXON_TABLES = {
-    'orders': (TaxonOrder, ['name', 'sub_order', 'superfamily', 'taxonomic_order'], ['name', 'sub_order', 'superfamily', 'taxonomic_order'] + PAGE_TEXTS),
-    'families': (TaxonFamily, ['name', 'sub_family'], ['name', 'sub_family'] + PAGE_TEXTS),
-    'genera': (TaxonGenus, ['name'], ['name'] + PAGE_TEXTS + ['identification_caption', 'identification_caption_en', 'identification_source']),
+    'orders': (TaxonOrder, ['name', 'sub_order', 'superfamily', 'taxonomic_order'], ['name', 'sub_order', 'superfamily', 'taxonomic_order'] + PAGE_TEXTS + [DEFINING]),
+    'families': (TaxonFamily, ['name', 'sub_family'], ['name', 'sub_family'] + PAGE_TEXTS + [DEFINING]),
+    'genera': (TaxonGenus, ['name'], ['name'] + PAGE_TEXTS + ['identification_caption', 'identification_caption_en', 'identification_source', DEFINING]),
 }
 
 
@@ -38,12 +42,34 @@ def taxon_plan(document):
         if not targets:
             result.append({'action': 'skipped', 'label': label, 'reason': 'אין שורה כזו ביעד — יש להוסיף אותה בניהול הטקסונומיה ואז לייבא שוב.'})
             continue
-        before = {f: getattr(targets[0], f) for f in fields}
+        from .sample_transfer import _describe
+        current = targets[0].defining_sample
+        before = {f: getattr(targets[0], f) for f in fields if f != DEFINING}
+        before[DEFINING] = str(current.transfer_id) if current else ''
         candidate = model.objects.get(pk=targets[0].pk)
         for field, value in values.items():
-            setattr(candidate, field, value)
+            if field != DEFINING:
+                setattr(candidate, field, value)
+        shown = {}
+        if values[DEFINING]:
+            try:
+                sample = Sample.objects.filter(transfer_id=values[DEFINING], deleted_at__isnull=True).first()
+            except (ValidationError, ValueError):
+                raise ValidationError(f'מזהה דגימה מגדירה לא תקין בשורה {number}.')
+            if sample is None:
+                label += ' (הדגימה המגדירה חסרה ביעד — לא שונתה; יש להעביר את Samples ולייבא שוב)'
+                values[DEFINING] = before[DEFINING]
+            else:
+                candidate.defining_sample = sample
+                shown[DEFINING] = _describe(sample)
+        else:
+            values[DEFINING] = before[DEFINING]
         candidate.full_clean(exclude=[f.name for f in model._meta.fields if f.name not in fields])
-        changes = [{'field': str(model._meta.get_field(f).verbose_name), 'before': before[f], 'after': values[f]}
-                   for f in fields if before[f] != values[f]]
+        changes = []
+        for f in fields:
+            if before[f] == values[f]:
+                continue
+            old_text = _describe(current) if f == DEFINING and current else before[f]
+            changes.append({'field': str(model._meta.get_field(f).verbose_name), 'before': old_text, 'after': shown.get(f, values[f])})
         result.append({'object': candidate, 'label': label, 'action': 'update' if changes else 'same', 'changes': changes})
     return result
