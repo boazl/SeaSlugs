@@ -943,6 +943,8 @@ class Sample(models.Model):
         for kind, model, name in ((self.Kind.FAMILY, TaxonFamily, self.family), (self.Kind.ORDER, TaxonOrder, self.order)):
             if self.kind == kind and name:
                 rows = model.objects.filter(name=name)
+                if model is TaxonOrder:
+                    rows = rows.filter(sub_order='')       # the order's own row; a sub-order keeps its own choice
                 picked = taxon_kind_defining_sample(kind, name)
                 if picked:
                     rows.update(defining_sample=picked)

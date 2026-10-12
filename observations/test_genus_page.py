@@ -268,6 +268,18 @@ class GenusPageTests(TestCase):
         self.assertEqual(sample.status, 'published')
         self.assertEqual(TaxonOrder.objects.get(name='Nudibranchia').defining_sample_id, sample.pk)
 
+    def test_order_observation_sets_only_the_order_row_and_the_catalog_lists_that_row(self):
+        TaxonOrder.objects.create(name='Nudibranchia', sub_order='Doridina', taxonomic_order='4')
+        sample = self._taxon_sample(Sample.Kind.ORDER, order='Nudibranchia')
+        self.assertIsNone(TaxonOrder.objects.get(name='Nudibranchia', sub_order='Doridina').defining_sample_id)
+        base = TaxonOrder.objects.get(name='Nudibranchia', sub_order='')
+        self.assertEqual(base.defining_sample_id, sample.pk)
+        import json
+        catalog = json.loads(self.client.get('/catalog.js').content.decode().split('=', 1)[1].strip().rstrip(';'))
+        self.assertEqual(catalog['taxa']['order_pages']['Nudibranchia'], base.pk)
+        entry = catalog['taxa']['orders'][str(base.pk)]               # the card's curated photo/video is findable
+        self.assertTrue(entry['thumbnail'] or entry['video_id'])
+
     def test_card_shows_the_observation_count_when_the_species_has_several(self):
         url = f'/genus/{self.genus.name}/'
         self.assertNotContains(self.client.get(url), 'count-badge" aria-hidden')      # one observation: no badge

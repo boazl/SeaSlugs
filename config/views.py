@@ -269,6 +269,10 @@ def gallery_file(request, filename='index.html'):
         # the gallery's order cards link there.
         from observations.views import order_base_rows
         order_pages = {name: row.pk for name, row in order_base_rows().items()}
+        # The order cards take their curated photo from the base row, which no species may resolve to (all the
+        # species of Nudibranchia sit on its sub-order rows), so make sure that row is in the taxa list too.
+        for row in order_base_rows().values():
+            register_taxon(taxa_orders, row, display_sub_order(row))
         # superfamily name -> its "Latin (Hebrew)" label, for the gallery's superfamily cards.
         from observations.models import TaxonSuperfamily
         taxa_superfamilies = {
