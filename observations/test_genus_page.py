@@ -595,3 +595,21 @@ class PhotoBeforeVideoTests(TestCase):
             self._both(sample)
             self.assert_photo_hero(url, sample)
 
+
+    def test_the_hero_photo_opens_full_size_with_the_round_arrows_mark(self):
+        """As on a species page: the photo is a link opened in the page's lightbox, with the round
+        arrows mark on it; a page with only a video keeps its player and gets no such link."""
+        family = self._taxon_sample(Sample.Kind.FAMILY, family='Chromodorididae')
+        order = self._taxon_sample(Sample.Kind.ORDER, order='Nudibranchia')
+        urls = [(f'/genus/{self.genus.name}/', self.genus_sample), (f'/family/{self.family.name}/', family),
+                (f'/order/{self.order.pk}/', order)]
+        for url, sample in urls:
+            hero = lambda: (lambda h: h[h.index('class="species-media'):h.index('class="species-summary"')])(
+                self.client.get(url).content.decode())
+            self.assertNotIn('lightbox-link', hero())                      # video only
+            self._both(sample)
+            html = self.client.get(url).content.decode()
+            self.assertIn(f'<a class="species-hero-link lightbox-link" href="/observations/{sample.pk}/photo/"', hero())
+            self.assertIn('⤢', hero())
+            self.assertIn('<dialog class="lightbox" id="lightbox"', html)
+            Sample.objects.filter(pk=sample.pk).update(image='')

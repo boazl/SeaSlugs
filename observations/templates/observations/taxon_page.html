@@ -36,6 +36,13 @@ gtag('config', 'G-CPGTC09P2P');</script>
         .species-hero{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:28px;align-items:start}
         @media(max-width:850px){.species-hero{grid-template-columns:1fr}}
         .species-media img{width:100%;height:auto;border-radius:10px;display:block}
+        .species-hero-link{position:relative;display:block;border-radius:10px;overflow:hidden}
+        .species-hero-link img{transition:transform .35s}
+        .species-hero-link:hover img{transform:scale(1.02)}
+        .species-hero-link .play{bottom:16px;left:16px;width:46px;height:46px;font-size:19px}
+        .lightbox{width:auto;max-width:96vw;max-height:94vh;padding:0;background:transparent;border:0;overflow:visible}
+        .lightbox img{display:block;max-width:96vw;max-height:90vh;width:auto;height:auto;border-radius:8px}
+        .lightbox .close{z-index:1;position:absolute;top:10px;inset-inline-end:10px;background:#05141dcc}
         .species-video{position:relative;padding-top:56.25%;border-radius:10px;overflow:hidden}
         .species-video iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
         .taxon-rank{display:inline-block;font-size:12px;letter-spacing:.4px;color:var(--accent);border:1px solid var(--accent);border-radius:20px;padding:3px 12px;margin-bottom:10px}
@@ -89,7 +96,10 @@ gtag('config', 'G-CPGTC09P2P');</script>
             <div class="species-media{% if image_url or video_id %}{% if rank == 'order' %} frame-order{% else %} frame-family{% endif %}{% endif %}">
 {# a photo is preferred over a video when the page has both #}
                 {% if image_url %}
-                <img src="{{ image_url }}" alt="{{ latin_name }}" width="800" height="600">
+                <a class="species-hero-link lightbox-link" href="{{ image_url }}" aria-label="{{ "הגדלת התמונה"|t:lang }}">
+                    <img src="{{ image_url }}" alt="{{ latin_name }}" width="800" height="600">
+                    <span class="play" aria-hidden="true">⤢</span>
+                </a>
                 {% elif video_id %}
                 <div class="species-video"><iframe src="https://www.youtube-nocookie.com/embed/{{ video_id }}" title="{{ latin_name }}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
                 {% endif %}
@@ -160,6 +170,23 @@ gtag('config', 'G-CPGTC09P2P');</script>
             <p class="species-share"><span>{{ "קישור לשיתוף:"|t:lang }}</span> <a href="{{ canonical_url }}" id="species-share-link">{{ canonical_url }}</a> <button type="button" id="species-share-copy" data-copy-label="{{ "העתקה"|t:lang }}" data-copied-label="{{ "הועתק!"|t:lang }}">{{ "העתקה"|t:lang }}</button></p>
         </section>
     </main>
+    <dialog class="lightbox" id="lightbox" aria-label="{{ "הגדלת התמונה"|t:lang }}"><button type="button" class="close" id="lightbox-close" aria-label="{{ "סגירה"|t:lang }}">✕</button><img id="lightbox-img" alt="{{ latin_name }}"></dialog>
+    <script>
+    (function(){
+        var box = document.getElementById('lightbox'), img = document.getElementById('lightbox-img');
+        if (!box || !box.showModal) return;
+        // The hero photo opens full-size in this dialog; a new tab only when explicitly asked for
+        // (Cmd/Ctrl/Shift-click, middle click, or "open in new tab").
+        document.querySelectorAll('.lightbox-link').forEach(function(a){
+            a.addEventListener('click', function(e){
+                if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                e.preventDefault(); img.src = a.href; box.showModal();
+            });
+        });
+        document.getElementById('lightbox-close').addEventListener('click', function(){ box.close(); });
+        box.addEventListener('click', function(e){ if (e.target === box || e.target === img) box.close(); });
+    })();
+    </script>
     <script>
     (function(){
         var btn = document.getElementById('species-share-copy');
