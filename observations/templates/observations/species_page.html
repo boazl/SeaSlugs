@@ -31,6 +31,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
         .back-row{margin:0 0 22px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
         .back-button{display:inline-block;background:var(--accent);color:#08232a;padding:10px 20px;border-radius:7px;text-decoration:none;font-weight:600}
         .back-button:hover{filter:brightness(1.08)}
+        .back-button-quiet{background:transparent;color:var(--accent);border:1px solid var(--accent);padding:9px 19px}
         .edit-button{display:inline-block;background:transparent;color:var(--accent);border:1px solid var(--accent);padding:9px 18px;border-radius:7px;text-decoration:none;font-weight:600}
         .edit-button:hover{background:var(--panel)}
         .species-hero{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:28px;align-items:start}
@@ -118,7 +119,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
             {% if taxon_genus_label %}<span>›</span><a href="{% url 'genus-page' taxon_genus.name %}{% if lang == 'en' %}?lang=en{% endif %}">{{ taxon_genus_label }}</a>{% endif %}
         </nav>
 
-        <p class="back-row">{% if taxon_genus_label %}<a class="back-button" href="{% url 'genus-page' taxon_genus.name %}{% if lang == 'en' %}?lang=en{% endif %}">{{ "חזרה לסוג"|t:lang }} {{ taxon_genus_label }}</a>{% elif taxon_family_label %}<a class="back-button" href="{% url 'family-page' taxon_family.name %}{% if lang == 'en' %}?lang=en{% endif %}">{{ "חזרה למשפחה"|t:lang }} {{ taxon_family_label }}</a>{% elif taxon_order_label %}<a class="back-button" href="{% url 'order-page' taxon_order.pk %}{% if lang == 'en' %}?lang=en{% endif %}">{{ "חזרה לסדרה"|t:lang }} {{ taxon_order_label }}</a>{% else %}<a class="back-button" href="/{% if lang == 'en' %}?lang=en{% endif %}">{{ "חזרה לגלריה"|t:lang }}</a>{% endif %}{% if edit_url %}<a class="edit-button" href="{{ edit_url }}">{{ "עריכת תצפית"|t:lang }}</a>{% endif %}{% if species_admin_url %}<a class="edit-button" href="{{ species_admin_url }}">{{ "עריכת מין"|t:lang }}</a>{% endif %}</p>
+        <p class="back-row">{% if taxon_genus_label %}<a class="back-button" href="{% url 'genus-page' taxon_genus.name %}{% if lang == 'en' %}?lang=en{% endif %}">{{ "חזרה לסוג"|t:lang }} {{ taxon_genus_label }}</a>{% elif taxon_family_label %}<a class="back-button" href="{% url 'family-page' taxon_family.name %}{% if lang == 'en' %}?lang=en{% endif %}">{{ "חזרה למשפחה"|t:lang }} {{ taxon_family_label }}</a>{% elif taxon_order_label %}<a class="back-button" href="{% url 'order-page' taxon_order.pk %}{% if lang == 'en' %}?lang=en{% endif %}">{{ "חזרה לסדרה"|t:lang }} {{ taxon_order_label }}</a>{% else %}<a class="back-button" href="{{ '/?restore=1'|with_lang:lang }}">{{ "חזרה לגלריה"|t:lang }}</a>{% endif %}{% if taxon_genus_label or taxon_family_label or taxon_order_label %}<a class="back-button back-button-quiet" href="{{ '/?restore=1'|with_lang:lang }}">{{ "חזרה לגלריה"|t:lang }}</a>{% endif %}{% if edit_url %}<a class="edit-button" href="{{ edit_url }}">{{ "עריכת תצפית"|t:lang }}</a>{% endif %}{% if species_admin_url %}<a class="edit-button" href="{{ species_admin_url }}">{{ "עריכת מין"|t:lang }}</a>{% endif %}</p>
 
         <article class="species-hero" id="obs-{{ main_sample.pk }}">
             <div class="species-media">

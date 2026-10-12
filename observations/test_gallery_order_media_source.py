@@ -21,3 +21,11 @@ class OrderCardMediaSourceTests(SimpleTestCase):
 class TaxonCardPageLinkSourceTests(SimpleTestCase):
     def test_sub_order_and_superfamily_cards_link_to_their_row_page(self):
         self.assertIn("(level === 'suborder' || level === 'superfamily') && entry.pk) href = `/order/${entry.pk}/`;", APP_JS)
+
+
+class GalleryViewRestoreSourceTests(SimpleTestCase):
+    def test_the_gallery_saves_its_view_and_restores_it_for_restore_1(self):
+        self.assertIn("sessionStorage.setItem(GALLERY_VIEW_KEY", APP_JS)
+        self.assertIn("if (!params.has('restore')) return null;", APP_JS)
+        self.assertIn("window.addEventListener('pagehide', () => saveGalleryView());", APP_JS)
+        self.assertIn("const restoredScroll = restoreGalleryView();", APP_JS)

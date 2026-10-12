@@ -44,7 +44,7 @@ class GenusPageTests(TestCase):
         self.genus.family = None
         self.genus.save()
         response = self.client.get(f'/genus/{self.genus.name}/')
-        self.assertContains(response, '<a class="back-button" href="/">')
+        self.assertContains(response, '<a class="back-button" href="/?restore=1">')
         self.assertContains(response, 'חזרה לגלריה')
 
     def test_family_page_has_a_back_button_to_its_order(self):
@@ -59,10 +59,10 @@ class GenusPageTests(TestCase):
     def test_order_page_has_a_back_button_to_the_gallery(self):
         url = f'/order/{self.order.pk}/'
         response = self.client.get(url)
-        self.assertContains(response, '<a class="back-button" href="/">חזרה לגלריה</a>')
+        self.assertContains(response, '<a class="back-button" href="/?restore=1">חזרה לגלריה</a>')
         self.assertNotContains(response, 'חזרה לסדרה')
         response = self.client.get(url + '?lang=en')
-        self.assertContains(response, '<a class="back-button" href="/?lang=en">Back to the gallery</a>')
+        self.assertContains(response, '<a class="back-button" href="/?restore=1&amp;lang=en">Back to the gallery</a>')
 
     def _taxon_sample(self, kind, owner=None, **names):
         self._video = getattr(self, '_video', 60000000000) + 1
@@ -184,7 +184,7 @@ class GenusPageTests(TestCase):
         self.genus.delete()
         response = self.client.get(url + '?lang=he')
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, '<a class="back-button" href="/">חזרה לגלריה</a>')
+        self.assertContains(response, '<a class="back-button" href="/?restore=1">חזרה לגלריה</a>')
         self.assertNotContains(response, 'חזרה לסוג')
 
     def test_observation_cards_link_to_their_place_in_the_gallery(self):

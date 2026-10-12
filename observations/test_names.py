@@ -118,7 +118,7 @@ class GalleryScriptTests(SimpleTestCase):
         self.assertIn('function syncSortControl()', js)
         self.assertIn('yearSortOption.remove()', js)
         self.assertIn("if (state.sort === 'year') { state.sort = defaultSort(); state.sortChosen = false; }", js)
-        self.assertEqual(js.count('syncSortControl();'), 4)   # area click, observations filter, reset, initial load
+        self.assertEqual(js.count('syncSortControl();'), 5)   # area click, observations filter, reset, initial load, restoring the saved view
         # The years line only appears under the migrant filter.
         self.assertIn("if (state.area === 'migrant' && (sp.first_observed_year || sp.last_observed_year))", js)
         self.assertIn("'נצפה לראשונה בים התיכון'", js)

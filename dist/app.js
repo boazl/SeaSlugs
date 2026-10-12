@@ -1156,6 +1156,39 @@ function buildTaxonCard(level, key, members, index, others) {
 }
 levelSelect.addEventListener('change', e => { setLevel(e.target.value); render(); });
 
+// ---- remembering the gallery view ----
+// The pages of the taxa (order ... genus) and of the species have a "back to the gallery" button that comes back
+// to "/?restore=1": the gallery then returns to the view the visitor left -- the same rank and taxon, the same
+// filters, search and place on the page. The view lives in this tab's sessionStorage; a plain visit to "/" is
+// always a fresh gallery.
+const GALLERY_VIEW_KEY = 'seaslugs-gallery-view';
+const GALLERY_VIEW_SETS = ['regions', 'sites', 'photographers', 'years', 'observations'];
+function saveGalleryView() {
+    try {
+        const saved = { ...state };
+        GALLERY_VIEW_SETS.forEach(k => { saved[k] = [...state[k]]; });
+        sessionStorage.setItem(GALLERY_VIEW_KEY, JSON.stringify({ state: saved, search: search.value, scrollY: window.scrollY }));
+    } catch (_) {}
+}
+// Applies the saved view when the page was opened with ?restore=1; returns the scroll position to go back to.
+function restoreGalleryView() {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has('restore')) return null;
+    params.delete('restore');
+    const query = params.toString();
+    window.history.replaceState(null, '', window.location.pathname + (query ? '?' + query : '') + window.location.hash);
+    let saved = null;
+    try { saved = JSON.parse(sessionStorage.getItem(GALLERY_VIEW_KEY)); } catch (_) {}
+    if (!saved || !saved.state) return null;
+    Object.assign(state, saved.state);
+    GALLERY_VIEW_SETS.forEach(k => { state[k] = new Set(saved.state[k] || []); });
+    search.value = saved.search || '';
+    syncSortControl();
+    levelSelect.value = state.level;
+    return saved.scrollY || 0;
+}
+window.addEventListener('pagehide', () => saveGalleryView());
+
 function render() {
     updateCollectionStatus();
     const q = normalize(search.value);
@@ -1206,6 +1239,7 @@ function render() {
     document.querySelector('#resultCount').textContent = language === 'he' ? `${total} פריטים` : `${total} ${total === 1 ? 'item' : 'items'}`;
     document.querySelector('#empty').hidden = total > 0;
     updateFilterToggleCount();
+    saveGalleryView();
 }
 
 // ---- mobile filter drawer ----
@@ -1565,4 +1599,6 @@ function setLanguage(value) {
 languageButton.addEventListener('click', () => setLanguage(language === 'he' ? 'en' : 'he'));
 let preferredLanguage = 'he';
 try { preferredLanguage = localStorage.getItem('seaslugs-language') || 'he'; } catch (_) {}
+const restoredScroll = restoreGalleryView();
 setLanguage(new URLSearchParams(window.location.search).get('lang') || readLanguageCookie() || preferredLanguage);
+if (restoredScroll) window.requestAnimationFrame(() => window.scrollTo(0, restoredScroll));

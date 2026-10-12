@@ -158,6 +158,14 @@ class WholeOrderPageTests(TestCase):
         html = self.client.get(reverse('admin:observations_taxongenus_change', args=[genus.pk])).content.decode()
         self.assertIn('href="/genus/Chromodoris/" class="button site-page-link"', html)
 
+    def test_every_level_page_has_a_back_to_the_gallery_button_that_restores_the_view(self):
+        """"/?restore=1": the gallery comes back to the view the visitor left (same rank, taxon, filters, place)."""
+        pages = [reverse('order-page', args=[row.pk]) for row in (self.base, self.group, self.superfamily)] + [
+            '/family/Chromodorididae/', '/genus/Chromodoris/', '/species/' + Species.objects.get(scientific_name='Chromodoris annae').areas.first().slug + '/']
+        for url in pages:
+            self.assertIn('href="/?restore=1">חזרה לגלריה</a>', self.client.get(url).content.decode(), url)
+        self.assertIn('href="/?restore=1&amp;lang=en">Back to the gallery</a>', self.client.get('/genus/Chromodoris/?lang=en').content.decode())
+
 
 class RetiredNudibranchiaGroupRedirectTests(TestCase):
     def test_old_group_pages_redirect_to_the_whole_order_page(self):
