@@ -91,10 +91,10 @@ gtag('config', 'G-CPGTC09P2P');</script>
             <span>›</span><span aria-current="page">{% if common_name %}{{ common_name }}{% else %}<span dir="ltr">{{ taxon.name }}</span>{% endif %}</span>
         </nav>
 
-        <p class="back-row">{% for t in trail reversed %}<a class="back-button" href="{{ t.url }}{% if lang == 'en' %}?lang=en{% endif %}">{% if t.kind == 'suborder' %}{{ "חזרה לתת-סדרה"|t:lang }}{% else %}{{ "חזרה לסדרה"|t:lang }}{% endif %} {{ t.label }}</a>{% endfor %}{% if rank == 'order' %}<a class="back-button{% if trail %} back-button-quiet{% endif %}" href="/{% if lang == 'en' %}?lang=en{% endif %}">{{ "חזרה לגלריה"|t:lang }}</a>{% endif %}{% if edit_url %}<a class="edit-button" href="{{ edit_url }}">{{ "עריכת תצפית"|t:lang }}</a>{% endif %}{% if taxon_admin_url %}<a class="edit-button" href="{{ taxon_admin_url }}">{% if rank == 'order' %}{{ "עריכת הסדרה"|t:lang }}{% else %}{{ "עריכת המשפחה"|t:lang }}{% endif %}</a>{% endif %}</p>
+        <p class="back-row">{% for t in trail reversed %}<a class="back-button" href="{{ t.url }}{% if lang == 'en' %}?lang=en{% endif %}">{% if t.kind == 'suborder' %}{{ "חזרה לתת-סדרה"|t:lang }}{% elif t.kind == 'superfamily' %}{{ "חזרה לעל-משפחה"|t:lang }}{% else %}{{ "חזרה לסדרה"|t:lang }}{% endif %} {{ t.label }}</a>{% endfor %}{% if rank == 'order' %}<a class="back-button{% if trail %} back-button-quiet{% endif %}" href="/{% if lang == 'en' %}?lang=en{% endif %}">{{ "חזרה לגלריה"|t:lang }}</a>{% endif %}{% if edit_url %}<a class="edit-button" href="{{ edit_url }}">{{ "עריכת תצפית"|t:lang }}</a>{% endif %}{% if taxon_admin_url %}<a class="edit-button" href="{{ taxon_admin_url }}">{% if level == 'suborder' %}{{ "עריכת התת-סדרה"|t:lang }}{% elif level == 'superfamily' %}{{ "עריכת העל-משפחה"|t:lang }}{% elif rank == 'order' %}{{ "עריכת הסדרה"|t:lang }}{% else %}{{ "עריכת המשפחה"|t:lang }}{% endif %}</a>{% endif %}</p>
 
         <article class="species-hero">
-            <div class="species-media{% if image_url or video_id %}{% if rank == 'order' %} frame-order{% else %} frame-family{% endif %}{% endif %}">
+            <div class="species-media{% if image_url or video_id %} frame-{{ level }}{% endif %}">
 {# a photo is preferred over a video when the page has both #}
                 {% if image_url %}
                 <a class="species-hero-link lightbox-link" href="{{ image_url }}" aria-label="{{ "הגדלת התמונה"|t:lang }}">
@@ -106,7 +106,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
                 {% endif %}
             </div>
             <div class="species-summary">
-                <span class="taxon-rank">{% if rank == 'order' %}{% if taxon.sub_order %}{{ "תת-סדרה"|t:lang }}{% else %}{{ "סדרה"|t:lang }}{% endif %}{% else %}{{ "משפחה"|t:lang }}{% endif %}</span>
+                <span class="taxon-rank">{% if level == 'suborder' %}{{ "תת-סדרה"|t:lang }}{% elif level == 'superfamily' %}{{ "על-משפחה"|t:lang }}{% elif rank == 'order' %}{{ "סדרה"|t:lang }}{% else %}{{ "משפחה"|t:lang }}{% endif %}</span>
                 {% if common_name %}
                 <h1>{{ common_name }}</h1>
                 <p class="taxon-latin"><bdi dir="ltr">{{ latin_name }}</bdi></p>
@@ -115,7 +115,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
                 {% endif %}
                 <dl class="quick-facts">
                     <div><dt>{{ "מינים בגלריה"|t:lang }}</dt><dd>{{ areas|length }}</dd></div>
-                    {% if children %}<div><dt>{% if rank == 'order' %}{{ "משפחות"|t:lang }}{% else %}{{ "סוגים"|t:lang }}{% endif %}</dt><dd>{{ children|length }}</dd></div>{% endif %}
+                    {% if children %}<div><dt>{{ children_title|t:lang }}</dt><dd>{{ children|length }}</dd></div>{% endif %}
                 </dl>
                 {% if taxon.link or taxon.article_pdf %}<div class="species-links">{% if taxon.link %}<a href="{{ taxon.link }}" target="_blank" rel="noopener">{{ "קישור נוסף ↗"|t:lang }}</a>{% endif %}{% if taxon.article_pdf %}<a href="{% if rank == 'order' %}{% url 'order-article' taxon.pk %}{% else %}{% url 'family-article' taxon.name %}{% endif %}" target="_blank" rel="noopener">{{ "מאמר (PDF) ↗"|t:lang }}</a>{% endif %}</div>{% endif %}
             </div>
@@ -136,7 +136,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
 
         {% if children %}
         <section class="species-section">
-            <h2>{% if rank == 'order' %}{{ "משפחות"|t:lang }}{% else %}{{ "סוגים"|t:lang }}{% endif %}</h2>
+            <h2>{{ children_title|t:lang }}</h2>
             <ul class="child-list">
                 {% for c in children %}<li><a href="{{ c.url }}{% if lang == 'en' %}?lang=en{% endif %}"><i dir="ltr">{{ c.latin }}</i>{% if c.common %}<span class="common">{{ c.common }}</span>{% endif %}<small>{{ c.count }}</small></a></li>{% endfor %}
             </ul>

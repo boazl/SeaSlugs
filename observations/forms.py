@@ -252,7 +252,7 @@ class SampleForm(forms.ModelForm):
             rows = list(TaxonFamily.objects.filter(name=family))
             return next((r for r in rows if not r.sub_family), rows[0] if rows else None)
         if kind == Sample.Kind.ORDER and order:
-            return TaxonOrder.objects.filter(name=order).first()
+            return TaxonOrder.objects.filter(name=order, sub_order='', superfamily='').first()
         return None
 
     def enable_taxon_files(self):

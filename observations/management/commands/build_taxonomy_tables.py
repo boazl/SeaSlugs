@@ -142,6 +142,8 @@ class Command(BaseCommand):
             lookup = {'name': name}
             if sub_field:
                 lookup[sub_field] = ''
+                if model is TaxonOrder:
+                    lookup['superfamily'] = ''      # the order's own row, not one of its superfamilies
             if apply:
                 obj, was_created = model.objects.get_or_create(defaults=defaults, **lookup)
             else:
@@ -161,7 +163,7 @@ class Command(BaseCommand):
             return obj
 
         existing_names = {
-            'order': set(TaxonOrder.objects.filter(sub_order='').values_list('name', flat=True)),
+            'order': set(TaxonOrder.objects.filter(sub_order='', superfamily='').values_list('name', flat=True)),
             'family': set(TaxonFamily.objects.filter(sub_family='').values_list('name', flat=True)),
             'genus': set(TaxonGenus.objects.values_list('name', flat=True)),
         }
@@ -221,7 +223,7 @@ class Command(BaseCommand):
                 sub_order = entry.get('sub_order', '')
                 taxonomic_order = entry.get('taxonomic_order', '')
                 key = (name, sub_order, taxonomic_order)
-                lookup = {'name': name, 'sub_order': sub_order, 'taxonomic_order': taxonomic_order}
+                lookup = {'name': name, 'sub_order': sub_order, 'superfamily': '', 'taxonomic_order': taxonomic_order}
                 defaults = {'name_he': entry.get('order_name_he', ''), 'name_en': entry.get('order_name_en', '')}
                 if not apply:
                     exists = TaxonOrder.objects.filter(**lookup).exists()
@@ -276,7 +278,7 @@ class Command(BaseCommand):
                     if order_obj is None:
                         order_name = _majority(family_order_votes[name])
                         if order_name:
-                            order_obj = TaxonOrder.objects.filter(name=order_name, sub_order='').first()
+                            order_obj = TaxonOrder.objects.filter(name=order_name, sub_order='', superfamily='').first()
                             if order_obj:
                                 family_order_link_counts['order_text'] += 1
                     if order_obj:

@@ -11,7 +11,7 @@ from django.utils.safestring import mark_safe
 from django.urls import reverse
 from .forms import SampleForm, SampleChangelistForm, taxonomy_for_form, species_name_options
 from .reference_links import link_kind
-from .models import Country, Sea, Region, Site, Species, Profile, Sample, DiveTrip, SiteImage, SpeciesArea, TaxonOrder, TaxonFamily, TaxonGenus, TaxonSuperfamily, SampleKind, IdentificationQualifier, LifeStage
+from .models import Country, Sea, Region, Site, Species, Profile, Sample, DiveTrip, SiteImage, SpeciesArea, TaxonOrder, TaxonFamily, TaxonGenus, SampleKind, IdentificationQualifier, LifeStage
 
 for model in [Country,Sea,Site,Profile,SiteImage,SampleKind]: admin.site.register(model)
 
@@ -257,7 +257,7 @@ class TaxonGroupFilter(TaxonSplitListFilter):
 
     def lookups(self, request, model_admin):
         only_order = request.GET.get('order_name')
-        orders = {o.pk: o for o in TaxonOrder.objects.all()}       # in the table's taxonomic order
+        orders = {o.pk: o for o in TaxonOrder.objects.filter(superfamily='')}       # in the table's taxonomic order; the superfamily rows are not groups of families' own
         families = {}     # (order name, sub-order) -> superfamilies
         for order_id, superfamily in TaxonFamily.objects.exclude(superfamily='').values_list('order_id', 'superfamily'):
             if order_id in orders and '\\' not in superfamily:    # a few rows hold the import artifact "\N"
@@ -288,10 +288,10 @@ class TaxonGroupFilter(TaxonSplitListFilter):
     def condition(self, value):
         kind, _, name = value.partition(':')
         if kind == 'sub':
-            pks = [o.pk for o in TaxonOrder.objects.all() if o.display_sub_order == name]
+            pks = [o.pk for o in TaxonOrder.objects.filter(superfamily='') if o.display_sub_order == name]
             return models.Q(**{f'{self.prefix}order__in': pks})
         if kind == 'none':
-            pks = [o.pk for o in TaxonOrder.objects.filter(name=name) if not o.display_sub_order]
+            pks = [o.pk for o in TaxonOrder.objects.filter(name=name, superfamily='') if not o.display_sub_order]
             return models.Q(**{f'{self.prefix}order__in': pks})
         return models.Q(**{f'{self.prefix}superfamily': name})
 
@@ -314,14 +314,11 @@ class TaxonGenusGroupFilter(TaxonGroupFilter):
 
 @admin.register(TaxonOrder)
 class TaxonOrderAdmin(admin.ModelAdmin):
-    list_display = ['taxonomic_order', 'name', 'name_he', 'name_en', 'sub_order', 'defining_sample']
-    search_fields = ['name', 'name_he', 'name_en', 'sub_order']
-
-
-@admin.register(TaxonSuperfamily)
-class TaxonSuperfamilyAdmin(admin.ModelAdmin):
-    list_display = ['name', 'name_he', 'name_en']
-    search_fields = ['name', 'name_he', 'name_en']
+    """Orders, sub-orders and superfamilies in one table; the "rank" column says which each row is."""
+    list_display = ['taxonomic_order', 'name', 'sub_order', 'superfamily', 'rank', 'name_he', 'name_en', 'defining_sample']
+    list_filter = ['rank']
+    search_fields = ['name', 'name_he', 'name_en', 'sub_order', 'superfamily']
+    readonly_fields = ['rank']
 
 
 @admin.register(TaxonFamily)

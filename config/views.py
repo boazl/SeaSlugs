@@ -66,7 +66,7 @@ def gallery_file(request, filename='index.html'):
         # bare family/order text value can't identify a specific suborder/subfamily row on its own.
         taxon_genus_by_name = {g.name: g for g in TaxonGenus.objects.select_related('family', 'family__order', 'defining_sample')}
         taxon_family_by_name = {f.name: f for f in TaxonFamily.objects.filter(sub_family='').select_related('order', 'defining_sample')}
-        taxon_order_by_name = {o.name: o for o in TaxonOrder.objects.filter(sub_order='').select_related('defining_sample')}
+        taxon_order_by_name = {o.name: o for o in TaxonOrder.objects.filter(sub_order='', superfamily='').select_related('defining_sample')}
 
         def resolve_taxon_chain(species):
             # A handful of species have a blank genus column even though their scientific name
@@ -130,7 +130,9 @@ def gallery_file(request, filename='index.html'):
                              # label above) -- lets app.js link a family/genus panel straight to
                              # its public page (/family/<name>/, /genus/<name>/); order panels
                              # link by id (/order/<pk>/), since one order name has several rows.
-                             'name': obj.name}
+                             'name': obj.name,
+                             # the row's own id: sub-order / superfamily cards link to /order/<pk>/ with it
+                             'pk': obj.pk}
                 if sub_value is not None:
                     dest[key]['sub_value'] = sub_value
             return key
@@ -273,12 +275,15 @@ def gallery_file(request, filename='index.html'):
         # species of Nudibranchia sit on its sub-order rows), so make sure that row is in the taxa list too.
         for row in order_base_rows().values():
             register_taxon(taxa_orders, row, display_sub_order(row))
-        # superfamily name -> its "Latin (Hebrew)" label, for the gallery's superfamily cards.
-        from observations.models import TaxonSuperfamily
-        taxa_superfamilies = {
-            sf.name: {'label': sf.name + (f' ({sf.name_he})' if sf.name_he else ''),
-                      'label_en': sf.name + (f' ({sf.name_en})' if sf.name_en else '')}
-            for sf in TaxonSuperfamily.objects.all()}
+        # superfamily name -> the entry of its row in the orders table (label, curated photo, page id), for the
+        # gallery's superfamily cards -- the same entry a sub-order card gets from its row.
+        taxa_superfamilies = {}
+        for sf in TaxonOrder.objects.filter(rank=TaxonOrder.Rank.SUPERFAMILY).select_related('defining_sample'):
+            register_taxon(taxa_superfamilies, sf, None)
+            entry = taxa_superfamilies.pop(str(sf.pk))
+            entry.update(label=sf.superfamily + (f' ({sf.name_he})' if sf.name_he else ''),
+                         label_en=sf.superfamily + (f' ({sf.name_en})' if sf.name_en else ''), name=sf.superfamily)
+            taxa_superfamilies[sf.superfamily] = entry
         taxa = {'orders': taxa_orders, 'families': taxa_families, 'genera': taxa_genera,
                 'superfamilies': taxa_superfamilies, 'order_pages': order_pages}
         data = {'species': species_out, 'collections': collections_out, 'areas': area_labels, 'regions': region_out, 'sites': site_out, 'trips': trip_out, 'taxa': taxa}

@@ -1,4 +1,4 @@
-"""Table transfer of the taxonomy tables' page content (orders, families, genera): names, description,
+"""Table transfer of the taxonomy tables' page content (orders -- with sub-orders and superfamilies --, families, genera): names, description,
 identification and sources in Hebrew/English, plus a genus' identification caption and source.
 
 Only the text of rows that already exist at the destination is updated: a row is matched by its
@@ -12,7 +12,7 @@ PAGE_TEXTS = ['name_he', 'name_en', 'description_he', 'description_en', 'identif
 
 # table -> (model, identity fields, all transferred fields)
 TAXON_TABLES = {
-    'orders': (TaxonOrder, ['name', 'sub_order', 'taxonomic_order'], ['name', 'sub_order', 'taxonomic_order'] + PAGE_TEXTS),
+    'orders': (TaxonOrder, ['name', 'sub_order', 'superfamily', 'taxonomic_order'], ['name', 'sub_order', 'superfamily', 'taxonomic_order'] + PAGE_TEXTS),
     'families': (TaxonFamily, ['name', 'sub_family'], ['name', 'sub_family'] + PAGE_TEXTS),
     'genera': (TaxonGenus, ['name'], ['name'] + PAGE_TEXTS + ['identification_caption', 'identification_caption_en', 'identification_source']),
 }

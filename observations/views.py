@@ -320,7 +320,9 @@ def genus_page(request, name):
         'genus': genus, 'areas': areas,
         'image_url': image_url, 'video_id': video_id, 'thumbnail': thumbnail,
         'taxon_order': taxon_order, 'taxon_family': taxon_family,
-        'order_trail': order_trail(taxon_order, lang),
+        'order_trail': order_trail(
+            (TaxonOrder.objects.filter(name=taxon_order.name, superfamily=taxon_family.superfamily).first() if taxon_order and taxon_family.superfamily else None) or taxon_order,
+            lang),
         'taxon_order_label': taxon_label(taxon_order), 'taxon_family_label': taxon_label(taxon_family),
         'common_name': common_name, 'description': description,
         'identification': (genus.identification_en or genus.identification_he) if lang == 'en' else (genus.identification_he or genus.identification_en),
@@ -387,13 +389,14 @@ def taxon_edit_url(request, kind, taxon):
     return None
 
 
-def _taxon_page(request, rank, obj, areas, children, parent, parent_url):
+def _taxon_page(request, rank, obj, areas, children, parent, parent_url, trail=()):
     lang = get_lang(request)
     pick = lambda he, en: (en or he) if lang == 'en' else (he or en)
     thumbnail, image_url, video_id = taxon_hero_media(obj.defining_sample, areas)
     sub = getattr(obj, 'sub_order', '') or getattr(obj, 'sub_family', '')
+    below_order = rank == 'order' and bool(obj.sub_order or obj.superfamily)     # a sub-order or a superfamily row
     return render(request, 'observations/taxon_page.html', {
-        'rank': rank, 'taxon': obj, 'latin_name': f'{obj.name} — {sub}' if sub else obj.name,
+        'rank': rank, 'taxon': obj, 'latin_name': ' — '.join(p for p in (obj.name, obj.sub_order, obj.superfamily) if p) if rank == 'order' else (f'{obj.name} — {sub}' if sub else obj.name),
         # Names only in the page's own language; otherwise the Latin name stands alone.
         'common_name': obj.name_en if lang == 'en' else obj.name_he,
         'description': pick(obj.description_he, obj.description_en),
@@ -402,12 +405,15 @@ def _taxon_page(request, rank, obj, areas, children, parent, parent_url):
         'areas': areas, 'children': children,
         'parent_label': ((parent.name_en if lang == 'en' else parent.name_he) or parent.name) if parent else '',
         'parent_url': parent_url,
-        'trail': (order_trail(obj, lang, include_self=False) if rank == 'order' else order_trail(parent, lang) if rank == 'family' else []),
+        'trail': list(trail),
+        # What this page is: order / suborder / superfamily (a row of the orders table) or family.
+        'level': obj.rank if rank == 'order' else rank,
+        'children_title': children_title(children) if children else '',
         'image_url': image_url, 'video_id': video_id, 'thumbnail': thumbnail,
         'canonical_url': request.build_absolute_uri(request.path),
-        # An order observation belongs to the whole order (its name has no sub-order), so a sub-order's
-        # page offers no "edit observation": saving it would change the whole order's page, not this one.
-        'edit_url': None if sub else taxon_edit_url(request, getattr(Sample.Kind, rank.upper()), obj),
+        # An order observation belongs to the whole order (its name has no sub-order), so a sub-order's or
+        # superfamily's page offers no "edit observation": saving it would change the whole order's page, not this one.
+        'edit_url': None if below_order else taxon_edit_url(request, getattr(Sample.Kind, rank.upper()), obj),
         'taxon_admin_url': taxon_admin_url(request.user, obj),
     })
 
@@ -426,41 +432,87 @@ def _child_list(areas, attr, url_name, lang):
     for entry in sorted(seen.values(), key=lambda e: ((e['obj'].taxonomic_order or '~'), e['obj'].name)):
         obj = entry['obj']
         common = (obj.name_en if lang == 'en' else obj.name_he) or ''
-        out.append({'latin': obj.name, 'common': common, 'count': entry['count'],
+        out.append({'kind': 'genus' if url_name == 'genus-page' else 'family', 'latin': obj.name, 'common': common, 'count': entry['count'],
                     'url': reverse(url_name, args=[obj.name])})
     return out
 
 
 def order_base_rows():
-    """{order name: the TaxonOrder row that stands for the whole order} -- the row with no sub-order
-    (the order's base row), else the first row in taxonomic order. The order's public page is the page of
-    this row, and it holds every species of the order, not just those of that one curated group."""
+    """{order name: the TaxonOrder row that stands for the whole order} -- the order's own row (no sub-order,
+    no superfamily), else the first of its sub-order rows in taxonomic order. The order's public page is the
+    page of this row, and it holds every species of the order, not just those of one sub-order."""
     out = {}
-    for row in TaxonOrder.objects.select_related('defining_sample'):
+    for row in TaxonOrder.objects.filter(superfamily='').select_related('defining_sample'):
         current = out.get(row.name)
         if current is None or (row.sub_order == '' and current.sub_order != ''):
             out[row.name] = row
     return out
 
 
+def row_label(row, lang):
+    """The name a row of the orders table goes by in this language: its own common name, else its Latin one."""
+    return (row.name_en if lang == 'en' else row.name_he) or row.own_name
+
+
 def order_trail(row, lang, include_self=True):
-    """The order levels above a taxon page, outermost first: the whole order, then -- when `row` is a
-    sub-order row -- that sub-order. [{'kind': 'order' | 'suborder', 'label', 'url'}]. `include_self`
-    False leaves `row` itself out (an order page's own trail)."""
+    """The levels above a page that sits in the orders table (or under it), outermost first: the whole
+    order, then the sub-order, then the superfamily -- as far as `row` has them. [{'kind': 'order' |
+    'suborder' | 'superfamily', 'label', 'url'}]. `include_self` False leaves `row` itself out."""
     if row is None:
         return []
-    def label(o):
-        name = o.name_en if lang == 'en' else o.name_he
-        return name or (o.sub_order or o.name)
-    trail = []
+    rows = {(r.sub_order, r.superfamily): r for r in TaxonOrder.objects.filter(name=row.name)}
     base = order_base_rows().get(row.name)
+    chain = []
     if base is not None and base.pk != row.pk:
-        trail.append({'kind': 'order', 'label': (base.name_en if lang == 'en' else base.name_he) or base.name,
-                      'url': reverse('order-page', args=[base.pk])})
+        chain.append(base)
+    sub_row = rows.get((row.sub_order, '')) if row.sub_order else None
+    if sub_row is not None and sub_row.pk != row.pk and sub_row.pk not in {c.pk for c in chain}:
+        chain.append(sub_row)
     if include_self:
-        trail.append({'kind': 'suborder' if row.sub_order else 'order', 'label': label(row),
-                      'url': reverse('order-page', args=[row.pk])})
-    return trail
+        chain.append(row)
+    return [{'kind': r.rank, 'label': row_label(r, lang), 'url': reverse('order-page', args=[r.pk])} for r in chain]
+
+
+def row_children(row, areas, lang):
+    """The next level down from a page of the orders table: its sub-orders / superfamilies (rows of the same
+    table) and the families that sit directly under it. [{'kind', 'latin', 'common', 'count', 'url'}]."""
+    rows = {(r.sub_order, r.superfamily): r for r in TaxonOrder.objects.filter(name=row.name)}
+    seen = {}
+    for area in areas:
+        family, order = area.taxon_family, area.taxon_order
+        sub = order.sub_order if order else ''
+        superfamily = family.superfamily if family else ''
+        child = None
+        if row.rank == TaxonOrder.Rank.ORDER:
+            child = rows.get((sub, '')) if sub else None
+            if child is None and superfamily:
+                child = rows.get((sub, superfamily))
+        elif row.rank == TaxonOrder.Rank.SUBORDER and superfamily:
+            child = rows.get((row.sub_order, superfamily))
+        if child is None and family is not None:
+            child = family
+        if child is None:
+            continue
+        entry = seen.setdefault(child, {'obj': child, 'count': 0})
+        entry['count'] += 1
+    out = []
+    for entry in sorted(seen.values(), key=lambda e: (isinstance(e['obj'], TaxonFamily), e['obj'].taxonomic_order or '~', str(e['obj']))):
+        obj = entry['obj']
+        if isinstance(obj, TaxonFamily):
+            kind, latin, url = 'family', obj.name, reverse('family-page', args=[obj.name])
+        else:
+            kind, latin, url = obj.rank, obj.own_name, reverse('order-page', args=[obj.pk])
+        out.append({'kind': kind, 'latin': latin, 'count': entry['count'], 'url': url,
+                    'common': (obj.name_en if lang == 'en' else obj.name_he) or ''})
+    return out
+
+
+CHILDREN_TITLES = {'family': 'משפחות', 'suborder': 'תתי-סדרות', 'superfamily': 'על-משפחות', 'genus': 'סוגים'}
+
+
+def children_title(children):
+    kinds = {c['kind'] for c in children}
+    return CHILDREN_TITLES[next(iter(kinds))] if len(kinds) == 1 else 'קבוצות טקסונומיות'
 
 
 # Ids of the informal Nudibranchia group rows that migration 0065 deleted; their old public pages
@@ -469,10 +521,10 @@ RETIRED_NUDIBRANCHIA_GROUP_IDS = {14, 16, 17}
 
 
 def order_page(request, pk):
-    """Public page for one order. The page of an order's own row (see order_base_rows) is the page
-    of the whole order: every gallery species whose order has that name, whichever sub-order row
-    (TaxonOrder -- one order name such as Nudibranchia has a row per sub-order) it sits in. The
-    sub-order rows' pages show just their own species."""
+    """Public page for one row of the orders table -- an order, a sub-order or a superfamily. The page of
+    an order's own row (see order_base_rows) is the page of the whole order: every gallery species whose
+    order has that name, whichever sub-order it sits in. A sub-order's page shows just its own species; a
+    superfamily's the species of its families."""
     order = TaxonOrder.objects.select_related('defining_sample').filter(pk=pk).first()
     if order is None:
         base_nudibranchia = order_base_rows().get('Nudibranchia')
@@ -480,15 +532,18 @@ def order_page(request, pk):
             return redirect('order-page', pk=base_nudibranchia.pk, permanent=True)
         raise Http404
     base = order_base_rows().get(order.name)
-    whole_order = base is not None and base.pk == order.pk
-    if whole_order:
-        areas = [a for a in gallery_areas() if a.taxon_order and a.taxon_order.name == order.name]
+    gallery = [a for a in gallery_areas() if a.taxon_order and a.taxon_order.name == order.name]
+    if order.rank == TaxonOrder.Rank.SUPERFAMILY:
+        areas = [a for a in gallery if a.taxon_family and a.taxon_family.superfamily == order.superfamily]
+    elif base is not None and base.pk == order.pk:
+        areas = gallery
     else:
-        areas = [a for a in gallery_areas() if a.taxon_order and a.taxon_order.pk == order.pk]
+        areas = [a for a in gallery if a.taxon_order.pk == order.pk]
     if not areas:
         raise Http404
-    children = _child_list(areas, 'taxon_family', 'family-page', get_lang(request))
-    return _taxon_page(request, 'order', order, areas, children, None, '')
+    lang = get_lang(request)
+    children = row_children(order, areas, lang)
+    return _taxon_page(request, 'order', order, areas, children, None, '', trail=order_trail(order, lang, include_self=False))
 
 
 def family_page(request, name):
@@ -504,8 +559,12 @@ def family_page(request, name):
     family = next((f for f in families if not f.sub_family), families[0])
     children = _child_list(areas, 'taxon_genus', 'genus-page', get_lang(request))
     order = family.order or areas[0].taxon_order
+    # Up from a family: its superfamily when that has a row in the orders table, else its sub-order / order.
+    parent = order
+    if order is not None and family.superfamily:
+        parent = TaxonOrder.objects.filter(name=order.name, superfamily=family.superfamily).first() or order
     return _taxon_page(request, 'family', family, areas, children, order,
-                       reverse('order-page', args=[order.pk]) if order else '')
+                       reverse('order-page', args=[order.pk]) if order else '', trail=order_trail(parent, get_lang(request)))
 
 
 def genus_article(request, name):

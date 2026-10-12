@@ -57,7 +57,7 @@ class TaxonResolver:
     def __init__(self):
         self.genus_by_name = {g.name: g for g in TaxonGenus.objects.select_related('family', 'family__order', 'defining_sample')}
         self.family_by_name = {f.name: f for f in TaxonFamily.objects.filter(sub_family='').select_related('order', 'defining_sample')}
-        self.order_by_name = {o.name: o for o in TaxonOrder.objects.filter(sub_order='').select_related('defining_sample')}
+        self.order_by_name = {o.name: o for o in TaxonOrder.objects.filter(sub_order='', superfamily='').select_related('defining_sample')}
 
     def resolve(self, species):
         # A handful of species have a blank genus column even though their scientific name

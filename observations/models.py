@@ -252,19 +252,28 @@ class Species(models.Model):
 
 
 class TaxonOrder(models.Model):
-    # name is NOT unique on its own: a single order (e.g. "Nudibranchia") has one row for the order
-    # itself (blank sub_order) plus one per sub-order (Doridina, Cladobranchia -- the WoRMS sub-orders),
-    # disambiguated by sub_order and taxonomic_order. Informal groups that are not WoRMS ranks are
-    # not rows here. build_taxonomy_tables seeds/updates these rows from the curated
-    # taxon_order_reference list in the supplement JSON; it never overwrites a value the user
-    # has since edited by hand in admin.
+    """The taxonomy table of everything above the family: orders, sub-orders and superfamilies, one
+    row each. `rank` says which a row is (it follows from the two columns below, see save()):
+    an ORDER row has neither sub_order nor superfamily; a SUB-ORDER row (Nudibranchia / Doridina) names
+    its sub_order; a SUPERFAMILY row (Nudibranchia / Doridina / Doridoidea) names its superfamily, and its
+    sub_order when it sits in one. `name` is always the order's name, the common names are the row's own
+    taxon's. build_taxonomy_tables seeds/updates the order and sub-order rows from the curated
+    taxon_order_reference list in the supplement JSON; it never overwrites a value the user has
+    since edited by hand in admin."""
+    class Rank(models.TextChoices):
+        ORDER = 'order', 'סדרה'
+        SUBORDER = 'suborder', 'תת-סדרה'
+        SUPERFAMILY = 'superfamily', 'על-משפחה'
     name = models.CharField('סדרה', max_length=150)
     name_he = models.CharField('שם בעברית', max_length=150, blank=True)
     name_en = models.CharField('שם באנגלית', max_length=150, blank=True)
     sub_order = models.CharField('תת-סדרה', max_length=150, blank=True)
+    superfamily = models.CharField('על-משפחה', max_length=150, blank=True)
+    rank = models.CharField('דרגה', max_length=20, choices=Rank.choices, default=Rank.ORDER, editable=False,
+        help_text='נקבעת לפי העמודות "תת-סדרה" ו"על-משפחה": ריקות - סדרה; רק תת-סדרה - תת-סדרה; על-משפחה - על-משפחה.')
     taxonomic_order = models.CharField('סדר טקסונומי', max_length=40, blank=True)
     defining_sample = models.ForeignKey('Sample', null=True, blank=True, on_delete=models.SET_NULL, related_name='+', verbose_name='דגימה מגדירה',
-        help_text='הדגימה שתמונתה או סרטון היוטיוב שלה יוצגו בכותרת הסדרה בגלריה.')
+        help_text='הדגימה שתמונתה או סרטון היוטיוב שלה יוצגו בכותרת השורה בגלריה ובדף שלה.')
     description_he = models.TextField('תיאור בעברית', blank=True)
     description_en = models.TextField('תיאור באנגלית', blank=True)
     identification_he = models.TextField('סימני זיהוי', blank=True)
@@ -273,38 +282,36 @@ class TaxonOrder(models.Model):
     link = models.URLField('קישור', blank=True)
     article_pdf = models.FileField('מאמר (PDF)', upload_to='articles/orders/', blank=True, validators=[FileExtensionValidator(['pdf'])])
     class Meta:
-        ordering = [models.functions.NullIf('taxonomic_order', models.Value('')).asc(nulls_last=True), 'name', 'sub_order']
-        verbose_name = 'סדרה (טקסונומיה)'
-        verbose_name_plural = 'סדרות (טקסונומיה)'
-        # (name, sub_order) is no longer unique on its own: the real classification has cases
-        # (e.g. Nudibranchia/Doridina, Nudibranchia/Cladobranchia) where the SAME name+sub_order
-        # pair legitimately covers several distinct informal groups, disambiguated only by
-        # taxonomic_order (see build_taxonomy_tables' taxon_order_reference seeding).
-        constraints = [models.UniqueConstraint(fields=['name', 'sub_order', 'taxonomic_order'], name='unique_taxonorder_name_sub_order_taxonomic_order')]
-    def __str__(self): return f'{self.name} ({self.sub_order})' if self.sub_order else self.name
+        ordering = [models.functions.NullIf('taxonomic_order', models.Value('')).asc(nulls_last=True), 'name', 'sub_order', 'superfamily']
+        verbose_name = 'סדרה / תת-סדרה / על-משפחה (טקסונומיה)'
+        verbose_name_plural = 'סדרות, תתי-סדרות ועל-משפחות (טקסונומיה)'
+        constraints = [models.UniqueConstraint(fields=['name', 'sub_order', 'superfamily', 'taxonomic_order'], name='unique_taxonorder_path')]
+    def __str__(self):
+        return ' / '.join(part for part in (self.name, self.sub_order, self.superfamily) if part)
+    @staticmethod
+    def rank_of(sub_order, superfamily):
+        if superfamily:
+            return TaxonOrder.Rank.SUPERFAMILY
+        return TaxonOrder.Rank.SUBORDER if sub_order else TaxonOrder.Rank.ORDER
+    def save(self, *args, **kwargs):
+        self.rank = self.rank_of(self.sub_order, self.superfamily)
+        if kwargs.get('update_fields') is not None and ('sub_order' in kwargs['update_fields'] or 'superfamily' in kwargs['update_fields']):
+            kwargs['update_fields'] = {*kwargs['update_fields'], 'rank'}
+        super().save(*args, **kwargs)
     @property
     def display_sub_order(self):
-        """The sub-order the gallery and the admin filters show (blank for the order's own row)."""
+        """The sub-order the gallery and the admin filters show (blank for an order's own row)."""
         return self.sub_order
-
-
-class TaxonSuperfamily(models.Model):
-    """A superfamily (WoRMS rank) with its Hebrew / English names. TaxonFamily.superfamily holds the
-    superfamily's Latin name as text; this table gives that name its common names."""
-    name = models.CharField('על-משפחה', max_length=150, unique=True)
-    name_he = models.CharField('שם בעברית', max_length=150, blank=True)
-    name_en = models.CharField('שם באנגלית', max_length=150, blank=True)
-    class Meta:
-        ordering = ['name']
-        verbose_name = 'על-משפחה (טקסונומיה)'
-        verbose_name_plural = 'על-משפחות (טקסונומיה)'
-    def __str__(self): return self.name
+    @property
+    def own_name(self):
+        """The Latin name of the taxon this row stands for: its superfamily, else its sub-order, else the order."""
+        return self.superfamily or self.sub_order or self.name
 
 
 class TaxonFamily(models.Model):
     # Same pattern as TaxonOrder.name: name is not unique alone, so a family can have several
     # rows, one per sub_family. (name, sub_family) is the unique pair.
-    order = models.ForeignKey(TaxonOrder, on_delete=models.PROTECT, null=True, blank=True, related_name='families', verbose_name='סדרה')
+    order = models.ForeignKey(TaxonOrder, on_delete=models.PROTECT, null=True, blank=True, related_name='families', verbose_name='סדרה', limit_choices_to={'superfamily': ''})
     name = models.CharField('משפחה', max_length=150)
     name_he = models.CharField('שם בעברית', max_length=150, blank=True)
     name_en = models.CharField('שם באנגלית', max_length=150, blank=True)
@@ -936,7 +943,7 @@ class Sample(models.Model):
             if self.kind == kind and name:
                 rows = model.objects.filter(name=name)
                 if model is TaxonOrder:
-                    rows = rows.filter(sub_order='')       # the order's own row; a sub-order keeps its own choice
+                    rows = rows.filter(sub_order='', superfamily='')       # the order's own row; a sub-order / superfamily keeps its own choice
                 picked = taxon_kind_defining_sample(kind, name)
                 if picked:
                     rows.update(defining_sample=picked)

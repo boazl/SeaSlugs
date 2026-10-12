@@ -959,7 +959,7 @@ function taxonEntry(level, id) {
         : level === 'superfamily' ? taxaData.superfamilies : null;
     return dict ? dict[id] : null;
 }
-// The curated media of an order / sub-order card: an order card is keyed by the order NAME, its page
+// The curated media of an order / sub-order card (a superfamily card's comes from taxaData.superfamilies): an order card is keyed by the order NAME, its page
 // row (the one holding the defining sample) is found through order_pages; a sub-order card by the
 // sub_order value of its row. Nothing found -> the card falls back to its first species' photo.
 function orderRowEntry(level, key) {
@@ -1130,10 +1130,12 @@ function buildTaxonCard(level, key, members, index, others) {
     });
     article.append(button);
     // The taxon's own page, as a separate link (a link can't sit inside the drill button).
-    // Order/sub-order/superfamily have no page; an order with a single group links to it.
+    // Every rank has its own page: family / genus by name, order / sub-order / superfamily by the id of their
+    // row in the orders table (an order's page is that of its base row, see order_pages).
     let href = '';
     if (others) href = '';
     else if ((level === 'family' || level === 'genus') && entry.name) href = `/${level}/${encodeURIComponent(entry.name)}/`;
+    else if ((level === 'suborder' || level === 'superfamily') && entry.pk) href = `/order/${entry.pk}/`;
     else if (level === 'order') {
         // The order's own page lists every species of the order, whichever curated group they sit in.
         const pageId = (taxaData.order_pages || {})[key];

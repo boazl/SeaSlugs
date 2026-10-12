@@ -27,11 +27,12 @@ class WholeOrderPageTests(TestCase):
         self.base = TaxonOrder.objects.create(name='Nudibranchia', name_he='חשופיות')
         self.group = TaxonOrder.objects.create(name='Nudibranchia', sub_order='Doridina')
         self.single = TaxonOrder.objects.create(name='Sacoglossa', name_he='עלעליות')
+        self.superfamily = TaxonOrder.objects.create(name='Nudibranchia', sub_order='Doridina', superfamily='Chromodoridoidea', name_he='חשופיות נדן')
         for i, (order, family, genus, sp) in enumerate([
                 (self.base, 'Hexabranchidae', 'Hexabranchus', 'sanguineus'),
                 (self.group, 'Chromodorididae', 'Chromodoris', 'annae'),
                 (self.single, 'Plakobranchidae', 'Plakobranchus', 'ocellatus')]):
-            fam = TaxonFamily.objects.create(name=family, order=order)
+            fam = TaxonFamily.objects.create(name=family, order=order, superfamily='Chromodoridoidea' if family == 'Chromodorididae' else '')
             TaxonGenus.objects.create(name=genus, family=fam)
             species = Species.objects.create(scientific_name=f'{genus} {sp}', genus=genus, species=sp)
             Sample(owner=owner, trip=trip, species=species, image=png((i * 70, 40, 90))).save_reviewed()
@@ -74,7 +75,7 @@ class WholeOrderPageTests(TestCase):
         sub = self.client.get(reverse('order-page', args=[self.group.pk])).content.decode()
         self.assertIn('עריכת תצפית', whole)
         self.assertNotIn('עריכת תצפית', sub)
-        self.assertIn('עריכת הסדרה', sub)
+        self.assertIn('עריכת התת-סדרה', sub)
 
     def test_a_sub_order_page_says_sub_order_and_links_back_to_the_whole_order(self):
         sub = self.client.get(reverse('order-page', args=[self.group.pk])).content.decode()
@@ -97,6 +98,48 @@ class WholeOrderPageTests(TestCase):
         self.assertIn('חזרה לסדרה חשופיות', hexa)
         self.assertNotIn('חזרה לתת-סדרה', hexa)
         self.assertIn(f'href="/order/{self.group.pk}/?lang=en"', self.client.get('/family/Chromodorididae/?lang=en').content.decode())
+
+    def test_rank_follows_the_sub_order_and_superfamily_columns(self):
+        self.assertEqual([o.rank for o in (self.base, self.group, self.superfamily)], ['order', 'suborder', 'superfamily'])
+        row = TaxonOrder(name='Runcinida', superfamily='Runcinoidea')
+        row.save()
+        self.assertEqual(TaxonOrder.objects.get(pk=row.pk).rank, 'superfamily')
+        row.superfamily = ''
+        row.save(update_fields=['superfamily'])
+        self.assertEqual(TaxonOrder.objects.get(pk=row.pk).rank, 'order')
+        self.assertEqual(str(self.superfamily), 'Nudibranchia / Doridina / Chromodoridoidea')
+
+    def test_a_superfamily_page_holds_its_families_species_and_says_superfamily(self):
+        response = self.client.get(reverse('order-page', args=[self.superfamily.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.names(response), ['Chromodoris'])
+        html = response.content.decode()
+        self.assertIn('>על-משפחה</span>', html)
+        self.assertIn('frame-superfamily', html)
+        self.assertIn('<h2>משפחות</h2>', html)
+        back = html[html.index('class="back-row"'):]
+        back = back[:back.index('</p>')]
+        self.assertLess(back.index('חזרה לתת-סדרה Doridina'), back.index('חזרה לסדרה חשופיות'))   # nearest level first
+        self.assertNotIn('עריכת תצפית', back)
+
+    def test_pages_list_the_next_level_down(self):
+        whole = self.client.get(reverse('order-page', args=[self.base.pk])).content.decode()
+        self.assertIn('<h2>קבוצות טקסונומיות</h2>', whole)            # a sub-order (Doridina) and a family (Hexabranchidae)
+        sub = self.client.get(reverse('order-page', args=[self.group.pk])).content.decode()
+        self.assertIn('<h2>על-משפחות</h2>', sub)
+        self.assertIn(f'href="/order/{self.superfamily.pk}/"', sub)
+
+    def test_a_family_page_links_back_to_its_superfamily_first(self):
+        html = self.client.get('/family/Chromodorididae/').content.decode()
+        row = html[html.index('class="back-row"'):]
+        row = row[:row.index('</p>')]
+        self.assertLess(row.index('חזרה לעל-משפחה חשופיות נדן'), row.index('חזרה לתת-סדרה'))
+        self.assertIn(f'href="/order/{self.superfamily.pk}/">חזרה לעל-משפחה', row)
+        crumbs = html[html.index('class="breadcrumb"'):]
+        self.assertIn('חשופיות נדן', crumbs[:crumbs.index('</nav>')])
+
+    def test_only_an_order_row_can_be_a_familys_order(self):
+        self.assertEqual(TaxonFamily._meta.get_field('order').remote_field.limit_choices_to, {'superfamily': ''})
 
 
 class RetiredNudibranchiaGroupRedirectTests(TestCase):

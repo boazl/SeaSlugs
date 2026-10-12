@@ -376,13 +376,18 @@ class TaxonomicSortAndPanelTests(TestCase):
         self.assertEqual(by_name['Polycera test']['sub_order'], 'Doridina')
         self.assertEqual(by_name['Doridoxa test']['sub_order'], '')
 
-    def test_catalog_has_superfamily_labels_with_their_hebrew_names(self):
-        from .models import TaxonSuperfamily
-        TaxonSuperfamily.objects.create(name='Phyllidioidea', name_he='חסרי שן')
-        TaxonSuperfamily.objects.create(name='Oxynooidea')
-        labels = self.catalog()['taxa']['superfamilies']
-        self.assertEqual(labels['Phyllidioidea']['label'], 'Phyllidioidea (חסרי שן)')
-        self.assertEqual(labels['Oxynooidea']['label'], 'Oxynooidea')
+    def test_catalog_has_superfamily_entries_from_their_rows_in_the_orders_table(self):
+        """A superfamily is a row of the orders table: its card gets the row's label, page id and curated photo."""
+        from .models import TaxonOrder
+        phyllidioidea = TaxonOrder.objects.create(name='Nudibranchia', sub_order='Doridina', superfamily='Phyllidioidea', name_he='חסרי שן')
+        TaxonOrder.objects.create(name='Sacoglossa', superfamily='Oxynooidea')
+        TaxonOrder.objects.create(name='Nudibranchia', sub_order='Doridina')      # a sub-order row is not a superfamily
+        entries = self.catalog()['taxa']['superfamilies']
+        self.assertEqual(set(entries), {'Phyllidioidea', 'Oxynooidea'})
+        self.assertEqual(entries['Phyllidioidea']['label'], 'Phyllidioidea (חסרי שן)')
+        self.assertEqual(entries['Phyllidioidea']['pk'], phyllidioidea.pk)
+        self.assertEqual(entries['Oxynooidea']['label'], 'Oxynooidea')
+        self.assertIn('thumbnail', entries['Phyllidioidea'])
 
     def test_catalog_order_field_uses_the_curated_name_not_a_stale_raw_synonym(self):
         from .models import TaxonOrder, TaxonFamily
