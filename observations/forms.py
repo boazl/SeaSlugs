@@ -490,6 +490,30 @@ class SampleChangelistForm(forms.ModelForm):
             data['species'] = None
             self.instance.undetermined_variant = ''
         return data
+    def _post_clean(self):
+        if self.instance.deleted_at:
+            # A deleted observation is only listed here so it can be restored: its (possibly incomplete
+            # or duplicate) data must not block saving the other rows of the list.
+            from django.forms.models import construct_instance
+            self.instance = construct_instance(self, self.instance, self._meta.fields, self._meta.exclude)
+            return
+        super()._post_clean()
+    def add_error(self, field, error):
+        # The model's own validation reports problems on fields this list form does not have (media,
+        # trip...). Django would raise a ValueError -- a server error page -- for those; show them as
+        # the row's general errors instead.
+        from django.core.exceptions import ValidationError, NON_FIELD_ERRORS
+        if field is None and isinstance(error, ValidationError) and hasattr(error, 'error_dict'):
+            rebuilt = {}
+            for name, errors in error.error_dict.items():
+                if name == NON_FIELD_ERRORS or name in self.fields:
+                    rebuilt.setdefault(name, []).extend(errors)
+                    continue
+                try: label = str(Sample._meta.get_field(name).verbose_name)
+                except Exception: label = name
+                rebuilt.setdefault(NON_FIELD_ERRORS, []).extend(ValidationError(f'{label}: {message}') for e in errors for message in e.messages)
+            error = ValidationError(rebuilt)
+        super().add_error(field, error)
 
 
 class DiveTripForm(forms.ModelForm):
