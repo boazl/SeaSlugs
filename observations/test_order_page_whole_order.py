@@ -67,6 +67,15 @@ class WholeOrderPageTests(TestCase):
         js = (Path(settings.BASE_DIR) / 'dist' / 'app.js').read_text(encoding='utf-8')
         self.assertIn("(taxaData.order_pages || {})[key]", js)
 
+    def test_only_the_whole_order_page_has_the_edit_observation_button(self):
+        """An order observation is the whole order's, so a sub-order page does not offer to edit it."""
+        self.client.login(username='manager', password='test-password')
+        whole = self.client.get(reverse('order-page', args=[self.base.pk])).content.decode()
+        sub = self.client.get(reverse('order-page', args=[self.group.pk])).content.decode()
+        self.assertIn('עריכת תצפית', whole)
+        self.assertNotIn('עריכת תצפית', sub)
+        self.assertIn('עריכת הסדרה', sub)
+
 
 class RetiredNudibranchiaGroupRedirectTests(TestCase):
     def test_old_group_pages_redirect_to_the_whole_order_page(self):
@@ -79,3 +88,4 @@ class RetiredNudibranchiaGroupRedirectTests(TestCase):
     def test_other_missing_orders_still_404(self):
         TaxonOrder.objects.create(name='Nudibranchia', sub_order='', taxonomic_order='3')
         self.assertEqual(self.client.get('/order/999/').status_code, 404)
+

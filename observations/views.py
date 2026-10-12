@@ -403,7 +403,9 @@ def _taxon_page(request, rank, obj, areas, children, parent, parent_url):
         'parent_url': parent_url,
         'image_url': image_url, 'video_id': video_id, 'thumbnail': thumbnail,
         'canonical_url': request.build_absolute_uri(request.path),
-        'edit_url': taxon_edit_url(request, getattr(Sample.Kind, rank.upper()), obj),
+        # An order observation belongs to the whole order (its name has no sub-order), so a sub-order's
+        # page offers no "edit observation": saving it would change the whole order's page, not this one.
+        'edit_url': None if sub else taxon_edit_url(request, getattr(Sample.Kind, rank.upper()), obj),
         'taxon_admin_url': taxon_admin_url(request.user, obj),
     })
 
