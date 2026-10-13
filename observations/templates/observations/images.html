@@ -10,15 +10,17 @@
 <h3>חסרות כאן, קיימות בסביבה השנייה ({{comparison.missing_here|length}})</h3>
 {% if comparison.missing_here %}<ul>{% for label in comparison.missing_here %}<li>{{label}}</li>{% endfor %}</ul>{% else %}<p>אין תמונות חסרות כאן.</p>{% endif %}
 <h3>קיימות רק כאן, חסרות בסביבה השנייה ({{comparison.only_here|length}})</h3>
-{% if comparison.only_here %}<ul>{% for label in comparison.only_here %}<li>{{label}}</li>{% endfor %}</ul><p><button type="button" id="select-only-here">סימון התמונות האלה בגלריה למטה, לקראת הורדה</button></p>{{ comparison.only_here|json_script:"only-here-names" }}{% else %}<p>אין תמונות שקיימות רק כאן.</p>{% endif %}
+{% if comparison.only_here %}<ul>{% for label in comparison.only_here %}<li>{{label}}</li>{% endfor %}</ul><p><button type="button" id="select-only-here" data-label-on="הצגת כל התמונות" data-label-off="סימון התמונות האלה בגלריה למטה, לקראת הורדה">סימון התמונות האלה בגלריה למטה, לקראת הורדה</button></p>{{ comparison.only_here|json_script:"only-here-names" }}{% else %}<p>אין תמונות שקיימות רק כאן.</p>{% endif %}
 </div>{% endif %}
 <p>סמנו תמונות והורידו כקבצים רגילים. בסביבת היעד העלו את הקבצים ללא שינוי שמם. הדפדפן עשוי לבקש אישור להורדת כמה קבצים. הורדה מעתיקה את התמונה ואינה מוחקת את המקור. התמונות המשויכות נושאות את נתוני התצפית בקובץ. תצפית חסרה תתווסף ביעד; בתצפית קיימת תוחלף רק התמונה. יש להעביר תחילה משתמשים וטבלאות עזר. קובצי ההעברה כוללים פרטי תצפית ושם חשבון.</p>
 {% if error %}<p class="errorlist" role="alert">{{error}}</p>{% endif %}
 <form method="post" id="image-selection">{% csrf_token %}<input type="hidden" name="action" value="delete">
-<p id="gallery-toolbar"><button type="button" id="select-all">בחירת הכול / ביטול</button> <button type="button" id="select-redundant">בחירת תמונות מיותרות</button> <button type="button" id="download-images">הורדת התמונות המסומנות למק</button></p>
-<div class="cards">{% for image in images %}<article><label><input type="checkbox" name="selected" value="{{image.token}}" data-name="{{image.name}}" data-download="{% url 'image-file' %}?download=1&amp;file={{image.token|urlencode}}" data-redundant="{% if image.redundant %}1{% else %}0{% endif %}"> {{image.size|filesizeformat}}</label><a href="{% url 'image-file' %}?file={{image.token|urlencode}}" target="_blank" rel="noopener"><img src="{% url 'image-file' %}?file={{image.token|urlencode}}" loading="lazy" alt="תמונה מנוהלת"></a>
-<p>תצפיות שמשתמשות בתמונה זו:</p><ul>{% for sample in image.refs %}<li><a href="{% url 'observation-edit' sample.pk %}">{{sample}}</a>{% if sample.trip.region %} · {{sample.trip.region.name}}{% endif %}{% if sample.deleted_at %} · תצפית מחוקה{% elif sample.status != 'published' %} · {{sample.get_status_display}}{% endif %}</li>{% empty %}<li>לא משויכת לתצפית — אפשר למחוק לפינוי מקום</li>{% endfor %}</ul>{% if image.redundant %}<p class="errorlist">תמונה מיותרת — כל התצפיות המשויכות נמחקו או שאין תצפית כלל. אפשר למחוק לפינוי מקום.</p>{% endif %}
-{% if image.blocked %}<p class="errorlist">המדיה היחידה בתצפית פעילה — המחיקה חסומה</p>{% endif %}</article>{% empty %}<p>אין תמונות שהועלו בסביבה זו. תמונות YouTube אינן מאוחסנות כאן.</p>{% endfor %}</div>
+<p id="gallery-toolbar"><button type="button" id="select-all">בחירת הכול / ביטול</button> <button type="button" id="select-redundant" data-label-on="הצגת כל התמונות" data-label-off="בחירת תמונות מיותרות">בחירת תמונות מיותרות</button> <button type="button" id="download-images">הורדת התמונות המסומנות למק</button></p>
+<p><label for="image-search">חיפוש:</label> <input type="search" id="image-search" placeholder="שם מין, סוג, משפחה, שם קובץ, אזור או שנה" style="width:min(100%,28em)" autocomplete="off"> <span id="image-count" aria-live="polite"></span></p>
+<p id="image-none" hidden>לא נמצאו תמונות.</p>
+<div class="cards">{% for image in images %}{% if image.group_label %}{% ifchanged image.group_label %}<h3 class="kind-heading" style="grid-column:1/-1;margin:18px 0 0;padding-bottom:6px;border-bottom:1px solid #36515a">{{image.group_label}}</h3>{% endifchanged %}{% endif %}<article data-group="{{image.group_label}}" data-search="{{image.search}}" data-redundant="{% if image.redundant %}1{% else %}0{% endif %}"><label><input type="checkbox" name="selected" value="{{image.token}}" data-name="{{image.name}}" data-download="{% url 'image-file' %}?download=1&amp;file={{image.token|urlencode}}" data-redundant="{% if image.redundant %}1{% else %}0{% endif %}"> {{image.size|filesizeformat}}</label><a href="{% url 'image-file' %}?file={{image.token|urlencode}}" target="_blank" rel="noopener"><img src="{% url 'image-file' %}?file={{image.token|urlencode}}" loading="lazy" alt="תמונה מנוהלת"></a>
+<p>תצפיות שמשתמשות בתמונה זו:</p><ul>{% for sample in image.refs %}<li><a href="{% url 'observation-edit' sample.pk %}">{{sample}}</a>{% if sample.trip.region %} · {{sample.trip.region.name}}{% endif %}{% if sample.deleted_at %} · תצפית מחוקה{% elif sample.status != 'published' %} · {{sample.get_status_display}}{% endif %}</li>{% empty %}{% if not image.identification_for %}<li>לא משויכת לתצפית — אפשר למחוק לפינוי מקום</li>{% endif %}{% endfor %}{% for genus in image.identification_for %}<li>קובץ זיהוי בדף הסוג <a href="{% url 'genus-page' genus.name %}" target="_blank" rel="noopener"><i>{{genus.name}}</i></a></li>{% endfor %}</ul>{% if image.redundant %}<p class="errorlist">תמונה מיותרת — כל התצפיות המשויכות נמחקו או שאין תצפית כלל. אפשר למחוק לפינוי מקום.</p>{% endif %}
+{% if image.identification_for %}<p class="errorlist">קובץ זיהוי של סוג — המחיקה חסומה (יש להחליף או להסיר אותו בעריכת הסוג)</p>{% elif image.blocked %}<p class="errorlist">המדיה היחידה בתצפית פעילה — המחיקה חסומה</p>{% endif %}</article>{% empty %}<p>אין תמונות שהועלו בסביבה זו. תמונות YouTube אינן מאוחסנות כאן.</p>{% endfor %}</div>
 <p><label><input type="checkbox" name="confirm" value="yes"> אני מאשר מחיקה קבועה של התמונות המסומנות, ללא גיבוי תמונה</label></p><button>מחיקת התמונות המסומנות</button></form>
 <h2>תמונת הבית</h2>
 <p>התמונה המוצגת בעמוד הבית, ליד הכותרת. עדכון כאן משפיע רק על הסביבה הנוכחית (מקומי/Render) — יש להעלות בנפרד בכל סביבה.</p>
@@ -27,16 +29,42 @@
 <form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="action" value="site_image"><p><input type="file" name="site_image" accept="image/jpeg,image/png,image/webp" required></p><button>{% if site_image %}החלפת תמונת הבית{% else %}הגדרת תמונת הבית{% endif %}</button></form>
 <h2>העברת תמונות לסביבה זו</h2><form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="action" value="upload"><p><input type="file" name="images" accept="image/jpeg" multiple required></p><p><label><input type="checkbox" name="replace" value="yes"> לאשר החלפת תמונות קיימות ומחיקת הגרסאות הקודמות שאינן בשימוש, ללא גיבוי</label></p><button>העלאת התמונות המסומנות</button></form>
 <script>
-const checks=()=>[...document.querySelectorAll('[name=selected]')];
-document.querySelector('#select-all').onclick=()=>{const checked=!checks().every(c=>c.checked);checks().forEach(c=>c.checked=checked)};
-document.querySelector('#select-redundant').onclick=()=>{checks().forEach(c=>c.checked=c.dataset.redundant==='1')};
-document.querySelector('#download-images').onclick=async()=>{for(const c of checks().filter(c=>c.checked)){const a=document.createElement('a');a.href=c.dataset.download;a.download='';document.body.append(a);a.click();a.remove();await new Promise(r=>setTimeout(r,500));}};
+const cards=()=>[...document.querySelectorAll('.cards > article')];
+const checkOf=card=>card.querySelector('[name=selected]');
+const visibleChecks=()=>cards().filter(c=>!c.hidden).map(checkOf);
+const search=document.querySelector('#image-search');
 const onlyHereNames=document.querySelector('#only-here-names');
-if(onlyHereNames){
-  const names=new Set(JSON.parse(onlyHereNames.textContent));
-  document.querySelector('#select-only-here').onclick=()=>{
-    checks().forEach(c=>c.checked=names.has(c.dataset.name));
-    document.querySelector('#gallery-toolbar').scrollIntoView({behavior:'smooth'});
-  };
+const onlyHere=onlyHereNames?new Set(JSON.parse(onlyHereNames.textContent)):new Set();
+// Filter modes, each with its toolbar button: while one is on, only its cards are shown (and
+// all of them selected); pressing the same button again shows every card. A card that gets
+// hidden is also unchecked, so nothing out of sight is ever downloaded or deleted by mistake.
+const modes={
+  redundant:{button:document.querySelector('#select-redundant'),match:card=>card.dataset.redundant==='1'},
+  onlyHere:{button:document.querySelector('#select-only-here'),match:card=>onlyHere.has(checkOf(card).dataset.name)},
+};
+let mode=null;
+function applyFilter(){
+  const words=search.value.trim().toLowerCase().split(/\s+/).filter(Boolean);let shown=0;
+  cards().forEach(card=>{
+    const show=(!mode||modes[mode].match(card))&&words.every(w=>card.dataset.search.includes(w));
+    card.hidden=!show;if(!show)checkOf(card).checked=false;else shown++;
+  });
+  // A group heading (sort "by image kind") is shown only while one of its cards is.
+  document.querySelectorAll('.kind-heading').forEach(h=>{h.hidden=!cards().some(c=>!c.hidden&&c.dataset.group===h.textContent)});
+  document.querySelector('#image-count').textContent=(words.length||mode)?`${shown} מתוך ${cards().length}`:'';
+  document.querySelector('#image-none').hidden=shown>0||!cards().length;
+  for(const [key,m] of Object.entries(modes)) if(m.button) m.button.textContent=mode===key?m.button.dataset.labelOn:m.button.dataset.labelOff;
 }
+function toggleMode(key){
+  const turningOn=mode!==key;
+  if(turningOn&&key==='onlyHere')search.value='';
+  mode=turningOn?key:null;applyFilter();
+  visibleChecks().forEach(c=>c.checked=turningOn);
+  if(turningOn)document.querySelector('#gallery-toolbar').scrollIntoView({behavior:'smooth'});
+}
+for(const [key,m] of Object.entries(modes)) if(m.button) m.button.onclick=()=>toggleMode(key);
+search.addEventListener('input',applyFilter);
+document.querySelector('#select-all').onclick=()=>{const c=visibleChecks();const checked=!c.every(x=>x.checked);c.forEach(x=>x.checked=checked)};
+document.querySelector('#download-images').onclick=async()=>{for(const c of visibleChecks().filter(c=>c.checked)){const a=document.createElement('a');a.href=c.dataset.download;a.download='';document.body.append(a);a.click();a.remove();await new Promise(r=>setTimeout(r,500));}};
+applyFilter();
 </script>{% endblock %}

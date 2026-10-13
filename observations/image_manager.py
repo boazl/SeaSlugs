@@ -17,23 +17,39 @@ from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import render, redirect
 from django.urls import reverse
 from django.utils import timezone
-from .models import Sample, SiteImage
+from .models import Sample, SiteImage, TaxonGenus
 from .forms import SampleForm
 
 MANIFEST_FORMAT = 'seaslugs-image-manifest-v1'
 
 
-SORT_OPTIONS={'file':'לפי שם קובץ','alpha':'לפי סדר אלפביתי (סוג ומין)','taxonomy':'לפי סדר טקסונומי'}
+SORT_OPTIONS={'alpha':'לפי סדר אלפביתי (סוג ומין)','kind':'לפי סוג התמונה','taxonomy':'לפי סדר טקסונומי','file':'לפי שם קובץ'}
+# 'kind' groups the cards by what the image is for, in this order, each group alphabetical:
+# genus identification files, then order, family, genus and species observations, then the
+# rest (collections, uncatalogued "other" species, orphans).
+KIND_GROUPS=('identification',Sample.Kind.ORDER,Sample.Kind.FAMILY,Sample.Kind.GENUS,Sample.Kind.SPECIES,'other')
+KIND_GROUP_LABELS=('קבצי זיהוי של סוגים','תמונות של סדרות','תמונות של משפחות','תמונות של סוגים','תמונות של מינים','אחר (אוספים, מינים לא מקוטלגים ותמונות לא משויכות)')
+DEFAULT_SORT='alpha'
 
 
 def _row_species(row):
     """The species this image is filed under, for sorting -- the first linked sample that
     has one (almost always all of a content-addressed image's samples agree on species;
     picking the first is enough to place the row sensibly). None for an orphaned image or
-    one only linked to collection/"other" samples, which sort after every named species."""
+    one only linked to collection/"other"/taxon-level samples."""
     for sample in row['refs']:
         if sample.species_id: return sample.species
     return None
+
+
+def _row_taxon(row):
+    """For a row with no species: the genus / family / order name it belongs to -- a genus,
+    family or order observation's own taxon, or the genus whose identification file this
+    is -- so it sorts alphabetically right next to that genus's species. None otherwise."""
+    for sample in row['refs']:
+        if sample.kind in (Sample.Kind.GENUS, Sample.Kind.FAMILY, Sample.Kind.ORDER) and sample.taxon_name:
+            return sample.taxon_name
+    return row['identification_for'][0].name if row['identification_for'] else None
 
 
 def _alpha_key(species):
@@ -48,29 +64,72 @@ def _taxonomy_key(species):
     return (0, species.phylogenetic_order, species.scientific_name.lower()) if species.phylogenetic_order else (1, '', species.scientific_name.lower())
 
 
-def files(sort='file'):
+def _search_text(row):
+    """Everything a card can be found by in the page's search box: file name, the linked
+    observations' names, years and regions, and the genus of an identification file."""
+    parts=[row['name']]
+    for sample in row['refs']:
+        parts+=[str(sample.taxon_name or ''),sample.genus,sample.family,sample.order]
+        if sample.species_id: parts+=[sample.species.genus,sample.species.scientific_name]
+        if sample.trip_id:
+            parts+=[sample.trip.title,str(sample.trip.year or '')]
+            if sample.trip.region_id: parts.append(sample.trip.region.name)
+    for genus in row['identification_for']: parts+=[genus.name,genus.name_he]
+    return ' '.join(p for p in parts if p).lower()
+
+
+def files(sort=DEFAULT_SORT):
     root=Path(settings.MEDIA_ROOT).resolve()
     if not root.exists(): return []
     linked={}
     for item in Sample.objects.exclude(image='').select_related('species','trip__region'):
         linked.setdefault(item.image.name,[]).append(item)
     site_images=set(SiteImage.objects.exclude(image='').values_list('image',flat=True))
+    # A genus's identification file (the diagram / plate shown in "סימני זיהוי" on the genus
+    # page) lives in the same media folder but is referenced from TaxonGenus, not Sample --
+    # it is in use, never redundant, and must not be deleted from here.
+    identification={}
+    for genus in TaxonGenus.objects.exclude(identification_file=''):
+        identification.setdefault(genus.identification_file.name,[]).append(genus)
     rows=[]
     for path in sorted(root.rglob('*')):
         if not path.is_file() or path.is_symlink() or not path.resolve().is_relative_to(root): continue
         if path.suffix.lower() not in ('.jpg','.jpeg','.png','.webp'): continue
-        name=path.relative_to(root).as_posix();refs=linked.get(name,[])
+        name=path.relative_to(root).as_posix();refs=linked.get(name,[]);genera=identification.get(name,[])
         # redundant: this exact file is kept on disk for nothing -- either no sample ever
         # referenced it, or every sample that did has since been soft-deleted. A site image
-        # (the homepage photo) is never redundant even with zero Sample refs, since it's
-        # referenced from SiteImage, not Sample.
-        redundant=name not in site_images and all(r.deleted_at for r in refs)
-        rows.append({'name':name,'size':path.stat().st_size,'refs':refs,'token':signing.dumps(name,salt='image-file'),
-                     'blocked':any(not r.video_url and not r.deleted_at for r in refs) or name in site_images,
-                     'redundant':redundant})
-    if sort in ('alpha','taxonomy'):
-        key_fn=_alpha_key if sort=='alpha' else _taxonomy_key
-        rows.sort(key=lambda row:(1,row['name']) if not (species:=_row_species(row)) else (0,key_fn(species)))
+        # (the homepage photo) or a genus identification file is never redundant even with
+        # zero Sample refs, since it's referenced from SiteImage / TaxonGenus, not Sample.
+        redundant=name not in site_images and not genera and all(r.deleted_at for r in refs)
+        row={'name':name,'size':path.stat().st_size,'refs':refs,'token':signing.dumps(name,salt='image-file'),
+             'identification_for':genera,
+             'blocked':any(not r.video_url and not r.deleted_at for r in refs) or name in site_images or bool(genera),
+             'redundant':redundant}
+        row['search']=_search_text(row)
+        rows.append(row)
+    if sort=='alpha':
+        def alpha(row):
+            if species:=_row_species(row): return (0,_alpha_key(species))
+            if taxon:=_row_taxon(row): return (0,(taxon.lower(),'',taxon.lower()))
+            return (1,(row['name'].lower(),))
+        rows.sort(key=alpha)
+    elif sort=='kind':
+        def by_kind(row):
+            if row['identification_for']:
+                row['group_label']=KIND_GROUP_LABELS[0]
+                return (0,row['identification_for'][0].name.lower(),row['name'].lower())
+            # Prefer a live observation's kind over a deleted one's when an image has several.
+            refs=sorted(row['refs'],key=lambda r:r.deleted_at is not None)
+            kind=refs[0].kind if refs else None
+            group=KIND_GROUPS.index(kind) if kind in KIND_GROUPS else len(KIND_GROUPS)-1
+            if kind==Sample.Kind.SPECIES and (species:=_row_species(row)): label=' '.join(_alpha_key(species))
+            elif refs: label=str(refs[0].taxon_name or '').lower()
+            else: label=''
+            row['group_label']=KIND_GROUP_LABELS[group]
+            return (group,label or '\uffff',row['name'].lower())
+        rows.sort(key=by_kind)
+    elif sort=='taxonomy':
+        rows.sort(key=lambda row:(1,row['name']) if not (species:=_row_species(row)) else (0,_taxonomy_key(species)))
     return rows
 
 
@@ -149,9 +208,9 @@ def image_file(request):
 @staff_member_required
 def manager(request):
     if not request.user.is_superuser: raise PermissionDenied
-    sort=request.GET.get('sort') or 'file'
-    if sort not in SORT_OPTIONS: sort='file'
-    redirect_target='image-manager' if sort=='file' else f"{reverse('image-manager')}?sort={sort}"
+    sort=request.GET.get('sort') or DEFAULT_SORT
+    if sort not in SORT_OPTIONS: sort=DEFAULT_SORT
+    redirect_target='image-manager' if sort==DEFAULT_SORT else f"{reverse('image-manager')}?sort={sort}"
     context={'local':not settings.PRODUCTION,'sort':sort,'sort_options':SORT_OPTIONS}
     if request.method=='POST':
         try:
@@ -165,6 +224,8 @@ def manager(request):
                     for name,path in selected:
                         if Sample.objects.filter(image=name,video_url='',deleted_at__isnull=True).exists():
                             raise ValidationError('לא ניתן למחוק תמונה שהיא המדיה היחידה בתצפית פעילה. הוסיפו סרטון או הסירו את התצפית תחילה.')
+                        if TaxonGenus.objects.filter(identification_file=name).exists():
+                            raise ValidationError('לא ניתן למחוק קובץ זיהוי של סוג מכאן. יש להחליף או להסיר אותו בעריכת הסוג.')
                         if SiteImage.objects.filter(image=name).exists():
                             raise ValidationError('לא ניתן למחוק את תמונת הבית מכאן. יש להחליף או להסיר אותה דרך "תמונת הבית" למטה.')
                     # No archive or retained copy: remove files only after checking all selections.

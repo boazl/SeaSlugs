@@ -66,7 +66,7 @@ class MediaTransferTests(TestCase):
 
         self.assertEqual(names('alpha'),['Aardvark snouty','Test species','Zebra stripey'])
         self.assertEqual(names('taxonomy'),['Aardvark snouty','Zebra stripey','Test species'])
-        # file order (the default) is unaffected -- unrelated to species entirely
+        # file order is unaffected -- unrelated to species entirely
         self.assertEqual(set(names('file')),{'Aardvark snouty','Test species','Zebra stripey'})
 
     def test_image_manager_sort_view_and_redirect(self):
@@ -74,16 +74,16 @@ class MediaTransferTests(TestCase):
         content=self.client.get('/admin/images/',{'sort':'alpha'}).content.decode()
         self.assertIn('<strong>לפי סדר אלפביתי (סוג ומין)</strong>',content)
         self.assertIn('href="?sort=taxonomy"',content)
-        # an invalid value falls back to the default rather than erroring
+        # an invalid value falls back to the default (alphabetical) rather than erroring
         content=self.client.get('/admin/images/',{'sort':'bogus'}).content.decode()
-        self.assertIn('<strong>לפי שם קובץ</strong>',content)
+        self.assertIn('<strong>לפי סדר אלפביתי (סוג ומין)</strong>',content)
         # the chosen sort survives an action's redirect back to the page
         from .image_manager import files
         row=files()[0]
         self.sample.video_url='https://youtu.be/abcdefghijk';self.sample.save()
-        response=self.client.post('/admin/images/?sort=alpha',{'action':'delete','confirm':'yes','selected':[row['token']]})
+        response=self.client.post('/admin/images/?sort=taxonomy',{'action':'delete','confirm':'yes','selected':[row['token']]})
         self.assertEqual(response.status_code,302)
-        self.assertEqual(response.url,'/admin/images/?sort=alpha')
+        self.assertEqual(response.url,'/admin/images/?sort=taxonomy')
 
     def test_image_manager_lists_using_observations_with_region_and_status(self):
         # Each image card must show which observation(s) actually use it -- with enough
@@ -216,6 +216,56 @@ class MediaTransferTests(TestCase):
         content_str=response.content.decode()
         self.assertNotIn('id="select-only-here"',content_str)
         self.assertNotIn('id="only-here-names"',content_str)
+
+    def test_genus_identification_file_is_in_use_not_redundant(self):
+        # A genus's identification image (shown on the genus page) has no Sample ref but is
+        # referenced from TaxonGenus -- it must not be flagged redundant, its card names the
+        # genus, it sorts alphabetically by that genus, and deleting it from here is refused.
+        from .image_manager import files
+        from .models import TaxonGenus
+        output=io.BytesIO();Image.new('RGB',(10,10),'red').save(output,'JPEG')
+        genus=TaxonGenus.objects.create(name='Aardvarkia')
+        genus.identification_file.save('id.jpg',ContentFile(output.getvalue()),save=True)
+        rows=files()
+        row=next(r for r in rows if r['name']==genus.identification_file.name)
+        self.assertFalse(row['redundant']);self.assertTrue(row['blocked'])
+        self.assertEqual(row['identification_for'],[genus]);self.assertIn('aardvarkia',row['search'])
+        self.assertEqual(rows[0]['name'],genus.identification_file.name)  # 'Aardvarkia' < 'Test species'
+        self.client.force_login(self.sample.owner)
+        content=self.client.get('/admin/images/').content.decode()
+        self.assertIn('קובץ זיהוי בדף הסוג',content);self.assertIn('/genus/Aardvarkia/',content)
+        response=self.client.post('/admin/images/',{'action':'delete','confirm':'yes','selected':[row['token']]})
+        self.assertContains(response,'קובץ זיהוי של סוג');self.assertTrue(Path(genus.identification_file.path).exists())
+
+    def test_kind_sort_groups_identification_then_order_family_genus_species(self):
+        from .image_manager import files
+        from .models import TaxonGenus
+        def jpeg(color):
+            out=io.BytesIO();Image.new('RGB',(10,10),color).save(out,'JPEG');return ContentFile(out.getvalue())
+        genus=TaxonGenus.objects.create(name='Zygenus')
+        genus.identification_file.save('id.jpg',jpeg('red'),save=True)
+        made={}
+        for kind,field,name in (('genus','genus','Bgenus'),('genus','genus','Agenus'),('family','family','Somefamily'),('order','order','Someorder')):
+            sample=Sample(owner=self.sample.owner,kind=kind,**{field:name},status='published')
+            sample.image.save(f'{name}.jpg',jpeg('green'),save=False);sample.save();made[name]=sample.image.name
+        orphan=Path(self.temp.name)/'aaa-orphan.jpg';Image.new('RGB',(10,10),'red').save(orphan,'JPEG')
+        names=[row['name'] for row in files('kind')]
+        self.assertEqual(names,[genus.identification_file.name,made['Someorder'],made['Somefamily'],
+                                made['Agenus'],made['Bgenus'],self.sample.image.name,'aaa-orphan.jpg'])
+        self.client.force_login(self.sample.owner)
+        content=self.client.get('/admin/images/',{'sort':'kind'}).content.decode()
+        self.assertIn('<strong>לפי סוג התמונה</strong>',content)
+        headings=[h for h in ('קבצי זיהוי של סוגים','תמונות של סדרות','תמונות של משפחות','תמונות של סוגים','תמונות של מינים','אחר (')]
+        positions=[content.index('kind-heading" style="grid-column:1/-1;margin:18px 0 0;padding-bottom:6px;border-bottom:1px solid #36515a">'+h) for h in headings]
+        self.assertEqual(positions,sorted(positions))
+        self.assertEqual(content.count('class="kind-heading"'),6)  # one heading per group, not per card
+        self.assertNotIn('class="kind-heading"',self.client.get('/admin/images/').content.decode())  # other sorts: no headings
+
+    def test_images_page_has_search_box_and_search_text(self):
+        self.client.force_login(self.sample.owner)
+        content=self.client.get('/admin/images/').content.decode()
+        self.assertIn('id="image-search"',content)
+        self.assertIn('data-search="',content);self.assertIn('test species',content);self.assertIn('eilat',content)
 
     def test_images_page_shows_redundant_badge_and_select_button(self):
         self.client.force_login(self.sample.owner)
