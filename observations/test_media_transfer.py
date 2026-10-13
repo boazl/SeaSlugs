@@ -255,11 +255,38 @@ class MediaTransferTests(TestCase):
         self.client.force_login(self.sample.owner)
         content=self.client.get('/admin/images/',{'sort':'kind'}).content.decode()
         self.assertIn('<strong>לפי סוג התמונה</strong>',content)
-        headings=[h for h in ('קבצי זיהוי של סוגים','תמונות של סדרות','תמונות של משפחות','תמונות של סוגים','תמונות של מינים','אחר (')]
-        positions=[content.index('kind-heading" style="grid-column:1/-1;margin:18px 0 0;padding-bottom:6px;border-bottom:1px solid #36515a">'+h) for h in headings]
+        headings=[h for h in ('קבצי זיהוי של סוגים','תמונות של סדרות','תמונות של משפחות','תמונות של סוגים','תמונות של מינים','אחר (אוספים, מינים לא מקוטלגים ותמונות לא משויכות)')]
+        positions=[content.index('">'+h+' <span class="kind-count"') for h in headings]
         self.assertEqual(positions,sorted(positions))
         self.assertEqual(content.count('class="kind-heading"'),6)  # one heading per group, not per card
+        self.assertIn('תמונות של סוגים <span class="kind-count" data-total="2">(2)</span>',content)
         self.assertNotIn('class="kind-heading"',self.client.get('/admin/images/').content.decode())  # other sorts: no headings
+
+    def test_identical_images_under_different_names_are_flagged(self):
+        # A re-encoded copy of a photo saved under another name is the same image even though
+        # its bytes differ; a different photo is not.
+        from .image_manager import files
+        root=Path(self.temp.name)
+        # Solid colours all fingerprint alike, so use two different patterned photos.
+        from PIL import ImageDraw
+        def photo(extent):
+            return Image.effect_mandelbrot((640,360),extent,100).convert('RGB')
+        photo((-2.2,-1,1,1)).save(self.sample.image.path,'JPEG',quality=95)
+        Image.open(self.sample.image.path).resize((480,270)).save(root/'copy.jpg','JPEG',quality=70)
+        captioned=Image.open(self.sample.image.path).copy();ImageDraw.Draw(captioned).rectangle((10,335,90,347),fill="white")
+        captioned.save(root/'captioned.jpg','JPEG')
+        photo((-1.5,-0.6,0.2,0.6)).save(root/'other.jpg','JPEG')
+        rows={r['name']:r for r in files()}
+        original=self.sample.image.name
+        self.assertIn((original,'exact'),rows['copy.jpg']['duplicates'])
+        self.assertIn(('copy.jpg','exact'),rows[original]['duplicates'])
+        self.assertIn((original,'caption'),rows['captioned.jpg']['duplicates'])
+        self.assertEqual(rows['other.jpg']['duplicates'],[])
+        self.client.force_login(self.sample.owner)
+        content=self.client.get('/admin/images/').content.decode()
+        self.assertEqual(content.count('<article class="duplicate"'),3)
+        self.assertIn('אותה תמונה עם כיתוב או סימון שונה',content)
+        self.assertIn('תמונה זהה בשם אחר',content);self.assertIn('<p class="file-name">other.jpg</p>',content)
 
     def test_images_page_has_search_box_and_search_text(self):
         self.client.force_login(self.sample.owner)

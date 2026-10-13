@@ -15,10 +15,32 @@
 <p>סמנו תמונות והורידו כקבצים רגילים. בסביבת היעד העלו את הקבצים ללא שינוי שמם. הדפדפן עשוי לבקש אישור להורדת כמה קבצים. הורדה מעתיקה את התמונה ואינה מוחקת את המקור. התמונות המשויכות נושאות את נתוני התצפית בקובץ. תצפית חסרה תתווסף ביעד; בתצפית קיימת תוחלף רק התמונה. יש להעביר תחילה משתמשים וטבלאות עזר. קובצי ההעברה כוללים פרטי תצפית ושם חשבון.</p>
 {% if error %}<p class="errorlist" role="alert">{{error}}</p>{% endif %}
 <form method="post" id="image-selection">{% csrf_token %}<input type="hidden" name="action" value="delete">
-<p id="gallery-toolbar"><button type="button" id="select-all">בחירת הכול / ביטול</button> <button type="button" id="select-redundant" data-label-on="הצגת כל התמונות" data-label-off="בחירת תמונות מיותרות">בחירת תמונות מיותרות</button> <button type="button" id="download-images">הורדת התמונות המסומנות למק</button></p>
+<p id="gallery-toolbar"><button type="button" id="select-all">בחירת הכול / ביטול</button> <button type="button" id="select-redundant" data-label-on="הצגת כל התמונות" data-label-off="בחירת תמונות מיותרות">בחירת תמונות מיותרות</button> <button type="button" id="select-duplicates" data-label-on="הצגת כל התמונות" data-label-off="הצגת תמונות זהות">הצגת תמונות זהות</button> <button type="button" id="download-images">הורדת התמונות המסומנות למק</button></p>
 <p><label for="image-search">חיפוש:</label> <input type="search" id="image-search" placeholder="שם מין, סוג, משפחה, שם קובץ, אזור או שנה" style="width:min(100%,28em)" autocomplete="off"> <span id="image-count" aria-live="polite"></span></p>
 <p id="image-none" hidden>לא נמצאו תמונות.</p>
-<div class="cards">{% for image in images %}{% if image.group_label %}{% ifchanged image.group_label %}<h3 class="kind-heading" style="grid-column:1/-1;margin:18px 0 0;padding-bottom:6px;border-bottom:1px solid #36515a">{{image.group_label}}</h3>{% endifchanged %}{% endif %}<article data-group="{{image.group_label}}" data-search="{{image.search}}" data-redundant="{% if image.redundant %}1{% else %}0{% endif %}"><label><input type="checkbox" name="selected" value="{{image.token}}" data-name="{{image.name}}" data-download="{% url 'image-file' %}?download=1&amp;file={{image.token|urlencode}}" data-redundant="{% if image.redundant %}1{% else %}0{% endif %}"> {{image.size|filesizeformat}}</label><a href="{% url 'image-file' %}?file={{image.token|urlencode}}" target="_blank" rel="noopener"><img src="{% url 'image-file' %}?file={{image.token|urlencode}}" loading="lazy" alt="תמונה מנוהלת"></a>
+<style>
+/* Card image = 110% of the public gallery's card image width (dist/styles.css): the gallery
+   grid sits in <main> (min(100vw, max(1500px, min(1900px, 96vw))) wide, less 5% padding each
+   side), beside a 260px filter sidebar and a 32px gap (no sidebar at 1000px and below), and
+   lays its cards out in --gcols columns --ggap apart. */
+:root{--gcols:3;--ggap:24px;--gside:292px}
+@media(min-width:1300px){:root{--gcols:4}}
+@media(min-width:1700px){:root{--gcols:5}}
+@media(max-width:1000px){:root{--gside:0px}}
+@media(max-width:850px){:root{--gcols:2}}
+@media(max-width:560px){:root{--ggap:14px}}
+:root{--gallery-img:calc((min(100vw,max(1500px,min(1900px,96vw))) - 10vw - var(--gside) - (var(--gcols) - 1) * var(--ggap)) / var(--gcols));--card-img:calc(var(--gallery-img) * 1.1)}
+main{max-width:max(1500px,min(1900px,96vw))}
+.image-cards{grid-template-columns:repeat(auto-fill,calc(var(--card-img) + 30px));justify-content:start;gap:15px}
+.image-cards article{padding:14px;font-size:15px;min-width:0;max-width:100%;box-sizing:border-box}
+.image-cards img{width:100%;max-width:var(--card-img);height:auto;aspect-ratio:16/9;object-fit:cover;display:block}
+.image-cards .file-name{margin:6px 0 0;font-size:13px;color:#b8ccd0;direction:ltr;text-align:left;overflow-wrap:anywhere}
+.image-cards article.duplicate{border-color:#ff5a52;box-shadow:0 0 0 2px #ff5a52}
+.image-cards .kind-heading{grid-column:1/-1;margin:18px 0 0;padding-bottom:6px;border-bottom:1px solid #36515a}
+.image-cards .kind-count{font-weight:400;color:#b8ccd0}
+@media(max-width:700px){.image-cards{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}}
+</style>
+<div class="cards image-cards">{% for image in images %}{% if image.group_label %}{% ifchanged image.group_label %}<h3 class="kind-heading" data-group="{{image.group_label}}">{{image.group_label}} <span class="kind-count" data-total="{{image.group_count}}">({{image.group_count}})</span></h3>{% endifchanged %}{% endif %}<article{% if image.duplicates %} class="duplicate"{% endif %} data-group="{{image.group_label}}" data-search="{{image.search}}" data-redundant="{% if image.redundant %}1{% else %}0{% endif %}" data-duplicate="{% if image.duplicates %}1{% else %}0{% endif %}"><label><input type="checkbox" name="selected" value="{{image.token}}" data-name="{{image.name}}" data-download="{% url 'image-file' %}?download=1&amp;file={{image.token|urlencode}}" data-redundant="{% if image.redundant %}1{% else %}0{% endif %}"> {{image.size|filesizeformat}}</label><a href="{% url 'image-file' %}?file={{image.token|urlencode}}" target="_blank" rel="noopener"><img src="{% url 'image-file' %}?file={{image.token|urlencode}}" loading="lazy" alt="תמונה מנוהלת"></a><p class="file-name">{{image.name}}</p>{% for other, match in image.duplicates %}<p class="errorlist">{% if match == 'exact' %}תמונה זהה בשם אחר{% else %}אותה תמונה עם כיתוב או סימון שונה{% endif %}: <span dir="ltr">{{other}}</span></p>{% endfor %}
 <p>תצפיות שמשתמשות בתמונה זו:</p><ul>{% for sample in image.refs %}<li><a href="{% url 'observation-edit' sample.pk %}">{{sample}}</a>{% if sample.trip.region %} · {{sample.trip.region.name}}{% endif %}{% if sample.deleted_at %} · תצפית מחוקה{% elif sample.status != 'published' %} · {{sample.get_status_display}}{% endif %}</li>{% empty %}{% if not image.identification_for %}<li>לא משויכת לתצפית — אפשר למחוק לפינוי מקום</li>{% endif %}{% endfor %}{% for genus in image.identification_for %}<li>קובץ זיהוי בדף הסוג <a href="{% url 'genus-page' genus.name %}" target="_blank" rel="noopener"><i>{{genus.name}}</i></a></li>{% endfor %}</ul>{% if image.redundant %}<p class="errorlist">תמונה מיותרת — כל התצפיות המשויכות נמחקו או שאין תצפית כלל. אפשר למחוק לפינוי מקום.</p>{% endif %}
 {% if image.identification_for %}<p class="errorlist">קובץ זיהוי של סוג — המחיקה חסומה (יש להחליף או להסיר אותו בעריכת הסוג)</p>{% elif image.blocked %}<p class="errorlist">המדיה היחידה בתצפית פעילה — המחיקה חסומה</p>{% endif %}</article>{% empty %}<p>אין תמונות שהועלו בסביבה זו. תמונות YouTube אינן מאוחסנות כאן.</p>{% endfor %}</div>
 <p><label><input type="checkbox" name="confirm" value="yes"> אני מאשר מחיקה קבועה של התמונות המסומנות, ללא גיבוי תמונה</label></p><button>מחיקת התמונות המסומנות</button></form>
@@ -40,6 +62,7 @@ const onlyHere=onlyHereNames?new Set(JSON.parse(onlyHereNames.textContent)):new 
 // hidden is also unchecked, so nothing out of sight is ever downloaded or deleted by mistake.
 const modes={
   redundant:{button:document.querySelector('#select-redundant'),match:card=>card.dataset.redundant==='1'},
+  duplicates:{button:document.querySelector('#select-duplicates'),match:card=>card.dataset.duplicate==='1',noSelect:true},
   onlyHere:{button:document.querySelector('#select-only-here'),match:card=>onlyHere.has(checkOf(card).dataset.name)},
 };
 let mode=null;
@@ -50,7 +73,10 @@ function applyFilter(){
     card.hidden=!show;if(!show)checkOf(card).checked=false;else shown++;
   });
   // A group heading (sort "by image kind") is shown only while one of its cards is.
-  document.querySelectorAll('.kind-heading').forEach(h=>{h.hidden=!cards().some(c=>!c.hidden&&c.dataset.group===h.textContent)});
+  document.querySelectorAll('.kind-heading').forEach(h=>{
+    const visible=cards().filter(c=>!c.hidden&&c.dataset.group===h.dataset.group).length,count=h.querySelector('.kind-count');
+    h.hidden=!visible;count.textContent=visible==+count.dataset.total?`(${visible})`:`(${visible} מתוך ${count.dataset.total})`;
+  });
   document.querySelector('#image-count').textContent=(words.length||mode)?`${shown} מתוך ${cards().length}`:'';
   document.querySelector('#image-none').hidden=shown>0||!cards().length;
   for(const [key,m] of Object.entries(modes)) if(m.button) m.button.textContent=mode===key?m.button.dataset.labelOn:m.button.dataset.labelOff;
@@ -59,7 +85,7 @@ function toggleMode(key){
   const turningOn=mode!==key;
   if(turningOn&&key==='onlyHere')search.value='';
   mode=turningOn?key:null;applyFilter();
-  visibleChecks().forEach(c=>c.checked=turningOn);
+  if(!modes[key].noSelect)visibleChecks().forEach(c=>c.checked=turningOn);
   if(turningOn)document.querySelector('#gallery-toolbar').scrollIntoView({behavior:'smooth'});
 }
 for(const [key,m] of Object.entries(modes)) if(m.button) m.button.onclick=()=>toggleMode(key);

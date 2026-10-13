@@ -64,6 +64,55 @@ def _taxonomy_key(species):
     return (0, species.phylogenetic_order, species.scientific_name.lower()) if species.phylogenetic_order else (1, '', species.scientific_name.lower())
 
 
+# Two files hold "the same photo" when their 96x54 grayscale thumbnails differ by at most
+# DUPLICATE_MAX_MEAN grey levels per pixel on average; they are an exact copy (re-saved,
+# re-exported or resized) when, in addition, 99.5% of pixels differ by at most
+# DUPLICATE_EXACT_P995. Measured on the real media folder: exact copies score mean 0-0.03 /
+# p99.5 0-2 (a resized re-encode ~1 / 10); the same photo with its caption replaced (e.g. a
+# genus label instead of the species one) mean 0.2-1.3 / p99.5 13-90; a re-graded or
+# different photo mean 5+.
+DUPLICATE_MAX_MEAN=1.5
+DUPLICATE_EXACT_P995=12
+THUMB=(96,54)
+_thumbnail_cache={}
+
+
+def _thumbnail(path):
+    """(average brightness, 12x7 preview, 96x54 grayscale bytes) of the image, cached per
+    process by (path, size, mtime); None for a file Pillow can't read."""
+    stat=path.stat();key=(str(path),stat.st_size,stat.st_mtime_ns)
+    if key not in _thumbnail_cache:
+        try:
+            with Image.open(path) as image:
+                image.draft('L',(THUMB[0]*3,THUMB[1]*3))
+                gray=image.convert('L').resize(THUMB,Image.Resampling.BOX)
+            pixels=gray.tobytes();tiny=gray.resize((12,7),Image.Resampling.BOX).tobytes()
+            _thumbnail_cache[key]=(sum(pixels)/len(pixels),tiny,pixels)
+        except (OSError,ValueError,Image.DecompressionBombError):
+            _thumbnail_cache[key]=None
+    return _thumbnail_cache[key]
+
+
+def _compare(a,b):
+    """'exact', 'caption' (same photo, different caption/markings) or None."""
+    if sum(abs(x-y) for x,y in zip(a[1],b[1]))/len(a[1])>DUPLICATE_MAX_MEAN*4: return None
+    diffs=[abs(x-y) for x,y in zip(a[2],b[2])]
+    if sum(diffs)/len(diffs)>DUPLICATE_MAX_MEAN: return None
+    return 'exact' if sorted(diffs)[int(len(diffs)*.995)]<=DUPLICATE_EXACT_P995 else 'caption'
+
+
+def _mark_duplicates(rows,paths):
+    """row['duplicates']: [(other file name, 'exact'|'caption')] for every other file holding
+    the same photo. Only images of similar overall brightness are compared in full."""
+    for row in rows: row['duplicates']=[]
+    thumbs=sorted(((t,row) for row,path in zip(rows,paths) if (t:=_thumbnail(path))),key=lambda item:item[0][0])
+    for i,(thumb,row) in enumerate(thumbs):
+        for other_thumb,other in thumbs[i+1:]:
+            if other_thumb[0]-thumb[0]>DUPLICATE_MAX_MEAN: break
+            if match:=_compare(thumb,other_thumb):
+                row['duplicates'].append((other['name'],match));other['duplicates'].append((row['name'],match))
+
+
 def _search_text(row):
     """Everything a card can be found by in the page's search box: file name, the linked
     observations' names, years and regions, and the genus of an identification file."""
@@ -91,7 +140,7 @@ def files(sort=DEFAULT_SORT):
     identification={}
     for genus in TaxonGenus.objects.exclude(identification_file=''):
         identification.setdefault(genus.identification_file.name,[]).append(genus)
-    rows=[]
+    rows=[];paths=[]
     for path in sorted(root.rglob('*')):
         if not path.is_file() or path.is_symlink() or not path.resolve().is_relative_to(root): continue
         if path.suffix.lower() not in ('.jpg','.jpeg','.png','.webp'): continue
@@ -106,7 +155,8 @@ def files(sort=DEFAULT_SORT):
              'blocked':any(not r.video_url and not r.deleted_at for r in refs) or name in site_images or bool(genera),
              'redundant':redundant}
         row['search']=_search_text(row)
-        rows.append(row)
+        rows.append(row);paths.append(path)
+    _mark_duplicates(rows,paths)
     if sort=='alpha':
         def alpha(row):
             if species:=_row_species(row): return (0,_alpha_key(species))
@@ -128,6 +178,9 @@ def files(sort=DEFAULT_SORT):
             row['group_label']=KIND_GROUP_LABELS[group]
             return (group,label or '\uffff',row['name'].lower())
         rows.sort(key=by_kind)
+        counts={}
+        for row in rows: counts[row['group_label']]=counts.get(row['group_label'],0)+1
+        for row in rows: row['group_count']=counts[row['group_label']]
     elif sort=='taxonomy':
         rows.sort(key=lambda row:(1,row['name']) if not (species:=_row_species(row)) else (0,_taxonomy_key(species)))
     return rows
