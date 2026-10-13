@@ -181,6 +181,17 @@ class MediaTransferTests(TestCase):
         self.assertIn('אין תמונות חסרות כאן',content)
         self.assertIn('אין תמונות שקיימות רק כאן',content)
 
+    def test_manifest_skips_a_sample_whose_image_file_is_missing_here(self):
+        # A table transfer brings a sample's image name without the file itself; that photo
+        # must count as missing here (not "already synced") so the comparison flags it.
+        from .image_manager import build_manifest,compare_manifest
+        name=self.sample.image.name
+        self.assertEqual(build_manifest()['images'],[name])
+        Path(self.sample.image.path).unlink()
+        self.assertEqual(build_manifest()['images'],[])
+        result=compare_manifest({'format':'seaslugs-image-manifest-v1','images':[name]})
+        self.assertEqual(result,{'missing_here':[name],'only_here':[]})
+
     def test_compare_manifest_rejects_malformed_file(self):
         self.client.force_login(self.sample.owner)
         upload=SimpleUploadedFile('manifest.json',b'{"format": "wrong"}',content_type='application/json')

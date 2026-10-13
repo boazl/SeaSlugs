@@ -187,7 +187,13 @@ def files(sort=DEFAULT_SORT):
 
 
 def _active_image_names():
-    return set(Sample.objects.exclude(image='').filter(deleted_at__isnull=True).values_list('image', flat=True).distinct())
+    """Filenames of active, image-bearing samples whose file is actually in this
+    environment's media folder. A table transfer copies a sample's image *name* without its
+    file, so the other environment can hold a sample pointing at a photo it doesn't have --
+    listing names alone made such a missing photo look "already synced" on both sides."""
+    root=Path(settings.MEDIA_ROOT).resolve()
+    names=set(Sample.objects.exclude(image='').filter(deleted_at__isnull=True).values_list('image', flat=True).distinct())
+    return {name for name in names if (root/name).is_file() and (root/name).resolve().is_relative_to(root)}
 
 
 def build_manifest():
