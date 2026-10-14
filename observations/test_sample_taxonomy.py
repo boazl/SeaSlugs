@@ -141,10 +141,10 @@ class NameTests(TaxonomyBase):
         s = self.sample(species=self.species, identification_qualifier='cf.')
         self.assertEqual(s.canonical_image_name(), 'observations/ak24-chromodoris-strigata.jpg')
         g = self.sample(kind=Sample.Kind.GENUS, genus='Chromodoris', family='Chromodorididae')
-        self.assertEqual(g.canonical_image_name(), 'observations/ak24-chromodoris.jpg')
+        self.assertEqual(g.canonical_image_name(), 'observations/genera-chromodoris.jpg')
         f = self.sample(kind=Sample.Kind.FAMILY, family='Chromodorididae', genus='Chromodoris')
         f.sync_taxonomy()
-        self.assertEqual(f.canonical_image_name(), 'observations/ak24-chromodorididae.jpg')
+        self.assertEqual(f.canonical_image_name(), 'observations/families-chromodorididae.jpg')
 
 
 class FormTests(TaxonomyBase):

@@ -45,15 +45,15 @@ class CanonicalImageNameTests(TestCase):
 
     def test_genus_kind_uses_the_genus_field(self):
         sample = Sample(owner=self.user, trip=self.trip, kind=Sample.Kind.GENUS, genus='Chelidonura')
-        self.assertEqual(sample.canonical_image_name(), 'observations/ei24-chelidonura.jpg')
+        self.assertEqual(sample.canonical_image_name(), 'observations/genera-chelidonura.jpg')   # its library trip, not the trip
 
     def test_family_and_order_kinds_use_their_own_field(self):
-        for kind, field in ((Sample.Kind.FAMILY, 'family'), (Sample.Kind.ORDER, 'order')):
+        for kind, field, prefix in ((Sample.Kind.FAMILY, 'family', 'families'), (Sample.Kind.ORDER, 'order', 'orders')):
             sample = Sample(owner=self.user, trip=self.trip, kind=kind, **{field: 'Some taxon'})
-            self.assertEqual(sample.canonical_image_name(), 'observations/ei24-some-taxon.jpg')
+            self.assertEqual(sample.canonical_image_name(), f'observations/{prefix}-some-taxon.jpg')
         # ...and a field that does not belong to the kind is ignored.
         sample = Sample(owner=self.user, trip=self.trip, kind=Sample.Kind.FAMILY, family='Fam', genus='Gen', order='Ord')
-        self.assertEqual(sample.canonical_image_name(), 'observations/ei24-fam.jpg')
+        self.assertEqual(sample.canonical_image_name(), 'observations/families-fam.jpg')
 
     def test_colliding_name_gets_a_numeric_suffix(self):
         with tempfile.TemporaryDirectory() as folder, override_settings(MEDIA_ROOT=folder):
@@ -287,7 +287,7 @@ class RenameImagesToCanonicalSharedImageTests(TestCase):
             call_command('rename_images_to_canonical', '--apply', stdout=out)
             species_sample.refresh_from_db(); genus_sample.refresh_from_db()
             self.assertEqual(species_sample.image.name, 'observations/ei24-chromodoris-quadricolor.jpg')
-            self.assertEqual(genus_sample.image.name, 'observations/ei24-chromodoris.jpg')
+            self.assertEqual(genus_sample.image.name, 'observations/genera-chromodoris.jpg')   # its library trip
             # each sample's own file physically exists, with the shared content
             self.assertEqual((Path(folder) / species_sample.image.name).read_bytes(), b'shared-photo')
             self.assertEqual((Path(folder) / genus_sample.image.name).read_bytes(), b'shared-photo')
@@ -346,7 +346,7 @@ class RenameImagesToCanonicalHashRecoveryTests(TestCase):
             call_command('rename_images_to_canonical', '--apply', stdout=out)
 
             genus_sample.refresh_from_db()
-            self.assertEqual(genus_sample.image.name, 'observations/ei24-chromodoris.jpg')
+            self.assertEqual(genus_sample.image.name, 'observations/genera-chromodoris.jpg')   # its library trip
             self.assertEqual((Path(folder) / genus_sample.image.name).read_bytes(), b'shared-photo')
             # the species sample's own file is untouched -- it's still legitimately needed there
             species_sample.refresh_from_db()

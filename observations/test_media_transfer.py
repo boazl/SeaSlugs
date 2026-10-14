@@ -275,7 +275,18 @@ class MediaTransferTests(TestCase):
         self.client.force_login(self.sample.owner)
         content=self.client.get('/admin/images/').content.decode()
         self.assertIn('id="select-mismatch"',content);self.assertIn('data-mismatch="1"',content)
-        self.assertIn('קובץ שאינו genera- צריך להיות משויך לתצפיות מין',content)
+        self.assertIn('קובץ שאינו genera- / families- / orders- צריך להיות משויך לתצפיות מין',content)
+        # ... and is renamed after its level with one button: the file and the observation follow
+        row=next(r for r in files() if r['name']==genus.image.name)
+        self.assertEqual(row['rename_to'],'observations/genera-testgenus.jpg')
+        self.assertIn('name="rename_file"',content)
+        old=Path(genus.image.path)
+        response=self.client.post('/admin/images/',{'action':'delete','rename_file':row['token']})
+        self.assertEqual(response.status_code,302)
+        genus.refresh_from_db()
+        self.assertEqual(genus.image.name,'observations/genera-testgenus.jpg')
+        self.assertTrue(Path(genus.image.path).exists());self.assertFalse(old.exists())
+        self.assertEqual(next(r for r in files() if r['name']==genus.image.name)['kind_mismatch'],[])
 
     def test_a_file_saved_again_with_other_bytes_but_the_same_picture_is_not_listed(self):
         # every download / transfer re-encodes the JPEG: other bytes, same picture
@@ -364,13 +375,15 @@ class MediaTransferTests(TestCase):
             sample.image.save(f'{name}.jpg',jpeg('green'),save=False);sample.save();made[name]=sample
         for name in ('Agenus','Bgenus'): TaxonGenus.objects.create(name=name)
         TaxonFamily.objects.create(name='Somefamily');TaxonOrder.objects.create(name='Someorder')
+        # a sub-order row has no observations of its own: it shows its defining sample's image
+        TaxonOrder.objects.create(name='Someorder',sub_order='Somesuborder',defining_sample=made['Bgenus'])
         # a family with no observation of its own: its page shows its defining sample's image
         TaxonFamily.objects.create(name='Otherfamily',defining_sample=made['Agenus'])
         self.assertTrue(SpeciesArea.objects.filter(species=self.sample.species).exists())
         orphan=Path(self.temp.name)/'aaa-orphan.jpg';Image.new('RGB',(10,10),'red').save(orphan,'JPEG')
         cards=files('kind')
         self.assertEqual([(c['name'],c['level']['label'] if c['level'] else None) for c in cards],[
-            (genus.identification_file.name,None),(made['Someorder'].image.name,'Someorder'),
+            (genus.identification_file.name,None),(made['Someorder'].image.name,'Someorder'),(made['Bgenus'].image.name,'Somesuborder'),
             (made['Agenus'].image.name,'Otherfamily'),(made['Somefamily'].image.name,'Somefamily'),
             (made['Agenus'].image.name,'Agenus'),(made['Bgenus'].image.name,'Bgenus'),
             (self.sample.image.name,'Test species · Israel'),('aaa-orphan.jpg',None)])
@@ -379,10 +392,10 @@ class MediaTransferTests(TestCase):
         self.client.force_login(self.sample.owner)
         content=self.client.get('/admin/images/',{'sort':'kind'}).content.decode()
         self.assertIn('<strong>לפי סוג התמונה</strong>',content)
-        headings=('קבצי זיהוי של סוגים','תמונות של סדרות','תמונות של משפחות','תמונות של סוגים','תמונות של מינים','אחר (תמונות שאינן מוצגות באף רמה)')
+        headings=('קבצי זיהוי של סוגים','תמונות של סדרות','תמונות של תתי-סדרות','תמונות של משפחות','תמונות של סוגים','תמונות של מינים','אחר (תמונות שאינן מוצגות באף רמה)')
         positions=[content.index('">'+h+' <span class="kind-count"') for h in headings]
         self.assertEqual(positions,sorted(positions))
-        self.assertEqual(content.count('class="kind-heading"'),6)  # one heading per group, not per card
+        self.assertEqual(content.count('class="kind-heading"'),7)  # one heading per group, not per card (no superfamily here)
         self.assertIn('תמונות של משפחות <span class="kind-count" data-total="2">(2)</span>',content)
         self.assertIn('<span class="level-badge" title="מספר הרמות שבהן התמונה מוצגת">2</span>',content)
         self.assertIn('ברמה: <a href="/family/Otherfamily/"',content)

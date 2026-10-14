@@ -10,7 +10,7 @@ from django.core.files.base import ContentFile
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 from django.core.validators import FileExtensionValidator
-from .models import IDENTIFICATION_FILE_EXTENSIONS, Sample, Profile, Species, Country, Region, Site, DiveTrip, TaxonOrder, TaxonFamily, TaxonGenus, IdentificationQualifier, LifeStage, split_undetermined_variant
+from .models import IDENTIFICATION_FILE_EXTENSIONS, Sample, Profile, Species, Country, Region, Site, DiveTrip, TaxonOrder, TaxonFamily, TaxonGenus, IdentificationQualifier, LifeStage, split_undetermined_variant, LIBRARY_TRIP_CODES
 
 
 class SignupForm(UserCreationForm):
@@ -204,7 +204,7 @@ class SampleForm(forms.ModelForm):
         'cf. = דומה ל…, aff. = קרוב ל… — מוצג בין הסוג למין. רק בדגימה מסוג ״מין״. הערכים נשמרים בטבלת העזר.')
     life_stage = reference_field(LifeStage, 'שלב חיים', 'למשל juv. = פרט צעיר — מוצג אחרי השם. הערכים נשמרים בטבלת העזר.')
     site = forms.ChoiceField(label='אתר צלילה',required=False)
-    trip = TripChoiceField(label='מסע צלילה', queryset=DiveTrip.objects.all(), required=False, help_text='לא מוצא/ת את המסע? אפשר להוסיף מסע חדש ולחזור לכאן.')
+    trip = TripChoiceField(label='מסע צלילה', queryset=DiveTrip.objects.exclude(code__in=LIBRARY_TRIP_CODES), required=False, help_text='לא מוצא/ת את המסע? אפשר להוסיף מסע חדש ולחזור לכאן.')
     class Meta:
         model = Sample
         fields = ['title','kind','order','family','genus','species','full_name','identification_qualifier','life_stage','species_other','trip','site','site_other','day','depth','video_url','image']
@@ -217,6 +217,12 @@ class SampleForm(forms.ModelForm):
         self.fields['kind'].required = False
         self.initial['full_name'] = self.instance.taxon_full_name if self.instance.pk else ''
         self.fields['video_url'].help_text = 'אפשר להשאיר ריק כאשר מעלים תמונה. ניתן להוסיף סרטון בהמשך.'
+        # the library trips (Genera / Families / Orders) are not offered -- a taxon observation is
+        # put into its own automatically (Sample.save) -- but an observation's current one stays valid
+        trips = DiveTrip.objects.exclude(code__in=LIBRARY_TRIP_CODES)
+        if self.instance.pk and self.instance.trip_id:
+            trips = trips | DiveTrip.objects.filter(pk=self.instance.trip_id)
+        self.fields['trip'].queryset = trips
         if self.instance.pk:
             # The undetermined_variant letter (if any) lives on the Sample, not the Species
             # it points to (see Sample.undetermined_variant) -- append it back onto the

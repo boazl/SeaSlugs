@@ -28,8 +28,8 @@ SORT_OPTIONS={'alpha':'לפי סדר אלפביתי (סוג ומין)','kind':'�
 # 'kind' groups the cards by what the image is for, in this order, each group alphabetical:
 # genus identification files, then order, family, genus and species observations, then the
 # rest (collections, uncatalogued "other" species, orphans).
-KIND_GROUPS=('identification',Sample.Kind.ORDER,Sample.Kind.FAMILY,Sample.Kind.GENUS,Sample.Kind.SPECIES,'other')
-KIND_GROUP_LABELS=('קבצי זיהוי של סוגים','תמונות של סדרות','תמונות של משפחות','תמונות של סוגים','תמונות של מינים','אחר (תמונות שאינן מוצגות באף רמה)')
+KIND_GROUPS=('identification','order','suborder','superfamily','family','genus','species','other')
+KIND_GROUP_LABELS=('קבצי זיהוי של סוגים','תמונות של סדרות','תמונות של תתי-סדרות','תמונות של על-משפחות','תמונות של משפחות','תמונות של סוגים','תמונות של מינים','אחר (תמונות שאינן מוצגות באף רמה)')
 DEFAULT_SORT='alpha'
 # one "העברת תמונות לסביבה זו" upload: up to 150 photos (a full genus set re-sent at once), 300MB
 MAX_UPLOAD_FILES=150
@@ -133,7 +133,8 @@ def _search_text(row):
     return ' '.join(p for p in parts if p).lower()
 
 
-LEVEL_KINDS=('order','family','genus','species')
+LIBRARY_PREFIXES={'genera-':'genus','families-':'family','orders-':'order'}
+LEVEL_KINDS=('order','suborder','superfamily','family','genus','species')
 
 
 def taxon_levels():
@@ -162,7 +163,7 @@ def taxon_levels():
     for row in TaxonOrder.objects.select_related('defining_sample'):
         own=not row.sub_order and not row.superfamily
         add(own_or_defining(('order',row.name) if own else ('order-row',row.pk),row.defining_sample),
-            {'kind':'order','label':row.own_name,'url':reverse('order-page',args=[row.pk])})
+            {'kind':row.rank,'label':row.own_name,'url':reverse('order-page',args=[row.pk])})
     for row in TaxonFamily.objects.select_related('defining_sample'):
         add(own_or_defining(('family',row.name) if not row.sub_family else ('family-row',row.pk),row.defining_sample),
             {'kind':'family','label':f'{row.name} ({row.sub_family})' if row.sub_family else row.name,'url':reverse('family-page',args=[row.name])})
@@ -203,11 +204,18 @@ def files(sort=DEFAULT_SORT):
              'blocked':any(not r.video_url and not r.deleted_at for r in refs) or name in site_images or bool(genera),
              'redundant':redundant}
         row['levels']=levels.get(name,[]);row['level_count']=len(row['levels'])
-        # naming rule: a genera-*.jpg file belongs to genus observations only, any other photo to
-        # observations of other kinds (species photos to species observations)
-        is_genus_file=Path(name).name.startswith('genera-')
-        row['genus_file']=is_genus_file
-        row['kind_mismatch']=[r for r in refs if not r.deleted_at and (r.kind==Sample.Kind.GENUS)!=is_genus_file]
+        # naming rule: genera-*.jpg belongs to genus observations only, families-*.jpg to family
+        # ones, orders-*.jpg to order ones (their library trips -- see TAXON_LIBRARY_TRIPS); any
+        # other photo to species / collection observations
+        prefix=next((p for p in LIBRARY_PREFIXES if Path(name).name.startswith(p)),'')
+        row['library_prefix']=prefix
+        expected=LIBRARY_PREFIXES.get(prefix)
+        row['kind_mismatch']=[r for r in refs if not r.deleted_at and
+                              (r.kind!=expected if expected else r.kind in LIBRARY_PREFIXES.values())]
+        # a genus / family / order observation's own photo under a wrong name (e.g. notrip-x.jpg)
+        # can be renamed right here to its level's name (genera- / families- / orders-)
+        owners=[r for r in refs if not r.deleted_at and not r.gallery_source_id and r.kind in LIBRARY_PREFIXES.values()]
+        row['rename_to']=owners[0].canonical_image_name() if row['kind_mismatch'] and len(owners)==1 else ''
         row['search']=_search_text(row)+' '+' '.join(l['label'].lower() for l in row['levels'])
         rows.append(row);paths.append(path)
     _mark_duplicates(rows,paths)
@@ -397,7 +405,22 @@ def manager(request):
     context={'local':not settings.PRODUCTION,'sort':sort,'sort_options':SORT_OPTIONS}
     if request.method=='POST':
         try:
-            action=request.POST.get('action')
+            action='rename' if request.POST.get('rename_file') else request.POST.get('action')
+            if action=='rename':
+                name,path=resolve(request.POST['rename_file'])
+                owners=[r for r in Sample.objects.filter(image=name,deleted_at__isnull=True,gallery_source__isnull=True)
+                        if r.kind in LIBRARY_PREFIXES.values()]
+                if len(owners)!=1: raise ValidationError('אפשר לשנות כאן רק שם של תמונה של תצפית אחת מסוג סוג, משפחה או סדרה.')
+                new_name=owners[0].canonical_image_name()
+                if new_name==name: raise ValidationError('לקובץ כבר יש את השם המתאים.')
+                from .media_transfer import save_images
+                with transaction.atomic():
+                    save_images({new_name:path.read_bytes()})
+                    # the owner and every observation showing it as a gallery image
+                    Sample.objects.filter(image=name).update(image=new_name)
+                path.unlink()
+                messages.success(request,f'שם הקובץ שונה: {name} ← {new_name}')
+                return redirect(redirect_target)
             if action=='delete':
                 chosen=request.POST.getlist('selected')
                 if not chosen: raise ValidationError('יש לסמן תמונות.')

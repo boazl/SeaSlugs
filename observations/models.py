@@ -544,6 +544,28 @@ class DiveTrip(models.Model):
             except ValueError: raise ValidationError({'start_day':'תאריך התחלה לא תקין.'})
 
 
+# The non-real "trips" that hold every order / family / genus observation (photos for a taxon
+# page, not a dive): a taxon-level observation always belongs to the one of its kind (see
+# Sample.save), which also names its image file -- genera-<genus>.jpg, families-<family>.jpg,
+# orders-<order>.jpg (Sample.canonical_image_name: trip code + name).
+TAXON_LIBRARY_TRIPS = {
+    'genus': ('Genera', 'ספריית זיהוי לפי סוג', 'Identification library by genus'),
+    'family': ('Families', 'ספריית זיהוי לפי משפחה', 'Identification library by family'),
+    'order': ('Orders', 'ספריית זיהוי לפי סדרה', 'Identification library by order'),
+}
+
+
+# not real dives: kept out of the trip lists, the trip pickers and the trips pages
+LIBRARY_TRIP_CODES = tuple(code for code, _, _ in TAXON_LIBRARY_TRIPS.values())
+
+
+def taxon_library_trip(kind):
+    """The library trip of a taxon-level kind ('genus' / 'family' / 'order'), created when missing."""
+    code, title, _ = TAXON_LIBRARY_TRIPS[kind]
+    trip, _ = DiveTrip.objects.get_or_create(code=code, defaults={'title': title, 'kind': DiveTrip.Kind.THEMATIC})
+    return trip
+
+
 class SampleKind(Named):
     """Bilingual reference table describing the values Sample.kind can hold. Sample.kind stays
     a plain CharField (not a real FK here) on purpose: it is compared to plain strings and the
@@ -757,7 +779,9 @@ class Sample(models.Model):
             # title, the order / family / genus of a taxon-level sample, or the free-text
             # not-yet-catalogued species.
             identity = self.taxon_name
-        trip_code = self.trip.code if self.trip_id else 'notrip'
+        # an order / family / genus observation is always named after its library trip
+        # (genera- / families- / orders-), even before save() has moved it there
+        trip_code = TAXON_LIBRARY_TRIPS[self.kind][0] if self.kind in TAXON_LIBRARY_TRIPS else self.trip.code if self.trip_id else 'notrip'
         base = slugify(f'{trip_code} {identity}', allow_unicode=True) or f'sample-{self.pk or "new"}'
         candidate = base; n = 2
         qs = Sample.objects.exclude(pk=self.pk) if self.pk else Sample.objects.all()
@@ -855,8 +879,9 @@ class Sample(models.Model):
             if self.species_id or self.species_other: errors['species'] = 'סרטון אוסף אינו משויך למין יחיד. נקה את בחירת המין.'
             if not self.title.strip(): errors['title'] = 'יש להזין כותרת לסרטון האוסף.'
         taxon_level = self.kind in (self.Kind.ORDER, self.Kind.FAMILY, self.Kind.GENUS)
-        if not self.trip_id:
-            if not taxon_level: errors['trip'] = 'יש לבחור מסע צלילה.'
+        if taxon_level:
+            pass    # an order / family / genus observation always goes to its library trip (save()), which has no year
+        elif not self.trip_id: errors['trip'] = 'יש לבחור מסע צלילה.'
         elif not self.trip.year: errors['trip'] = 'למסע הנבחר אין שנה מוגדרת. יש להשלים שנה במסע הצלילה לפני פרסום.'
         self.site_other = self.site_other.strip()
         if self.kind == self.Kind.SPECIES and self.species_id and (self.species_other or '').strip():
@@ -951,7 +976,10 @@ class Sample(models.Model):
                     if duplicate: errors['video_url'] = f'הסרטון הזה כבר קיים בתצפית אחרת ({duplicate}). לא ניתן להשתמש באותו סרטון פעמיים.'
         if errors: raise ValidationError(errors)
     def save(self, *args, **kwargs):
-        if kwargs.get('update_fields') is None: self.sync_taxonomy()
+        if kwargs.get('update_fields') is None:
+            self.sync_taxonomy()
+            if self.kind in TAXON_LIBRARY_TRIPS and not (self.trip_id and self.trip.code == TAXON_LIBRARY_TRIPS[self.kind][0]):
+                self.trip = taxon_library_trip(self.kind)   # an order / family / genus observation lives in its library trip
         if self.gallery_source_id and kwargs.get('update_fields') is None:
             # keep the mirror exact even for a save that skipped clean() (transfers, scripts)
             source = Sample.objects.filter(pk=self.gallery_source_id).values('image', 'image_hash').first()
@@ -981,7 +1009,7 @@ class Sample(models.Model):
                 Species.objects.filter(pk=self.species_id).update(scientific_name=models.F('scientific_name'))
             other = bool(self.species_other) or bool(self.site_other)
             taxon_level = self.kind in (self.Kind.ORDER, self.Kind.FAMILY, self.Kind.GENUS)
-            complete = bool((taxon_level and not self.trip_id or self.trip_id and self.trip.year) and (self.species_id if self.kind == self.Kind.SPECIES else True) and not other)
+            complete = bool((taxon_level or self.trip_id and self.trip.year) and (self.species_id if self.kind == self.Kind.SPECIES else True) and not other)
             if approve and not complete:
                 raise ValidationError('לפני אישור יש להשלים את שנת המסע ולהחליף ערכי ״אחר״ בערכים מטבלאות העזר.')
             self.status = 'published' if complete and (approve or self.kind == self.Kind.SPECIES) else 'pending'

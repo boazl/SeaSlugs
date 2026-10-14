@@ -12,7 +12,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme, urlencode
-from .models import Sample, Profile, Region, Site, DiveTrip, SiteImage, Species, Country, SpeciesArea, SampleKind, KIND_EN_NAMES, TaxonGenus, TaxonFamily, TaxonOrder, full_name_for
+from .models import Sample, Profile, Region, Site, DiveTrip, SiteImage, Species, Country, SpeciesArea, SampleKind, KIND_EN_NAMES, TaxonGenus, TaxonFamily, TaxonOrder, full_name_for, LIBRARY_TRIP_CODES
 from .forms import SiteQuickForm, SpeciesQuickForm, SignupForm, SampleForm, ProfileForm, DiveTripForm, TripQuickForm, taxonomy_for_form, species_name_options
 from .notifications import notify_new_user_registered
 from . import seo_text
@@ -32,7 +32,7 @@ def trips(request):
         species_other='', site_other='').filter(Q(kind='collection', species__isnull=True) | Q(kind='species',species__isnull=False)
         ).filter(Q(image__gt='') | Q(video_url__gt='')   # the public list shows only trips that have media (photo or video)
         ).select_related('species','trip','owner','owner__profile')
-    available = DiveTrip.objects.filter(samples__in=published).distinct()
+    available = DiveTrip.objects.filter(samples__in=published).exclude(code__in=LIBRARY_TRIP_CODES).distinct()
     rows, filters = _trip_list_context(request, available)
     rows = list(rows.select_related('country', 'region', 'site')
                 .prefetch_related(Prefetch('samples',queryset=published,to_attr='public_samples')))
@@ -855,7 +855,7 @@ def trip_picker_data():
     """What the observation form's trip filters (country / region / site / year) need: every trip's
     place and year, and the names of the places that have a trip, so the browser can narrow the long
     trip list without a round trip. Also keeps the region->site mapping the site field already uses."""
-    trips = list(DiveTrip.objects.values('id', 'region_id', 'country_id', 'site_id', 'year'))
+    trips = list(DiveTrip.objects.exclude(code__in=LIBRARY_TRIP_CODES).values('id', 'region_id', 'country_id', 'site_id', 'year'))
     used = lambda key: {t[key] for t in trips if t[key]}
     return {
         'trips': trips,
@@ -1145,7 +1145,7 @@ def trips_manage(request):
     """Every dive trip with filters (region/site, year) and an add button that carries the filters
     into the add form, which suggests the trip's name and code from them."""
     from django.db.models import Count
-    rows = DiveTrip.objects.select_related('country', 'region', 'site').annotate(
+    rows = DiveTrip.objects.exclude(code__in=LIBRARY_TRIP_CODES).select_related('country', 'region', 'site').annotate(
         sample_count=Count('samples', filter=Q(samples__deleted_at__isnull=True), distinct=True))
     rows, filters = _trip_list_context(request, rows, management=True)
     return render(request, 'observations/trips_manage.html', {

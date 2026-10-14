@@ -210,7 +210,7 @@ class GenusPageTests(TestCase):
         html = self.client.get('/observations/?lang=he').content.decode()
         self.assertNotIn(f'/species/{self.area.slug}/#obs-{species_sample.pk}', html)
 
-    def test_taxon_observation_needs_no_trip_and_the_field_is_disabled(self):
+    def test_taxon_observation_goes_to_its_library_trip_and_the_field_is_disabled(self):
         self.client.force_login(self.owner)
         form = self.client.get('/observations/new/?kind=genus&name=Chromodoris').context['form']
         for name in ('trip', 'site', 'site_other', 'day'):
@@ -220,26 +220,26 @@ class GenusPageTests(TestCase):
                                                            'taxon_description_he': 'תיאור', 'next': '/'})
         self.assertEqual(response.status_code, 302, getattr(response, 'context', None) and response.context['form'].errors)
         sample = Sample.objects.get(kind=Sample.Kind.ORDER, order='Nudibranchia')
-        self.assertIsNone(sample.trip)
+        self.assertEqual(sample.trip.code, 'Orders')                 # its library trip, not a dive
         sample.save_reviewed(actor=self.owner, approve=True)         # ... and can be approved and published like that
         self.assertEqual(sample.status, 'published')
         # a posted trip is ignored for taxon kinds (the field is disabled)
         other = self.client.post('/observations/new/', {'kind': 'family', 'family': 'Chromodorididae', 'trip': str(self.trip.pk), 'site': '', 'next': '/'})
-        self.assertIsNone(Sample.objects.get(kind=Sample.Kind.FAMILY, family='Chromodorididae').trip)
+        self.assertEqual(Sample.objects.get(kind=Sample.Kind.FAMILY, family='Chromodorididae').trip.code, 'Families')
         # the pages and lists that show observations cope with a trip-less one
         self.assertEqual(self.client.get('/observations/').status_code, 200)
         self.assertEqual(self.client.get(f'/order/{self.order.pk}/').status_code, 200)
         self.assertEqual(self.client.get(f'/admin/observations/sample/{sample.pk}/change/').status_code, 200)
         self.assertEqual(self.client.get('/observations/trips/').status_code, 200)
 
-    def test_editing_a_taxon_observation_keeps_the_trip_it_already_has(self):
+    def test_editing_a_taxon_observation_moves_it_to_its_library_trip(self):
         self.client.force_login(self.owner)
-        self.assertEqual(self.genus_sample.trip_id, self.trip.pk)
+        self.assertEqual(self.genus_sample.trip.code, 'Genera')     # saved into it on creation
         response = self.client.post(f'/observations/{self.genus_sample.pk}/edit/', {
             'kind': 'genus', 'genus': 'Chromodoris', 'video_url': self.genus_sample.video_url, 'site': '', 'next': '/'})
         self.assertEqual(response.status_code, 302, getattr(response, 'context', None) and response.context['form'].errors)
         self.genus_sample.refresh_from_db()
-        self.assertEqual(self.genus_sample.trip_id, self.trip.pk)
+        self.assertEqual((self.genus_sample.trip.code, self.genus_sample.trip.kind), ('Genera', 'thematic'))
 
     def test_species_and_collection_observations_still_need_a_trip(self):
         self.client.force_login(self.owner)
