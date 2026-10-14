@@ -74,8 +74,8 @@ class SpeciesAdminViewOnSiteButtonTests(TestCase):
         page = self.client.get(self.admin_url).content.decode()
         row = page[page.index('class="submit-row"'):]
         row = row[:row.index('</div>')]
-        self.assertIn(f'href="/species/{slug}/"', row)
-        self.assertIn('צפייה בדף המין<', row)
+        self.assertIn('name="_save_and_view" value="0"', row)
+        self.assertIn('שמירה וצפייה בדף המין<', row)
         self.assertEqual(self.client.get(f'/species/{slug}/').status_code, 200)
 
     def test_a_species_in_two_areas_gets_a_button_per_page(self):

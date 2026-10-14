@@ -148,15 +148,25 @@ class WholeOrderPageTests(TestCase):
         empty = TaxonOrder.objects.create(name='Pteropoda', sub_order='Gymnosomata')      # no gallery species: no page
         for row, label in ((self.base, 'צפייה בדף הסדרה'), (self.group, 'צפייה בדף התת-סדרה'), (self.superfamily, 'צפייה בדף העל-משפחה')):
             html = self.client.get(reverse('admin:observations_taxonorder_change', args=[row.pk])).content.decode()
-            self.assertIn(f'href="{reverse("order-page", args=[row.pk])}" class="button site-page-link"', html)
-            self.assertIn(label, html)
+            self.assertIn('name="_save_and_view" value="0" class="button site-page-link"', html)
+            self.assertIn('שמירה ו' + label, html)
         self.assertNotIn('site-page-link', self.client.get(reverse('admin:observations_taxonorder_change', args=[empty.pk])).content.decode())
         family = TaxonFamily.objects.get(name='Chromodorididae')
         html = self.client.get(reverse('admin:observations_taxonfamily_change', args=[family.pk])).content.decode()
-        self.assertIn('href="/family/Chromodorididae/" class="button site-page-link"', html)
+        self.assertIn('שמירה וצפייה בדף המשפחה', html)
         genus = TaxonGenus.objects.get(name='Chromodoris')
         html = self.client.get(reverse('admin:observations_taxongenus_change', args=[genus.pk])).content.decode()
-        self.assertIn('href="/genus/Chromodoris/" class="button site-page-link"', html)
+        self.assertIn('שמירה וצפייה בדף הסוג', html)
+        # the button saves the row and then opens its page (not the table)
+        url = reverse('admin:observations_taxonfamily_change', args=[family.pk])
+        form = self.client.get(url).context['adminform'].form
+        from django import forms as dj_forms
+        data = {name: ('' if value is None else value) for name, value in form.initial.items()
+                if name in form.fields and not isinstance(form.fields[name], dj_forms.FileField)}
+        data.update({'name_he': 'משפחה בדוקה', '_save_and_view': '0'})
+        response = self.client.post(url, data)
+        self.assertRedirects(response, '/family/Chromodorididae/', fetch_redirect_response=False)
+        family.refresh_from_db(); self.assertEqual(family.name_he, 'משפחה בדוקה')
 
     def test_every_level_page_has_a_back_to_the_gallery_button_that_restores_the_view(self):
         """"/?restore=1": the gallery comes back to the view the visitor left (same rank, taxon, filters, place)."""

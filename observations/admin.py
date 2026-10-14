@@ -1,5 +1,6 @@
 from django import forms
 from django.contrib import admin, messages
+from django.shortcuts import redirect
 from django.utils.html import escape as html_escape
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
@@ -78,6 +79,31 @@ class SpeciesAdminForm(forms.ModelForm):
         self.fields['species'].help_text = 'אפשר לכלול סימון זהות פתוחה, למשל "cf. strigata" או "sp. 7".'
 
 
+class SaveAndViewMixin:
+    """A "save and view the page on the site" button next to Save, for each public page of the row
+    (submit_line.html): it saves like Save and then opens that page instead of the table."""
+    def site_pages(self, obj):
+        """[(label, url)] -- the label starts with "צפייה ב..." (the button reads "שמירה וצפייה ב...")."""
+        return []
+
+    def render_change_form(self, request, context, add=False, change=False, form_url='', obj=None):
+        context['site_pages'] = self.site_pages(obj) if obj is not None and obj.pk else []
+        return super().render_change_form(request, context, add=add, change=change, form_url=form_url, obj=obj)
+
+    def response_change(self, request, obj):
+        choice = request.POST.get('_save_and_view')
+        if choice is not None:
+            pages = self.site_pages(obj)
+            try: label, url = pages[int(choice)]
+            except (ValueError, IndexError):
+                # the page no longer exists after this save (e.g. nothing left to show): back to the form
+                self.message_user(request, 'השינויים נשמרו, אבל הדף כבר לא קיים באתר.', messages.WARNING)
+                return redirect(request.path)
+            self.message_user(request, f'"{obj}" נשמר.', messages.SUCCESS)
+            return redirect(url)
+        return super().response_change(request, obj)
+
+
 def species_site_pages(species):
     """[(button label, url)] for every public gallery page of the species -- areas whose defining
     sample is a published, publicly showable one (the same rule the gallery itself uses)."""
@@ -92,14 +118,12 @@ def species_site_pages(species):
 
 
 @admin.register(Species)
-class SpeciesAdmin(admin.ModelAdmin):
+class SpeciesAdmin(SaveAndViewMixin, admin.ModelAdmin):
     form = SpeciesAdminForm
     readonly_fields = ['scientific_name', 'full_name_display']
-    def render_change_form(self, request, context, add=False, change=False, form_url='', obj=None):
-        # "View on the site" buttons next to Save: one per public gallery page of this species
-        # (a species observed in several areas has a page for each).
-        context['site_pages'] = species_site_pages(obj) if obj is not None and obj.pk else []
-        return super().render_change_form(request, context, add=add, change=change, form_url=form_url, obj=obj)
+    def site_pages(self, obj):
+        # one per public gallery page of this species (a species observed in several areas has a page for each)
+        return species_site_pages(obj)
     @admin.display(description='שם מלא כולל מחבר (נגזר)')
     def full_name_display(self, obj):
         return obj.full_name if obj and obj.pk else '—'
@@ -328,17 +352,15 @@ class DefiningSampleChoicesMixin:
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 
-class TaxonSitePageMixin:
-    """A "view the page on the site" button next to Save -- as the species admin has -- when the row has a
-    public page (one with at least one gallery species; the page 404s otherwise)."""
+class TaxonSitePageMixin(SaveAndViewMixin):
+    """The row's public page (one with at least one gallery species; the page 404s otherwise)."""
     def site_page(self, obj):
         """(button label, url) or None."""
         raise NotImplementedError
 
-    def render_change_form(self, request, context, add=False, change=False, form_url='', obj=None):
-        page = self.site_page(obj) if obj is not None and obj.pk else None
-        context['site_pages'] = [page] if page else []
-        return super().render_change_form(request, context, add=add, change=change, form_url=form_url, obj=obj)
+    def site_pages(self, obj):
+        page = self.site_page(obj)
+        return [page] if page else []
 
 
 @admin.register(TaxonOrder)

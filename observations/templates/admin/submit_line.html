@@ -1,3 +1,4 @@
 {% extends "admin/submit_line.html" %}
-{# Same save row as Django's; the species admin adds "view on the site" buttons (context: site_pages). #}
-{% block submit-row %}{{ block.super }}{% for label, url in site_pages %}<a href="{{ url }}" class="button site-page-link" style="padding:10px 15px;margin:0 5px;text-decoration:none">{{ label }}</a>{% endfor %}{% endblock %}
+{# Same save row as Django's, plus "save and view the page" buttons (context: site_pages -- see admin.SaveAndViewMixin): #}
+{# each saves like Save and then opens that public page instead of returning to the table. #}
+{% block submit-row %}{{ block.super }}{% for label, url in site_pages %}<button type="submit" name="_save_and_view" value="{{ forloop.counter0 }}" class="button site-page-link" style="padding:10px 15px;margin:0 5px">שמירה ו{{ label }}</button>{% endfor %}{% endblock %}
