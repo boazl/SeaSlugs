@@ -1048,6 +1048,7 @@ function renderTaxonLevel(species, level, frag) {
             level = LEVELS[LEVELS.indexOf(level) + 1];
         }
     }
+    grid.dataset.level = level;
     const heading = document.createElement('h2');
     heading.className = 'gallery-group-title';
     heading.textContent = rankName(level);
@@ -1204,6 +1205,7 @@ function render() {
     if (state.sort === 'year') filteredSpecies = [...filteredSpecies].sort(speciesYearCompare);
     if (state.sort === 'count') filteredSpecies = [...filteredSpecies].sort(speciesCountCompare);
     grid.replaceChildren();
+    grid.dataset.level = '';       // set by renderTaxonLevel: the rank the cards are of (styles.css sizes them by it)
     const frag = document.createDocumentFragment();
     if (filteredCollections.length) {
         const heading = document.createElement('h2');
