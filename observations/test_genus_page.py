@@ -276,26 +276,29 @@ class GenusPageTests(TestCase):
         self.assertEqual(response.status_code, 302, getattr(response, 'context', None) and response.context['form'].errors)
         sample.refresh_from_db()
         self.assertEqual(sample.status, 'published')
-        self.assertEqual(TaxonOrder.objects.get(name='Nudibranchia').defining_sample_id, sample.pk)
+        from observations.defining import display_sample
+        self.assertEqual(display_sample(TaxonOrder.objects.get(name='Nudibranchia')), sample)
 
     def test_order_observation_sets_only_the_order_row_and_the_catalog_lists_that_row(self):
         TaxonOrder.objects.create(name='Nudibranchia', sub_order='Doridina', taxonomic_order='4')
         sample = self._taxon_sample(Sample.Kind.ORDER, order='Nudibranchia')
-        self.assertIsNone(TaxonOrder.objects.get(name='Nudibranchia', sub_order='Doridina').defining_sample_id)
+        from observations.defining import display_sample
+        self.assertNotEqual(display_sample(TaxonOrder.objects.get(name='Nudibranchia', sub_order='Doridina')), sample)
         base = TaxonOrder.objects.get(name='Nudibranchia', sub_order='')
-        self.assertEqual(base.defining_sample_id, sample.pk)
+        self.assertEqual(display_sample(base), sample)
         import json
         catalog = json.loads(self.client.get('/catalog.js').content.decode().split('=', 1)[1].strip().rstrip(';'))
         self.assertEqual(catalog['taxa']['order_pages']['Nudibranchia'], base.pk)
         entry = catalog['taxa']['orders'][str(base.pk)]               # the card's curated photo/video is findable
         self.assertTrue(entry['thumbnail'] or entry['video_id'])
 
-    def test_the_newest_order_observation_is_the_defining_sample(self):
+    def test_the_newest_order_observation_is_what_the_order_shows(self):
         older = self._taxon_sample(Sample.Kind.ORDER, order='Nudibranchia')
         newer = self._taxon_sample(Sample.Kind.ORDER, order='Nudibranchia')
-        self.assertEqual(TaxonOrder.objects.get(name='Nudibranchia', sub_order='').defining_sample_id, newer.pk)
+        from observations.defining import display_sample
+        self.assertEqual(display_sample(TaxonOrder.objects.get(name='Nudibranchia', sub_order='')), newer)
         newer.soft_delete(self.owner)
-        self.assertEqual(TaxonOrder.objects.get(name='Nudibranchia', sub_order='').defining_sample_id, older.pk)
+        self.assertEqual(display_sample(TaxonOrder.objects.get(name='Nudibranchia', sub_order='')), older)
 
     def test_card_shows_the_observation_count_when_the_species_has_several(self):
         url = f'/genus/{self.genus.name}/'
@@ -368,9 +371,10 @@ class GenusPageTests(TestCase):
     def test_genus_page_without_a_defining_sample_falls_back_to_a_species_photo(self):
         # Breadcrumbs and gallery panels always link to the genus page, so a genus with no
         # media of its own still gets a page, using one of its species' photo/video.
-        self.genus_sample.soft_delete(self.owner)  # only genus-kind sample -- see Sample.save
+        self.genus_sample.soft_delete(self.owner)  # only genus-kind sample
         self.genus.refresh_from_db()
-        self.assertIsNone(self.genus.defining_sample_id)
+        # a genus' defining sample is one of its species' observations (see defining.py)
+        self.assertTrue(self.genus.defining_sample_id is None or self.genus.defining_sample.kind == Sample.Kind.SPECIES)
         response = self.client.get(f'/genus/{self.genus.name}/')
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.context['image_url'] or response.context['video_id'])
@@ -379,12 +383,15 @@ class GenusPageTests(TestCase):
         sample = Sample(owner=self.owner, kind=Sample.Kind.FAMILY, family='Chromodorididae', order='Nudibranchia',
                         trip=self.trip, video_url='https://youtu.be/44444444444')
         sample.save_reviewed(actor=self.owner, approve=True)
+        from observations.defining import display_sample
         self.family.refresh_from_db()
-        self.assertEqual(self.family.defining_sample_id, sample.pk)
+        # the family's own observation is what its page shows (its defining sample is a genus observation)
+        self.assertEqual(display_sample(self.family), sample)
+        self.assertNotEqual(self.family.defining_sample_id, sample.pk)
         self.assertEqual(self.client.get('/family/Chromodorididae/').context['video_id'], '44444444444')
-        sample.soft_delete(self.owner)   # a stale family-kind pick is cleared; the page falls back to a species
+        sample.soft_delete(self.owner)   # gone: the page falls back to the defining sample / a species
         self.family.refresh_from_db()
-        self.assertIsNone(self.family.defining_sample_id)
+        self.assertNotEqual(display_sample(self.family), sample)
         self.assertEqual(self.client.get('/family/Chromodorididae/').status_code, 200)
 
     def test_observation_filter_offers_every_record_type(self):

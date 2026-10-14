@@ -30,7 +30,7 @@ TABLES = {'groups': ACCOUNT_TABLES['groups'], 'users': ACCOUNT_TABLES['users'],
           'species': (Species, ['scientific_name','name_he','name_en','source_id','genus','species','author','order','family','superfamily','accepted_genus','accepted_species','common_name','transliteration','language','formatted_author','distribution','phylogenetic_order','full_species_name_with_order','reference_author','is_migrant','habitat','food','first_observed_year','last_observed_year','size_from','size_to','size_max','description_he','description_en','link','reference_link']),
           'trips': (DiveTrip, ['code','title','source_sort','year','month','start_day','duration_days','country','region','site','country_name','region_name','reserve','sea_name','species_count','source_metadata','kind','description_he','description_en','link']),
           'qualifiers': (IdentificationQualifier,['code','name','name_en']), 'lifestages': (LifeStage,['code','name','name_en']),
-          'samples': (Sample, ['title','kind','trip','owner','order','family','genus','species','identification_qualifier','life_stage','site','species_other','undetermined_variant','site_other','day','depth','video_url','status','source_id','gallery_order','source_metadata','transfer_id','image']),
+          'samples': (Sample, ['title','kind','trip','owner','order','family','genus','species','identification_qualifier','life_stage','site','species_other','undetermined_variant','site_other','day','depth','video_url','status','source_id','gallery_order','source_metadata','transfer_id','image','gallery_source']),
           'speciesareas': (SpeciesArea, ['species','country','sea','undetermined_variant','defining_sample'])}
 
 
@@ -304,6 +304,15 @@ def apply(document, expected, actor=None, backup=None):
                 if reference_counts(item['object']): raise ValidationError('נוצר קשר חדש לרשומה להסרה; יש לבדוק שוב.')
                 item['object'].delete()
         if document['table'] == 'samples':
+            # A gallery image whose owning sample arrived in this same file: link it now that
+            # both rows are saved (the plan couldn't resolve a sample that didn't exist yet).
+            for item in items:
+                pending = getattr(item['object'], '_pending_gallery', None) if item['action'] in ('new', 'update', 'same') else None
+                if pending:
+                    source = Sample.objects.filter(transfer_id=pending, deleted_at__isnull=True).first()
+                    if source:
+                        sample = Sample.objects.get(pk=item['object'].pk)
+                        sample.gallery_source = source.gallery_source or source; sample.save()
             # Mirror Sample.save_reviewed()'s own side effect: a transferred sample that is
             # already published must register itself in SpeciesArea exactly like one saved
             # through the site normally would, otherwise imported species silently never

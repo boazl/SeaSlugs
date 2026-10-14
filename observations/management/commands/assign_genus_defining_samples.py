@@ -1,62 +1,42 @@
-"""Point each TaxonGenus.defining_sample at its own dedicated genus-kind Sample
-(kind=Sample.Kind.GENUS, genus=<genus name>), whenever a published one exists --
-overriding whatever species-level photo may currently be set there. A purpose-built genus
-reference photo is a better representative of the whole genus in the gallery's genus panel
-than a photo of one particular species standing in for it.
+"""Give every order / sub-order / superfamily, family and genus row a defining sample that fits it
+(see observations/defining.py): a row whose defining sample is of the wrong level or taxon, deleted,
+or shows nothing while another would, gets the first one that fits; an empty row is filled.
 
-Safe to re-run: a genus with no matching genus-kind sample is left completely untouched, so
-this never clears a value build_taxonomy_tables (or an admin) set some other way.
-"""
+Dry run by default; --apply writes (after a database backup)."""
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-from observations.models import Sample, TaxonGenus
+from observations.models import TaxonGenus, TaxonFamily, TaxonOrder
 from observations.table_transfer import create_backup
-
-from .build_taxonomy_tables import _pick_defining_sample
 
 
 class Command(BaseCommand):
-    help = "Point TaxonGenus.defining_sample at each genus's own dedicated genus-kind Sample, when one exists."
+    help = "Fix every taxonomy row's defining sample to one that fits its level (first that fits)."
 
     def add_arguments(self, parser):
         parser.add_argument('--apply', action='store_true', help='Actually write to the database (default: dry run report only).')
 
     def handle(self, *args, **options):
-        apply = options['apply']
+        from observations.defining import repair, fits, first_choice
 
-        def genus_samples(name):
-            return Sample.objects.filter(kind=Sample.Kind.GENUS, genus=name,
-                                          status='published', deleted_at__isnull=True)
+        def run(apply):
+            changed = {'orders': 0, 'families': 0, 'genera': 0}
+            for key, model in (('orders', TaxonOrder), ('families', TaxonFamily), ('genera', TaxonGenus)):
+                for row in model.objects.select_related('defining_sample'):
+                    if apply:
+                        changed[key] += repair(row)
+                    else:
+                        current = row.defining_sample
+                        picked = first_choice(row)
+                        if (current is None or not fits(row, current)) and (picked.pk if picked else None) != row.defining_sample_id:
+                            changed[key] += 1
+            return changed
 
-        def run():
-            updated = 0
-            unchanged = 0
-            for genus in TaxonGenus.objects.all():
-                picked = _pick_defining_sample(genus_samples(genus.name))
-                if not picked or genus.defining_sample_id == picked.pk:
-                    unchanged += 1
-                    continue
-                updated += 1
-                if apply:
-                    genus.defining_sample = picked
-                    genus.save(update_fields=['defining_sample'])
-            return updated, unchanged
-
-        if apply:
+        if options['apply']:
             backup = create_backup()
             with transaction.atomic():
-                updated, unchanged = run()
+                changed = run(True)
             self.stdout.write(f'Backup created: {backup.name}')
         else:
-            updated, unchanged = run()
-
-        genera_with_sample = Sample.objects.filter(
-            kind=Sample.Kind.GENUS, status='published', deleted_at__isnull=True,
-        ).values('genus').distinct().count()
-        self.stdout.write(
-            f'genus defining_sample: {updated} to update, {unchanged} already correct or no genus-kind sample '
-            f'(of {TaxonGenus.objects.count()} genera; {genera_with_sample} distinct genera have a published genus-kind sample)'
-        )
-        if not apply:
-            self.stdout.write('Dry run only -- pass --apply to write to the database.')
+            changed = run(False)
+        self.stdout.write('defining samples changed: ' + ', '.join(f'{k} {v}' for k, v in changed.items()))

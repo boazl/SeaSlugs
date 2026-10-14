@@ -60,8 +60,14 @@ def taxon_plan(document):
                 label += ' (הדגימה המגדירה חסרה ביעד — לא שונתה; יש להעביר את Samples ולייבא שוב)'
                 values[DEFINING] = before[DEFINING]
             else:
-                candidate.defining_sample = sample
-                shown[DEFINING] = _describe(sample)
+                from .defining import fits
+                if not fits(candidate, sample):
+                    # the sample is of the wrong level or taxon for this row here (see defining.py)
+                    label += ' (הדגימה המגדירה אינה מתאימה לשורה זו ביעד — לא שונתה)'
+                    values[DEFINING] = before[DEFINING]
+                else:
+                    candidate.defining_sample = sample
+                    shown[DEFINING] = _describe(sample)
         else:
             values[DEFINING] = before[DEFINING]
         candidate.full_clean(exclude=[f.name for f in model._meta.fields if f.name not in fields])

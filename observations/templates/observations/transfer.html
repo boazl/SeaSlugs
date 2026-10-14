@@ -6,6 +6,7 @@
 <p>בסנכרון מלא הקובץ נחשב לרשימה המלאה: רשומות שאינן בו יוצגו להסרה. אתרים כפולים באותו שם ובאותה מדינה ימוזגו רק כשיש יעד יחיד, תוך שמירת הקשרים. רשומה מקושרת ללא יעד ברור תחסום את הפעולה. סנכרנו אתרים לפני מחיקת אזורים ישנים; אזורים חדשים יש לייבא תחילה במצב הרגיל.</p>
 {% if token %}
 {% for item in items %}{% if item.action == 'skipped' or item.action == 'blocked' %}<p class="errorlist">{{item.label}} — {{item.reason}}</p>{% endif %}{% endfor %}
+{% for item in items %}{% for warning in item.warnings %}<p class="errorlist">{{item.label}} — {{warning}}</p>{% endfor %}{% endfor %}
 <h2>{{table_name}} — {{changed}} רשומות להוספה, עדכון, מיזוג או מחיקה, {{unchanged}} ללא שינוי</h2>
 {% for item in items %}{% if item.action != 'same' and item.action != 'skipped' %}
 <article><h3>{{item.label}} — {% if item.action == 'new' %}חדש{% elif item.action == 'merge' %}מיזוג ושמירת הקשרים{% elif item.action == 'delete' %}מחיקה{% elif item.action == 'blocked' %}מחיקה חסומה{% else %}עדכון{% endif %}</h3>

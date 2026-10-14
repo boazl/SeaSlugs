@@ -99,6 +99,9 @@ def gallery_file(request, filename='index.html'):
             )
 
         taxa_orders, taxa_families, taxa_genera = {}, {}, {}
+        # a taxon card shows its own order/family/genus observation, else its defining sample
+        from observations.defining import display_sample, own_kind_samples
+        own_kind = own_kind_samples()
 
         def taxon_media(defining_sample):
             if not defining_sample or defining_sample.status != 'published' or defining_sample.deleted_at:
@@ -123,7 +126,7 @@ def gallery_file(request, filename='index.html'):
         def register_taxon(dest, obj, sub_value):
             key = str(obj.pk)
             if key not in dest:
-                thumbnail, image_url, video_id = taxon_media(obj.defining_sample)
+                thumbnail, image_url, video_id = taxon_media(display_sample(obj, own_kind))
                 label, label_en = taxon_label_pair(obj, sub_value)
                 dest[key] = {'label': label, 'label_en': label_en, 'thumbnail': thumbnail, 'image_url': image_url, 'video_id': video_id,
                              # obj.name -- the plain taxon name (never the sub_value-qualified

@@ -201,12 +201,12 @@ class Command(BaseCommand):
                 kind='species', status='published', deleted_at__isnull=True, species_other='', **filters)
 
         def fill_defining_sample(obj, level, **filters):
-            if not apply or obj.defining_sample_id is not None:
+            # an empty (or unfit) defining sample gets the first one that fits the row's level
+            # -- see observations/defining.py for which observations may define which row
+            if not apply:
                 return
-            picked = _pick_defining_sample(base_species_samples(**filters))
-            if picked:
-                obj.defining_sample = picked
-                obj.save(update_fields=['defining_sample'])
+            from observations.defining import repair
+            if repair(obj):
                 defining_counts[level] += 1
 
         order_reference_counts = [0, 0]

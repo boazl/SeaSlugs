@@ -110,11 +110,14 @@ class KindFieldsTests(TaxonomyBase):
         self.assertEqual(s.status, 'published')
         self.assertFalse(any('להחליף את ערך המין' in r for r in s.publication_reasons()))
 
-    def test_saving_a_genus_sample_points_the_genus_at_it(self):
+    def test_a_genus_sample_is_what_its_genus_shows(self):
+        # the genus' own observation is shown first; its defining sample is one of its species
+        from .defining import display_sample
         s = self.sample(kind=Sample.Kind.GENUS, genus='Chromodoris')
         s.save_reviewed(actor=self.user, approve=True)
         self.genus.refresh_from_db()
-        self.assertEqual(self.genus.defining_sample_id, s.pk)
+        self.assertEqual(display_sample(self.genus), s)
+        self.assertNotEqual(self.genus.defining_sample_id, s.pk)
 
 
 class NameTests(TaxonomyBase):

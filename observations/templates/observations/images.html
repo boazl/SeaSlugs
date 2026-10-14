@@ -1,5 +1,5 @@
 {% extends 'observations/base.html' %}{% block site_hero %}{% endblock %}{% block content %}
-<h1>ניהול תמונות</h1><p><a href="{% url 'folder-import' %}">ייבוא תיקיית תמונות לפי מסע צלילה</a></p><p class="notice">סביבה: <strong>{% if local %}המק המקומי{% else %}האתר ב־Render{% endif %}</strong> · {{images|length}} קבצים · {{total_bytes|filesizeformat}}</p>
+<h1>ניהול תמונות</h1><p><a href="{% url 'folder-import' %}">ייבוא תיקיית תמונות לפי מסע צלילה</a></p><p class="notice">סביבה: <strong>{% if local %}המק המקומי{% else %}האתר ב־Render{% endif %}</strong> · {{file_count}} קבצים · {{total_bytes|filesizeformat}}</p>
 <p>מיון: {% for key,label in sort_options.items %}{% if key == sort %}<strong>{{label}}</strong>{% else %}<a href="?sort={{key}}">{{label}}</a>{% endif %}{% if not forloop.last %} · {% endif %}{% endfor %}</p>
 <p><a href="http://127.0.0.1:8000/admin/images/">תמונות במק</a> · <a href="https://seaslugs.onrender.com/admin/images/" target="_blank" rel="noopener">תמונות באתר</a></p>
 <h2>השוואת תמונות בין הסביבות</h2>
@@ -11,15 +11,25 @@
 {% if comparison.missing_here %}<ul>{% for label in comparison.missing_here %}<li>{{label}}</li>{% endfor %}</ul>{% else %}<p>אין תמונות חסרות כאן.</p>{% endif %}
 <h3>קיימות רק כאן, חסרות בסביבה השנייה ({{comparison.only_here|length}})</h3>
 {% if comparison.only_here %}<ul>{% for label in comparison.only_here %}<li>{{label}}</li>{% endfor %}</ul><p><button type="button" id="select-only-here" data-label-on="הצגת כל התמונות" data-label-off="סימון התמונות האלה בגלריה למטה, לקראת הורדה">סימון התמונות האלה בגלריה למטה, לקראת הורדה</button></p>{{ comparison.only_here|json_script:"only-here-names" }}{% else %}<p>אין תמונות שקיימות רק כאן.</p>{% endif %}
+<h3>אותו שם קובץ, תוכן שונה ({{comparison.different_content|length}})</h3>
+{% if not comparison.contents_checked %}<p class="helptext">הקובץ יוצא בגרסה קודמת של האתר ואינו כולל את תוכן הקבצים. יש לייצא אותו מחדש בסביבה השנייה אחרי עדכון הקוד שם.</p>
+{% elif comparison.different_content %}<p class="helptext">הקובץ קיים בשתי הסביבות בשם זהה אבל התמונה שונה. יש להעביר את הגרסה הנכונה לסביבה השנייה: לסמן אותן כאן, להוריד, ולהעלות בסביבה השנייה ב"העברת תמונות לסביבה זו" עם אישור החלפת תמונות קיימות.</p>
+<table class="content-diff"><tr><th>קובץ</th><th>גודל כאן</th><th>גודל בסביבה השנייה</th><th>עודכן כאן</th><th>עודכן בסביבה השנייה</th><th>החדשה יותר</th></tr>{% for row in comparison.different_content %}<tr><td dir="ltr">{{row.name}}</td><td>{{row.size_here|filesizeformat}}</td><td>{% if row.size_there is not None %}{{row.size_there|filesizeformat}}{% else %}—{% endif %}</td><td dir="ltr">{{row.mtime_here|date:"Y-m-d H:i"}}</td><td dir="ltr">{{row.mtime_there|date:"Y-m-d H:i"}}</td><td>{% if row.newer == 'here' %}כאן{% elif row.newer == 'there' %}בסביבה השנייה{% else %}—{% endif %}</td></tr>{% endfor %}</table>
+<p><button type="button" id="select-different-content" data-label-on="הצגת כל התמונות" data-label-off="סימון התמונות האלה בגלריה למטה, לקראת הורדה">סימון התמונות האלה בגלריה למטה, לקראת הורדה</button></p>{{ comparison.different_content_names|json_script:"different-content-names" }}
+{% else %}<p>לכל הקבצים המשותפים אותו תוכן בשתי הסביבות.</p>{% endif %}
+<h3>תצפיות שקיימות בשתי הסביבות עם תמונה שונה ({{comparison.different_image|length}})</h3>
+{% if not comparison.assignments_checked %}<p class="helptext">הקובץ יוצא בגרסה קודמת של האתר ואינו כולל את שיוך התמונות לתצפיות. יש לייצא אותו מחדש בסביבה השנייה אחרי עדכון הקוד שם.</p>
+{% elif comparison.different_image %}<p class="helptext">התמונה עצמה קיימת, אבל התצפית משתמשת בה רק באחת הסביבות (או בתמונה אחרת). העברת טבלת התצפיות אינה מעבירה את שיוך התמונה — יש לבחור את התמונה בעריכת התצפית בסביבה שבה היא חסרה.</p><ul>{% for row in comparison.different_image %}<li><a href="{% url 'observation-edit' row.sample.pk %}">{{row.sample}}</a> ({{row.sample.get_kind_display}}) — כאן: <span dir="ltr">{{row.here|default:"ללא תמונה"}}</span> · בסביבה השנייה: <span dir="ltr">{{row.there|default:"ללא תמונה"}}</span></li>{% endfor %}</ul>
+{% else %}<p>לכל התצפיות אותה תמונה בשתי הסביבות.</p>{% endif %}
 </div>{% endif %}
 <p>סמנו תמונות והורידו כקבצים רגילים. בסביבת היעד העלו את הקבצים ללא שינוי שמם. הדפדפן עשוי לבקש אישור להורדת כמה קבצים. הורדה מעתיקה את התמונה ואינה מוחקת את המקור. התמונות המשויכות נושאות את נתוני התצפית בקובץ. תצפית חסרה תתווסף ביעד; בתצפית קיימת תוחלף רק התמונה. יש להעביר תחילה משתמשים וטבלאות עזר. קובצי ההעברה כוללים פרטי תצפית ושם חשבון.</p>
 {% if error %}<p class="errorlist" role="alert">{{error}}</p>{% endif %}
 <form method="post" id="image-selection">{% csrf_token %}<input type="hidden" name="action" value="delete">
-<p id="gallery-toolbar"><button type="button" id="select-all">בחירת הכול / ביטול</button> <button type="button" id="select-redundant" data-label-on="הצגת כל התמונות" data-label-off="בחירת תמונות מיותרות">בחירת תמונות מיותרות</button> <button type="button" id="select-duplicates" data-label-on="הצגת כל התמונות" data-label-off="הצגת תמונות זהות">הצגת תמונות זהות</button> <button type="button" id="download-images">הורדת התמונות המסומנות למק</button></p>
+<p id="gallery-toolbar"><button type="button" id="select-all">בחירת הכול / ביטול</button> <button type="button" id="select-redundant" data-label-on="הצגת כל התמונות" data-label-off="בחירת תמונות מיותרות">בחירת תמונות מיותרות</button> <button type="button" id="select-duplicates" data-label-on="הצגת כל התמונות" data-label-off="הצגת תמונות זהות">הצגת תמונות זהות</button> <button type="button" id="select-mismatch" data-label-on="הצגת כל התמונות" data-label-off="שיוך לא תואם לשם">שיוך לא תואם לשם</button> <button type="button" id="download-images">הורדת התמונות המסומנות למק</button></p>
 <p><label for="image-search">חיפוש:</label> <input type="search" id="image-search" placeholder="שם מין, סוג, משפחה, שם קובץ, אזור או שנה" style="width:min(100%,28em)" autocomplete="off"> <span id="image-count" aria-live="polite"></span></p>
 <p id="image-none" hidden>לא נמצאו תמונות.</p>
 <style>
-/* Card image = 110% of the public gallery's card image width (dist/styles.css): the gallery
+/* Card image = 121% of the public gallery's card image width (110%, then 10% more) (dist/styles.css): the gallery
    grid sits in <main> (min(100vw, max(1500px, min(1900px, 96vw))) wide, less 5% padding each
    side), beside a 260px filter sidebar and a 32px gap (no sidebar at 1000px and below), and
    lays its cards out in --gcols columns --ggap apart. */
@@ -29,7 +39,7 @@
 @media(max-width:1000px){:root{--gside:0px}}
 @media(max-width:850px){:root{--gcols:2}}
 @media(max-width:560px){:root{--ggap:14px}}
-:root{--gallery-img:calc((min(100vw,max(1500px,min(1900px,96vw))) - 10vw - var(--gside) - (var(--gcols) - 1) * var(--ggap)) / var(--gcols));--card-img:calc(var(--gallery-img) * 1.1)}
+:root{--gallery-img:calc((min(100vw,max(1500px,min(1900px,96vw))) - 10vw - var(--gside) - (var(--gcols) - 1) * var(--ggap)) / var(--gcols));--card-img:calc(var(--gallery-img) * 1.21)}
 main{max-width:max(1500px,min(1900px,96vw))}
 .image-cards{grid-template-columns:repeat(auto-fill,calc(var(--card-img) + 30px));justify-content:start;gap:15px}
 .image-cards article{padding:14px;font-size:15px;min-width:0;max-width:100%;box-sizing:border-box}
@@ -38,10 +48,15 @@ main{max-width:max(1500px,min(1900px,96vw))}
 .image-cards article.duplicate{border-color:#ff5a52;box-shadow:0 0 0 2px #ff5a52}
 .image-cards .kind-heading{grid-column:1/-1;margin:18px 0 0;padding-bottom:6px;border-bottom:1px solid #36515a}
 .image-cards .kind-count{font-weight:400;color:#b8ccd0}
+.image-cards .image-link{position:relative;display:block}
+.image-cards .level-badge{position:absolute;top:6px;inset-inline-start:6px;min-width:26px;height:26px;padding:0 6px;box-sizing:border-box;border-radius:13px;background:#61dfcc;color:#08232a;font-weight:700;font-size:15px;line-height:26px;text-align:center;box-shadow:0 1px 4px #0008}
+.image-cards .level-line{margin:4px 0 0;font-size:14px}
+.content-diff{border-collapse:collapse;font-size:14px;margin:8px 0}.content-diff th,.content-diff td{border:1px solid #36515a;padding:4px 8px;text-align:start}
 @media(max-width:700px){.image-cards{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}}
 </style>
-<div class="cards image-cards">{% for image in images %}{% if image.group_label %}{% ifchanged image.group_label %}<h3 class="kind-heading" data-group="{{image.group_label}}">{{image.group_label}} <span class="kind-count" data-total="{{image.group_count}}">({{image.group_count}})</span></h3>{% endifchanged %}{% endif %}<article{% if image.duplicates %} class="duplicate"{% endif %} data-group="{{image.group_label}}" data-search="{{image.search}}" data-redundant="{% if image.redundant %}1{% else %}0{% endif %}" data-duplicate="{% if image.duplicates %}1{% else %}0{% endif %}"><label><input type="checkbox" name="selected" value="{{image.token}}" data-name="{{image.name}}" data-download="{% url 'image-file' %}?download=1&amp;file={{image.token|urlencode}}" data-redundant="{% if image.redundant %}1{% else %}0{% endif %}"> {{image.size|filesizeformat}}</label><a href="{% url 'image-file' %}?file={{image.token|urlencode}}" target="_blank" rel="noopener"><img src="{% url 'image-file' %}?file={{image.token|urlencode}}" loading="lazy" alt="תמונה מנוהלת"></a><p class="file-name">{{image.name}}</p>{% for other, match in image.duplicates %}<p class="errorlist">{% if match == 'exact' %}תמונה זהה בשם אחר{% else %}אותה תמונה עם כיתוב או סימון שונה{% endif %}: <span dir="ltr">{{other}}</span></p>{% endfor %}
+<div class="cards image-cards">{% for image in images %}{% if image.group_label %}{% ifchanged image.group_label %}<h3 class="kind-heading" data-group="{{image.group_label}}">{{image.group_label}} <span class="kind-count" data-total="{{image.group_count}}">({{image.group_count}})</span></h3>{% endifchanged %}{% endif %}<article{% if image.duplicates %} class="duplicate"{% endif %} data-group="{{image.group_label}}" data-search="{{image.search}}" data-redundant="{% if image.redundant %}1{% else %}0{% endif %}" data-duplicate="{% if image.duplicates %}1{% else %}0{% endif %}" data-mismatch="{% if image.kind_mismatch %}1{% else %}0{% endif %}"><label><input type="checkbox" name="selected" value="{{image.token}}" data-name="{{image.name}}" data-download="{% url 'image-file' %}?download=1&amp;file={{image.token|urlencode}}" data-redundant="{% if image.redundant %}1{% else %}0{% endif %}"> {{image.size|filesizeformat}}</label><a class="image-link" href="{% url 'image-file' %}?file={{image.token|urlencode}}" target="_blank" rel="noopener">{% if image.level_count %}<span class="level-badge" title="מספר הרמות שבהן התמונה מוצגת">{{image.level_count}}</span>{% endif %}<img src="{% url 'image-file' %}?file={{image.token|urlencode}}" loading="lazy" alt="תמונה מנוהלת"></a><p class="file-name">{{image.name}}</p>{% if image.level %}<p class="level-line">ברמה: <a href="{{image.level.url}}" target="_blank" rel="noopener" dir="ltr">{{image.level.label}}</a></p>{% elif image.levels %}<p class="level-line">מוצגת ב: {% for level in image.levels %}<a href="{{level.url}}" target="_blank" rel="noopener" dir="ltr">{{level.label}}</a>{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}{% for other, match in image.duplicates %}<p class="errorlist">תמונה זהה בשם אחר: <span dir="ltr">{{other}}</span></p>{% endfor %}
 <p>תצפיות שמשתמשות בתמונה זו:</p><ul>{% for sample in image.refs %}<li><a href="{% url 'observation-edit' sample.pk %}">{{sample}}</a>{% if sample.trip.region %} · {{sample.trip.region.name}}{% endif %}{% if sample.deleted_at %} · תצפית מחוקה{% elif sample.status != 'published' %} · {{sample.get_status_display}}{% endif %}</li>{% empty %}{% if not image.identification_for %}<li>לא משויכת לתצפית — אפשר למחוק לפינוי מקום</li>{% endif %}{% endfor %}{% for genus in image.identification_for %}<li>קובץ זיהוי בדף הסוג <a href="{% url 'genus-page' genus.name %}" target="_blank" rel="noopener"><i>{{genus.name}}</i></a></li>{% endfor %}</ul>{% if image.redundant %}<p class="errorlist">תמונה מיותרת — כל התצפיות המשויכות נמחקו או שאין תצפית כלל. אפשר למחוק לפינוי מקום.</p>{% endif %}
+{% if image.kind_mismatch %}<p class="errorlist">שיוך לא תואם לשם הקובץ: {% if image.genus_file %}קובץ genera- צריך להיות משויך לתצפיות מסוג סוג בלבד{% else %}קובץ שאינו genera- צריך להיות משויך לתצפיות מין (לא לתצפית סוג){% endif %} — {% for r in image.kind_mismatch %}{{r}} ({{r.get_kind_display}}){% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
 {% if image.identification_for %}<p class="errorlist">קובץ זיהוי של סוג — המחיקה חסומה (יש להחליף או להסיר אותו בעריכת הסוג)</p>{% elif image.blocked %}<p class="errorlist">המדיה היחידה בתצפית פעילה — המחיקה חסומה</p>{% endif %}</article>{% empty %}<p>אין תמונות שהועלו בסביבה זו. תמונות YouTube אינן מאוחסנות כאן.</p>{% endfor %}</div>
 <p><label><input type="checkbox" name="confirm" value="yes"> אני מאשר מחיקה קבועה של התמונות המסומנות, ללא גיבוי תמונה</label></p><button>מחיקת התמונות המסומנות</button></form>
 <h2>תמונת הבית</h2>
@@ -57,13 +72,17 @@ const visibleChecks=()=>cards().filter(c=>!c.hidden).map(checkOf);
 const search=document.querySelector('#image-search');
 const onlyHereNames=document.querySelector('#only-here-names');
 const onlyHere=onlyHereNames?new Set(JSON.parse(onlyHereNames.textContent)):new Set();
+const differentNames=document.querySelector('#different-content-names');
+const differentContent=differentNames?new Set(JSON.parse(differentNames.textContent)):new Set();
 // Filter modes, each with its toolbar button: while one is on, only its cards are shown (and
 // all of them selected); pressing the same button again shows every card. A card that gets
 // hidden is also unchecked, so nothing out of sight is ever downloaded or deleted by mistake.
 const modes={
   redundant:{button:document.querySelector('#select-redundant'),match:card=>card.dataset.redundant==='1'},
   duplicates:{button:document.querySelector('#select-duplicates'),match:card=>card.dataset.duplicate==='1',noSelect:true},
+  mismatch:{button:document.querySelector('#select-mismatch'),match:card=>card.dataset.mismatch==='1',noSelect:true},
   onlyHere:{button:document.querySelector('#select-only-here'),match:card=>onlyHere.has(checkOf(card).dataset.name)},
+  differentContent:{button:document.querySelector('#select-different-content'),match:card=>differentContent.has(checkOf(card).dataset.name)},
 };
 let mode=null;
 function applyFilter(){
@@ -83,7 +102,7 @@ function applyFilter(){
 }
 function toggleMode(key){
   const turningOn=mode!==key;
-  if(turningOn&&key==='onlyHere')search.value='';
+  if(turningOn&&(key==='onlyHere'||key==='differentContent'))search.value='';
   mode=turningOn?key:null;applyFilter();
   if(!modes[key].noSelect)visibleChecks().forEach(c=>c.checked=turningOn);
   if(turningOn)document.querySelector('#gallery-toolbar').scrollIntoView({behavior:'smooth'});
@@ -91,6 +110,6 @@ function toggleMode(key){
 for(const [key,m] of Object.entries(modes)) if(m.button) m.button.onclick=()=>toggleMode(key);
 search.addEventListener('input',applyFilter);
 document.querySelector('#select-all').onclick=()=>{const c=visibleChecks();const checked=!c.every(x=>x.checked);c.forEach(x=>x.checked=checked)};
-document.querySelector('#download-images').onclick=async()=>{for(const c of visibleChecks().filter(c=>c.checked)){const a=document.createElement('a');a.href=c.dataset.download;a.download='';document.body.append(a);a.click();a.remove();await new Promise(r=>setTimeout(r,500));}};
+document.querySelector('#download-images').onclick=async()=>{const seen=new Set();for(const c of visibleChecks().filter(c=>c.checked&&!seen.has(c.value)&&seen.add(c.value))){const a=document.createElement('a');a.href=c.dataset.download;a.download='';document.body.append(a);a.click();a.remove();await new Promise(r=>setTimeout(r,500));}};
 applyFilter();
 </script>{% endblock %}

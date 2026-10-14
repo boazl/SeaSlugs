@@ -29,11 +29,20 @@ class TaxonTransferTests(TestCase):
             for forbidden in ('order', 'family', 'article_pdf', 'id'):
                 self.assertNotIn(forbidden, TABLES[table][1])
 
-    def sample(self, n=1):
+    def sample(self, n=1, kind=Sample.Kind.FAMILY):
+        # an observation one level below the row it defines (see defining.py): a family-kind
+        # observation for an order row, genus-kind for a family, species-kind for a genus. Saving
+        # it fills empty defining samples automatically -- cleared again here, so each test starts
+        # from a destination that hasn't chosen one yet.
+        from .models import Species
         owner = User.objects.get_or_create(username='owner')[0]
         trip = DiveTrip.objects.get_or_create(title='Library', year=2026)[0]
-        return Sample.objects.create(owner=owner, kind=Sample.Kind.ORDER, order='Nudibranchia', trip=trip,
-                                     video_url=f'https://youtu.be/{str(n).zfill(11)}')
+        extra = {Sample.Kind.FAMILY: {'family': 'Chromodorididae'}, Sample.Kind.GENUS: {'genus': 'Felimare'},
+                 Sample.Kind.SPECIES: {'species': Species.objects.get_or_create(scientific_name='Felimare picta', genus='Felimare', species='picta')[0]},
+                 Sample.Kind.ORDER: {'order': 'Nudibranchia'}}[kind]
+        sample = Sample.objects.create(owner=owner, kind=kind, trip=trip, video_url=f'https://youtu.be/{str(n).zfill(11)}', **extra)
+        for model in (TaxonOrder, TaxonFamily, TaxonGenus): model.objects.update(defining_sample=None)
+        return sample
 
     def test_defining_sample_travels_by_transfer_id_and_is_applied(self):
         sample = self.sample()
@@ -54,13 +63,22 @@ class TaxonTransferTests(TestCase):
         self.assertTrue(all(i['action'] == 'same' for i in plan(again)))
 
     def test_defining_sample_of_families_and_genera_travels_too(self):
-        sample = self.sample()
-        for table, obj in (('families', self.family), ('genera', self.genus)):
+        for table, obj, kind in (('families', self.family, Sample.Kind.GENUS), ('genera', self.genus, Sample.Kind.SPECIES)):
+            sample = self.sample(5 if kind == Sample.Kind.GENUS else 6, kind=kind)
             doc = export_table(table)
             doc['rows'][0]['defining_sample'] = str(sample.transfer_id)
             self.apply(doc)
             obj.refresh_from_db()
             self.assertEqual(obj.defining_sample_id, sample.pk)
+
+    def test_a_defining_sample_of_the_wrong_level_is_not_applied(self):
+        unfit = self.sample(7, kind=Sample.Kind.ORDER)       # an order observation can't define an order row
+        doc = export_table('orders')
+        {r['sub_order']: r for r in doc['rows']}['Doridina']['defining_sample'] = str(unfit.transfer_id)
+        items = plan(doc)
+        self.assertTrue(any('אינה מתאימה' in i['label'] for i in items))
+        self.apply(doc); self.order.refresh_from_db()
+        self.assertIsNone(self.order.defining_sample_id)
 
     def test_missing_or_empty_defining_sample_leaves_the_destination_choice_alone(self):
         mine, other = self.sample(1), self.sample(2)

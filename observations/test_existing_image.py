@@ -89,6 +89,43 @@ class ExistingImageTests(TestCase):
         self.assertTrue(default_storage.exists(self.name))
 
 
+    # --- one photo, one owner (Sample.gallery_source) ---------------------------------------
+    def test_a_gallery_image_is_a_reference_to_the_photos_owner(self):
+        self.client.post('/observations/new/', self.data(existing_image=f'/observations/{self.source.pk}/photo/'))
+        item = Sample.objects.get(species=self.target_species)
+        self.assertEqual(item.gallery_source_id, self.source.pk)
+        # a reference to a reference resolves to the owner
+        third = Species.objects.create(scientific_name='Third species')
+        self.client.post('/observations/new/', self.data(species='Third species', existing_image=f'/observations/{item.pk}/photo/'))
+        self.assertEqual(Sample.objects.get(species=third).gallery_source_id, self.source.pk)
+
+    def test_the_same_photo_cannot_be_uploaded_as_a_second_observations_own_image(self):
+        other = Sample(owner=self.user, species=self.target_species, trip=self.trip, image=self.name, kind='species', status='published')
+        with self.assertRaises(Exception) as ctx:
+            other.full_clean()
+        self.assertIn('תמונה קיימת בגלריה', str(ctx.exception))
+
+    def test_the_owner_follows_into_its_references_and_cannot_lose_its_photo_while_shown_elsewhere(self):
+        self.client.post('/observations/new/', self.data(existing_image=f'/observations/{self.source.pk}/photo/'))
+        item = Sample.objects.get(species=self.target_species)
+        new_name = default_storage.save('observations/transfer/new.jpg', ContentFile(b'other-bytes'))
+        self.source.image = new_name; self.source.save()
+        item.refresh_from_db(); self.assertEqual(item.image.name, new_name)
+        self.client.post(f'/observations/{self.source.pk}/action/', {'action': 'release_species'})
+        self.client.post(f'/observations/{self.source.pk}/action/', {'action': 'delete_image'})
+        self.source.refresh_from_db(); self.assertEqual(self.source.image.name, new_name)   # blocked
+
+    def test_erasing_the_gallery_address_stops_showing_that_photo(self):
+        self.client.post('/observations/new/', self.data(existing_image=f'/observations/{self.source.pk}/photo/', video_url='https://youtu.be/abcdefghijk'))
+        item = Sample.objects.get(species=self.target_species)
+        page = self.client.get(f'/observations/{item.pk}/edit/')
+        self.assertEqual(page.context['form'].initial['existing_image'], f'/observations/{self.source.pk}/photo/')
+        self.client.post(f'/observations/{item.pk}/edit/', self.data(existing_image='', video_url='https://youtu.be/abcdefghijk'))
+        item.refresh_from_db()
+        self.assertEqual((item.gallery_source_id, item.image.name), (None, ''))
+        self.assertTrue(default_storage.exists(self.name))
+
+
 @override_settings(STORAGES=STORAGES)
 class ImageSearchTests(TestCase):
     def setUp(self):

@@ -655,6 +655,14 @@ class Sample(models.Model):
     transfer_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     video_url = models.URLField('קישור YouTube', blank=True, validators=[youtube_id])
     image = models.ImageField('תמונה חלופית (רשות)', upload_to='observations/', blank=True)
+    # "תמונה קיימת בגלריה": this observation shows the image of ANOTHER observation (the file's
+    # one owner) instead of a file of its own. Each stored photo has exactly one owner -- the
+    # sample whose own image it is (gallery_source empty); every other sample showing it points
+    # at that owner here. image/image_hash are then kept as a mirror of the owner's (see clean()
+    # and save()), so everything that displays sample.image keeps working unchanged. Only one of
+    # the two is ever set by hand: an uploaded alternate image, or a gallery image.
+    gallery_source = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='gallery_references',
+        verbose_name='תמונה קיימת בגלריה', help_text='התצפית מציגה את התמונה של תצפית אחרת, בלי להעתיק את הקובץ.')
     # SHA-256 of the image's bytes (recomputed in clean() whenever an image is present) -- lets
     # clean() detect "this exact photo/video was already entered as a different sample" without
     # caring what storage path/filename it ended up under (uploads that don't go through the
@@ -881,7 +889,23 @@ class Sample(models.Model):
         if self.day and self.trip_id and self.trip.year and self.trip.month:
             try: date(self.trip.year, self.trip.month, self.day)
             except ValueError: errors['day'] = 'תאריך לא תקין.'
-        if self.image:
+        if self.gallery_source_id:
+            # A gallery image: always the ORIGINAL owner's photo (a reference to a reference
+            # resolves to its owner), mirrored into image/image_hash; no duplicate check --
+            # sharing the owner's file is the whole point of the field.
+            source = self.gallery_source
+            while source.gallery_source_id and source.gallery_source_id != source.pk: source = source.gallery_source
+            if source.pk == self.pk: errors['gallery_source'] = 'תצפית אינה יכולה להציג את התמונה של עצמה.'
+            elif source.deleted_at or not source.image: errors['gallery_source'] = 'לתצפית שנבחרה אין תמונה פעילה בגלריה.'
+            else:
+                self.gallery_source = source
+                digest = source.image_hash
+                if not digest:
+                    try:
+                        with source.image.open('rb') as handle: digest = hashlib.sha256(handle.read()).hexdigest()
+                    except (FileNotFoundError, OSError): digest = ''
+                self.image = source.image.name; self.image_hash = digest
+        elif self.image:
             # The content-hash storage naming convention used everywhere an image actually
             # gets uploaded (the observation edit form, the folder importer, the image
             # manager's re-upload flow -- see media_transfer.py/folder_import.py) sets
@@ -903,8 +927,13 @@ class Sample(models.Model):
                 self.image_hash = digest
                 image_changed = not original or original['image'] != self.image.name
                 if image_changed:
-                    duplicate = Sample.objects.exclude(pk=self.pk).filter(deleted_at__isnull=True, image_hash=digest).first()
-                    if duplicate and not getattr(self, '_shared_image', False): errors['image'] = f'התמונה הזו כבר קיימת בתצפית אחרת ({duplicate}). לא ניתן להשתמש באותה תמונה פעמיים.'
+                    # One photo, one owner: the same bytes (or the same stored file) may not be
+                    # this sample's OWN image while another active sample already has them --
+                    # to show an existing photo, use the gallery-image field instead.
+                    others = Sample.objects.exclude(pk=self.pk).filter(deleted_at__isnull=True).exclude(gallery_source_id=self.pk) if self.pk else Sample.objects.filter(deleted_at__isnull=True)
+                    duplicate = others.filter(models.Q(image_hash=digest) | models.Q(image=self.image.name)).first()
+                    if duplicate: errors['image'] = (f'התמונה הזו כבר קיימת בתצפית אחרת ({duplicate}). לא ניתן להעלות את אותה תמונה פעמיים — '
+                                                     'כדי להציג אותה גם כאן, בחרו אותה בשדה "תמונה קיימת בגלריה".')
         else:
             self.image_hash = ''
         if self.video_url:
@@ -923,32 +952,27 @@ class Sample(models.Model):
         if errors: raise ValidationError(errors)
     def save(self, *args, **kwargs):
         if kwargs.get('update_fields') is None: self.sync_taxonomy()
+        if self.gallery_source_id and kwargs.get('update_fields') is None:
+            # keep the mirror exact even for a save that skipped clean() (transfers, scripts)
+            source = Sample.objects.filter(pk=self.gallery_source_id).values('image', 'image_hash').first()
+            if source:
+                if source['image'] != (self.image.name or ''): self.image_hash = source['image_hash']
+                self.image = source['image']; self.image_hash = source['image_hash'] or self.image_hash
         super().save(*args, **kwargs)
-        # A GENUS-kind sample is a purpose-built photo/video for its whole genus -- keep the
-        # genus it identifies pointed at the current best genus-kind sample for it on every
-        # save, not just through save_reviewed() below: sample transfer (image_manager.py /
-        # sample_transfer.py) saves genus-kind samples with a plain .save() and never goes
-        # through save_reviewed() at all, and soft_delete() below is itself just a save()
-        # call that sets deleted_at -- both need this to stay in sync, so it belongs here
-        # rather than duplicated in each caller.
-        if self.kind == self.Kind.GENUS and self.genus:
-            TaxonGenus.objects.filter(name=self.genus).update(
-                defining_sample=TaxonGenus.pick_defining_sample(self.genus))
-        # FAMILY- and ORDER-kind samples are likewise purpose-built media for a family / order
-        # page. Unlike genera, those taxa usually already show a species photo picked by
-        # build_taxonomy_tables, so a family/order-kind sample replaces it when one exists,
-        # and a stale family/order-kind pick (deleted / unpublished) is cleared -- the page
-        # then falls back to one of its species' photos (views.taxon_hero_media).
-        for kind, model, name in ((self.Kind.FAMILY, TaxonFamily, self.family), (self.Kind.ORDER, TaxonOrder, self.order)):
-            if self.kind == kind and name:
-                rows = model.objects.filter(name=name)
-                if model is TaxonOrder:
-                    rows = rows.filter(sub_order='', superfamily='')       # the order's own row; a sub-order / superfamily keeps its own choice
-                picked = taxon_kind_defining_sample(kind, name)
-                if picked:
-                    rows.update(defining_sample=picked)
-                else:
-                    rows.filter(defining_sample__kind=kind).update(defining_sample=None)
+        if self.pk and not self.gallery_source_id:
+            # This sample owns its photo: every observation showing it as a gallery image follows
+            # its current file (a new photo, or none).
+            Sample.objects.filter(gallery_source_id=self.pk).exclude(image=self.image.name or '').update(
+                image=self.image.name or '', image_hash=self.image_hash)
+        # The taxonomy rows this sample can define (see defining.py: a species defines its genus,
+        # a genus-kind observation its family, a family-kind observation its order rows) keep a
+        # defining sample that fits: one this save made unfit (deleted, unpublished, moved to
+        # another taxon) is replaced by the first that fits, and an empty one is filled. An
+        # order / family / genus page shows its own-kind observation directly (defining.display_sample).
+        if kwargs.get('update_fields') is None or 'deleted_at' in (kwargs.get('update_fields') or ()):
+            from .defining import rows_affected_by, repair
+            for row in rows_affected_by(self):
+                if not isinstance(row, SpeciesArea): repair(row)
     def save_reviewed(self, actor=None, approve=False):
         self.full_clean(validate_constraints=False)
         with transaction.atomic():

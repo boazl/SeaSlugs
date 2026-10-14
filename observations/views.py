@@ -304,7 +304,8 @@ def genus_page(request, name):
             areas.append(area)
     if not areas:
         raise Http404
-    thumbnail, image_url, video_id = taxon_hero_media(genus.defining_sample, areas)
+    from .defining import display_sample
+    thumbnail, image_url, video_id = taxon_hero_media(display_sample(genus), areas)
     lang = get_lang(request)
 
     def taxon_label(obj):
@@ -335,8 +336,8 @@ def genus_page(request, name):
 
 
 def taxon_hero_media(defining_sample, areas):
-    """(thumbnail, image_url, video_id) for a taxon page's hero: the taxon's own defining
-    sample when it has a photo/video, otherwise the first of its species' defining samples
+    """(thumbnail, image_url, video_id) for a taxon page's hero: the taxon's own observation, else
+    its defining sample (see defining.display_sample), when it has a photo/video, otherwise the first of its species' defining samples
     that does -- so a genus/family/order page never 404s just for lacking its own media."""
     media = taxon_media(defining_sample)
     if media[1] or media[2]:
@@ -392,7 +393,8 @@ def taxon_edit_url(request, kind, taxon):
 def _taxon_page(request, rank, obj, areas, children, parent, parent_url, trail=()):
     lang = get_lang(request)
     pick = lambda he, en: (en or he) if lang == 'en' else (he or en)
-    thumbnail, image_url, video_id = taxon_hero_media(obj.defining_sample, areas)
+    from .defining import display_sample
+    thumbnail, image_url, video_id = taxon_hero_media(display_sample(obj), areas)
     sub = getattr(obj, 'sub_order', '') or getattr(obj, 'sub_family', '')
     below_order = rank == 'order' and bool(obj.sub_order or obj.superfamily)     # a sub-order or a superfamily row
     return render(request, 'observations/taxon_page.html', {
@@ -934,8 +936,8 @@ def edit(request,pk=None):
             undetermined_variant=item.undetermined_variant,
         ).first() if (item.pk is None and item.kind==Sample.Kind.SPECIES and item.species_id and item.trip_id) else None
         if existing:
-            if getattr(item,'_shared_image',False):
-                existing.image = item.image.name; existing._shared_image = True   # the chosen gallery image itself, not a copy
+            if getattr(item,'_gallery_choice',False) and item.gallery_source_id:
+                existing.gallery_source = item.gallery_source; existing.image = item.image.name   # the chosen gallery image itself, not a copy
             elif item.image: existing.image = canonical_image_write(item, existing)
             if item.video_url: existing.video_url = item.video_url
             existing.save_reviewed()
@@ -953,7 +955,7 @@ def edit(request,pk=None):
         # back to "pending", and a pending sample is ignored by the taxon page and the gallery.
         approve_taxon = manager and item.kind in (Sample.Kind.ORDER, Sample.Kind.FAMILY, Sample.Kind.GENUS)
         item.save_reviewed(actor=request.user if approve_taxon else None, approve=approve_taxon)
-        if getattr(item,'_shared_image',False) and old_image_name and old_image_name!=item.image.name:
+        if getattr(item,'_gallery_choice',False) and old_image_name and old_image_name!=item.image.name:
             from .media_transfer import delete_image_if_unused
             delete_image_if_unused(old_image_name)        # the file this observation used to have, if nothing else uses it
         form.save_taxon_files(item)
@@ -1232,6 +1234,14 @@ def observation_action(request, pk):
             messages.error(request, 'לא ניתן למחוק את התמונה כאשר התצפית מגדירה את המין. יש להסיר קודם את התצפית מהמין.')
         elif not item.image:
             messages.error(request, 'לתצפית זו אין תמונה.')
+        elif item.gallery_source_id:
+            # a gallery image: stop showing it -- the file belongs to its owner and stays
+            item.gallery_source = None; item.image = ''; item.image_hash = ''
+            item.save(update_fields=['gallery_source', 'image', 'image_hash', 'updated_at'])
+            messages.success(request, 'התצפית כבר לא מציגה את התמונה הקיימת בגלריה.')
+        elif item.gallery_references.filter(deleted_at__isnull=True).exists():
+            others = ', '.join(str(x) for x in item.gallery_references.filter(deleted_at__isnull=True)[:5])
+            messages.error(request, f'התמונה מוצגת גם בתצפיות אחרות כתמונה קיימת בגלריה ({others}). יש להסיר אותה מהן קודם.')
         else:
             from .media_transfer import delete_image_if_unused
             old_name = item.image.name

@@ -190,7 +190,92 @@ class MediaTransferTests(TestCase):
         Path(self.sample.image.path).unlink()
         self.assertEqual(build_manifest()['images'],[])
         result=compare_manifest({'format':'seaslugs-image-manifest-v1','images':[name]})
-        self.assertEqual(result,{'missing_here':[name],'only_here':[]})
+        self.assertEqual((result['missing_here'],result['only_here']),([name],[]))
+
+    def test_compare_manifest_reports_an_observation_whose_image_differs(self):
+        # The same photo file exists on both sides, but one observation uses it only here --
+        # the file lists agree, so only the per-observation assignments reveal it.
+        import json
+        from .image_manager import build_manifest,compare_manifest
+        family=Sample(owner=self.sample.owner,kind='family',family='Flabellinidae',status='published')
+        family.save()
+        family.image.name=self.sample.image.name;family.save()
+        other=build_manifest();other['assignments'][str(family.transfer_id)]=''
+        result=compare_manifest(other)
+        self.assertEqual((result['missing_here'],result['only_here']),([],[]))
+        self.assertTrue(result['assignments_checked'])
+        self.assertEqual([(r['sample'].pk,r['here'],r['there']) for r in result['different_image']],[(family.pk,self.sample.image.name,'')])
+        # an older export without assignments still compares files, and says it couldn't check
+        old={'format':'seaslugs-image-manifest-v1','images':other['images']}
+        self.assertFalse(compare_manifest(old)['assignments_checked'])
+        self.client.force_login(self.sample.owner)
+        upload=SimpleUploadedFile('manifest.json',json.dumps(other).encode(),content_type='application/json')
+        content=self.client.post('/admin/images/',{'action':'compare_manifest','manifest':upload}).content.decode()
+        self.assertIn('תצפיות שקיימות בשתי הסביבות עם תמונה שונה (1)',content)
+        self.assertIn(f'/observations/{family.pk}/edit/',content);self.assertIn('ללא תמונה',content)
+
+    def test_compare_manifest_reports_a_same_named_file_with_different_content(self):
+        from .image_manager import build_manifest,compare_manifest
+        other=build_manifest();name=self.sample.image.name
+        self.assertEqual(compare_manifest(other)['different_content'],[])
+        here=other['files'][name]
+        self.assertEqual(here[2],Path(self.sample.image.path).stat().st_size)
+        other['files'][name]=['0'*64,here[1]+100,12345]
+        result=compare_manifest(other)
+        self.assertTrue(result['contents_checked'])
+        row=result['different_content'][0]
+        self.assertEqual((row['name'],row['newer'],row['size_here'],row['size_there']),(name,'there',here[2],12345))
+        self.assertEqual(result['different_content_names'],[name])
+        # an older export (hash and time only) still compares
+        other['files'][name]=['0'*64,here[1]]
+        self.assertIsNone(compare_manifest(other)['different_content'][0]['size_there'])
+        self.client.force_login(self.sample.owner)
+        import json
+        other['files'][name]=['0'*64,here[1]+100,12345]
+        upload=SimpleUploadedFile('manifest.json',json.dumps(other).encode(),content_type='application/json')
+        content=self.client.post('/admin/images/',{'action':'compare_manifest','manifest':upload}).content.decode()
+        self.assertIn('id="select-different-content"',content);self.assertIn('id="different-content-names"',content)
+        self.assertIn('<td>12.1\xa0ק&quot;ב</td>',content)
+
+    def test_a_same_named_file_with_old_content_is_replaced_by_uploading_the_other_environments_version(self):
+        # The Mac's genera-x.jpg held an old copy of a species photo; the website's genera-x.jpg is
+        # the genus photo. Downloading it there and uploading it here (replace confirmed) keeps the
+        # name and the genus observation, and swaps the content.
+        import hashlib
+        from .image_manager import files
+        genus=Sample(owner=self.sample.owner,kind='genus',genus='Testgenus',status='published',trip=self.sample.trip)
+        out=io.BytesIO();Image.new('RGB',(64,36),'purple').save(out,'JPEG')
+        genus.image.save('genera-testgenus.jpg',ContentFile(out.getvalue()),save=False);genus.save()
+        name=genus.image.name
+        self.client.force_login(self.sample.owner)
+        # "the other environment's" version: the same observation, another photo
+        row=next(r for r in files() if r['name']==name)
+        response=self.client.get('/admin/images/file/',{'file':row['token'],'download':'1'})
+        raw=b''.join(response.streaming_content);response.close()
+        with Image.open(io.BytesIO(raw)) as downloaded:
+            exif=downloaded.getexif()
+            replacement=io.BytesIO();Image.new('RGB',(64,36),'orange').save(replacement,'JPEG',exif=exif)
+        response=self.client.post('/admin/images/',{'action':'upload','replace':'yes',
+            'images':SimpleUploadedFile('genera-testgenus.jpg',replacement.getvalue(),content_type='image/jpeg')})
+        self.assertEqual(response.status_code,302)
+        genus.refresh_from_db()
+        self.assertEqual(genus.kind,'genus')
+        with Image.open(genus.image.path) as stored: self.assertGreater(stored.convert('RGB').getpixel((10,10))[1],60)   # orange, not purple
+        self.assertEqual(Sample.objects.filter(image=genus.image.name).count(),1)
+
+    def test_a_genera_file_on_a_species_observation_or_another_file_on_a_genus_one_is_flagged(self):
+        from .image_manager import files
+        rows={r['name']:r for r in files()}
+        self.assertEqual(rows[self.sample.image.name]['kind_mismatch'],[])        # species photo, species observation
+        genus=Sample(owner=self.sample.owner,kind='genus',genus='Testgenus',status='published')
+        out=io.BytesIO();Image.new('RGB',(30,20),'teal').save(out,'JPEG')
+        genus.image.save('notrip-testgenus.jpg',ContentFile(out.getvalue()),save=False);genus.save()
+        rows={r['name']:r for r in files()}
+        self.assertEqual(rows[genus.image.name]['kind_mismatch'],[genus])
+        self.client.force_login(self.sample.owner)
+        content=self.client.get('/admin/images/').content.decode()
+        self.assertIn('id="select-mismatch"',content);self.assertIn('data-mismatch="1"',content)
+        self.assertIn('קובץ שאינו genera- צריך להיות משויך לתצפיות מין',content)
 
     def test_compare_manifest_rejects_malformed_file(self):
         self.client.force_login(self.sample.owner)
@@ -249,8 +334,10 @@ class MediaTransferTests(TestCase):
         self.assertContains(response,'קובץ זיהוי של סוג');self.assertTrue(Path(genus.identification_file.path).exists())
 
     def test_kind_sort_groups_identification_then_order_family_genus_species(self):
+        # Sort "by image kind": one card per level (taxon page) that shows the image, grouped
+        # identification / order / family / genus / species / other; the badge counts levels.
         from .image_manager import files
-        from .models import TaxonGenus
+        from .models import TaxonGenus,TaxonFamily,TaxonOrder,SpeciesArea
         def jpeg(color):
             out=io.BytesIO();Image.new('RGB',(10,10),color).save(out,'JPEG');return ContentFile(out.getvalue())
         genus=TaxonGenus.objects.create(name='Zygenus')
@@ -258,19 +345,32 @@ class MediaTransferTests(TestCase):
         made={}
         for kind,field,name in (('genus','genus','Bgenus'),('genus','genus','Agenus'),('family','family','Somefamily'),('order','order','Someorder')):
             sample=Sample(owner=self.sample.owner,kind=kind,**{field:name},status='published')
-            sample.image.save(f'{name}.jpg',jpeg('green'),save=False);sample.save();made[name]=sample.image.name
+            sample.image.save(f'{name}.jpg',jpeg('green'),save=False);sample.save();made[name]=sample
+        for name in ('Agenus','Bgenus'): TaxonGenus.objects.create(name=name)
+        TaxonFamily.objects.create(name='Somefamily');TaxonOrder.objects.create(name='Someorder')
+        # a family with no observation of its own: its page shows its defining sample's image
+        TaxonFamily.objects.create(name='Otherfamily',defining_sample=made['Agenus'])
+        self.assertTrue(SpeciesArea.objects.filter(species=self.sample.species).exists())
         orphan=Path(self.temp.name)/'aaa-orphan.jpg';Image.new('RGB',(10,10),'red').save(orphan,'JPEG')
-        names=[row['name'] for row in files('kind')]
-        self.assertEqual(names,[genus.identification_file.name,made['Someorder'],made['Somefamily'],
-                                made['Agenus'],made['Bgenus'],self.sample.image.name,'aaa-orphan.jpg'])
+        cards=files('kind')
+        self.assertEqual([(c['name'],c['level']['label'] if c['level'] else None) for c in cards],[
+            (genus.identification_file.name,None),(made['Someorder'].image.name,'Someorder'),
+            (made['Agenus'].image.name,'Otherfamily'),(made['Somefamily'].image.name,'Somefamily'),
+            (made['Agenus'].image.name,'Agenus'),(made['Bgenus'].image.name,'Bgenus'),
+            (self.sample.image.name,'Test species · Israel'),('aaa-orphan.jpg',None)])
+        agenus=[c for c in cards if c['name']==made['Agenus'].image.name]
+        self.assertEqual([c['level_count'] for c in agenus],[2,2])
         self.client.force_login(self.sample.owner)
         content=self.client.get('/admin/images/',{'sort':'kind'}).content.decode()
         self.assertIn('<strong>לפי סוג התמונה</strong>',content)
-        headings=[h for h in ('קבצי זיהוי של סוגים','תמונות של סדרות','תמונות של משפחות','תמונות של סוגים','תמונות של מינים','אחר (אוספים, מינים לא מקוטלגים ותמונות לא משויכות)')]
+        headings=('קבצי זיהוי של סוגים','תמונות של סדרות','תמונות של משפחות','תמונות של סוגים','תמונות של מינים','אחר (תמונות שאינן מוצגות באף רמה)')
         positions=[content.index('">'+h+' <span class="kind-count"') for h in headings]
         self.assertEqual(positions,sorted(positions))
         self.assertEqual(content.count('class="kind-heading"'),6)  # one heading per group, not per card
-        self.assertIn('תמונות של סוגים <span class="kind-count" data-total="2">(2)</span>',content)
+        self.assertIn('תמונות של משפחות <span class="kind-count" data-total="2">(2)</span>',content)
+        self.assertIn('<span class="level-badge" title="מספר הרמות שבהן התמונה מוצגת">2</span>',content)
+        self.assertIn('ברמה: <a href="/family/Otherfamily/"',content)
+        self.assertIn(f'{len({c["name"] for c in cards})} קבצים',content)
         self.assertNotIn('class="kind-heading"',self.client.get('/admin/images/').content.decode())  # other sorts: no headings
 
     def test_identical_images_under_different_names_are_flagged(self):
@@ -291,12 +391,12 @@ class MediaTransferTests(TestCase):
         original=self.sample.image.name
         self.assertIn((original,'exact'),rows['copy.jpg']['duplicates'])
         self.assertIn(('copy.jpg','exact'),rows[original]['duplicates'])
-        self.assertIn((original,'caption'),rows['captioned.jpg']['duplicates'])
+        self.assertEqual(rows['captioned.jpg']['duplicates'],[])     # a different caption: a different image
         self.assertEqual(rows['other.jpg']['duplicates'],[])
         self.client.force_login(self.sample.owner)
         content=self.client.get('/admin/images/').content.decode()
-        self.assertEqual(content.count('<article class="duplicate"'),3)
-        self.assertIn('אותה תמונה עם כיתוב או סימון שונה',content)
+        self.assertEqual(content.count('<article class="duplicate"'),2)
+        self.assertNotIn('אותה תמונה עם כיתוב או סימון שונה',content)
         self.assertIn('תמונה זהה בשם אחר',content);self.assertIn('<p class="file-name">other.jpg</p>',content)
 
     def test_images_page_has_search_box_and_search_text(self):
@@ -552,21 +652,39 @@ class MediaTransferTests(TestCase):
         self.assertEqual(response.status_code,302,response.content)
         self.assertTrue(SpeciesArea.objects.filter(species=new_species).exists())
 
-    def test_json_export_and_update_preserves_destination_image(self):
+    def test_json_export_and_update_copies_the_image_name_and_warns_when_its_file_is_missing(self):
+        # A samples-table transfer copies which photo each observation shows (by file name);
+        # a file not present here is still copied and reported, for image management to bring.
         import json
         self.client.force_login(self.sample.owner)
         response=self.client.post('/admin/table-transfer/',{'action':'export','table':'samples'})
         self.assertEqual(response['Content-Type'],'application/json; charset=utf-8')
         doc=json.loads(response.content);doc['rows'][0]['title']='Table update'
-        doc['rows'][0]['image']='different/source/file.jpg'
-        original=self.sample.image.name
+        self.assertEqual(doc['rows'][0]['gallery_source'],'')
+        doc['rows'][0]['image']='observations/other-photo.jpg'
         response=self.client.post('/admin/table-transfer/',{'action':'preview','file':SimpleUploadedFile('table.json',json.dumps(doc).encode())})
         self.assertIn('token',response.context)
+        self.assertContains(response,'observations/other-photo.jpg חסר ביעד')
         with patch('observations.table_transfer.create_backup',return_value=Path('backup.sqlite3')):
             response=self.client.post('/admin/table-transfer/',{'action':'apply','confirm':'yes','token':response.context['token']})
         self.assertEqual(response.status_code,302)
-        self.sample.refresh_from_db();self.assertEqual(self.sample.title,'Table update');self.assertEqual(self.sample.image.name,original)
-        self.assertTrue(Path(self.sample.image.path).exists())
+        self.sample.refresh_from_db();self.assertEqual(self.sample.title,'Table update');self.assertEqual(self.sample.image.name,'observations/other-photo.jpg')
+    def test_samples_transfer_copies_a_gallery_image_by_its_owners_transfer_id(self):
+        import uuid
+        from .table_transfer import plan,apply,fingerprint
+        reference=Sample(owner=self.sample.owner,kind='genus',genus='Testgenus',status='published',gallery_source=self.sample)
+        reference.full_clean(exclude=['species','trip']);reference.save()
+        self.assertEqual(reference.image.name,self.sample.image.name)
+        doc=export_table('samples');doc['media_mode']='separate'
+        row=next(r for r in doc['rows'] if r['transfer_id']==str(reference.transfer_id))
+        self.assertEqual(row['gallery_source'],str(self.sample.transfer_id))
+        # the reference arrives as a new observation in another environment: gallery image kept
+        Sample.objects.filter(pk=reference.pk).delete()
+        items=plan(doc);new=[i for i in items if i['action']=='new'][0]
+        self.assertEqual(new['object'].gallery_source_id,self.sample.pk)
+        with patch('observations.table_transfer.create_backup',return_value=Path('backup.sqlite3')):apply(doc,fingerprint())
+        copied=Sample.objects.get(transfer_id=row['transfer_id'])
+        self.assertEqual((copied.gallery_source_id,copied.image.name),(self.sample.pk,self.sample.image.name))
     def test_sample_transfer_names_the_missing_species_instead_of_a_generic_message(self):
         # A samples-table row referencing a species that doesn't exist in this environment's
         # species table (e.g. transferred in from an environment where it does) must say so
@@ -650,7 +768,7 @@ class MediaTransferTests(TestCase):
     def test_missing_photo_skips_only_that_row(self):
         import uuid
         doc=export_table('samples');doc['media_mode']='separate'
-        missing=dict(doc['rows'][0],transfer_id=str(uuid.uuid4()),title='Missing image')
+        missing=dict(doc['rows'][0],transfer_id=str(uuid.uuid4()),title='Missing image',image='')
         doc['rows'][0]['title']='Changed';doc['rows'].append(missing)
         items=plan(doc);self.assertEqual([i['action'] for i in items],['update','skipped'])
         with patch('observations.table_transfer.create_backup',return_value=Path('backup.sqlite3')):apply(doc,fingerprint())

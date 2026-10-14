@@ -1,3 +1,5 @@
+"""assign_genus_defining_samples (and the genus admin action that runs it): every order / family /
+genus row gets a defining sample that fits it -- an observation one level below (defining.py)."""
 from pathlib import Path
 from unittest.mock import patch
 
@@ -5,138 +7,89 @@ from django.contrib.auth.models import User
 from django.core.management import call_command
 from django.test import TestCase
 
-from .models import DiveTrip, Sample, Species, TaxonGenus
+from .models import DiveTrip, Sample, Species, TaxonFamily, TaxonGenus, TaxonOrder
 
 
-class AssignGenusDefiningSamplesTests(TestCase):
+class AssignDefiningSamplesTests(TestCase):
     def setUp(self):
-        # create_backup() does real file I/O (backing up the live sqlite file) -- irrelevant to
-        # the assignment logic under test here, and the test runner's in-memory database isn't
-        # a real file to back up in the first place.
+        # create_backup() does real file I/O (backing up the live sqlite file) -- irrelevant here
         patcher = patch('observations.management.commands.assign_genus_defining_samples.create_backup', return_value=Path('backup-stub.sqlite3'))
         self.addCleanup(patcher.stop)
         patcher.start()
-        self.user = User.objects.create_user('owner', password='a-valid-password-927')
-        self.trip = DiveTrip.objects.create(title='Genus library', year=2026)
-        self.genus = TaxonGenus.objects.create(name='Chromodoris')
+        self.user = User.objects.create_superuser('owner', password='a-valid-password-927')
+        self.trip = DiveTrip.objects.create(title='Library', year=2026)
+        self.order = TaxonOrder.objects.create(name='Nudibranchia')
+        self.family = TaxonFamily.objects.create(name='Chromodorididae', order=self.order)
+        self.genus = TaxonGenus.objects.create(name='Chromodoris', family=self.family)
+        self.species = Species.objects.create(scientific_name='Chromodoris annae', genus='Chromodoris', species='annae')
+        self.n = 0
 
-    def genus_sample(self, **kwargs):
-        if 'video_url' not in kwargs:
-            self._video_counter = getattr(self, '_video_counter', 0) + 1
-            kwargs = dict(kwargs, video_url=f'https://youtu.be/{str(self._video_counter).zfill(11)}')
-        data = dict(owner=self.user, kind=Sample.Kind.GENUS, genus='Chromodoris', trip=self.trip)
-        data.update(kwargs)
-        item = Sample(**data)
-        item.save_reviewed(actor=self.user, approve=True)
+    def sample(self, **kwargs):
+        self.n += 1
+        item = Sample(owner=self.user, trip=self.trip, video_url=f'https://youtu.be/{str(self.n).zfill(11)}', status='published', **kwargs)
+        item.save()
         return item
 
-    def test_dry_run_makes_no_database_changes(self):
-        # Sample.save() (see models.py) now keeps the genus pointed at its own genus-kind
-        # sample automatically as soon as one is saved -- simulate stale legacy data that
-        # predates that behavior (e.g. imported straight into the database) by clearing it
-        # back out, so this test still exercises the command's own dry-run guarantee.
-        sample = self.genus_sample()
-        TaxonGenus.objects.filter(pk=self.genus.pk).update(defining_sample=None)
+    def test_saving_fills_each_level_with_an_observation_one_level_below(self):
+        species = self.sample(kind=Sample.Kind.SPECIES, species=self.species)
+        genus = self.sample(kind=Sample.Kind.GENUS, genus='Chromodoris')
+        family = self.sample(kind=Sample.Kind.FAMILY, family='Chromodorididae')
+        self.sample(kind=Sample.Kind.ORDER, order='Nudibranchia')
+        for row in (self.genus, self.family, self.order): row.refresh_from_db()
+        self.assertEqual((self.genus.defining_sample_id, self.family.defining_sample_id, self.order.defining_sample_id),
+                         (species.pk, genus.pk, family.pk))
+
+    def test_dry_run_makes_no_changes_and_apply_replaces_an_unfit_value(self):
+        species = self.sample(kind=Sample.Kind.SPECIES, species=self.species)
+        genus_kind = self.sample(kind=Sample.Kind.GENUS, genus='Chromodoris')
+        TaxonGenus.objects.filter(pk=self.genus.pk).update(defining_sample=genus_kind)     # old rule: wrong level
         call_command('assign_genus_defining_samples')
-        self.genus.refresh_from_db()
-        self.assertIsNone(self.genus.defining_sample_id)
-
-    def test_apply_points_the_genus_at_its_own_genus_kind_sample(self):
-        sample = self.genus_sample()
+        self.genus.refresh_from_db(); self.assertEqual(self.genus.defining_sample_id, genus_kind.pk)
         call_command('assign_genus_defining_samples', '--apply')
-        self.genus.refresh_from_db()
-        self.assertEqual(self.genus.defining_sample_id, sample.pk)
+        self.genus.refresh_from_db(); self.assertEqual(self.genus.defining_sample_id, species.pk)
+        call_command('assign_genus_defining_samples', '--apply')   # idempotent
+        self.genus.refresh_from_db(); self.assertEqual(self.genus.defining_sample_id, species.pk)
 
-    def test_apply_overrides_an_existing_species_level_defining_sample(self):
-        # The genus already has a species-level photo standing in for it (e.g. from
-        # build_taxonomy_tables) -- a purpose-built genus photo should take priority.
-        species = Species.objects.create(scientific_name='Chromodoris annae')
-        species_sample = Sample(owner=self.user, species=species, trip=self.trip,
-                                 video_url='https://youtu.be/zzzzzzzzzzz')
-        species_sample.save_reviewed()
-        self.genus.defining_sample = species_sample
-        self.genus.save(update_fields=['defining_sample'])
+    def test_a_deleted_defining_sample_is_replaced_by_the_next_that_fits(self):
+        older = self.sample(kind=Sample.Kind.SPECIES, species=self.species)
+        newer = self.sample(kind=Sample.Kind.SPECIES, species=self.species)
+        TaxonGenus.objects.filter(pk=self.genus.pk).update(defining_sample=newer)
+        newer.soft_delete(self.user)
+        self.genus.refresh_from_db(); self.assertEqual(self.genus.defining_sample_id, older.pk)
 
-        genus_sample = self.genus_sample()
-        call_command('assign_genus_defining_samples', '--apply')
-        self.genus.refresh_from_db()
-        self.assertEqual(self.genus.defining_sample_id, genus_sample.pk)
-
-    def test_genus_without_a_matching_sample_is_left_untouched(self):
-        species = Species.objects.create(scientific_name='Chromodoris annae')
-        species_sample = Sample(owner=self.user, species=species, trip=self.trip,
-                                 video_url='https://youtu.be/abcdefghijk')
-        species_sample.save_reviewed()
-        self.genus.defining_sample = species_sample
-        self.genus.save(update_fields=['defining_sample'])
-
-        other_genus = TaxonGenus.objects.create(name='Hypselodoris')  # no genus-kind sample at all
-        call_command('assign_genus_defining_samples', '--apply')
-        self.genus.refresh_from_db()
-        other_genus.refresh_from_db()
-        self.assertEqual(self.genus.defining_sample_id, species_sample.pk)
-        self.assertIsNone(other_genus.defining_sample_id)
-
-    def test_rerun_is_idempotent(self):
-        sample = self.genus_sample()
-        call_command('assign_genus_defining_samples', '--apply')
-        call_command('assign_genus_defining_samples', '--apply')
-        self.genus.refresh_from_db()
-        self.assertEqual(self.genus.defining_sample_id, sample.pk)
-
-    def test_creating_a_genus_sample_immediately_points_the_genus_at_it(self):
-        # Regression test: Sample.save() (models.py) must keep TaxonGenus.defining_sample
-        # correct on its own, without needing the management command run afterward -- this
-        # is what image_manager.py's transfer upload relies on (it saves genus-kind samples
-        # with a plain .save(), never through save_reviewed() or this command).
-        sample = self.genus_sample()
-        self.genus.refresh_from_db()
-        self.assertEqual(self.genus.defining_sample_id, sample.pk)
-
-    def test_soft_delete_repoints_to_another_genus_sample(self):
-        first = self.genus_sample()
-        second = self.genus_sample()
-        self.genus.refresh_from_db()
-        self.assertEqual(self.genus.defining_sample_id, second.pk)        # the newest genus observation shows
-        second.soft_delete(self.user)
-        self.genus.refresh_from_db()
-        self.assertEqual(self.genus.defining_sample_id, first.pk)
-
-    def test_soft_delete_clears_defining_sample_when_no_replacement_exists(self):
-        sample = self.genus_sample()
-        sample.soft_delete(self.user)
-        self.genus.refresh_from_db()
-        self.assertIsNone(self.genus.defining_sample_id)
-
-    def test_unpublished_genus_sample_is_not_used(self):
-        # A pending (unapproved) genus-kind sample must not become the genus's public photo.
-        pending = Sample.objects.create(owner=self.user, kind=Sample.Kind.GENUS, genus='Chromodoris',
-                                         trip=self.trip, video_url='https://youtu.be/abcdefghijk')
-        self.assertEqual(pending.status, 'pending')
-        call_command('assign_genus_defining_samples', '--apply')
-        self.genus.refresh_from_db()
-        self.assertIsNone(self.genus.defining_sample_id)
-
-
-class TaxonGenusAdminActionTests(TestCase):
-    def setUp(self):
-        # create_backup() does real file I/O -- irrelevant here, same reasoning as above.
-        patcher = patch('observations.management.commands.assign_genus_defining_samples.create_backup', return_value=Path('backup-stub.sqlite3'))
-        self.addCleanup(patcher.stop)
-        patcher.start()
-        self.manager = User.objects.create_superuser('manager', password='test-password')
-        self.trip = DiveTrip.objects.create(title='Genus library', year=2026)
-        self.genus = TaxonGenus.objects.create(name='Chromodoris')
+    def test_the_admin_offers_only_fitting_observations_in_alphabetical_order(self):
+        other = Species.objects.create(scientific_name='Chromodoris africana', genus='Chromodoris', species='africana')
+        b = self.sample(kind=Sample.Kind.SPECIES, species=self.species)
+        a = self.sample(kind=Sample.Kind.SPECIES, species=other)
+        self.sample(kind=Sample.Kind.GENUS, genus='Chromodoris')
+        self.client.force_login(self.user)
+        page = self.client.get(f'/admin/observations/taxongenus/{self.genus.pk}/change/')
+        field = page.context['adminform'].form.fields['defining_sample']
+        self.assertEqual([s.pk for s in field.queryset], [a.pk, b.pk])
+        self.assertContains(page, 'select_search.js')
 
     def test_refresh_action_runs_regardless_of_selection(self):
-        sample = Sample(owner=self.manager, kind=Sample.Kind.GENUS, genus='Chromodoris',
-                         trip=self.trip, video_url='https://youtu.be/abcdefghijk')
-        sample.save_reviewed(actor=self.manager, approve=True)
-        # corrupt it first, to prove the action truly recomputes rather than trusting the row
+        species = self.sample(kind=Sample.Kind.SPECIES, species=self.species)
         TaxonGenus.objects.filter(pk=self.genus.pk).update(defining_sample=None)
-        self.client.force_login(self.manager)
+        self.client.force_login(self.user)
         response = self.client.post('/admin/observations/taxongenus/',
             {'action': 'refresh_defining_samples', '_selected_action': [str(self.genus.pk)]})
         self.assertEqual(response.status_code, 302)
         self.genus.refresh_from_db()
-        self.assertEqual(self.genus.defining_sample_id, sample.pk)
+        self.assertEqual(self.genus.defining_sample_id, species.pk)
+
+    def test_an_empty_level_is_skipped_down_to_the_next(self):
+        # no family observation: the order takes a genus one; no genus observation either: a species one
+        from .defining import choices
+        species = self.sample(kind=Sample.Kind.SPECIES, species=self.species)
+        for row in (self.family, self.order): row.refresh_from_db()
+        self.assertEqual((self.family.defining_sample_id, self.order.defining_sample_id), (species.pk, species.pk))
+        genus = self.sample(kind=Sample.Kind.GENUS, genus='Chromodoris')
+        for row in (self.family, self.order): row.refresh_from_db()
+        self.assertEqual((self.family.defining_sample_id, self.order.defining_sample_id), (genus.pk, genus.pk))
+        self.assertEqual(list(choices(self.order)), [genus])
+        # a family observation without a photo or video doesn't count: the level is still "empty"
+        silent = Sample(owner=self.user, trip=self.trip, kind=Sample.Kind.FAMILY, family='Chromodorididae', status='published'); silent.save()
+        self.order.refresh_from_db(); self.assertEqual(self.order.defining_sample_id, genus.pk)
+        family = self.sample(kind=Sample.Kind.FAMILY, family='Chromodorididae')
+        self.order.refresh_from_db(); self.assertEqual(self.order.defining_sample_id, family.pk)

@@ -1,4 +1,5 @@
 """Natural-key transfer of video samples; never transfers credentials or grants roles."""
+import uuid
 from decimal import Decimal, InvalidOperation
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -23,6 +24,10 @@ def sample_row(obj, fields):
         if field == 'trip':
             result[field] = obj.trip.code if obj.trip_id else None
             continue
+        if field == 'gallery_source':
+            # travels as the owning sample's fixed transfer id ('' for none), never its numeric id
+            result[field] = str(obj.gallery_source.transfer_id) if obj.gallery_source_id and obj.gallery_source else ''
+            continue
         value = getattr(obj, field)
         if field in ('transfer_id','image'): value = str(value)
         elif field == 'owner': value = value.get_username()
@@ -38,7 +43,7 @@ def sample_plan(document, fields):
     result = []; seen = set(); targets = set()
     for incoming in document['rows']:
         missing = set(fields) - set(incoming) if isinstance(incoming, dict) else None
-        if missing and set(incoming) <= set(fields) and missing - set(TAXONOMY_FIELDS) in (set(), {'transfer_id','image'}):
+        if missing and set(incoming) <= set(fields) and missing - set(TAXONOMY_FIELDS) - {'gallery_source'} in (set(), {'transfer_id','image'}):
             # A row from an older environment/file: no order/family/genus/qualifier/life stage
             # (a taxon-level sample then carried its name in species_other), and possibly no
             # transfer_id/image either (the oldest EXIF rows).
@@ -47,6 +52,7 @@ def sample_plan(document, fields):
             if 'transfer_id' not in incoming:
                 incoming = dict(incoming, transfer_id=str(uuid.uuid5(uuid.NAMESPACE_URL,incoming.get('video_url',''))), image='')
             for field in TAXONOMY_FIELDS: incoming.setdefault(field, '')
+            if 'gallery_source' in fields: incoming.setdefault('gallery_source', '')
             legacy_field = {'order': 'order', 'family': 'family', 'genus': 'genus'}.get(incoming.get('kind'))
             if legacy_field and not incoming[legacy_field] and isinstance(incoming.get('species_other'), str):
                 incoming[legacy_field] = incoming['species_other']; incoming['species_other'] = ''
@@ -100,13 +106,36 @@ def sample_plan(document, fields):
                            'reason':f'התצפית ביעד ({_describe(obj)}) מסומנת כמחוקה. אם יש להחזיר אותה יש לעשות זאת בניהול ואז לייבא שוב; אחרת השורה הזו לא תועבר.'})
             continue
         if obj: values['transfer_id'] = str(obj.transfer_id)
+        warnings = []; pending_gallery = None
+        gallery_tid = values.pop('gallery_source', '') if 'gallery_source' in values else ''
+        values['gallery_source'] = None
         if document.get('media_mode')=='separate':
-            # Plain table transfers never copy, remove, or replace target image references --
-            # actual image files travel separately, through image management.
-            values['image'] = obj.image.name if obj and obj.image else ''
+            # A plain table transfer copies which photo each observation shows: its own alternate
+            # image by file name, or its gallery image as the owning sample's transfer id. The
+            # files themselves still travel through image management -- a file missing here is
+            # copied anyway and reported, and the image comparison then lists it as missing.
+            from django.core.files.storage import default_storage
+            if gallery_tid:
+                try: gallery_tid = str(uuid.UUID(gallery_tid))
+                except (ValueError, TypeError): raise ValidationError('מזהה תמונה קיימת בגלריה לא תקין.')
+                source = Sample.objects.filter(transfer_id=gallery_tid, deleted_at__isnull=True).first()
+                if source and source.gallery_source_id: source = source.gallery_source
+                if source:
+                    values['gallery_source'] = source; values['image'] = source.image.name if source.image else ''
+                    if not source.image: warnings.append(f'לתצפית שהתמונה שלה נבחרה כתמונה קיימת בגלריה ({_describe(source)}) אין תמונה ביעד.')
+                elif any(isinstance(r, dict) and r.get('transfer_id') == gallery_tid for r in document['rows']):
+                    pending_gallery = gallery_tid; values['image'] = ''   # linked once that sample is saved too (apply)
+                else:
+                    values['image'] = ''
+                    warnings.append('התמונה הקיימת בגלריה שייכת לתצפית שאינה קיימת ביעד ולא הועברה איתה; יש להעביר גם אותה ולייבא שוב.')
+            elif values['image']:
+                from .media_transfer import validate_image_name
+                validate_image_name(values['image'])
+                if not default_storage.exists(values['image']):
+                    warnings.append(f'קובץ התמונה {values["image"]} חסר ביעד — שם התמונה הועתק; יש להעביר את הקובץ דרך ניהול התמונות.')
             # An order / family / genus observation may legitimately have no media of its own (its
             # page then borrows a species photo), so only the other kinds need one to be transferred.
-            if not values['video_url'] and not values['image'] and values['kind'] not in ('order', 'family', 'genus'):
+            if not values['video_url'] and not values['image'] and not pending_gallery and values['kind'] not in ('order', 'family', 'genus'):
                 result.append({'object':None,'label':values['title'] or incoming.get('species') or identity,
                                'action':'skipped','changes':[],
                                'reason':'התצפית לא הועברה: חסרה תמונה ביעד ואין סרטון. העבירו את התמונה דרך ניהול התמונות ואז ייבאו שוב.'})
@@ -162,6 +191,9 @@ def sample_plan(document, fields):
             raise ValidationError('אין לפרסם רשומה עם ערכי אחר.')
         before = sample_row(obj, fields) if obj else {}
         after = sample_row(candidate, fields)
+        if pending_gallery and 'gallery_source' in after: after['gallery_source'] = pending_gallery
         changes = [{'field':str(Sample._meta.get_field(f).verbose_name),'before':before.get(f,''),'after':after[f]} for f in fields if before.get(f) != after[f]]
-        result.append({'object':candidate,'label':candidate.title or str(candidate),'action':'new' if obj is None else 'update' if changes else 'same','changes':changes})
+        candidate._pending_gallery = pending_gallery
+        result.append({'object':candidate,'label':candidate.title or str(candidate),'action':'new' if obj is None else 'update' if changes else 'same',
+                       'changes':changes,'warnings':warnings})
     return result

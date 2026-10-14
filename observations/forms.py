@@ -194,7 +194,9 @@ class SampleForm(forms.ModelForm):
     # Sample.sync_taxonomy() normalises on the server). Each is a text input with a <datalist>
     # that the script narrows by the level above it.
     existing_image = forms.CharField(required=False, label='או: תמונה קיימת בגלריה', widget=forms.TextInput(attrs={'dir': 'ltr', 'placeholder': '/observations/123/photo/'}),
-        help_text='במקום להעלות קובץ אפשר להשתמש בתמונה שכבר קיימת בגלריה: הדביקו את כתובת התמונה (כפתור "העתקת כתובת התמונה"), או בחרו מהגלריה. התצפית תצביע על אותו קובץ, בלי להעתיק אותו.')
+        help_text='במקום להעלות קובץ אפשר להציג תמונה שכבר קיימת בגלריה: הדביקו את כתובת התמונה (כפתור "העתקת כתובת התמונה"), או בחרו מהגלריה. '
+                  'התצפית תצביע על אותו קובץ, בלי להעתיק אותו. רק אחד משני השדות — תמונה חלופית או תמונה קיימת בגלריה — יכול להיות מוגדר. '
+                  'מחיקת הכתובת מבטלת את התמונה הקיימת בגלריה.')
     full_name = forms.CharField(label='השם המדעי המלא (כולל מחבר ותוספות)', required=False, disabled=True,
         widget=forms.TextInput(attrs={'size': 60}),
         help_text='מתעדכן אוטומטית לפי הסדרה/המשפחה/הסוג/המין שנבחרו, סימון הזהות (cf./aff.) ושלב החיים.')
@@ -221,6 +223,12 @@ class SampleForm(forms.ModelForm):
             # displayed text so re-editing shows exactly what was typed, and clean() below
             # round-trips it the same way it does on first entry.
             self.initial['species'] = species_epithet_with_variant(self.instance)
+            if self.instance.gallery_source_id:
+                self.initial['existing_image'] = f'/observations/{self.instance.gallery_source_id}/photo/'
+            elif self.instance.image and 'existing_image' in self.fields:
+                # an own alternate image is set: the gallery-image field stays inactive until it is deleted
+                self.fields['existing_image'].widget.attrs['data-own-image'] = '1'
+                self.fields['existing_image'].help_text += ' לתצפית יש תמונה חלופית משלה — כדי לבחור תמונה קיימת יש למחוק אותה קודם.'
         self.fields['species_other'].help_text = 'אם המין לא נמצא ברשימה שלמעלה, אפשר לפרט כאן במקום לבחור מהרשימה.'
         self.fields['site'].choices = [('', 'בחרו…')] + [(str(x.pk), str(x)) for x in Site.objects.all()] + [('other','אחר — פירוט')]
         if self.instance.pk:
@@ -379,16 +387,30 @@ class SampleForm(forms.ModelForm):
         # file (images are shared between records -- see media_transfer.delete_image_if_unused), and the
         # "one image, one observation" rule is waived because the choice is deliberate.
         reference = (data.get('existing_image') or '').strip()
-        if reference:
+        uploaded = self.files.get(self.add_prefix('image'))
+        if reference and 'existing_image' in self.fields:
             match = re.search(r'/observations/(\d+)/photo/?(?:[?#].*)?$', reference)
-            source = Sample.objects.filter(pk=int(match.group(1)), status=Sample.Status.PUBLISHED, deleted_at__isnull=True).exclude(image='').first() if match else None
-            if not source:
+            source = Sample.objects.filter(pk=int(match.group(1)), deleted_at__isnull=True).exclude(image='').first() if match else None
+            if source and source.gallery_source_id: source = source.gallery_source   # always the photo's owner
+            if not source or source.deleted_at or (source.status != Sample.Status.PUBLISHED and source.pk != self.instance.gallery_source_id):
                 self.add_error('existing_image', 'הכתובת אינה כתובת של תמונה קיימת בגלריה. בחרו תמונה מהרשימה, או הדביקו את כתובת התמונה כפי שהועתקה מהאתר.')
-            elif self.files.get(self.add_prefix('image')):
-                self.add_error('existing_image', 'בחרו העלאת קובץ או תמונה קיימת, לא את שניהם.')
+            elif uploaded:
+                self.add_error('existing_image', 'רק אחד מהשדות יכול להיות מוגדר: תמונה חלופית (העלאת קובץ) או תמונה קיימת בגלריה.')
+            elif self.instance.pk and source.pk == self.instance.pk:
+                self.add_error('existing_image', 'זו התמונה של התצפית עצמה.')
+            elif self.instance.pk and not self.instance.gallery_source_id and self.instance.image and self.instance.gallery_references.filter(deleted_at__isnull=True).exists():
+                self.add_error('existing_image', 'התמונה של תצפית זו מוצגת גם בתצפיות אחרות (כתמונה קיימת בגלריה), ולכן אי אפשר להחליף אותה בתמונה של תצפית אחרת.')
             else:
                 data['image'] = source.image.name
-                self.instance._shared_image = True
+                self.instance.gallery_source = source
+                self.instance._gallery_choice = True
+        elif 'existing_image' in self.fields and self.instance.gallery_source_id and not uploaded:
+            # the gallery-image address was erased: the observation no longer shows that photo
+            data['image'] = ''
+            self.instance.gallery_source = None
+            self.instance._gallery_choice = True
+        if uploaded:
+            self.instance.gallery_source = None   # an uploaded alternate image is the observation's own
         # species_other, if filled in, always wins -- it's a deliberate manual override.
         # Otherwise, whatever was typed into species must match an existing species
         # exactly (case-insensitively); if it doesn't, that's a validation error rather

@@ -312,6 +312,22 @@ class TaxonGenusGroupFilter(TaxonGroupFilter):
     prefix = 'family__'
 
 
+class DefiningSampleChoicesMixin:
+    """The defining-sample select offers only the observations that may define this row, one level
+    below it (see observations/defining.py) -- on a new row, none until it is saved."""
+    class Media:
+        js = ['observations/js/select_search.js']
+    def get_form(self, request, obj=None, **kwargs):
+        self._defining_row = obj
+        return super().get_form(request, obj, **kwargs)
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == 'defining_sample':
+            from .defining import choices
+            row = getattr(self, '_defining_row', None)
+            kwargs['queryset'] = choices(row) if row is not None else Sample.objects.none()
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+
 class TaxonSitePageMixin:
     """A "view the page on the site" button next to Save -- as the species admin has -- when the row has a
     public page (one with at least one gallery species; the page 404s otherwise)."""
@@ -326,7 +342,7 @@ class TaxonSitePageMixin:
 
 
 @admin.register(TaxonOrder)
-class TaxonOrderAdmin(TaxonSitePageMixin, admin.ModelAdmin):
+class TaxonOrderAdmin(DefiningSampleChoicesMixin, TaxonSitePageMixin, admin.ModelAdmin):
     """Orders, sub-orders and superfamilies in one table; the "rank" column says which each row is."""
     list_display = ['taxonomic_order', 'name', 'sub_order', 'superfamily', 'rank', 'name_he', 'name_en', 'defining_sample']
     list_filter = ['rank']
@@ -339,7 +355,7 @@ class TaxonOrderAdmin(TaxonSitePageMixin, admin.ModelAdmin):
 
 
 @admin.register(TaxonFamily)
-class TaxonFamilyAdmin(TaxonSitePageMixin, admin.ModelAdmin):
+class TaxonFamilyAdmin(DefiningSampleChoicesMixin, TaxonSitePageMixin, admin.ModelAdmin):
     show_facets = admin.ShowFacets.ALWAYS     # the order filter's counts are the point of it
     list_display = ['taxonomic_order', 'name', 'name_he', 'name_en', 'sub_family', 'superfamily', 'order', 'defining_sample']
     list_filter = [TaxonFamilyOrderNameFilter, TaxonFamilyGroupFilter]
@@ -351,7 +367,7 @@ class TaxonFamilyAdmin(TaxonSitePageMixin, admin.ModelAdmin):
 
 
 @admin.register(TaxonGenus)
-class TaxonGenusAdmin(TaxonSitePageMixin, admin.ModelAdmin):
+class TaxonGenusAdmin(DefiningSampleChoicesMixin, TaxonSitePageMixin, admin.ModelAdmin):
     show_facets = admin.ShowFacets.ALWAYS     # the order filter's counts are the point of it
     list_display = ['taxonomic_order', 'name', 'name_he', 'name_en', 'family', 'defining_sample']
     list_filter = [TaxonGenusOrderNameFilter, TaxonGenusGroupFilter]
@@ -367,7 +383,7 @@ class TaxonGenusAdmin(TaxonSitePageMixin, admin.ModelAdmin):
         ('מקורות וקבצים', {'fields': ['sources', 'link', 'article_pdf']}),
     ]
     actions = ['refresh_defining_samples']
-    @admin.action(description='עדכון דגימה מגדירה לכל הסוגים מתוך דגימות ה"סוג" הקיימות (מתעלם מהבחירה)')
+    @admin.action(description='תיקון הדגימה המגדירה בכל הסדרות, המשפחות והסוגים לפי הכללים (מתעלם מהבחירה)')
     def refresh_defining_samples(self, request, queryset):
         from io import StringIO
         from django.core.management import call_command
@@ -392,6 +408,8 @@ class DiveTripAdmin(admin.ModelAdmin):
 
 @admin.register(SpeciesArea)
 class SpeciesAreaAdmin(admin.ModelAdmin):
+    class Media:
+        js = ['observations/js/select_search.js']
     list_display = ['species','undetermined_variant','country','sea','defining_sample','slug']
     list_filter = ['country','sea']
     search_fields = ['species__scientific_name','undetermined_variant','slug']
@@ -403,7 +421,7 @@ class SpeciesAreaAdmin(admin.ModelAdmin):
             # published, not deleted, matching this row's species+country+sea+variant.
             kwargs['queryset'] = Sample.objects.filter(kind='species', species_id=self._obj.species_id, status='published',
                 trip__country_id=self._obj.country_id, trip__region__sea_id=self._obj.sea_id, deleted_at__isnull=True,
-                undetermined_variant=self._obj.undetermined_variant)
+                undetermined_variant=self._obj.undetermined_variant).select_related('species','trip').order_by('species__scientific_name', '-created_at', '-pk')
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
     def get_form(self, request, obj=None, **kwargs):
         self._obj = obj

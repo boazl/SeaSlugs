@@ -3,6 +3,7 @@ import base64
 import hashlib
 import io
 import json
+from datetime import datetime, timezone as dt_timezone
 from PIL import Image, ImageOps
 from django.core.files.base import ContentFile
 import re
@@ -17,7 +18,7 @@ from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import render, redirect
 from django.urls import reverse
 from django.utils import timezone
-from .models import Sample, SiteImage, TaxonGenus
+from .models import Sample, SiteImage, TaxonGenus, TaxonFamily, TaxonOrder, SpeciesArea
 from .forms import SampleForm
 
 MANIFEST_FORMAT = 'seaslugs-image-manifest-v1'
@@ -28,7 +29,7 @@ SORT_OPTIONS={'alpha':'לפי סדר אלפביתי (סוג ומין)','kind':'�
 # genus identification files, then order, family, genus and species observations, then the
 # rest (collections, uncatalogued "other" species, orphans).
 KIND_GROUPS=('identification',Sample.Kind.ORDER,Sample.Kind.FAMILY,Sample.Kind.GENUS,Sample.Kind.SPECIES,'other')
-KIND_GROUP_LABELS=('קבצי זיהוי של סוגים','תמונות של סדרות','תמונות של משפחות','תמונות של סוגים','תמונות של מינים','אחר (אוספים, מינים לא מקוטלגים ותמונות לא משויכות)')
+KIND_GROUP_LABELS=('קבצי זיהוי של סוגים','תמונות של סדרות','תמונות של משפחות','תמונות של סוגים','תמונות של מינים','אחר (תמונות שאינן מוצגות באף רמה)')
 DEFAULT_SORT='alpha'
 
 
@@ -102,15 +103,17 @@ def _compare(a,b):
 
 
 def _mark_duplicates(rows,paths):
-    """row['duplicates']: [(other file name, 'exact'|'caption')] for every other file holding
-    the same photo. Only images of similar overall brightness are compared in full."""
+    """row['duplicates']: [(other file name, 'exact')] for every other file holding the very same
+    image -- an exact copy (re-saved, re-exported or resized); the same photo with a different
+    caption or marking is a different image and is not listed. Only images of similar overall brightness are compared in full."""
     for row in rows: row['duplicates']=[]
     thumbs=sorted(((t,row) for row,path in zip(rows,paths) if (t:=_thumbnail(path))),key=lambda item:item[0][0])
     for i,(thumb,row) in enumerate(thumbs):
         for other_thumb,other in thumbs[i+1:]:
             if other_thumb[0]-thumb[0]>DUPLICATE_MAX_MEAN: break
-            if match:=_compare(thumb,other_thumb):
-                row['duplicates'].append((other['name'],match));other['duplicates'].append((row['name'],match))
+            # only identical content counts: the same photo with a different caption is a different image
+            if _compare(thumb,other_thumb)=='exact':
+                row['duplicates'].append((other['name'],'exact'));other['duplicates'].append((row['name'],'exact'))
 
 
 def _search_text(row):
@@ -127,6 +130,48 @@ def _search_text(row):
     return ' '.join(p for p in parts if p).lower()
 
 
+LEVEL_KINDS=('order','family','genus','species')
+
+
+def taxon_levels():
+    """{file name: [level, ...]} -- every taxon page ("level": an order / sub-order /
+    superfamily, a family, a genus, a species in an area) that shows each image. A level shows
+    the images of its own observations (an order-, family- or genus-kind observation of that
+    taxon; for a species, its observations in that area) -- each one's alternate image or
+    gallery image; only when none of them has one, the image of the level's defining sample.
+    A level is {'kind', 'label', 'url'}."""
+    observations={}
+    for sample in Sample.objects.filter(deleted_at__isnull=True).exclude(image='').select_related('trip'):
+        if sample.kind=='order' and sample.order: key=('order',sample.order)
+        elif sample.kind=='family' and sample.family: key=('family',sample.family)
+        elif sample.kind=='genus' and sample.genus: key=('genus',sample.genus)
+        elif sample.kind=='species' and sample.species_id and sample.trip_id and sample.trip.country_id and sample.trip.sea_id:
+            key=('species',sample.species_id,sample.trip.country_id,sample.trip.sea_id,sample.undetermined_variant)
+        else: continue
+        observations.setdefault(key,set()).add(sample.image.name)
+    def own_or_defining(key,defining):
+        if key in observations: return observations[key]
+        if defining and not defining.deleted_at and defining.image: return {defining.image.name}
+        return set()
+    levels={}
+    def add(names,level):
+        for name in names: levels.setdefault(name,[]).append(level)
+    for row in TaxonOrder.objects.select_related('defining_sample'):
+        own=not row.sub_order and not row.superfamily
+        add(own_or_defining(('order',row.name) if own else ('order-row',row.pk),row.defining_sample),
+            {'kind':'order','label':row.own_name,'url':reverse('order-page',args=[row.pk])})
+    for row in TaxonFamily.objects.select_related('defining_sample'):
+        add(own_or_defining(('family',row.name) if not row.sub_family else ('family-row',row.pk),row.defining_sample),
+            {'kind':'family','label':f'{row.name} ({row.sub_family})' if row.sub_family else row.name,'url':reverse('family-page',args=[row.name])})
+    for row in TaxonGenus.objects.select_related('defining_sample'):
+        add(own_or_defining(('genus',row.name),row.defining_sample),{'kind':'genus','label':row.name,'url':reverse('genus-page',args=[row.name])})
+    for area in SpeciesArea.objects.select_related('species','country','sea','defining_sample'):
+        key=('species',area.species_id,area.country_id,area.sea_id,area.undetermined_variant)
+        label=f'{area.species.scientific_name}{" "+area.undetermined_variant if area.undetermined_variant else ""} · {area.country.name}'
+        add(own_or_defining(key,area.defining_sample),{'kind':'species','label':label,'url':reverse('species-page',args=[area.slug]) if area.slug else ''})
+    return levels
+
+
 def files(sort=DEFAULT_SORT):
     root=Path(settings.MEDIA_ROOT).resolve()
     if not root.exists(): return []
@@ -140,7 +185,7 @@ def files(sort=DEFAULT_SORT):
     identification={}
     for genus in TaxonGenus.objects.exclude(identification_file=''):
         identification.setdefault(genus.identification_file.name,[]).append(genus)
-    rows=[];paths=[]
+    rows=[];paths=[];levels=taxon_levels()
     for path in sorted(root.rglob('*')):
         if not path.is_file() or path.is_symlink() or not path.resolve().is_relative_to(root): continue
         if path.suffix.lower() not in ('.jpg','.jpeg','.png','.webp'): continue
@@ -154,7 +199,13 @@ def files(sort=DEFAULT_SORT):
              'identification_for':genera,
              'blocked':any(not r.video_url and not r.deleted_at for r in refs) or name in site_images or bool(genera),
              'redundant':redundant}
-        row['search']=_search_text(row)
+        row['levels']=levels.get(name,[]);row['level_count']=len(row['levels'])
+        # naming rule: a genera-*.jpg file belongs to genus observations only, any other photo to
+        # observations of other kinds (species photos to species observations)
+        is_genus_file=Path(name).name.startswith('genera-')
+        row['genus_file']=is_genus_file
+        row['kind_mismatch']=[r for r in refs if not r.deleted_at and (r.kind==Sample.Kind.GENUS)!=is_genus_file]
+        row['search']=_search_text(row)+' '+' '.join(l['label'].lower() for l in row['levels'])
         rows.append(row);paths.append(path)
     _mark_duplicates(rows,paths)
     if sort=='alpha':
@@ -164,23 +215,23 @@ def files(sort=DEFAULT_SORT):
             return (1,(row['name'].lower(),))
         rows.sort(key=alpha)
     elif sort=='kind':
-        def by_kind(row):
+        # One card per level that shows the image (an image on two levels appears twice --
+        # the badge on it counts its levels); identification files and images on no level
+        # keep a single card in their own groups.
+        cards=[]
+        for row in rows:
             if row['identification_for']:
-                row['group_label']=KIND_GROUP_LABELS[0]
-                return (0,row['identification_for'][0].name.lower(),row['name'].lower())
-            # Prefer a live observation's kind over a deleted one's when an image has several.
-            refs=sorted(row['refs'],key=lambda r:r.deleted_at is not None)
-            kind=refs[0].kind if refs else None
-            group=KIND_GROUPS.index(kind) if kind in KIND_GROUPS else len(KIND_GROUPS)-1
-            if kind==Sample.Kind.SPECIES and (species:=_row_species(row)): label=' '.join(_alpha_key(species))
-            elif refs: label=str(refs[0].taxon_name or '').lower()
-            else: label=''
-            row['group_label']=KIND_GROUP_LABELS[group]
-            return (group,label or '\uffff',row['name'].lower())
-        rows.sort(key=by_kind)
+                cards.append(dict(row,level=None,group=0,sort_label=row['identification_for'][0].name.lower()))
+            for level in row['levels']:
+                cards.append(dict(row,level=level,group=1+LEVEL_KINDS.index(level['kind']),sort_label=level['label'].lower()))
+            if not row['levels'] and not row['identification_for']:
+                cards.append(dict(row,level=None,group=len(KIND_GROUPS)-1,sort_label='\uffff'))
+        cards.sort(key=lambda c:(c['group'],c['sort_label'],c['name'].lower()))
         counts={}
-        for row in rows: counts[row['group_label']]=counts.get(row['group_label'],0)+1
-        for row in rows: row['group_count']=counts[row['group_label']]
+        for card in cards:
+            card['group_label']=KIND_GROUP_LABELS[card['group']];counts[card['group']]=counts.get(card['group'],0)+1
+        for card in cards: card['group_count']=counts[card['group']]
+        return cards
     elif sort=='taxonomy':
         rows.sort(key=lambda row:(1,row['name']) if not (species:=_row_species(row)) else (0,_taxonomy_key(species)))
     return rows
@@ -196,6 +247,35 @@ def _active_image_names():
     return {name for name in names if (root/name).is_file() and (root/name).resolve().is_relative_to(root)}
 
 
+def _image_assignments():
+    """{transfer_id: image name} for every active sample, image-bearing or not -- which photo
+    each observation shows. transfer_id is the same in both environments (table transfer
+    keeps it), so this catches an observation that uses an image in one environment and has
+    none, or a different one, in the other -- e.g. a family observation given an existing
+    genus photo here, a change neither the file list (that photo exists in both) nor a table
+    transfer (which carries a sample's fields, not its image) brings across."""
+    root=Path(settings.MEDIA_ROOT).resolve();result={}
+    for transfer_id,name in Sample.objects.filter(deleted_at__isnull=True).values_list('transfer_id','image'):
+        result[str(transfer_id)]=name if name and (root/name).is_file() else ''
+    return result
+
+
+_content_hash_cache={}
+
+
+def _file_details():
+    """{file name: [sha256 of its bytes, modification time, size in bytes]} for every active sample's image
+    present here -- so the comparison also catches a file both environments have under the
+    same name but with different content (e.g. a genus photo re-captioned in one of them)."""
+    root=Path(settings.MEDIA_ROOT).resolve();result={}
+    for name in _active_image_names():
+        path=root/name;stat=path.stat();key=(name,stat.st_size,stat.st_mtime_ns)
+        if key not in _content_hash_cache:
+            _content_hash_cache[key]=hashlib.sha256(path.read_bytes()).hexdigest()
+        result[name]=[_content_hash_cache[key],int(stat.st_mtime),stat.st_size]
+    return result
+
+
 def build_manifest():
     """A small JSON listing every active, image-bearing sample's own canonical filename
     (see Sample.canonical_image_name) -- not a hash of the file's bytes and not an opaque
@@ -203,22 +283,50 @@ def build_manifest():
     kept in sync between environments by table-transfer), the exact same filename names the
     exact same photo in both environments, so comparing the plain names is enough on its
     own -- and the names themselves are what the admin needs anyway, to know which file to
-    go find."""
-    return {'format': MANIFEST_FORMAT, 'exported_at': timezone.now().isoformat(), 'images': sorted(_active_image_names())}
+    go find. 'assignments' adds which image each observation uses (see _image_assignments)."""
+    return {'format': MANIFEST_FORMAT, 'exported_at': timezone.now().isoformat(), 'images': sorted(_active_image_names()),
+            'assignments': _image_assignments(),'files': _file_details()}
 
 
 def compare_manifest(manifest):
     """Diff this environment's own active, image-bearing samples' filenames against an
     uploaded manifest from the other environment. Returns which filenames need downloading
     from there (present there, absent here) and which need sending there (present here,
-    absent there) -- informational; the admin decides what, if anything, to transfer."""
+    absent there) -- informational; the admin decides what, if anything, to transfer --
+    plus, when the other side's manifest has assignments (older exports don't), the
+    observations present in both whose image differs."""
     if not isinstance(manifest, dict) or manifest.get('format') != MANIFEST_FORMAT or not isinstance(manifest.get('images'), list):
         raise ValidationError('קובץ השוואה לא תקין או גרסה לא נתמכת.')
     if not all(isinstance(name, str) for name in manifest['images']):
         raise ValidationError('קובץ השוואה לא תקין.')
+    remote_assignments=manifest.get('assignments')
+    if remote_assignments is not None and (not isinstance(remote_assignments,dict)
+            or not all(isinstance(k,str) and isinstance(v,str) for k,v in remote_assignments.items())):
+        raise ValidationError('קובץ השוואה לא תקין.')
     remote = set(manifest['images'])
     local = _active_image_names()
-    return {'missing_here': sorted(remote - local), 'only_here': sorted(local - remote)}
+    remote_files=manifest.get('files')
+    if remote_files is not None and (not isinstance(remote_files,dict) or not all(
+            isinstance(k,str) and isinstance(v,list) and len(v) in (2,3) and isinstance(v[0],str) and all(isinstance(x,int) for x in v[1:])
+            for k,v in remote_files.items())):
+        raise ValidationError('קובץ השוואה לא תקין.')
+    result={'missing_here': sorted(remote - local), 'only_here': sorted(local - remote), 'assignments_checked': remote_assignments is not None, 'different_image': [],
+            'contents_checked': remote_files is not None, 'different_content': []}
+    if remote_files:
+        for name,(digest,mtime,size) in sorted(_file_details().items()):
+            if name in remote_files and remote_files[name][0]!=digest:
+                there=remote_files[name]
+                result['different_content'].append({'name':name,'newer':'here' if mtime>there[1] else 'there' if mtime<there[1] else '',
+                    'size_here':size,'size_there':there[2] if len(there)>2 else None,
+                    'mtime_here':datetime.fromtimestamp(mtime,tz=dt_timezone.utc),'mtime_there':datetime.fromtimestamp(there[1],tz=dt_timezone.utc)})
+        result['different_content_names']=[row['name'] for row in result['different_content']]
+    if remote_assignments:
+        local_assignments=_image_assignments()
+        differing=[tid for tid,name in local_assignments.items() if tid in remote_assignments and remote_assignments[tid]!=name]
+        samples={str(s.transfer_id):s for s in Sample.objects.filter(transfer_id__in=differing).select_related('species','trip')}
+        rows=[{'sample':samples[tid],'here':local_assignments[tid],'there':remote_assignments[tid]} for tid in differing if tid in samples]
+        result['different_image']=sorted(rows,key=lambda r:str(r['sample'].taxon_name or '').lower())
+    return result
 
 
 def resolve(token):
@@ -419,6 +527,8 @@ def manager(request):
                 except (ValueError,UnicodeDecodeError): raise ValidationError('קובץ השוואה לא תקין.')
                 context['comparison']=compare_manifest(manifest)
         except ValidationError as exc: context['error']='; '.join(exc.messages)
-    context['images']=files(sort);context['total_bytes']=sum(r['size'] for r in context['images'])
+    context['images']=files(sort)
+    unique={r['name']:r['size'] for r in context['images']}
+    context['file_count']=len(unique);context['total_bytes']=sum(unique.values())
     context['site_image']=SiteImage.objects.filter(key='intro_photo').exclude(image='').first()
     response=render(request,'observations/images.html',context);response['Cache-Control']='private, no-store';return response
