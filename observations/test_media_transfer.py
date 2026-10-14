@@ -277,6 +277,22 @@ class MediaTransferTests(TestCase):
         self.assertIn('id="select-mismatch"',content);self.assertIn('data-mismatch="1"',content)
         self.assertIn('קובץ שאינו genera- צריך להיות משויך לתצפיות מין',content)
 
+    def test_a_file_saved_again_with_other_bytes_but_the_same_picture_is_not_listed(self):
+        # every download / transfer re-encodes the JPEG: other bytes, same picture
+        from .image_manager import build_manifest,compare_manifest
+        other=build_manifest();name=self.sample.image.name
+        digest,mtime,size,picture=other['files'][name]
+        other['files'][name]=['f'*64,mtime,size+10,picture]
+        result=compare_manifest(other)
+        self.assertEqual((result['different_content'],result['encoding_only']),([],1))
+
+    def test_upload_accepts_up_to_150_photos(self):
+        from .image_manager import MAX_UPLOAD_FILES
+        self.assertEqual(MAX_UPLOAD_FILES,150)
+        self.client.force_login(self.sample.owner)
+        files=[SimpleUploadedFile(f'{n}.jpg',b'x',content_type='image/jpeg') for n in range(151)]
+        self.assertContains(self.client.post('/admin/images/',{'action':'upload','images':files}),'בחרו בין תמונה אחת ל־150 תמונות.')
+
     def test_compare_manifest_rejects_malformed_file(self):
         self.client.force_login(self.sample.owner)
         upload=SimpleUploadedFile('manifest.json',b'{"format": "wrong"}',content_type='application/json')

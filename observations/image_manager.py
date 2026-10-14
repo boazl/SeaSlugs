@@ -31,6 +31,9 @@ SORT_OPTIONS={'alpha':'לפי סדר אלפביתי (סוג ומין)','kind':'�
 KIND_GROUPS=('identification',Sample.Kind.ORDER,Sample.Kind.FAMILY,Sample.Kind.GENUS,Sample.Kind.SPECIES,'other')
 KIND_GROUP_LABELS=('קבצי זיהוי של סוגים','תמונות של סדרות','תמונות של משפחות','תמונות של סוגים','תמונות של מינים','אחר (תמונות שאינן מוצגות באף רמה)')
 DEFAULT_SORT='alpha'
+# one "העברת תמונות לסביבה זו" upload: up to 150 photos (a full genus set re-sent at once), 300MB
+MAX_UPLOAD_FILES=150
+MAX_UPLOAD_BYTES=300*1024*1024
 
 
 def _row_species(row):
@@ -264,7 +267,7 @@ _content_hash_cache={}
 
 
 def _file_details():
-    """{file name: [sha256 of its bytes, modification time, size in bytes]} for every active sample's image
+    """{file name: [sha256 of its bytes, modification time, size in bytes, picture]} for every active sample's image
     present here -- so the comparison also catches a file both environments have under the
     same name but with different content (e.g. a genus photo re-captioned in one of them)."""
     root=Path(settings.MEDIA_ROOT).resolve();result={}
@@ -272,7 +275,10 @@ def _file_details():
         path=root/name;stat=path.stat();key=(name,stat.st_size,stat.st_mtime_ns)
         if key not in _content_hash_cache:
             _content_hash_cache[key]=hashlib.sha256(path.read_bytes()).hexdigest()
-        result[name]=[_content_hash_cache[key],int(stat.st_mtime),stat.st_size]
+        thumb=_thumbnail(path)
+        # picture: the 96x54 grayscale thumbnail (base64) -- the same photo saved again (every
+        # download / transfer re-encodes the JPEG) has other bytes but the same picture
+        result[name]=[_content_hash_cache[key],int(stat.st_mtime),stat.st_size,base64.b64encode(thumb[2]).decode('ascii') if thumb else '']
     return result
 
 
@@ -307,15 +313,25 @@ def compare_manifest(manifest):
     local = _active_image_names()
     remote_files=manifest.get('files')
     if remote_files is not None and (not isinstance(remote_files,dict) or not all(
-            isinstance(k,str) and isinstance(v,list) and len(v) in (2,3) and isinstance(v[0],str) and all(isinstance(x,int) for x in v[1:])
-            for k,v in remote_files.items())):
+            isinstance(k,str) and isinstance(v,list) and len(v) in (2,3,4) and isinstance(v[0],str) and all(isinstance(x,int) for x in v[1:3])
+            and (len(v)<4 or isinstance(v[3],str)) for k,v in remote_files.items())):
         raise ValidationError('קובץ השוואה לא תקין.')
     result={'missing_here': sorted(remote - local), 'only_here': sorted(local - remote), 'assignments_checked': remote_assignments is not None, 'different_image': [],
             'contents_checked': remote_files is not None, 'different_content': []}
     if remote_files:
-        for name,(digest,mtime,size) in sorted(_file_details().items()):
+        result['encoding_only']=0
+        for name,(digest,mtime,size,picture) in sorted(_file_details().items()):
             if name in remote_files and remote_files[name][0]!=digest:
                 there=remote_files[name]
+                if len(there)>3 and there[3] and picture:
+                    # other bytes: is it another picture, or the same one saved again?
+                    try: theirs=base64.b64decode(there[3])
+                    except ValueError: theirs=b''
+                    mine=base64.b64decode(picture)
+                    if len(theirs)==len(mine):
+                        diffs=sorted(abs(x-y) for x,y in zip(mine,theirs))
+                        if sum(diffs)/len(diffs)<=DUPLICATE_MAX_MEAN and diffs[int(len(diffs)*.995)]<=DUPLICATE_EXACT_P995:
+                            result['encoding_only']+=1; continue
                 result['different_content'].append({'name':name,'newer':'here' if mtime>there[1] else 'there' if mtime<there[1] else '',
                     'size_here':size,'size_there':there[2] if len(there)>2 else None,
                     'mtime_here':datetime.fromtimestamp(mtime,tz=dt_timezone.utc),'mtime_there':datetime.fromtimestamp(there[1],tz=dt_timezone.utc)})
@@ -403,8 +419,8 @@ def manager(request):
                 return redirect(redirect_target)
             elif action=='upload':
                 uploads=request.FILES.getlist('images')
-                if not uploads or len(uploads)>50: raise ValidationError('בחרו בין תמונה אחת ל־50 תמונות.')
-                if sum(upload.size for upload in uploads)>100*1024*1024: raise ValidationError('עד 100MB בהעלאה אחת.')
+                if not uploads or len(uploads)>MAX_UPLOAD_FILES: raise ValidationError(f'בחרו בין תמונה אחת ל־{MAX_UPLOAD_FILES} תמונות.')
+                if sum(upload.size for upload in uploads)>MAX_UPLOAD_BYTES: raise ValidationError(f'עד {MAX_UPLOAD_BYTES//(1024*1024)}MB בהעלאה אחת.')
                 from .sample_transfer import sample_plan, _describe
                 from .table_transfer import TABLES
                 from .media_transfer import save_images
