@@ -139,7 +139,6 @@ html[dir="ltr"] .card h3.hebrew{direction:ltr;text-align:left}
 .taxon-card[class*="taxon-level-"] .image-wrap,.species-media[class*="frame-"]{position:relative}
 .taxon-card[class*="taxon-level-"] .image-wrap:before,.species-media[class*="frame-"]:before{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;border:var(--frame-width,0) solid var(--frame-color,transparent);border-radius:inherit}
 .species-media[class*="frame-"]{border-radius:10px;overflow:hidden}
-/* Order, sub-order and superfamily cards on a computer: as large as the image-management cards (121% of
-   a normal gallery card), 3 to 4 across. Phones and narrow windows (850px and below) keep
-   the normal size. The grid's own --cols / --gap give the normal card width. */
-@media(min-width:851px){.grid[data-level=order],.grid[data-level=suborder],.grid[data-level=superfamily]{grid-template-columns:repeat(auto-fill,minmax(min(max(calc((100% - (var(--cols) - 1) * var(--gap)) / var(--cols) * 1.21),calc((100% - 3 * var(--gap)) / 4)),calc((100% - 2 * var(--gap)) / 3)),1fr))}}
+/* Order, sub-order and superfamily cards on a computer: at most 3 across, so the main groups show as large
+   pictures (wider than a normal gallery card). Phones and narrow windows (850px and below) keep the normal layout. */
+@media(min-width:851px){.grid[data-level=order],.grid[data-level=suborder],.grid[data-level=superfamily]{grid-template-columns:repeat(3,minmax(0,1fr))}}
