@@ -179,3 +179,8 @@ body:has(.controls-panel) .collection-selection:empty{margin:0}
   .controls-panel{margin-inline-end:232px}
   .controls-panel .collection-head{justify-content:flex-start}
 }
+/* The taxon card's "page" link sits at the end of the rank / species-count line instead of a line of its
+   own (it is a separate link after the card's drill button, so it is placed there, not nested in it). */
+.taxon-card{position:relative}
+.taxon-card .card-meta{padding-inline-end:56px}
+.taxon-card .taxon-card-page{position:absolute;bottom:0;inset-inline-end:0;margin:0;line-height:1.65}
