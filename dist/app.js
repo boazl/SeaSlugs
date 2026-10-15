@@ -984,6 +984,14 @@ function taxonLabel(level, key) {
     }
     return key;
 }
+// "(7 פריטים)" after a group heading: the number of cards in the group (the gallery's item count
+// lives here; #resultCount stays only for screen readers -- see styles.css).
+function groupCount(n) {
+    const span = document.createElement('span');
+    span.className = 'group-count';
+    span.textContent = language === 'he' ? ` (${n} פריטים)` : ` (${n} ${n === 1 ? 'item' : 'items'})`;
+    return span;
+}
 function rankName(level) {
     const names = { order: ['סדרה', 'Order'], suborder: ['תת־סדרה', 'Suborder'],
         superfamily: ['על־משפחה', 'Superfamily'], family: ['משפחה', 'Family'], genus: ['סוג', 'Genus'], species: ['מין', 'Species'] };
@@ -1084,6 +1092,7 @@ function renderTaxonLevel(species, level, frag) {
         frag.append(g.level === 'species' ? buildSpeciesCard(g.first, n) : buildTaxonCard(g.level, g.key, g.members, n, g.others));
         n++;
     }
+    heading.append(groupCount(n));
     return n;
 }
 function buildTaxonCard(level, key, members, index, others) {
@@ -1213,6 +1222,7 @@ function render() {
         heading.textContent = language === 'he' ? 'אוספי מסעות צלילה' : 'Dive trip collections';
         frag.append(heading);
         filteredCollections.forEach((c, i) => frag.append(buildCollectionCard(c, i)));
+        heading.append(groupCount(filteredCollections.length));
     }
     let cardCount = filteredSpecies.length;
     if (filteredSpecies.length && level !== 'species') {
@@ -1221,6 +1231,7 @@ function render() {
         const heading = document.createElement('h2');
         heading.className = 'gallery-group-title';
         heading.textContent = language === 'he' ? 'מינים' : 'Species';
+        heading.append(groupCount(filteredSpecies.length));
         frag.append(heading);
         let prev = null;
         filteredSpecies.forEach((sp, i) => {

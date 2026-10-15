@@ -36,11 +36,12 @@ gtag('config', 'G-CPGTC09P2P');</script>
             <div data-home-section="hero" data-lang="{{ lang }}">{{ sections.hero|safe }}</div>
         </section>
         <section class="collection" aria-labelledby="collectionTitle">
-            <p class="collection-note" data-home-section="collection_note" data-lang="{{ lang }}">{{ sections.collection_note|safe }}</p>
+            <div class="controls-panel">
+            <p class="collection-note" id="collectionNote" role="tooltip" data-home-section="collection_note" data-lang="{{ lang }}">{{ sections.collection_note|safe }}</p>
             <div class="collection-head">
                 <h2 id="collectionTitle">אוסף הסרטונים <span id="total"></span></h2><label
-                    class="search"><span>חיפוש</span><input type="search" id="search" placeholder="שם המין או הסרטון…"
-                        autocomplete="off" aria-label="חיפוש לפי שם המין או הסרטון"></label><label
+                    class="search"><span class="search-label">חיפוש</span><input type="search" id="search" placeholder="שם המין או הסרטון…"
+                        autocomplete="off" aria-label="חיפוש לפי שם המין או הסרטון" aria-describedby="collectionNote"></label><label
                     class="sort-order"><span>מיון</span><select id="sortSelect" aria-label="מיון המינים">
                         <option value="taxonomic">סדר טקסונומי</option>
                         <option value="alpha">אלפביתי (סוג ואז מין)</option>
@@ -59,6 +60,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
             <div class="area-filter-bar">
                 <h4 id="areaGroupTitle">אזור</h4>
                 <div class="filters" id="areaFilters" role="group" aria-label="סינון לפי אזור"></div>
+            </div>
             </div>
             <button type="button" id="filterToggle" class="filter-toggle" aria-haspopup="true" aria-controls="filterSidebar" aria-expanded="false"><span id="filterToggleLabel">סינון</span><span id="filterToggleCount" class="filter-toggle-count" hidden>0</span></button>
             <div class="gallery-layout">

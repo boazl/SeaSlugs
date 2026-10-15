@@ -142,3 +142,40 @@ html[dir="ltr"] .card h3.hebrew{direction:ltr;text-align:left}
 /* Order, sub-order and superfamily cards on a computer: at most 3 across, so the main groups show as large
    pictures (wider than a normal gallery card). Phones and narrow windows (850px and below) keep the normal layout. */
 @media(min-width:851px){.grid[data-level=order],.grid[data-level=suborder],.grid[data-level=superfamily]{grid-template-columns:repeat(3,minmax(0,1fr))}}
+/* Home page, compact top (htmlbody:has(.controls-panel) only -- the header rules shared with the other pages via
+   site-header.css stay as they are): a smaller header and opening panel, and search, sort, level and
+   area in one panel, so a full-screen window shows the first two rows of the gallery. */
+body:has(.controls-panel) .masthead{padding:8px 5%}
+body:has(.controls-panel) .intro{padding:10px 0}
+body:has(.controls-panel) .intro h1{font-size:clamp(24px,2.2vw,36px)}
+body:has(.controls-panel) .eyebrow{margin:0 0 6px}
+body:has(.controls-panel) .intro-copy{margin:8px 0 0;line-height:1.6}
+body:has(.controls-panel) .collection{border-top:0;padding-top:0;position:relative}
+.controls-panel{position:relative;display:flex;flex-direction:column;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 16px}
+.controls-panel .collection-head{gap:12px 20px}
+.controls-panel .search{padding:2px 0}
+.controls-panel .sort-order select{padding:6px 10px}
+.controls-panel .area-filter-bar{margin:0;display:flex;align-items:center;gap:12px}
+.controls-panel .area-filter-bar h4{margin:0;white-space:nowrap}
+/* the collection note ("the collection holds about 250 species ...") is the hover help of the word "חיפוש" */
+.controls-panel .collection-note{display:none;position:absolute;z-index:30;top:52px;inset-inline-start:12px;max-width:min(560px,90%);margin:0;padding:12px 14px;background:var(--bg);color:var(--ink);border:1px solid var(--accent);border-radius:8px;box-shadow:0 6px 24px #0009;font-size:14px;line-height:1.6}
+.controls-panel:has(.search-label:hover) .collection-note{display:block}
+.search-label{cursor:help;text-decoration:underline dotted;text-underline-offset:4px}
+body:has(.controls-panel) .gallery-layout{margin-top:12px}
+body:has(.controls-panel) .gallery-group-title{margin:0 0 -14px}
+body:has(.controls-panel) .collection-selection:empty{margin:0}
+@media(min-width:851px){body:has(.controls-panel) .grid{row-gap:22px}}
+.group-count{font-size:15px;font-weight:400;color:var(--muted)}
+/* the result count is read out by screen readers; it is shown in the group heading instead */
+#resultCount{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media(min-width:851px){.controls-panel .filter{padding:5px 14px;min-height:34px}}
+@media(max-width:850px){.controls-panel .area-filter-bar{flex-direction:column;align-items:stretch;gap:8px}}
+/* The logo keeps its full size (200px): on a computer it stands at the side, beside both the opening
+   text and the controls panel, which end before it; search, sort and level sit together at the start. */
+@media(min-width:851px){
+  body:has(.controls-panel) .intro{position:relative;min-height:0}
+  body:has(.controls-panel) .intro-text{padding-inline-end:232px}
+  body:has(.controls-panel) .intro-index{position:absolute;top:12px;inset-inline-end:0}
+  .controls-panel{margin-inline-end:232px}
+  .controls-panel .collection-head{justify-content:flex-start}
+}

@@ -26,9 +26,13 @@ class MappingValidationTests(SimpleTestCase):
                 'sample_transfer_id': sample_id or str(uuid4())}
 
     def test_manifest_has_only_the_37_approved_sources_plus_the_merged_page_and_no_unresolved_species(self):
-        self.assertEqual(len(set(HISTORICAL_SPECIES_REDIRECTS) - {MERGED}), 37)
+        # 37 approved sources, the merged page, and (2026-10-15) Hexabranchus sanguineus' Israel Red Sea
+        # page, whose only observation moved to the Sinai area (Tiran) -- flagged as 404 by Search Console
+        moved = 'hexabranchus-sanguineus-israel-red-sea-gulf-of-aqaba'
+        self.assertEqual(len(set(HISTORICAL_SPECIES_REDIRECTS) - {MERGED, moved}), 37)
         self.assertEqual(set(HISTORICAL_SPECIES_REDIRECTS) & {MERGED}, {MERGED})
-        self.assertEqual(len(HISTORICAL_SPECIES_REDIRECTS), 38)
+        self.assertEqual(HISTORICAL_SPECIES_REDIRECTS[moved][0], 'hexabranchus-sanguineus-sinai-red-sea-gulf-of-aqaba')
+        self.assertEqual(len(HISTORICAL_SPECIES_REDIRECTS), 39)
         self.assertEqual(HISTORICAL_SPECIES_REDIRECTS[OLD][0], CURRENT)
         for stem in UNRESOLVED:
             self.assertNotIn(stem + '-phillipines-indo-pacific', HISTORICAL_SPECIES_REDIRECTS)
