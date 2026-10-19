@@ -87,7 +87,7 @@ function updateCollectionStatus() {
         const label = document.createElement('span');
         const trip = state.collection ? collectionsList.find(x => String(x.trip_id) === state.collection) : null;
         label.textContent = (language === 'he' ? 'מוצג: ' : 'Showing: ') + drillLabel(state.drill)
-            + (state.collection ? (language === 'he' ? ' · באוסף: ' : ' · in collection: ') + (trip ? collectionTitle(trip) : (labelFor(state.collection, tripLabelsData) || '')) : '');
+            + (state.collection ? (language === 'he' ? ' · באוסף: ' : ' · in collection: ') + (trip ? collectionName(trip) : (labelFor(state.collection, tripLabelsData) || '')) : '');
         // Up one rank (to the parent taxon this one was drilled from), and all the way up.
         const parent = drillParent(state.drill);
         const up = document.createElement('button');
@@ -118,7 +118,7 @@ function updateCollectionStatus() {
     if (!state.collection) return;
     const c = collectionsList.find(x => String(x.trip_id) === state.collection);
     const label = document.createElement('span');
-    const description = c ? collectionTitle(c) : (labelFor(state.collection, tripLabelsData) || '');
+    const description = c ? collectionName(c) : (labelFor(state.collection, tripLabelsData) || '');
     label.textContent = (language === 'he' ? 'מינים באוסף: ' : 'Species in collection: ') + description;
     const back = document.createElement('button');
     back.type = 'button';
@@ -535,7 +535,7 @@ function collectionMatches(c, q) {
         const a = areaLabelsData[c.area];
         // Includes the card's own heading ("50 מינים · מרץ 2023"), so the species count, month
         // and year shown on the card are searchable too.
-        const hay = normalize([collectionTitle(c), c.title, c.year, r?.label, r?.label_en, a?.label, a?.label_en, c.photographer, photographerLabel(c)].filter(Boolean).join(' '));
+        const hay = normalize([collectionTitle(c), c.title, c.title_en, c.year, r?.label, r?.label_en, a?.label, a?.label_en, c.photographer, photographerLabel(c)].filter(Boolean).join(' '));
         if (!hay.includes(q)) return false;
     }
     return true;
@@ -543,6 +543,15 @@ function collectionMatches(c, q) {
 
 // ---- media / dialog ----
 
+// The collection's gallery title in the page's language -- or the only one filled in ('' when none).
+function galleryTitle(c) {
+    const first = language === 'en' ? c.title_en : c.title, second = language === 'en' ? c.title : c.title_en;
+    return ((first || '').trim() || (second || '').trim());
+}
+// What a collection is called: its gallery title, else its species count and date.
+function collectionName(c) {
+    return galleryTitle(c) || collectionTitle(c);
+}
 function collectionTitle(c) {
     const en = language === 'en';
     const count = c.species_count == null ? (en ? 'Species count not specified' : 'מספר המינים לא צוין') : `${c.species_count} ${en ? 'species' : 'מינים'}`;
@@ -650,12 +659,19 @@ function openSpeciesDialog(species, button) {
     list.hidden = false;
     openDialog();
 }
+// The collection's gallery only: its species, filtered to that trip, without the media dialog.
+function openCollectionGallery(c) {
+    state.collection = String(c.trip_id);
+    search.value = '';
+    render();
+    document.querySelector('#resultCount').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
 function playCollection(c, button) {
     opener = button;
     state.collection = String(c.trip_id);
     search.value = '';
     render();
-    showMedia(c.video_id, c.image_url, collectionTitle(c), collectionSubtitle(c));
+    showMedia(c.video_id, c.image_url, collectionName(c), [galleryTitle(c) ? collectionTitle(c) : '', collectionSubtitle(c)].filter(Boolean).join(' · '));
     openDialog();
 }
 
@@ -667,7 +683,7 @@ function buildCollectionCard(c, index) {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'video-button';
-    const title = collectionTitle(c);
+    const title = collectionName(c);
     button.setAttribute('aria-label', `${language === 'he' ? 'בחירת אוסף' : 'Select collection'}: ${title}`);
     const wrap = document.createElement('span');
     wrap.className = 'image-wrap';
@@ -687,6 +703,10 @@ function buildCollectionCard(c, index) {
     const h3 = document.createElement('h3');
     h3.className = 'hebrew';
     h3.textContent = title;
+    // with a gallery title, the species count and date move to a line of their own under it
+    const summary = document.createElement('span');
+    summary.className = 'collection-summary';
+    if (galleryTitle(c)) summary.textContent = collectionTitle(c);
     const credit = document.createElement('span');
     credit.className = 'photographer';
     if (c.photographer) credit.textContent = (language === 'he' ? 'צילום: ' : 'Photography: ') + photographerLabel(c);
@@ -695,13 +715,23 @@ function buildCollectionCard(c, index) {
     const region = document.createElement('span');
     // Filtered to a single region: its name is already the filter, so don't repeat it.
     if (state.regions.size !== 1) region.textContent = labelFor(c.region, regionLabelsData);
-    const label = document.createElement('span');
-    label.textContent = language === 'he' ? 'צפייה באוסף' : 'View collection';
-    meta.append(region, label);
-    info.append(h3, credit, meta);
+    meta.append(region);
+    info.append(h3);
+    if (summary.textContent) info.append(summary);
+    info.append(credit);
+    info.append(meta);
     button.append(wrap, info);
     button.addEventListener('click', () => playCollection(c, button));
-    article.append(button);
+    // "View collection": straight to the collection's gallery, without opening its video / photo first
+    // (a separate button -- a button can't sit inside the card's button; styles.css puts it on the meta line).
+    const view = document.createElement('button');
+    view.type = 'button';
+    view.className = 'collection-view';
+    view.textContent = language === 'he' ? 'צפייה באוסף' : 'View collection';
+    view.setAttribute('aria-label', `${view.textContent}: ${title}`);
+    view.addEventListener('click', () => openCollectionGallery(c));
+    article.classList.add('collection-card');
+    article.append(button, view);
     return article;
 }
 // Scientific names are shown with the genus and the species epithet in italics and everything

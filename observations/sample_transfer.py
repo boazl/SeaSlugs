@@ -43,7 +43,7 @@ def sample_plan(document, fields):
     result = []; seen = set(); targets = set()
     for incoming in document['rows']:
         missing = set(fields) - set(incoming) if isinstance(incoming, dict) else None
-        if missing and set(incoming) <= set(fields) and missing - set(TAXONOMY_FIELDS) - {'gallery_source'} in (set(), {'transfer_id','image'}):
+        if missing and set(incoming) <= set(fields) and missing - set(TAXONOMY_FIELDS) - {'gallery_source', 'title_en'} in (set(), {'transfer_id','image'}):
             # A row from an older environment/file: no order/family/genus/qualifier/life stage
             # (a taxon-level sample then carried its name in species_other), and possibly no
             # transfer_id/image either (the oldest EXIF rows).
@@ -53,6 +53,7 @@ def sample_plan(document, fields):
                 incoming = dict(incoming, transfer_id=str(uuid.uuid5(uuid.NAMESPACE_URL,incoming.get('video_url',''))), image='')
             for field in TAXONOMY_FIELDS: incoming.setdefault(field, '')
             if 'gallery_source' in fields: incoming.setdefault('gallery_source', '')
+            if 'title_en' in fields: incoming.setdefault('title_en', '')
             legacy_field = {'order': 'order', 'family': 'family', 'genus': 'genus'}.get(incoming.get('kind'))
             if legacy_field and not incoming[legacy_field] and isinstance(incoming.get('species_other'), str):
                 incoming[legacy_field] = incoming['species_other']; incoming['species_other'] = ''

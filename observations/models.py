@@ -630,6 +630,8 @@ class Sample(models.Model):
     # taxon, not a dive, and may have no trip.
     trip = models.ForeignKey(DiveTrip, verbose_name='מסע צלילה', on_delete=models.PROTECT, related_name='samples', null=True, blank=True)
     title = models.CharField('כותרת הגלריה', max_length=240, blank=True)
+    title_en = models.CharField('כותרת הגלריה באנגלית', max_length=240, blank=True,
+        help_text='מוצגת כשהאתר באנגלית; כשהשדה ריק מוצגת במקומה כותרת באנגלית שנבנית מהמקום ומהתאריך של המסע.')
     gallery_order = models.PositiveIntegerField(default=0)
     source_metadata = models.JSONField(default=dict, blank=True)
 
@@ -704,6 +706,11 @@ class Sample(models.Model):
         db_table = 'samples'
         verbose_name = 'דגימה / תצפית'; verbose_name_plural = 'Samples — דגימות ותצפיות'
     def __str__(self): return f'{self.taxon_name} · {self.trip.year if self.trip_id and self.trip.year else ""}'
+    def gallery_title(self, lang='he'):
+        """The gallery title in this language -- or, when only the other language's one is filled in,
+        that one ('' when neither is)."""
+        first, second = (self.title_en, self.title) if lang == 'en' else (self.title, self.title_en)
+        return (first or '').strip() or (second or '').strip()
     @property
     def taxon_name(self):
         """The name that identifies this observation, taken from the field that matches its
@@ -1001,15 +1008,19 @@ class Sample(models.Model):
             from .defining import rows_affected_by, repair
             for row in rows_affected_by(self):
                 if not isinstance(row, SpeciesArea): repair(row)
+    def is_complete(self):
+        """Everything publishing needs: a trip with a year (not needed by an order / family / genus
+        observation), a catalogued species for a species observation, and no "other" free-text values."""
+        taxon_level = self.kind in (self.Kind.ORDER, self.Kind.FAMILY, self.Kind.GENUS)
+        other = bool(self.species_other) or bool(self.site_other)
+        return bool((taxon_level or self.trip_id and self.trip.year) and (self.species_id if self.kind == self.Kind.SPECIES else True) and not other)
     def save_reviewed(self, actor=None, approve=False):
         self.full_clean(validate_constraints=False)
         with transaction.atomic():
             # Acquire SQLite's write lock before checking first occurrence.
             if self.species_id:
                 Species.objects.filter(pk=self.species_id).update(scientific_name=models.F('scientific_name'))
-            other = bool(self.species_other) or bool(self.site_other)
-            taxon_level = self.kind in (self.Kind.ORDER, self.Kind.FAMILY, self.Kind.GENUS)
-            complete = bool((taxon_level or self.trip_id and self.trip.year) and (self.species_id if self.kind == self.Kind.SPECIES else True) and not other)
+            complete = self.is_complete()
             if approve and not complete:
                 raise ValidationError('לפני אישור יש להשלים את שנת המסע ולהחליף ערכי ״אחר״ בערכים מטבלאות העזר.')
             self.status = 'published' if complete and (approve or self.kind == self.Kind.SPECIES) else 'pending'

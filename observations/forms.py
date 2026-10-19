@@ -207,7 +207,7 @@ class SampleForm(forms.ModelForm):
     trip = TripChoiceField(label='מסע צלילה', queryset=DiveTrip.objects.exclude(code__in=LIBRARY_TRIP_CODES), required=False, help_text='לא מוצא/ת את המסע? אפשר להוסיף מסע חדש ולחזור לכאן.')
     class Meta:
         model = Sample
-        fields = ['title','kind','order','family','genus','species','full_name','identification_qualifier','life_stage','species_other','trip','site','site_other','day','depth','video_url','image']
+        fields = ['title','title_en','kind','order','family','genus','species','full_name','identification_qualifier','life_stage','species_other','trip','site','site_other','day','depth','video_url','image']
         widgets = {'image': SampleImageInput,
                    'order': forms.TextInput(attrs={'list': 'order-options', 'autocomplete': 'off', 'placeholder': 'הקלידו לחיפוש…'}),
                    'family': forms.TextInput(attrs={'list': 'family-options', 'autocomplete': 'off', 'placeholder': 'הקלידו לחיפוש…'}),

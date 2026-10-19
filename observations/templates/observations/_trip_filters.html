@@ -8,9 +8,12 @@
 <div class="filter-actions"><button type="submit">{{ "סינון"|t:lang }}</button><a href="{{ reset_url }}">{{ "איפוס סינון"|t:lang }}</a>{% if trip_management %}<a class="button" id="add-trip" href="{{ add_url }}">+ הוספת מסע</a>{% endif %}</div>
 </form>
 <style>.trip-filters{display:flex;flex-wrap:wrap;gap:12px 16px}.trip-filters label{flex:0 1 170px;width:170px;max-width:100%}.trip-filters select{width:170px;max-width:100%;min-width:0}.trip-filters .filter-actions{flex-basis:100%}.trip-filters #f-year{width:125px}</style>
+{{ trip_places|json_script:"trip-places" }}{{ always_years|json_script:"always-years" }}
 <script>
 (() => {
   const country = document.getElementById('f-country'), region = document.getElementById('f-region'), site = document.getElementById('f-site');
+  const yearSelect = document.getElementById('f-year');
+  const places = JSON.parse(document.getElementById('trip-places').textContent), always = new Set(JSON.parse(document.getElementById('always-years').textContent).map(String));
   function limitOptions(select, predicate) {
     for (const option of select.options) {
       if (!option.value) continue;
@@ -21,6 +24,10 @@
   function refresh() {
     limitOptions(region, o => !country.value || o.dataset.country === country.value);
     limitOptions(site, o => (!country.value || o.dataset.country === country.value) && (!region.value || o.dataset.region === region.value));
+    // the year: only years of trips in the chosen place
+    const years = new Set(places.filter(t => (!country.value || String(t.country_id) === country.value)
+      && (!region.value || String(t.region_id) === region.value) && (!site.value || String(t.site_id) === site.value)).map(t => String(t.year)));
+    limitOptions(yearSelect, o => years.has(o.value) || always.has(o.value));
     const add = document.getElementById('add-trip');
     if (add) {
       const query = new URLSearchParams();

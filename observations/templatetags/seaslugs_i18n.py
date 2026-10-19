@@ -313,3 +313,9 @@ def by_language(value, lang):
     """'Hebrew / English' -> the half in the page's language (page titles that were written in both)."""
     hebrew, separator, english = str(value).partition(' / ')
     return (english if lang == 'en' else hebrew) if separator else value
+
+
+@register.filter
+def gallery_title(sample, lang):
+    """A sample's gallery title in the page's language, or the only one there is (Sample.gallery_title)."""
+    return sample.gallery_title(lang) if hasattr(sample, 'gallery_title') else ''

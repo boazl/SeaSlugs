@@ -106,7 +106,11 @@ if(tripEl)tripEl.addEventListener('change',()=>updateSites(true));
     for(const o of region.options)if(o.value)o.hidden=o.disabled=!!country.value&&o.dataset.country!==country.value;
     for(const o of site.options)if(o.value){const r=f.regions.find(x=>String(x.id)===o.dataset.region);
       o.hidden=o.disabled=(!!region.value&&o.dataset.region!==region.value)||(!!country.value&&!!r&&String(r.country_id)!==country.value);}
-    for(const s of [region,site])if(s.selectedOptions[0]?.disabled)s.value='';
+    // only the years of the trips left by the place filters
+    const placeOk=t=>(!country.value||String(t.country_id)===country.value)&&(!region.value||String(t.region_id)===region.value)&&(!site.value||String(t.site_id)===site.value);
+    const years=new Set(locations.trips.filter(placeOk).map(t=>String(t.year)));
+    for(const o of year.options)if(o.value)o.hidden=o.disabled=!years.has(o.value);
+    for(const s of [region,site,year])if(s.selectedOptions[0]?.disabled)s.value='';
   }
   function apply(userChange){
     narrowChoices();

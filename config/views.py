@@ -251,7 +251,7 @@ def gallery_file(request, filename='index.html'):
             trip_out[str(item.trip_id)] = {'label': item.trip.title, 'area': area_key}
             trip_objects[item.trip_id] = item.trip
             collections_out.append({
-                'sample_id': item.pk, 'trip_id': item.trip_id, 'title': item.title,
+                'sample_id': item.pk, 'trip_id': item.trip_id, 'title': item.title, 'title_en': item.title_en,
                 'photographer': item.photographer_name,
                 'photographer_he': item.photographer_display_name('he'),
                 'photographer_en': item.photographer_display_name('en'),

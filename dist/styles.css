@@ -184,3 +184,9 @@ body:has(.controls-panel) .collection-selection:empty{margin:0}
 .taxon-card{position:relative}
 .taxon-card .card-meta{padding-inline-end:56px}
 .taxon-card .taxon-card-page{position:absolute;bottom:0;inset-inline-end:0;margin:0;line-height:1.65}
+/* A collection card's "view collection" button, at the end of its meta line (see buildCollectionCard). */
+.collection-card{position:relative}
+.collection-card .card-meta{padding-inline-end:110px}
+.collection-view{position:absolute;bottom:0;inset-inline-end:0;background:none;border:0;padding:0;margin:0;color:var(--accent);font:inherit;font-size:14px;line-height:1.65;cursor:pointer}
+.collection-view:hover{text-decoration:underline}
+.collection-summary{display:block;margin-top:2px;font-size:14px;color:var(--ink)}

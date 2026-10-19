@@ -953,8 +953,12 @@ def edit(request,pk=None):
         # An order / family / genus observation edited by a manager is the manager's own curated media
         # for that taxon page: it is approved (published) by the save itself. Without this the save put it
         # back to "pending", and a pending sample is ignored by the taxon page and the gallery.
-        approve_taxon = manager and item.kind in (Sample.Kind.ORDER, Sample.Kind.FAMILY, Sample.Kind.GENUS)
-        item.save_reviewed(actor=request.user if approve_taxon else None, approve=approve_taxon)
+        # An observation a manager saves is approved by that save -- of any kind (a collection, an order /
+        # family / genus observation, a species), whenever it is complete; an incomplete one (no trip year,
+        # an "other" value) still waits as pending until it is completed. Others' observations: species ones
+        # publish themselves when complete, the rest wait for a manager's approval.
+        approve_now = manager and item.is_complete()
+        item.save_reviewed(actor=request.user if approve_now else None, approve=approve_now)
         if getattr(item,'_gallery_choice',False) and old_image_name and old_image_name!=item.image.name:
             from .media_transfer import delete_image_if_unused
             delete_image_if_unused(old_image_name)        # the file this observation used to have, if nothing else uses it
@@ -1134,6 +1138,10 @@ def _trip_list_context(request, available, management=False):
     sites = Site.objects.all() if management else Site.objects.filter(dive_trips__in=available).distinct()
     return rows, {'countries': countries.order_by('name'), 'regions': regions.select_related('country').order_by('name'),
         'sites': sites.select_related('region').order_by('name'), 'years': sorted(years, reverse=True),
+        # the place and year of every listed trip: the year select offers only the years of the trips the
+        # chosen place leaves (management also keeps this year, for a new trip)
+        'trip_places': list(available.values('country_id', 'region_id', 'site_id', 'year')),
+        'always_years': [date.today().year] if management else [],
         'country': country, 'region': region, 'site': site, 'year': year, 'sort': sort,
         'sort_headers': headers, 'reset_url': reverse('trips-manage' if management else 'dive-trips') +
             ('?' + urlencode({'lang': query['lang']}) if 'lang' in query else ''),
