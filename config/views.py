@@ -257,6 +257,7 @@ def gallery_file(request, filename='index.html'):
                 'photographer_en': item.photographer_display_name('en'),
                 'area': area_key,
                 'region': str(region.pk), 'year': item.trip.year, 'month': item.trip.month,
+                'country': item.trip.country.name, 'country_en': item.trip.country.name_en or item.trip.country.name,
                 'video_id': youtube_id(item.video_url) if item.video_url else None,
                 'image_url': f'/observations/{item.pk}/photo/' if item.image else None,
                 'thumbnail': f'/observations/{item.pk}/photo/' if item.image else item.thumbnail,

@@ -56,3 +56,14 @@ class CollectionTitleEnTests(TestCase):
         catalog = json.loads(self.client.get('/catalog.js').content.decode().split('=', 1)[1].strip().rstrip(';'))
         collection = next(c for c in catalog['collections'] if c['sample_id'] == self.sample.pk)
         self.assertEqual((collection['title'], collection['title_en']), ('צלילת לילה', 'Night dive'))
+
+
+class CollectionOrderTests(TestCase):
+    def test_collections_sort_by_country_then_year_in_every_sort(self):
+        from pathlib import Path
+        root = Path(__file__).resolve().parent.parent
+        js = (root / 'dist' / 'app.js').read_text(encoding='utf-8')
+        self.assertIn('collectionsList.filter(c => collectionMatches(c, q)).sort(collectionCompare)', js)
+        body = js.split('function collectionCompare(a, b) {')[1].split('\n}')[0]
+        self.assertLess(body.index('a.country'), body.index('a.year'))
+        self.assertIn("'country_en':", (root / 'config' / 'views.py').read_text(encoding='utf-8'))

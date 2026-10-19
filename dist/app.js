@@ -911,6 +911,16 @@ function speciesSortCompare(a, b) {
     if (ea !== eb) return ea.localeCompare(eb, 'he');
     return normalize(a.title || '').localeCompare(normalize(b.title || ''), 'he');
 }
+// Dive trip collections are always listed by country, then chronologically (year, month) within it --
+// whatever sort the species below use, alphabetical included.
+function collectionCompare(a, b) {
+    const loc = language === 'he' ? 'he' : 'en';
+    const ca = (language === 'he' ? a.country : a.country_en) || '', cb = (language === 'he' ? b.country : b.country_en) || '';
+    if (ca !== cb) return ca.localeCompare(cb, loc);
+    if ((a.year || 0) !== (b.year || 0)) return (a.year || 0) - (b.year || 0);
+    if ((a.month || 0) !== (b.month || 0)) return (a.month || 0) - (b.month || 0);
+    return collectionName(a).localeCompare(collectionName(b), loc);
+}
 // Observation-year sort: earliest first record in the Mediterranean first (the order the
 // species arrived in); species with no recorded year come last, alphabetical among themselves.
 function speciesYearKey(sp) {
@@ -1238,7 +1248,7 @@ function render() {
     const taxonomic = state.sort === 'taxonomic';
     const level = taxonomic ? state.level : 'species';
     levelControl.hidden = !taxonomic;
-    const filteredCollections = taxonomic ? [] : collectionsList.filter(c => collectionMatches(c, q));
+    const filteredCollections = taxonomic ? [] : collectionsList.filter(c => collectionMatches(c, q)).sort(collectionCompare);
     let filteredSpecies = speciesList.filter(sp => speciesMatches(sp, q));
     if (state.sort === 'alpha') filteredSpecies = [...filteredSpecies].sort(speciesSortCompare);
     if (state.sort === 'year') filteredSpecies = [...filteredSpecies].sort(speciesYearCompare);
