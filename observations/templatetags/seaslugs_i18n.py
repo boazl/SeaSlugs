@@ -114,6 +114,7 @@ TRANSLATIONS = {
     'מחוקה': 'deleted',
     'צפייה ב־YouTube': 'Watch on YouTube',
     'צפייה בתמונה המלאה': 'View full image',
+    'אין לתצפית תמונה משלה. זו התמונה של התצפית המגדירה:': 'This observation has no photo of its own. This is the photo of the defining observation:',
     'עריכה': 'Edit',
     'עריכת תצפית': 'Edit observation',
     'עריכת מין': 'Edit species',

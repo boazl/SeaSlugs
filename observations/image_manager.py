@@ -302,6 +302,55 @@ def build_manifest():
             'assignments': _image_assignments(),'files': _file_details()}
 
 
+ALIGN_SALT='image-manager-align-names'
+_SAFE_IMAGE_NAME=re.compile(r'observations/[^/\\]+\.(?:jpe?g|png|webp)',re.IGNORECASE)
+
+
+def _same_picture(path,remote):
+    """Is the local file the very picture the other environment's file entry describes? Equal bytes, or
+    the same 96x54 grayscale fingerprint (a download / upload re-encodes the JPEG)."""
+    if remote and hashlib.sha256(path.read_bytes()).hexdigest()==remote[0]: return True
+    thumb=_thumbnail(path)
+    if not thumb or not remote or len(remote)<4 or not remote[3]: return False
+    try: theirs=base64.b64decode(remote[3])
+    except ValueError: return False
+    if len(theirs)!=len(thumb[2]): return False
+    diffs=sorted(abs(x-y) for x,y in zip(thumb[2],theirs))
+    return sum(diffs)/len(diffs)<=DUPLICATE_MAX_MEAN and diffs[int(len(diffs)*.995)]<=DUPLICATE_EXACT_P995
+
+
+def _rename_conflict(pairs,olds=None):
+    """Why the renames {old: new} can't all be done here, or '' -- a new name may only be taken (by a
+    file or by any sample, deleted ones included) when it is itself one of the names being renamed away
+    (two observations whose names are swapped between the environments)."""
+    root=Path(settings.MEDIA_ROOT).resolve();olds=set(pairs) if olds is None else olds
+    if len(set(pairs.values()))!=len(pairs): return 'שני קבצים מקבלים אותו שם.'
+    for old,new in pairs.items():
+        if not (_SAFE_IMAGE_NAME.fullmatch(old) and _SAFE_IMAGE_NAME.fullmatch(new)): return 'שם קובץ לא תקין.'
+        if not (root/old).is_file(): return f'הקובץ {old} לא נמצא.'
+        if new in olds: continue
+        if (root/new).exists() or Sample.objects.filter(image=new).exists(): return f'השם {new} כבר תפוס כאן.'
+    return ''
+
+
+def align_names(pairs):
+    """Renames each local file old -> new (the name the same picture has in the other environment) and
+    points every sample showing it -- its owner and the observations showing it as a gallery image -- at
+    the new name. In two steps through temporary names, so swapped names work too."""
+    problem=_rename_conflict(pairs)
+    if problem: raise ValidationError(problem)
+    root=Path(settings.MEDIA_ROOT).resolve();temp={}
+    with transaction.atomic():
+        for i,old in enumerate(sorted(pairs)):
+            temp[old]=f'observations/align-tmp-{i}-{Path(old).name}'
+            (root/old).replace(root/temp[old])
+            Sample.objects.filter(image=old).update(image=temp[old])
+        for old,new in pairs.items():
+            (root/temp[old]).replace(root/new)
+            Sample.objects.filter(image=temp[old]).update(image=new)
+    return len(pairs)
+
+
 def compare_manifest(manifest):
     """Diff this environment's own active, image-bearing samples' filenames against an
     uploaded manifest from the other environment. Returns which filenames need downloading
@@ -350,6 +399,22 @@ def compare_manifest(manifest):
         samples={str(s.transfer_id):s for s in Sample.objects.filter(transfer_id__in=differing).select_related('species','trip')}
         rows=[{'sample':samples[tid],'here':local_assignments[tid],'there':remote_assignments[tid]} for tid in differing if tid in samples]
         result['different_image']=sorted(rows,key=lambda r:str(r['sample'].taxon_name or '').lower())
+        # the same picture under another file name in the two environments: offer to take the other's name
+        root=Path(settings.MEDIA_ROOT).resolve();pairs={}
+        for row in rows:
+            here,there=row['here'],row['there']
+            row['same_picture']=bool(here and there and remote_files and there in remote_files and (root/here).is_file()
+                                     and _same_picture(root/here,remote_files[there]))
+            if row['same_picture'] and pairs.get(here,there)==there: pairs[here]=there
+            elif row['same_picture']: row['same_picture']=False; pairs.pop(here,None)
+        if len(set(pairs.values()))!=len(pairs): pairs={}
+        while True:     # drop the pairs that can't be done (until what's left can), keep the rest
+            kept={o:n for o,n in pairs.items() if not _rename_conflict({o:n},set(pairs))}
+            if kept==pairs: break
+            pairs=kept
+        for row in rows: row['renamable']=row['here'] in pairs
+        result['align_pairs']=sorted(pairs.items())
+        result['align_token']=signing.dumps(pairs,salt=ALIGN_SALT) if pairs else ''
     return result
 
 
@@ -559,6 +624,13 @@ def manager(request):
                 response=HttpResponse(body,content_type='application/json; charset=utf-8')
                 response['Content-Disposition']=f'attachment; filename="seaslugs-images-{env}.json"'
                 return response
+            elif action=='align_names':
+                try: pairs=signing.loads(request.POST.get('pairs',''),salt=ALIGN_SALT,max_age=3600)
+                except signing.BadSignature: raise ValidationError('יש להריץ שוב את ההשוואה.')
+                if not isinstance(pairs,dict) or not pairs: raise ValidationError('אין קבצים לשינוי שם.')
+                count=align_names(pairs)
+                messages.success(request,f'שמות {count} קבצים שונו לשמות שבסביבה השנייה.')
+                return redirect(redirect_target)
             elif action=='compare_manifest':
                 upload=request.FILES.get('manifest')
                 if not upload: raise ValidationError('יש לבחור קובץ השוואה.')

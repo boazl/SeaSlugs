@@ -42,10 +42,7 @@ def forwards(apps, schema_editor):
         name = {'order': sample.order, 'family': sample.family, 'genus': sample.genus}[sample.kind]
         base = slugify(f'{code} {name}', allow_unicode=True) or f'sample-{sample.pk}'
         candidate, n = base, 2
-        # A file already on disk under the new name that no sample shows is this sample's own photo when
-        # its old file isn't here (e.g. fetched from the website by the image manager): take it over.
-        own_file_missing = not (root / old).is_file()
-        while f'observations/{candidate}.jpg' in used or ((root / f'observations/{candidate}.jpg').exists() and not own_file_missing):
+        while f'observations/{candidate}.jpg' in used or (root / f'observations/{candidate}.jpg').exists():
             candidate = f'{base}-{n}'; n += 1
         new = f'observations/{candidate}.jpg'
         if (root / old).is_file():

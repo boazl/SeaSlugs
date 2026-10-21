@@ -439,6 +439,28 @@ def _child_list(areas, attr, url_name, lang):
     return out
 
 
+def _attach_defining_previews(rows):
+    """item.defining_preview: for an order / family / genus observation with no photo or video of its own, the
+    observation whose photo its taxon page shows instead (the row's defining sample) -- the list shows it small,
+    labelled as such, so an empty library observation isn't a blank card."""
+    from .defining import display_sample, own_kind_samples
+    empty = [r for r in rows if r.kind in ('order', 'family', 'genus') and not r.image and not r.video_url]
+    if not empty: return
+    own = own_kind_samples(); bases = None; cache = {}
+    for item in empty:
+        key = (item.kind, {'order': item.order, 'family': item.family, 'genus': item.genus}[item.kind])
+        if not key[1]: continue
+        if key not in cache:
+            if item.kind == 'genus': row = TaxonGenus.objects.filter(name=key[1]).select_related('defining_sample').first()
+            elif item.kind == 'family':
+                row = TaxonFamily.objects.filter(name=key[1]).order_by('sub_family', 'pk').select_related('defining_sample').first()
+            else:
+                bases = order_base_rows() if bases is None else bases; row = bases.get(key[1])
+            shown = display_sample(row, own) if row else None
+            cache[key] = shown if shown and shown.pk != item.pk and shown.image and not shown.deleted_at else None
+        item.defining_preview = cache[key]
+
+
 def order_base_rows():
     """{order name: the TaxonOrder row that stands for the whole order} -- the order's own row (no sub-order,
     no superfamily), else the first of its sub-order rows in taxonomic order. The order's public page is the
@@ -730,6 +752,7 @@ def listing(request):
     by_pk = {r.pk: r for r in rows}
     for pk_, url_ in gallery_urls(rows, lang).items():
         by_pk[pk_].gallery_url = url_
+    _attach_defining_previews(rows)
 
     context = {
         'observations': rows,
