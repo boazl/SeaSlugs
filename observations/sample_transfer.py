@@ -8,6 +8,8 @@ from .models import Sample, Species, Country, Region, Site, DiveTrip, youtube_id
 
 # Fields added after the first transfer format: older rows lack them (defaulted to '').
 TAXONOMY_FIELDS = ('order', 'family', 'genus', 'identification_qualifier', 'life_stage')
+# The observation note, added later still: an older row without it leaves the target's note as it is.
+NOTE_FIELDS = ('note_he', 'note_en')
 
 
 def _describe(sample):
@@ -43,7 +45,8 @@ def sample_plan(document, fields):
     result = []; seen = set(); targets = set()
     for incoming in document['rows']:
         missing = set(fields) - set(incoming) if isinstance(incoming, dict) else None
-        if missing and set(incoming) <= set(fields) and missing - set(TAXONOMY_FIELDS) - {'gallery_source', 'title_en'} in (set(), {'transfer_id','image'}):
+        keep_notes = bool(missing) and set(NOTE_FIELDS) <= missing
+        if missing and set(incoming) <= set(fields) and missing - set(TAXONOMY_FIELDS) - {'gallery_source', 'title_en'} - set(NOTE_FIELDS) in (set(), {'transfer_id','image'}):
             # A row from an older environment/file: no order/family/genus/qualifier/life stage
             # (a taxon-level sample then carried its name in species_other), and possibly no
             # transfer_id/image either (the oldest EXIF rows).
@@ -54,6 +57,8 @@ def sample_plan(document, fields):
             for field in TAXONOMY_FIELDS: incoming.setdefault(field, '')
             if 'gallery_source' in fields: incoming.setdefault('gallery_source', '')
             if 'title_en' in fields: incoming.setdefault('title_en', '')
+            for field in NOTE_FIELDS:
+                if field in fields: incoming.setdefault(field, '')
             legacy_field = {'order': 'order', 'family': 'family', 'genus': 'genus'}.get(incoming.get('kind'))
             if legacy_field and not incoming[legacy_field] and isinstance(incoming.get('species_other'), str):
                 incoming[legacy_field] = incoming['species_other']; incoming['species_other'] = ''
@@ -107,6 +112,8 @@ def sample_plan(document, fields):
                            'reason':f'התצפית ביעד ({_describe(obj)}) מסומנת כמחוקה. אם יש להחזיר אותה יש לעשות זאת בניהול ואז לייבא שוב; אחרת השורה הזו לא תועבר.'})
             continue
         if obj: values['transfer_id'] = str(obj.transfer_id)
+        if keep_notes and obj:
+            for field in NOTE_FIELDS: values[field] = getattr(obj, field)
         warnings = []; pending_gallery = None
         gallery_tid = values.pop('gallery_source', '') if 'gallery_source' in values else ''
         values['gallery_source'] = None

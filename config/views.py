@@ -27,6 +27,10 @@ def gallery_file(request, filename='index.html'):
         HOME_TEXT = home_text_all()
         from observations.home_content import home_sections
         sections, sections_both = home_sections(lang, request, has_site_image)
+        from observations.articles import home_articles_html
+        for code, html in ((code, home_articles_html(code)) for code in ('he', 'en')):
+            sections_both[code] = {**sections_both[code], 'articles': str(html)}
+        sections = sections_both[lang]
         template = engines['django'].from_string((settings.BASE_DIR / 'dist' / filename).read_text())
         response = HttpResponse(template.render({
             'has_site_image': has_site_image, 'lang': lang, 'home': HOME_TEXT[lang], 'home_text': HOME_TEXT,

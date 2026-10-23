@@ -117,7 +117,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
                     <div><dt>{{ "מינים בגלריה"|t:lang }}</dt><dd>{{ areas|length }}</dd></div>
                     {% if children %}<div><dt>{{ children_title|t:lang }}</dt><dd>{{ children|length }}</dd></div>{% endif %}
                 </dl>
-                {% if taxon.link or taxon.article_pdf %}<div class="species-links">{% if taxon.link %}<a href="{{ taxon.link }}" target="_blank" rel="noopener">{{ "קישור נוסף ↗"|t:lang }}</a>{% endif %}{% if taxon.article_pdf %}<a href="{% if rank == 'order' %}{% url 'order-article' taxon.pk %}{% else %}{% url 'family-article' taxon.name %}{% endif %}" target="_blank" rel="noopener">{{ "מאמר (PDF) ↗"|t:lang }}</a>{% endif %}</div>{% endif %}
+                {% if taxon.link %}<div class="species-links"><a href="{{ taxon.link }}" target="_blank" rel="noopener">{{ "קישור נוסף ↗"|t:lang }}</a></div>{% endif %}
             </div>
         </article>
 
@@ -127,6 +127,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
             <p class="species-lead">{{ description|linebreaksbr }}</p>
         </section>
         {% endif %}
+        {% include 'observations/_articles_section.html' %}
         {% if identification %}
         <section class="info-card">
             <h2><span class="info-icon" aria-hidden="true">◎</span>{{ "זיהוי"|t:lang }}</h2>

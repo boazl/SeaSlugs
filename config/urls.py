@@ -10,9 +10,10 @@ from observations.release_views import releases
 from observations.image_manager import manager as image_manager, image_file
 
 from observations.folder_import import folder_import
-from observations.views import site_image, species_page, species_article, genus_page, genus_article, genus_identification, family_article, order_article, order_page, family_page, divetrip_locations
+from observations.views import site_image, species_page, genus_page, genus_identification, order_page, family_page, divetrip_locations
+from observations.articles import article_list, article_pdf, article_thumb, species_article, genus_article, family_article, order_article
 from observations.db_replace import db_replace, db_replace_download
-from observations.article_files import article_files, article_file_open, article_file_delete
+from observations.article_files import article_files, article_file_open, article_file_delete, unused_article_delete, article_transfer_file, article_delete
 
 urlpatterns = [
     path('admin/images/folder/',folder_import,name='folder-import'),
@@ -22,6 +23,9 @@ urlpatterns = [
     path('admin/article-files/', article_files, name='article-files'),
     path('admin/article-files/open/', article_file_open, name='article-file-open'),
     path('admin/article-files/delete/', article_file_delete, name='article-file-delete'),
+    path('admin/article-files/delete-articles/', unused_article_delete, name='unused-article-delete'),
+    path('admin/article-files/transfer-file/', article_transfer_file, name='article-transfer-file'),
+    path('admin/article-files/delete-chosen-articles/', article_delete, name='article-delete'),
     path('admin/table-transfer/', transfer, name='table-transfer'),
     path('admin/db-replace/', db_replace, name='db-replace'),
     path('admin/db-replace/download/', db_replace_download, name='db-replace-download'),
@@ -31,6 +35,9 @@ urlpatterns = [
     path('analytics/exclude/', analytics_exclude, name='analytics-exclude'),
     path('analytics/include/', analytics_include, name='analytics-include'),
     path('site-image/<slug:key>.jpg', site_image, name='site-image'),
+    path('articles/', article_list, name='article-list'),
+    path('articles/<slug:slug>/<str:lang>.pdf', article_pdf, name='article-pdf'),
+    path('articles/<slug:slug>/<str:lang>.jpg', article_thumb, name='article-thumb'),
     path('species/<slug:slug>/', species_page, name='species-page'),
     path('species/<slug:slug>/article.pdf', species_article, name='species-article'),
     path('genus/<str:name>/', genus_page, name='genus-page'),

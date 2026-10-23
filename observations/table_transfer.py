@@ -30,8 +30,10 @@ TABLES = {'groups': ACCOUNT_TABLES['groups'], 'users': ACCOUNT_TABLES['users'],
           'species': (Species, ['scientific_name','name_he','name_en','source_id','genus','species','author','order','family','superfamily','accepted_genus','accepted_species','common_name','transliteration','language','formatted_author','distribution','phylogenetic_order','full_species_name_with_order','reference_author','is_migrant','habitat','food','first_observed_year','last_observed_year','size_from','size_to','size_max','description_he','description_en','link','reference_link']),
           'trips': (DiveTrip, ['code','title','source_sort','year','month','start_day','duration_days','country','region','site','country_name','region_name','reserve','sea_name','species_count','source_metadata','kind','description_he','description_en','link']),
           'qualifiers': (IdentificationQualifier,['code','name','name_en']), 'lifestages': (LifeStage,['code','name','name_en']),
-          'samples': (Sample, ['title','title_en','kind','trip','owner','order','family','genus','species','identification_qualifier','life_stage','site','species_other','undetermined_variant','site_other','day','depth','video_url','status','source_id','gallery_order','source_metadata','transfer_id','image','gallery_source']),
-          'speciesareas': (SpeciesArea, ['species','country','sea','undetermined_variant','defining_sample'])}
+          'samples': (Sample, ['title','title_en','kind','trip','owner','order','family','genus','species','identification_qualifier','life_stage','site','species_other','undetermined_variant','site_other','day','depth','video_url','status','source_id','gallery_order','source_metadata','transfer_id','image','gallery_source','note_he','note_en']),
+          'speciesareas': (SpeciesArea, ['species','country','sea','undetermined_variant','defining_sample','note_he','note_en'])}
+# Fields a file exported before they existed may lack: the target then keeps its own values.
+NOTE_FIELDS = ('note_he', 'note_en')
 
 
 def reference(obj):
@@ -132,7 +134,9 @@ def plan(document):
     if model is Species and document['rows'] and all(isinstance(r,dict) and {'scientific_name','name_he','name_en','source_id'}<=set(r)<=set(fields) and set(r)==set(document['rows'][0]) for r in document['rows']):
         fields=[f for f in fields if f in document['rows'][0]]
     for number,incoming in enumerate(document['rows'],1):
-        if not isinstance(incoming,dict) or set(incoming)!=set(fields): raise ValidationError(f'שדות לא תואמים בשורה {number}; יש לעדכן את הקוד בשתי הסביבות.')
+        # A species-area row from a file exported before the page notes existed has no note fields: the target keeps its own.
+        older_area_row = model is SpeciesArea and isinstance(incoming,dict) and set(incoming)==set(fields)-set(NOTE_FIELDS)
+        if not isinstance(incoming,dict) or (set(incoming)!=set(fields) and not older_area_row): raise ValidationError(f'שדות לא תואמים בשורה {number}; יש לעדכן את הקוד בשתי הסביבות.')
         values={}
         for f,v in incoming.items():
             if f in ('country','sea','region','site'): values[f]=related(f,v,required=not (model is DiveTrip))
@@ -214,6 +218,8 @@ def plan(document):
             # stable) -- carry the existing one over rather than letting a plain update
             # reset it to '' and have save() mint a fresh one.
             candidate.slug = obj.slug
+            for field in NOTE_FIELDS:
+                if field not in values: setattr(candidate, field, getattr(obj, field))
         if obj: candidate._state.adding = False
         candidate.full_clean()
         after=row(candidate,fields)

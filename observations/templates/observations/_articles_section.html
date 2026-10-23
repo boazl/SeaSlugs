@@ -1,0 +1,4 @@
+{% load seaslugs_i18n %}{% if article_links %}<section class="species-section" id="articles">
+    <h2>{{ "מאמרים"|t:lang }}</h2>
+    {% include 'observations/_article_links.html' with links=article_links %}
+</section>{% endif %}

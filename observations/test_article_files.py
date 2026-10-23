@@ -7,7 +7,7 @@ from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
 from django.test import TestCase, override_settings
 
-from .models import TaxonFamily, TaxonGenus
+from .models import Article, TaxonFamily, TaxonGenus
 
 
 class ArticleFilesPageTests(TestCase):
@@ -19,8 +19,8 @@ class ArticleFilesPageTests(TestCase):
         self.addCleanup(override.disable)
         self.admin = User.objects.create_superuser('boss', 'b@example.org', 'x')
         self.staff = User.objects.create_user('staff', password='x', is_staff=True)
-        self.family = TaxonFamily.objects.create(name='Phyllidiidae')
-        self.family.article_pdf.save('used.pdf', ContentFile(b'%PDF-1.4 used'), save=True)
+        self.article = Article(slug='phyllidiidae', title_he='Phyllidiidae')
+        self.article.pdf_en.save('used.pdf', ContentFile(b'%PDF-1.4 used'), save=True)
         self.orphan_name = 'articles/families/zookeys-770-009.pdf'
         os.makedirs(os.path.join(self.media, 'articles/families'), exist_ok=True)
         with open(os.path.join(self.media, self.orphan_name), 'wb') as f:
@@ -30,9 +30,9 @@ class ArticleFilesPageTests(TestCase):
     def test_lists_files_marks_orphans_and_links_the_row_that_uses_a_file(self):
         response = self.client.get('/admin/article-files/')
         self.assertContains(response, self.orphan_name)
-        self.assertContains(response, self.family.article_pdf.name)
+        self.assertContains(response, self.article.pdf_en.name)
         self.assertContains(response, 'Phyllidiidae')
-        self.assertContains(response, f'/admin/observations/taxonfamily/{self.family.pk}/change/')
+        self.assertContains(response, f'/admin/observations/article/{self.article.pk}/change/')
         self.assertContains(response, "1 מהם יתומים")
         # exactly one delete form: the orphan's
         self.assertEqual(response.content.decode().count('action="/admin/article-files/delete/"'), 1)
@@ -54,8 +54,8 @@ class ArticleFilesPageTests(TestCase):
         self.assertContains(response, 'הקובץ נמחק')
 
     def test_a_file_in_use_is_never_deleted_here(self):
-        path = self.family.article_pdf.path
-        response = self.client.post('/admin/article-files/delete/', {'name': self.family.article_pdf.name}, follow=True)
+        path = self.article.pdf_en.path
+        response = self.client.post('/admin/article-files/delete/', {'name': self.article.pdf_en.name}, follow=True)
         self.assertTrue(os.path.exists(path))
         self.assertContains(response, 'הקובץ בשימוש')
 
@@ -68,7 +68,7 @@ class ArticleFilesPageTests(TestCase):
         self.assertTrue(os.path.exists(os.path.join(self.media, 'secret.pdf')))
 
     def test_a_row_whose_file_is_missing_from_the_disk_is_reported(self):
-        os.remove(self.family.article_pdf.path)
+        os.remove(self.article.pdf_en.path)
         response = self.client.get('/admin/article-files/')
         self.assertContains(response, 'שורות שהקובץ שלהן חסר בדיסק')
 
@@ -97,7 +97,8 @@ class IdentificationFilesOnThePageTests(TestCase):
         self.client.force_login(User.objects.create_superuser('boss', 'b@example.org', 'x'))
         self.genus = TaxonGenus.objects.create(name='Coryphellina')
         self.genus.identification_file.save('key.pdf', ContentFile(b'%PDF-1.4 key'), save=True)
-        self.genus.article_pdf.save('art.pdf', ContentFile(b'%PDF-1.4 art'), save=True)
+        self.article = Article(slug='art', title_en='Art')
+        self.article.pdf_he.save('art.pdf', ContentFile(b'%PDF-1.4 art'), save=True)
         os.makedirs(os.path.join(self.media, 'identification/genera'), exist_ok=True)
         self.orphan = 'identification/genera/old.png'
         with open(os.path.join(self.media, self.orphan), 'wb') as f:
@@ -106,7 +107,7 @@ class IdentificationFilesOnThePageTests(TestCase):
     def test_identification_and_article_files_are_both_listed_with_their_kind_and_row(self):
         page = self.client.get('/admin/article-files/').content.decode()
         self.assertIn(self.genus.identification_file.name, page)
-        self.assertIn(self.genus.article_pdf.name, page)
+        self.assertIn(self.article.pdf_he.name, page)
         self.assertIn(self.orphan, page)
         self.assertIn('זיהוי', page)
         self.assertIn(f'/admin/observations/taxongenus/{self.genus.pk}/change/', page)

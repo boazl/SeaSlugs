@@ -20,6 +20,8 @@ from .gallery_data import TaxonResolver, taxon_media, area_samples, annotate_are
 from .i18n import get_lang
 from .templatetags.seaslugs_i18n import loc
 from .species_redirects import historical_species_redirect
+from .articles import article_links, note_html
+from .names import known_binomials
 
 
 def is_manager(user): return user.is_authenticated and user.is_staff and user.has_perm('observations.change_sample')
@@ -48,6 +50,7 @@ def trips(request):
         else:
             trip.display_title = trip.title
         trip.display_description = (trip.description_en or '') if lang == 'en' else (trip.description_he or '')
+        trip.article_links = article_links(trip.articles.all(), lang)
         # The free-text reserve/site name is usually typed in Hebrew -- left out in English.
         hebrew = any('\u0590' <= ch <= '\u05ff' for ch in trip.reserve)
         trip.display_reserve = '' if lang == 'en' and hebrew else trip.reserve
@@ -167,9 +170,12 @@ def species_page(request, slug):
     species_label = f'{species.scientific_name} {area.undetermined_variant}'.strip()
     # An observation's own heading only appears when it adds something to the page title
     # (cf./aff./life stage); a plain one would just repeat the h1.
+    binomials = known_binomials()
+    articles = list(area.species.articles.all())
     for s in samples:
         s.show_name = s.taxon_label != species.scientific_name
         s.name_main, s.name_author, s.name_stage = s.taxon_parts()
+        s.note = note_html(s, lang, articles, binomials)
     # The main observation is the area's defining sample (the one behind the hero photo/
     # video); the observations grid below lists only the other ones.
     main_sample = next((s for s in samples if s.pk == area.defining_sample_id), samples[0])
@@ -218,6 +224,8 @@ def species_page(request, slug):
         species_label, common_name, taxon_label(family_obj), taxon_label(order_obj), len(samples), place, lang,
         migrant=species.is_migrant and seo_text.is_mediterranean(area), migrant_year=species.first_observed_year))
     return render(request, 'observations/species_page.html', {
+        'article_links': article_links(articles, lang, binomials),
+        'note': note_html(area, lang, articles, binomials),
         'can_copy_image': is_manager(request.user),
         'meta_title': meta_title, 'meta_description': meta_description, 'place_label': place,
         'area': area, 'species': species, 'species_label': species_label, 'samples': samples,
@@ -254,18 +262,6 @@ def _article_response(request, field_file, label, content_type='application/pdf'
         response[key] = value
     response['Content-Disposition'] = 'inline; filename="%s"' % (filename or '%s.pdf' % label).replace('"', "'")
     return response
-
-
-def species_article(request, slug):
-    """Streams a species' curated article PDF. Production never serves MEDIA_ROOT
-    directly (same reason observation-photo/site-image exist as dedicated views rather
-    than linking straight to .url) -- this is that view for Species.article_pdf. Keyed by
-    the same species+area slug the page itself uses (the file is shared by the species
-    across all its areas, but there's no separate species-only slug to key it by)."""
-    area = get_object_or_404(SpeciesArea.objects.select_related('species'), slug=slug)
-    if not area.species.article_pdf:
-        raise Http404
-    return _article_response(request, area.species.article_pdf, area.species.scientific_name)
 
 
 def parse_sources(text):
@@ -326,6 +322,7 @@ def genus_page(request, name):
             lang),
         'taxon_order_label': taxon_label(taxon_order), 'taxon_family_label': taxon_label(taxon_family),
         'common_name': common_name, 'description': description,
+        'article_links': article_links(genus.articles.all(), lang),
         'identification': (genus.identification_en or genus.identification_he) if lang == 'en' else (genus.identification_he or genus.identification_en),
         'identification_caption': (genus.identification_caption_en or genus.identification_caption) if lang == 'en' else (genus.identification_caption or genus.identification_caption_en),
         'sources': parse_sources(genus.sources),
@@ -402,6 +399,7 @@ def _taxon_page(request, rank, obj, areas, children, parent, parent_url, trail=(
         # Names only in the page's own language; otherwise the Latin name stands alone.
         'common_name': obj.name_en if lang == 'en' else obj.name_he,
         'description': pick(obj.description_he, obj.description_en),
+        'article_links': article_links(obj.articles.all(), lang),
         'identification': pick(obj.identification_he, obj.identification_en),
         'sources': [line.strip() for line in obj.sources.splitlines() if line.strip()],
         'areas': areas, 'children': children,
@@ -594,31 +592,6 @@ def family_page(request, name):
         parent = TaxonOrder.objects.filter(name=order.name, superfamily=family.superfamily).first() or order
     return _taxon_page(request, 'family', family, areas, children, order,
                        reverse('order-page', args=[order.pk]) if order else '', trail=order_trail(parent, get_lang(request)))
-
-
-def genus_article(request, name):
-    """Streams a genus' curated article PDF -- the genus-level analogue of species_article
-    above, keyed directly by TaxonGenus.name."""
-    genus = get_object_or_404(TaxonGenus, name=name)
-    if not genus.article_pdf:
-        raise Http404
-    return _article_response(request, genus.article_pdf, genus.name)
-
-def family_article(request, name):
-    """Streams a family's article PDF (the family page's own row -- see family_page)."""
-    families = list(TaxonFamily.objects.filter(name=name))
-    family = next((f for f in families if not f.sub_family), families[0] if families else None)
-    if family is None or not family.article_pdf:
-        raise Http404
-    return _article_response(request, family.article_pdf, family.name)
-
-
-def order_article(request, pk):
-    """Streams an order group's article PDF."""
-    order = get_object_or_404(TaxonOrder, pk=pk)
-    if not order.article_pdf:
-        raise Http404
-    return _article_response(request, order.article_pdf, order.name)
 
 
 def genus_identification(request, name):
@@ -933,6 +906,9 @@ def edit(request,pk=None):
         form.fields['species_other'].widget=forms.HiddenInput()
     if request.user.is_staff: form.enable_add_links()
     if is_manager(request.user): form.enable_taxon_files()
+    else:
+        # the observation note is shown publicly on the species page: managers write it
+        for name in ('note_he', 'note_en'): form.fields.pop(name, None)
     if request.method=='POST' and form.is_valid():
         item=form.save(commit=False)
         def canonical_image_write(source_sample, target_sample=None):

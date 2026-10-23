@@ -432,10 +432,17 @@ class GenusPageTests(TestCase):
     def test_genus_article_streams_the_pdf(self):
         with tempfile.TemporaryDirectory() as tmp:
             with override_settings(MEDIA_ROOT=tmp):
-                self.genus.article_pdf.save('article.pdf', ContentFile(b'%PDF-1.4 test'), save=True)
-                response = self.client.get(f'/genus/{self.genus.name}/article.pdf')
+                from .models import Article
+                article = Article(slug='genus-paper', title_en='Paper')
+                article.pdf_en.save('article.pdf', ContentFile(b'%PDF-1.4 test'), save=True)
+                self.genus.articles.add(article)
+                response = self.client.get(f'/genus/{self.genus.name}/article.pdf', follow=True)
+                self.assertEqual(response.redirect_chain[0][0], '/articles/genus-paper/en.pdf')
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(response['Content-Type'], 'application/pdf')
+                page = self.client.get(f'/genus/{self.genus.name}/').content.decode()
+                self.assertIn('id="articles"', page)
+                self.assertIn('href="/articles/genus-paper/en.pdf"', page)
 
     def test_genus_article_404s_without_a_pdf(self):
         response = self.client.get(f'/genus/{self.genus.name}/article.pdf')

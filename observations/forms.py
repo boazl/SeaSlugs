@@ -93,7 +93,6 @@ class TaxonFileInput(forms.ClearableFileInput):
 
 
 TAXON_FILE_MAX_BYTES = 20 * 1024 * 1024      # identification diagram / key (PDF or image)
-TAXON_ARTICLE_MAX_BYTES = 20 * 1024 * 1024   # article PDF of an order / family / genus
 
 
 def _size_validator(limit):
@@ -104,7 +103,6 @@ def _size_validator(limit):
 
 
 validate_taxon_file_size = _size_validator(TAXON_FILE_MAX_BYTES)
-validate_taxon_article_size = _size_validator(TAXON_ARTICLE_MAX_BYTES)
 
 
 class ReferenceSelect(forms.Select):
@@ -207,7 +205,8 @@ class SampleForm(forms.ModelForm):
     trip = TripChoiceField(label='מסע צלילה', queryset=DiveTrip.objects.exclude(code__in=LIBRARY_TRIP_CODES), required=False, help_text='לא מוצא/ת את המסע? אפשר להוסיף מסע חדש ולחזור לכאן.')
     class Meta:
         model = Sample
-        fields = ['title','title_en','kind','order','family','genus','species','full_name','identification_qualifier','life_stage','species_other','trip','site','site_other','day','depth','video_url','image']
+        fields = ['title','title_en','kind','order','family','genus','species','full_name','identification_qualifier','life_stage','species_other','trip','site','site_other','day','depth','video_url','image','note_he','note_en']
+        widgets = {'note_he': forms.Textarea(attrs={'rows': 3}), 'note_en': forms.Textarea(attrs={'rows': 3, 'dir': 'ltr'})}
         widgets = {'image': SampleImageInput,
                    'order': forms.TextInput(attrs={'list': 'order-options', 'autocomplete': 'off', 'placeholder': 'הקלידו לחיפוש…'}),
                    'family': forms.TextInput(attrs={'list': 'family-options', 'autocomplete': 'off', 'placeholder': 'הקלידו לחיפוש…'}),
@@ -279,9 +278,11 @@ class SampleForm(forms.ModelForm):
             self.fields['taxon_' + attr] = TaxonTextField(required=False, label=label,
                 widget=forms.Textarea(attrs={'rows': rows, 'data-taxon-file': 'any'}),
                 help_text='קישור בכל שורה (אפשר להוסיף טקסט לפני הקישור).' if attr == 'sources' else '')
-        pdf = [FileExtensionValidator(['pdf']), validate_taxon_article_size]
-        self.fields['taxon_article_pdf'] = forms.FileField(required=False, label='מאמר (PDF) של הסדרה / המשפחה / הסוג',
-            widget=TaxonFileInput(attrs={'accept': 'application/pdf', 'data-taxon-file': 'any'}), validators=pdf)
+        from .models import Article
+        self.fields['taxon_articles'] = forms.ModelMultipleChoiceField(Article.objects.all(), required=False,
+            label='מאמרים של הסדרה / המשפחה / הסוג',
+            widget=forms.SelectMultiple(attrs={'data-taxon-file': 'any', 'size': 6}),
+            help_text='בחירה מתוך המאמרים שכבר הועלו (Ctrl/Cmd לבחירה של כמה). מאמר חדש מעלים פעם אחת בניהול ← מאמרים.')
         self.fields['taxon_identification_file'] = forms.FileField(required=False, label='קובץ זיהוי של הסוג (PDF או תמונה)',
             widget=TaxonFileInput(attrs={'data-taxon-file': 'genus'}),
             validators=[FileExtensionValidator(IDENTIFICATION_FILE_EXTENSIONS), validate_taxon_file_size],
@@ -301,7 +302,7 @@ class SampleForm(forms.ModelForm):
         if taxon is not None:
             for attr, _label, _rows in self.TAXON_TEXT_FIELDS:
                 self.initial['taxon_' + attr] = getattr(taxon, attr)
-            self.initial['taxon_article_pdf'] = taxon.article_pdf or None
+            self.initial['taxon_articles'] = list(taxon.articles.values_list('pk', flat=True))
             if kind == Sample.Kind.GENUS:
                 self.initial['taxon_identification_file'] = taxon.identification_file or None
                 self.initial['taxon_identification_caption'] = taxon.identification_caption
@@ -309,11 +310,6 @@ class SampleForm(forms.ModelForm):
                 self.initial['taxon_identification_source'] = taxon.identification_source
                 self.fields['taxon_identification_file'].widget.link_url = reverse('genus-identification', args=[taxon.name])
                 self.fields['taxon_identification_file'].widget.show_image = taxon.identification_is_image
-                self.fields['taxon_article_pdf'].widget.link_url = reverse('genus-article', args=[taxon.name])
-            elif kind == Sample.Kind.FAMILY:
-                self.fields['taxon_article_pdf'].widget.link_url = reverse('family-article', args=[taxon.name])
-            else:
-                self.fields['taxon_article_pdf'].widget.link_url = reverse('order-article', args=[taxon.pk])
 
     # (TaxonOrder/Family/Genus attribute, label, textarea rows) -- the page texts every taxon-level sample can edit
     TAXON_TEXT_FIELDS = (
@@ -324,14 +320,14 @@ class SampleForm(forms.ModelForm):
         ('sources', 'מקורות', 3),
     )
     TAXON_FILE_FIELDS = (tuple('taxon_' + attr for attr, _l, _r in TAXON_TEXT_FIELDS)
-                         + ('taxon_article_pdf', 'taxon_identification_file', 'taxon_identification_caption', 'taxon_identification_caption_en', 'taxon_identification_source'))
+                         + ('taxon_articles', 'taxon_identification_file', 'taxon_identification_caption', 'taxon_identification_caption_en', 'taxon_identification_source'))
     # the identification file, its captions and its source exist for genera only
     GENUS_ONLY_FIELDS = ('taxon_identification_file', 'taxon_identification_caption', 'taxon_identification_caption_en', 'taxon_identification_source')
 
     def clean_taxon_files(self, data):
         """Rejects an upload/clear that has no taxon row to attach to or that does not match
         the sample's kind (the fields stay on the page while the kind select changes)."""
-        if 'taxon_article_pdf' not in self.fields:
+        if 'taxon_articles' not in self.fields:
             return
         touched = [n for n in self.TAXON_FILE_FIELDS if n in self.changed_data]
         if not touched:
@@ -348,7 +344,7 @@ class SampleForm(forms.ModelForm):
 
     def save_taxon_files(self, sample):
         """After the sample is saved: store/clear the order/family/genus files submitted with it."""
-        if 'taxon_article_pdf' not in self.fields or sample.kind not in self.TAXON_KINDS:
+        if 'taxon_articles' not in self.fields or sample.kind not in self.TAXON_KINDS:
             return None
         taxon = self.taxon_for(sample.kind, sample.order, sample.family, sample.genus)
         if taxon is None:
@@ -364,7 +360,8 @@ class SampleForm(forms.ModelForm):
             if value:
                 setattr(taxon, attr, value)
             changed.append(attr)
-        apply('article_pdf', 'taxon_article_pdf')
+        if 'taxon_articles' in self.changed_data:
+            taxon.articles.set(self.cleaned_data.get('taxon_articles') or [])
         for attr, _label, _rows in self.TAXON_TEXT_FIELDS:
             if 'taxon_' + attr in self.changed_data:
                 setattr(taxon, attr, self.cleaned_data.get('taxon_' + attr) or '')

@@ -123,7 +123,8 @@ class SpeciesTitleAndDescriptionTests(SeoFixture):
         self.assertIn('Chromodoris annae', description)
         self.assertIn('חיננית ים', description)
         self.assertIn('Chromodorididae', description)
-        self.assertIn('1 תצפיות', description)
+        self.assertIn('תצפית אחת', description)
+        self.assertNotIn('1 תצפיות', description)
         self.assertNotIn('מהגר', description)
 
     def test_the_migrant_sentence_only_appears_for_the_mediterranean_population(self):
@@ -135,7 +136,8 @@ class SpeciesTitleAndDescriptionTests(SeoFixture):
         red = self.page(f'/species/{self.area.slug}/').split('<meta name="description" content="')[1].split('">')[0]
         mediterranean = self.page(f'/species/{med.slug}/').split('<meta name="description" content="')[1].split('">')[0]
         self.assertNotIn('מהגר', red)
-        self.assertIn('מין מהגר בים התיכון, נרשם לראשונה בשנת 2008', mediterranean)
+        # (the meta description is cut at 160 characters; the sentence starts well inside them)
+        self.assertIn('מין מהגר בים התיכון, נרשם לראשונה', mediterranean)
 
     def test_english_fallback_description(self):
         self.species.description_he = ''

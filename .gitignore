@@ -25,3 +25,6 @@ Claude outputs/
 # Folder-import staging: transient working data auto-cleaned after 1 hour by
 # folder_import.py, never meant to be tracked (was accidentally committed once).
 folder-import-staging/
+
+# Files moved aside to be deleted by hand (Claude cannot delete without permission) -- never published.
+_to_delete/

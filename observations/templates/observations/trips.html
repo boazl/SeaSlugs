@@ -23,11 +23,12 @@
 <th scope="col" data-key="date" data-type="number"><button type="button" class="trip-sort">{{ "תאריך"|t:lang }}</button></th>
 <th scope="col" class="col-count" data-key="species" data-type="number"><button type="button" class="trip-sort">{{ "מינים בגלריה"|t:lang }}</button></th></tr></thead>
 {% for trip in trips %}<tbody class="trip-group" id="trip-{{ trip.pk }}">
-<tr class="trip-row{% if trip.species_samples or trip.display_description %} expandable{% endif %}" data-title="{{ trip.display_title }}" data-place="{{ trip.display_place }}" data-date="{{ trip.date_key }}" data-species="{{ trip.species_total }}">
-<td class="col-toggle">{% if trip.species_samples or trip.display_description %}<button type="button" class="trip-toggle" aria-expanded="true" aria-controls="trip-detail-{{ trip.pk }}" aria-label="{{ 'פתיחה או סגירה של דגימות המסע'|t:lang }}: {{ trip.display_title }}"><span class="trip-arrow" aria-hidden="true">&#9656;</span></button>{% endif %}</td>
+<tr class="trip-row{% if trip.species_samples or trip.display_description or trip.article_links %} expandable{% endif %}" data-title="{{ trip.display_title }}" data-place="{{ trip.display_place }}" data-date="{{ trip.date_key }}" data-species="{{ trip.species_total }}">
+<td class="col-toggle">{% if trip.species_samples or trip.display_description or trip.article_links %}<button type="button" class="trip-toggle" aria-expanded="true" aria-controls="trip-detail-{{ trip.pk }}" aria-label="{{ 'פתיחה או סגירה של דגימות המסע'|t:lang }}: {{ trip.display_title }}"><span class="trip-arrow" aria-hidden="true">&#9656;</span></button>{% endif %}</td>
 <td class="trip-name">{{ trip.display_title }}</td><td>{{ trip.display_place }}</td><td>{{ trip.date_text }}</td><td class="col-count">{{ trip.species_total }}</td></tr>
-{% if trip.species_samples or trip.display_description %}<tr class="trip-detail" id="trip-detail-{{ trip.pk }}"><td colspan="5">
+{% if trip.species_samples or trip.display_description or trip.article_links %}<tr class="trip-detail" id="trip-detail-{{ trip.pk }}"><td colspan="5">
 {% if trip.display_description %}<p>{{ trip.display_description|linebreaksbr }}</p>{% endif %}
+{% if trip.article_links %}<h3>{{ "מאמרים"|t:lang }}</h3>{% include 'observations/_article_links.html' with links=trip.article_links %}{% endif %}
 {% if trip.species_samples %}<h3>{{ "דגימות מינים מהמסע"|t:lang }}</h3><div class="trip-thumbs">{% for item in trip.species_samples %}<a class="trip-thumb" href="{% if item.video_url %}{{item.video_url}}{% else %}{% url 'observation-photo' item.pk %}{% endif %}" target="_blank" rel="noopener"><span class="trip-thumb-img">{% if item.image %}<img src="{% url 'observation-photo' item.pk %}" alt="" loading="lazy">{% else %}<img src="{{item.thumbnail}}" alt="" loading="lazy">{% endif %}{% if item.video_url %}<span class="trip-thumb-play" aria-hidden="true">&#9654;</span>{% endif %}</span><i dir="ltr">{{item.species}}</i><small>{{ "צילום:"|t:lang }} {{ item|photographer_name:lang }}</small></a>{% endfor %}</div>{% endif %}
 </td></tr>{% endif %}
 </tbody>{% endfor %}

@@ -131,6 +131,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
             <section class="home-section" data-home-section="what" data-lang="{{ lang }}">{{ sections.what|safe }}</section>
             <section class="home-section" data-home-section="project" data-lang="{{ lang }}">{{ sections.project|safe }}</section>
             <section class="home-section" data-home-section="contribute" data-lang="{{ lang }}">{{ sections.contribute|safe }}</section>
+            {% if sections.articles %}<section class="home-section home-articles-section" data-home-section="articles" data-lang="{{ lang }}">{{ sections.articles|safe }}</section>{% endif %}
         </div>
         <div class="home-links" data-home-section="browse" data-lang="{{ lang }}">{{ sections.browse|safe }}</div>
     </main>

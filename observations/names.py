@@ -38,3 +38,42 @@ def name_html(text):
             out.append(escape(token))
     flush()
     return mark_safe(' '.join(out))
+
+
+# A binomial inside running text: a genus (or its initial, "P.") then an epithet, optionally with cf./aff. between.
+_TEXT_NAME_RE = re.compile(r'\b([A-Z][a-z]+|[A-Z]\.)(\s+(?:cf\.|aff\.))?\s+([a-z][a-z-]+)\b')
+
+
+def known_binomials():
+    """{(genus, epithet)} of every catalog species with a plain epithet -- the names italicize_names recognises."""
+    from .models import Species
+    pairs = set()
+    for genus, epithet in Species.objects.values_list('genus', 'species'):
+        genus, epithet = (genus or '').strip(), (epithet or '').strip()
+        if GENUS_RE.match(genus) and EPITHET_RE.match(epithet):
+            pairs.add((genus, epithet))
+    return pairs
+
+
+def italicize_names(text, binomials=None):
+    """Escaped HTML of free text (a page note, an article title) with each scientific name in it set the way
+    name_html sets a name: genus and epithet in <i>, a cf./aff. between them roman. Only names of catalog
+    species are touched -- in full ("Phyllidia ocellata") or with the genus abbreviated ("P. cf. ocellata") --
+    so ordinary words that merely look like a binomial ("This species") stay roman."""
+    if binomials is None:
+        binomials = known_binomials()
+    initials = {(genus[0] + '.', epithet) for genus, epithet in binomials}
+    source = str(text or '')
+    out, pos = [], 0
+    for match in _TEXT_NAME_RE.finditer(source):
+        genus, qualifier, epithet = match.group(1), match.group(2) or '', match.group(3)
+        if (genus, epithet) not in binomials and (genus, epithet) not in initials:
+            continue
+        out.append(escape(source[pos:match.start()]))
+        if qualifier:
+            out.append(f'<i>{escape(genus)}</i>{escape(qualifier)} <i>{escape(epithet)}</i>')
+        else:
+            out.append(f'<i>{escape(genus)} {escape(epithet)}</i>')
+        pos = match.end()
+    out.append(escape(source[pos:]))
+    return mark_safe(''.join(out))

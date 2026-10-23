@@ -66,7 +66,7 @@ def species_description(species_label, common_name, family_label, order_label, o
         if en:
             parts.append(f'{n} observation{"" if n == 1 else "s"}' + (f' in {label}.' if label else '.'))
         else:
-            parts.append(f'{n} תצפיות' + (f' – {label}.' if label else '.'))
+            parts.append(('תצפית אחת' if n == 1 else f'{n} תצפיות') + (f' – {label}.' if label else '.'))
     elif label:
         parts.append(f'Region: {label}.' if en else f'אזור: {label}.')
     if migrant:

@@ -1,20 +1,98 @@
 {% extends 'observations/base.html' %}{% block site_hero %}{% endblock %}
 {% block content %}<a href="{% url 'admin:index' %}">חזרה לניהול האתר</a>
 <h1>קבצי מאמרים וקובצי זיהוי</h1>
-<p>כל קובצי המאמרים (PDF) וקובצי הזיהוי של הסוגים (PDF או תמונה) שעל השרת: {{ rows|length }} קבצים, {{ total_mb }}MB. {% if orphans %}<strong>{{ orphans|length }} מהם יתומים</strong> (אף שורה לא משתמשת בהם, {{ orphan_mb }}MB) ואפשר למחוק אותם.{% else %}אין קבצים יתומים.{% endif %}</p>
+<p class="notice">סביבה: <strong>{% if local %}המק המקומי{% else %}האתר ב־Render{% endif %}</strong> · {{ library|length }} מאמרים בספרייה</p>
+<p><a href="http://127.0.0.1:8000/admin/article-files/">מאמרים במק</a> · <a href="https://seaslugs.org.il/admin/article-files/" target="_blank" rel="noopener">מאמרים באתר</a></p>
+
+<h2>העברת מאמרים בין הסביבות</h2>
+<p>כמו בהעברת התמונות: ייצוא מפיק קובץ JSON קטן (בלי קובצי ה־PDF עצמם) עם פרטי כל מאמר, טביעת אצבע לכל PDF והעמודים שבחרו בו. מעלים אותו בסביבה השנייה ומקבלים אילו מאמרים חסרים שם, אילו קיימים רק כאן ואילו שונים.</p>
+<form method="post">{% csrf_token %}<input type="hidden" name="action" value="export_manifest"><button>ייצוא רשימת מאמרים להשוואה</button></form>
+<form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="action" value="compare_manifest"><p><input type="file" name="manifest" accept="application/json" required></p><button>השוואה מול קובץ שיוצא בסביבה השנייה</button></form>
+{% if transfer_error %}<p class="errorlist" role="alert">{{ transfer_error }}</p>{% endif %}
+{% if comparison %}<div class="comparison">
+<h3>חסרים כאן, קיימים בסביבה השנייה ({{ comparison.missing_here|length }})</h3>
+{% if comparison.missing_here %}<ul>{% for a in comparison.missing_here %}<li>{{ a.title }} <span dir="ltr">({{ a.slug }})</span></li>{% endfor %}</ul><p class="helptext">יש להוריד אותם בסביבה השנייה ולהעלות כאן.</p>{% else %}<p>אין מאמרים חסרים כאן.</p>{% endif %}
+<h3>קיימים רק כאן, חסרים בסביבה השנייה ({{ comparison.only_here|length }})</h3>
+{% if comparison.only_here %}<ul>{% for a in comparison.only_here %}<li>{{ a.title }} <span dir="ltr">({{ a.slug }})</span></li>{% endfor %}</ul><p><button type="button" class="quiet select-slugs" data-source="only-here-slugs">סימון המאמרים האלה ברשימה למטה, לקראת הורדה</button></p>{{ comparison.only_here_slugs|json_script:"only-here-slugs" }}{% else %}<p>אין מאמרים שקיימים רק כאן.</p>{% endif %}
+<h3>קיימים בשתי הסביבות עם הבדלים ({{ comparison.different|length }})</h3>
+{% if comparison.different %}<ul class="article-diff">{% for a in comparison.different %}<li><strong>{{ a.title }}</strong> <span dir="ltr">({{ a.slug }})</span>
+{% if a.details %}<br>פרטים שונים: {{ a.details|join:", " }}{% endif %}
+{% for f in a.pdfs %}<br>{{ f.label }}: {{ f.state }}{% if f.newer %} — החדש יותר {{ f.newer }}{% endif %}{% if f.size_here %} ({{ f.size_here|filesizeformat }} כאן, {{ f.size_there|filesizeformat }} שם){% endif %}{% endfor %}
+{% for pg in a.pages %}<br>{{ pg.label }}: {% if pg.only_here %}רק כאן — <span dir="ltr">{{ pg.only_here|join:", " }}</span>{% endif %}{% if pg.only_here and pg.only_there %}; {% endif %}{% if pg.only_there %}רק בסביבה השנייה — <span dir="ltr">{{ pg.only_there|join:", " }}</span>{% endif %}{% endfor %}</li>{% endfor %}</ul>
+<p class="helptext">להעברת הגרסה של סביבה זו: לסמן, להוריד ולהעלות בסביבה השנייה (עם אישור החלפה אם ה־PDF השתנה).</p><p><button type="button" class="quiet select-slugs" data-source="different-slugs">סימון המאמרים האלה ברשימה למטה, לקראת הורדה</button></p>{{ comparison.different_slugs|json_script:"different-slugs" }}
+{% else %}<p>לכל המאמרים המשותפים אותם פרטים, קבצים ועמודים בשתי הסביבות.</p>{% endif %}
+</div>{% endif %}
+<h3>המאמרים בסביבה זו</h3>
+{% if library %}<form method="post" action="{% url 'article-delete' %}" onsubmit="return confirm('למחוק לצמיתות את המאמרים המסומנים, את קובצי ה־PDF שלהם ואת בחירתם בכל העמודים?')">{% csrf_token %}
+<p class="toolbar"><button type="button" id="select-all-articles" class="quiet">בחירת הכול / ביטול</button> <button type="button" id="download-articles">הורדת המאמרים המסומנים</button> <button type="submit" class="danger">מחיקת המאמרים המסומנים</button></p>
+<ul class="library">{% for a in library %}<li><label><input type="checkbox" name="slugs" class="article-box" value="{{ a.slug }}" data-files="{% url 'article-transfer-file' %}?article={{ a.slug|urlencode }}&amp;part=details{% if a.pdf_he %} {% url 'article-transfer-file' %}?article={{ a.slug|urlencode }}&amp;part=he{% endif %}{% if a.pdf_en %} {% url 'article-transfer-file' %}?article={{ a.slug|urlencode }}&amp;part=en{% endif %}"> {{ a }}</label> <span dir="ltr">({{ a.slug }})</span>{% if a.pdf_he %} · PDF עברית{% endif %}{% if a.pdf_en %} · PDF אנגלית{% endif %}</li>{% endfor %}</ul></form>
+<p class="helptext">מחיקה כאן זהה למחיקה ב־ניהול ← מאמרים: נמחקים המאמר, קובצי ה־PDF והתצוגה המקדימה שלו, והוא יורד מכל העמודים שבחרו בו. המחיקה היא בסביבה זו בלבד; בסביבה השנייה מוחקים בנפרד (ההשוואה תציג אותו כ"קיים רק בסביבה השנייה").</p>
+<p class="helptext">לכל מאמר יורדים קובץ פרטים (<span dir="ltr">&lt;כתובת&gt;.article.json</span>) וקובצי ה־PDF שלו. הדפדפן עשוי לבקש אישור להורדת כמה קבצים.</p>
+{% else %}<p>אין מאמרים בסביבה זו.</p>{% endif %}
+<h3>העברת מאמרים לסביבה זו</h3>
+<p>מעלים את הקבצים שהורדו בסביבה השנייה, בלי לשנות את שמם: לכל מאמר את קובץ הפרטים ואת קובצי ה־PDF שלו. מאמר חסר נוסף; מאמר קיים מתעדכן (כותרות, מקור, תאריך, העמודים שבחרו בו). העמודים מקושרים לפי שם; עמוד שאינו קיים כאן מדווח ולא מקושר. לפני ההעברה נוצר גיבוי של המסד.</p>
+<form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="action" value="upload_articles"><p><input type="file" name="files" accept=".json,application/json,application/pdf" multiple required></p><p><label><input type="checkbox" name="replace" value="yes"> לאשר החלפת קובצי PDF קיימים (הקובץ הקודם נמחק)</label></p><button>העלאת המאמרים</button></form>
+
+<h2>קבצים</h2>
+<p>כל קובצי המאמרים (PDF ותצוגות מקדימות) וקובצי הזיהוי של הסוגים (PDF או תמונה) שעל השרת: {{ rows|length }} קבצים, {{ total_mb }}MB. {% if orphans %}<strong>{{ orphans|length }} מהם יתומים</strong> (אף שורה לא משתמשת בהם, {{ orphan_mb }}MB) ואפשר למחוק אותם.{% else %}אין קבצים יתומים.{% endif %}</p>
 <p>קובץ שבשימוש לא נמחק מכאן: להסרתו מסמנים "לסלק" בעמוד העריכה של השורה (או את תיבת הניקוי בטופס התצפית) ושומרים — הקובץ נמחק גם מהדיסק.</p>
+{% if orphans %}<form method="post" action="{% url 'article-file-delete' %}" id="orphan-files" onsubmit="return confirm('למחוק לצמיתות את הקבצים?')">{% csrf_token %}
+<p class="toolbar"><button type="button" id="select-orphans" class="quiet">בחירת כל הקבצים המיותרים</button> <button type="submit" class="danger" id="delete-selected" disabled>מחיקת הקבצים המסומנים</button></p>{% endif %}
 <table class="article-files">
-<thead><tr><th>קובץ</th><th>סוג</th><th>גודל</th><th>הועלה</th><th>בשימוש אצל</th><th></th></tr></thead>
+<thead><tr><th></th><th>קובץ</th><th>סוג</th><th>גודל</th><th>הועלה</th><th>בשימוש אצל</th><th></th></tr></thead>
 <tbody>{% for r in rows %}<tr{% if not r.uses %} class="orphan"{% endif %}>
+<td>{% if not r.uses %}<input type="checkbox" name="names" value="{{ r.name }}" class="orphan-box" aria-label="סימון {{ r.name }}">{% endif %}</td>
 <td dir="ltr"><a href="{% url 'article-file-open' %}?name={{ r.name|urlencode }}" target="_blank" rel="noopener">{{ r.name }}</a></td>
 <td>{{ r.what }}</td>
 <td>{{ r.size_mb }}MB</td>
 <td>{{ r.modified|date:"d.m.Y H:i" }}</td>
 <td>{% for kind, text, url in r.uses %}{{ kind }}: {% if url %}<a href="{{ url }}">{{ text }}</a>{% else %}{{ text }}{% endif %}{% if not forloop.last %}<br>{% endif %}{% empty %}<strong>יתום</strong>{% endfor %}</td>
-<td>{% if not r.uses %}<form method="post" action="{% url 'article-file-delete' %}" onsubmit="return confirm('למחוק לצמיתות את הקובץ?')">{% csrf_token %}<input type="hidden" name="name" value="{{ r.name }}"><button class="danger">מחיקה</button></form>{% endif %}</td>
-</tr>{% empty %}<tr><td colspan="6">אין קובצי מאמרים או זיהוי בשרת.</td></tr>{% endfor %}</tbody></table>
+<td>{% if not r.uses %}<button class="danger" name="name" value="{{ r.name }}">מחיקה</button>{% endif %}</td>
+</tr>{% empty %}<tr><td colspan="7">אין קובצי מאמרים או זיהוי בשרת.</td></tr>{% endfor %}</tbody></table>
+{% if orphans %}</form>{% endif %}
+<h2>מאמרים שאינם מוצגים באף עמוד</h2>
+{% if unused_articles %}<p>מאמרים בספרייה שאף מין, סדרה, משפחה, סוג או מסע צלילה לא בחר בהם, ושאינם מסומנים להצגה בדף הבית. מחיקה מוחקת את המאמר ואת קובצי ה־PDF והתצוגה המקדימה שלו.</p>
+<form method="post" action="{% url 'unused-article-delete' %}" onsubmit="return confirm('למחוק לצמיתות את המאמרים המסומנים ואת הקבצים שלהם?')">{% csrf_token %}
+<ul class="unused-articles">{% for a in unused_articles %}<li><label><input type="checkbox" name="articles" value="{{ a.pk }}"> {{ a }}</label> · <a href="{% url 'admin:observations_article_change' a.pk %}">עריכה / בחירת עמודים</a></li>{% endfor %}</ul>
+<button type="submit" class="danger">מחיקת המאמרים המסומנים</button></form>
+{% else %}<p>כל המאמרים בספרייה מוצגים לפחות בעמוד אחד.</p>{% endif %}
 {% if missing %}<h2>שורות שהקובץ שלהן חסר בדיסק</h2>
 <p>השורה מצביעה על קובץ שלא קיים בשרת (למשל אחרי החלפת מסד נתונים בלי תיקיית ה־media). יש להעלות אותו מחדש או לסלק את ההפניה.</p>
 <ul>{% for name, uses in missing %}<li dir="ltr">{{ name }} — {% for kind, text, url in uses %}{{ kind }}: {% if url %}<a href="{{ url }}">{{ text }}</a>{% else %}{{ text }}{% endif %}{% if not forloop.last %}; {% endif %}{% endfor %}</li>{% endfor %}</ul>{% endif %}
-<style>.article-files{border-collapse:collapse;width:100%}.article-files th,.article-files td{padding:8px 10px;border-bottom:1px solid #345;text-align:start;vertical-align:top}.article-files tr.orphan{background:rgba(255,120,120,.08)}.article-files .danger{background:#c33;color:#fff}</style>
+<style>.article-files{border-collapse:collapse;width:100%}.article-files th,.article-files td{padding:8px 10px;border-bottom:1px solid #345;text-align:start;vertical-align:top}.article-files tr.orphan{background:rgba(255,120,120,.08)}.danger{background:#c33;color:#fff}.danger:disabled{opacity:.5;cursor:default}.quiet{background:transparent;color:#64dfce;border:1px solid #64dfce}.toolbar{display:flex;gap:12px;flex-wrap:wrap}.unused-articles{list-style:none;padding:0}.unused-articles li{margin:6px 0}.unused-articles label{display:inline}.library{list-style:none;padding:0}.library li{margin:4px 0}.library label{display:inline}.article-diff li{margin:8px 0}.comparison{border:1px solid #36515a;border-radius:10px;padding:4px 18px;margin:12px 0}</style>
+<script>
+(function(){
+    var boxes = Array.prototype.slice.call(document.querySelectorAll('.article-box'));
+    var all = document.getElementById('select-all-articles');
+    if (all) all.addEventListener('click', function(){
+        var on = !boxes.every(function(b){ return b.checked; }); boxes.forEach(function(b){ b.checked = on; });
+    });
+    document.querySelectorAll('.select-slugs').forEach(function(button){
+        button.addEventListener('click', function(){
+            var slugs = JSON.parse(document.getElementById(button.dataset.source).textContent);
+            boxes.forEach(function(b){ b.checked = slugs.indexOf(b.value) !== -1; });
+            document.getElementById('download-articles').scrollIntoView({behavior: 'smooth'});
+        });
+    });
+    var download = document.getElementById('download-articles');
+    if (download) download.addEventListener('click', async function(){
+        for (const box of boxes.filter(function(b){ return b.checked; })) {
+            for (const url of box.dataset.files.split(' ')) {
+                const a = document.createElement('a'); a.href = url; a.download = ''; document.body.append(a); a.click(); a.remove();
+                await new Promise(function(r){ setTimeout(r, 500); });
+            }
+        }
+    });
+})();
+(function(){
+    var boxes = document.querySelectorAll('.orphan-box'), selectAll = document.getElementById('select-orphans'), del = document.getElementById('delete-selected');
+    if (!selectAll) return;
+    var refresh = function(){ del.disabled = !Array.prototype.some.call(boxes, function(b){ return b.checked; }); };
+    selectAll.addEventListener('click', function(){
+        var all = Array.prototype.every.call(boxes, function(b){ return b.checked; });
+        boxes.forEach(function(b){ b.checked = !all; }); refresh();
+    });
+    boxes.forEach(function(b){ b.addEventListener('change', refresh); });
+})();
+</script>
 {% endblock %}

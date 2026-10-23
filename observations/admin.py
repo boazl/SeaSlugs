@@ -12,7 +12,7 @@ from django.utils.safestring import mark_safe
 from django.urls import reverse
 from .forms import SampleForm, SampleChangelistForm, taxonomy_for_form, species_name_options
 from .reference_links import link_kind
-from .models import Country, Sea, Region, Site, Species, Profile, Sample, DiveTrip, SiteImage, SpeciesArea, TaxonOrder, TaxonFamily, TaxonGenus, SampleKind, IdentificationQualifier, LifeStage
+from .models import Article, Country, Sea, Region, Site, Species, Profile, Sample, DiveTrip, SiteImage, SpeciesArea, TaxonOrder, TaxonFamily, TaxonGenus, SampleKind, IdentificationQualifier, LifeStage
 
 for model in [Country,Sea,Site,Profile,SiteImage,SampleKind]: admin.site.register(model)
 
@@ -117,9 +117,33 @@ def species_site_pages(species):
     return pages
 
 
+class SpeciesAreaNoteInline(admin.TabularInline):
+    """The species' areas (one public page each) on the species form, so the page note of an area -- e.g. an
+    uncertain identification at one site -- is written right here. The areas themselves come from the
+    published observations, so none is added or removed here."""
+    model = SpeciesArea
+    verbose_name = 'הערה לעמוד המין באזור'
+    verbose_name_plural = 'הערות לעמודי המין באזורים (מוצגות בעמוד של אותו אזור בלבד)'
+    fields = ['area_page', 'note_he', 'note_en']
+    readonly_fields = ['area_page']
+    extra = 0
+    can_delete = False
+    formfield_overrides = {models.TextField: {'widget': forms.Textarea(attrs={'rows': 3, 'cols': 48})}}
+    def has_add_permission(self, request, obj=None):
+        return False
+    @admin.display(description='אזור')
+    def area_page(self, obj):
+        label = ' · '.join(x for x in (obj.undetermined_variant, str(obj.country), str(obj.sea)) if x)
+        if not obj.slug:
+            return label
+        return format_html('<a href="{}" target="_blank" rel="noopener">{}</a>', reverse('species-page', args=[obj.slug]), label)
+
+
 @admin.register(Species)
 class SpeciesAdmin(SaveAndViewMixin, admin.ModelAdmin):
     form = SpeciesAdminForm
+    autocomplete_fields = ['articles']
+    inlines = [SpeciesAreaNoteInline]
     readonly_fields = ['scientific_name', 'full_name_display']
     def site_pages(self, obj):
         # one per public gallery page of this species (a species observed in several areas has a page for each)
@@ -145,7 +169,7 @@ class SpeciesAdmin(SaveAndViewMixin, admin.ModelAdmin):
         ('זיהוי מדעי', {'fields':['phylogenetic_order','genus','species','author','scientific_name','full_name_display','formatted_author','reference_author','full_species_name_with_order']}),
         ('סיווג טקסונומי', {'fields':['order','superfamily','family','accepted_genus','accepted_species']}),
         ('שמות ותפוצה', {'fields':['name_he','name_en','common_name','transliteration','language','distribution']}),
-        ('תוכן לעמוד המין', {'fields':['description_he','description_en','identification_he','identification_en','similar_species_he','similar_species_en','size_from','size_to','size_max','link','reference_link','article_pdf']}),
+        ('תוכן לעמוד המין', {'fields':['description_he','description_en','identification_he','identification_en','similar_species_he','similar_species_en','size_from','size_to','size_max','link','reference_link','articles']}),
         ('בית גידול ותזונה', {'fields':['habitat','habitat_en','food','food_en','depth_min','depth_max','native_range_he','native_range_en']}),
         ('מין מהגר — הים התיכון', {'fields':['is_migrant','first_observed_year','first_record_place_he','first_record_place_en','last_observed_year','last_record_place_he','last_record_place_en','med_status_he','med_status_en','introduction_route_he','introduction_route_en']}),
         ('מקורות', {'fields':['sources']}),
@@ -370,6 +394,7 @@ class TaxonOrderAdmin(DefiningSampleChoicesMixin, TaxonSitePageMixin, admin.Mode
     list_filter = ['rank']
     search_fields = ['name', 'name_he', 'name_en', 'sub_order', 'superfamily']
     readonly_fields = ['rank']
+    autocomplete_fields = ['articles']
     def site_page(self, obj):
         from .views import order_row_areas
         label = {'order': 'צפייה בדף הסדרה', 'suborder': 'צפייה בדף התת-סדרה', 'superfamily': 'צפייה בדף העל-משפחה'}[obj.rank]
@@ -382,7 +407,7 @@ class TaxonFamilyAdmin(DefiningSampleChoicesMixin, TaxonSitePageMixin, admin.Mod
     list_display = ['taxonomic_order', 'name', 'name_he', 'name_en', 'sub_family', 'superfamily', 'order', 'defining_sample']
     list_filter = [TaxonFamilyOrderNameFilter, TaxonFamilyGroupFilter]
     search_fields = ['name', 'name_he', 'name_en', 'sub_family', 'superfamily']
-    autocomplete_fields = ['order']
+    autocomplete_fields = ['order', 'articles']
     def site_page(self, obj):
         from .views import gallery_areas
         return ('צפייה בדף המשפחה', reverse('family-page', args=[obj.name])) if any(a.taxon_family and a.taxon_family.name == obj.name for a in gallery_areas()) else None
@@ -394,7 +419,7 @@ class TaxonGenusAdmin(DefiningSampleChoicesMixin, TaxonSitePageMixin, admin.Mode
     list_display = ['taxonomic_order', 'name', 'name_he', 'name_en', 'family', 'defining_sample']
     list_filter = [TaxonGenusOrderNameFilter, TaxonGenusGroupFilter]
     search_fields = ['name', 'name_he', 'name_en']
-    autocomplete_fields = ['family']
+    autocomplete_fields = ['family', 'articles']
     def site_page(self, obj):
         from .views import gallery_areas
         return ('צפייה בדף הסוג', reverse('genus-page', args=[obj.name])) if any(a.taxon_genus and a.taxon_genus.pk == obj.pk for a in gallery_areas()) else None
@@ -402,7 +427,7 @@ class TaxonGenusAdmin(DefiningSampleChoicesMixin, TaxonSitePageMixin, admin.Mode
         ('זיהוי וסיווג', {'fields': ['name', 'name_he', 'name_en', 'family', 'taxonomic_order', 'defining_sample']}),
         ('תיאור וזיהוי', {'fields': ['description_he', 'description_en', 'identification_he', 'identification_en']}),
         ('קובץ זיהוי (תרשים, תמונות או מפתח)', {'fields': ['identification_file', 'identification_caption', 'identification_caption_en', 'identification_source']}),
-        ('מקורות וקבצים', {'fields': ['sources', 'link', 'article_pdf']}),
+        ('מקורות ומאמרים', {'fields': ['sources', 'link', 'articles']}),
     ]
     actions = ['refresh_defining_samples']
     @admin.action(description='תיקון הדגימה המגדירה בכל הסדרות, המשפחות והסוגים לפי הכללים (מתעלם מהבחירה)')
@@ -420,12 +445,40 @@ class DiveTripAdmin(admin.ModelAdmin):
     list_filter = ['kind','year','country','region','site']
     search_fields = ['code','title','region_name','reserve','site__name']
     readonly_fields = ['source_metadata']
+    autocomplete_fields = ['articles']
 
     # Narrows the "region" options to the selected country and the "site" options to the
     # selected region, fetched from views.divetrip_locations. See divetrip_admin.js. (A trip's
     # sea is its region's sea -- there is no sea field on the trip.)
     class Media:
         js = ['observations/js/divetrip_admin.js']
+
+
+@admin.register(Article)
+class ArticleAdmin(admin.ModelAdmin):
+    """The article library: each article is uploaded here once and then picked from the "מאמרים" field of
+    the species, orders, families, genera and dive trips it concerns (shown on all their pages)."""
+    list_display = ['__str__', 'title_en', 'source', 'published_on', 'show_on_home', 'used_on']
+    list_filter = ['show_on_home']
+    search_fields = ['title_he', 'title_en', 'source', 'slug']
+    prepopulated_fields = {'slug': ['title_en']}
+    fieldsets = [
+        (None, {'fields': ['title_he', 'title_en', 'slug', 'source', 'link']}),
+        ('קבצים', {'fields': ['pdf_he', 'pdf_en'], 'description': 'PDF אחד לפחות. בעמוד בשפה שאין לה PDF מוצג ה־PDF בשפה השנייה, עם ציון השפה.'}),
+        ('פרסום', {'fields': ['published_on', 'show_on_home']}),
+    ]
+    def get_queryset(self, request):
+        return super().get_queryset(request).prefetch_related('species', 'orders', 'families', 'genera', 'trips')
+    @admin.display(description='מוצג אצל')
+    def used_on(self, obj):
+        names = [s.scientific_name for s in obj.species.all()] + [str(x) for x in obj.genera.all()] \
+            + [str(x) for x in obj.families.all()] + [str(x) for x in obj.orders.all()] + [str(x) for x in obj.trips.all()]
+        return ', '.join(names) or '—'
+    def view_on_site(self, obj):
+        return reverse('article-list') + '#' + obj.slug
+    def delete_view(self, request, object_id, extra_context=None):
+        extra_context = {**(extra_context or {}), 'title': 'מחיקת מאמר: המאמר, קובצי ה־PDF והתצוגה המקדימה שלו יימחקו, והוא יוסר מכל העמודים שבחרו בו'}
+        return super().delete_view(request, object_id, extra_context)
 
 
 @admin.register(SpeciesArea)

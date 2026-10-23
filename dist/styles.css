@@ -190,3 +190,9 @@ body:has(.controls-panel) .collection-selection:empty{margin:0}
 .collection-view{position:absolute;bottom:0;inset-inline-end:0;background:none;border:0;padding:0;margin:0;color:var(--accent);font:inherit;font-size:14px;line-height:1.65;cursor:pointer}
 .collection-view:hover{text-decoration:underline}
 .collection-summary{display:block;margin-top:2px;font-size:14px;color:var(--ink)}
+
+/* Home page: articles ticked "הצגה בדף הבית" (observations/articles.py, home_articles_html) */
+.home-articles{list-style:none;padding:0;margin:0 0 8px;display:grid;gap:12px}
+.home-articles li{display:flex;gap:12px;align-items:center}
+.home-article-thumb{flex:0 0 48px;width:48px;height:48px;border-radius:6px;overflow:hidden;border:1px solid var(--line)}
+.home-article-thumb img{width:48px;height:48px;object-fit:cover;object-position:top;display:block}

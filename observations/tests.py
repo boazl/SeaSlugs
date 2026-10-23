@@ -643,10 +643,11 @@ class WorkflowTests(TestCase):
         self.assertEqual(SpeciesArea.objects.filter(species=bare,country=self.country,sea=self.sea).count(),2)
         area_a.refresh_from_db();self.assertEqual(area_a.defining_sample_id,first.pk)
 
-    def test_species_article_pdf_rejects_non_pdf_extension(self):
-        self.species.article_pdf = SimpleUploadedFile('notes.txt', b'not a pdf', content_type='text/plain')
+    def test_article_pdf_rejects_non_pdf_extension(self):
+        from .models import Article
+        article = Article(slug='notes', title_he='הערות', pdf_he=SimpleUploadedFile('notes.txt', b'not a pdf', content_type='text/plain'))
         with self.assertRaises(ValidationError):
-            self.species.full_clean()
+            article.full_clean()
 
     def test_dive_trip_kind_defaults_to_dive_and_thematic_choice_is_available(self):
         self.assertEqual(self.trip.kind, DiveTrip.Kind.DIVE)
@@ -698,9 +699,12 @@ class WorkflowTests(TestCase):
     def test_species_article_view_streams_the_pdf(self):
         self.record()
         area = SpeciesArea.objects.get(species=self.species, country=self.country, sea=self.sea)
-        self.species.article_pdf = SimpleUploadedFile('article.pdf', b'%PDF-1.4 fake', content_type='application/pdf')
-        self.species.save()
-        response = self.client.get(f'/species/{area.slug}/article.pdf')
+        from .models import Article
+        article = Article.objects.create(slug='paper', title_he='מאמר',
+                                         pdf_he=SimpleUploadedFile('article.pdf', b'%PDF-1.4 fake', content_type='application/pdf'))
+        self.species.articles.add(article)
+        response = self.client.get(f'/species/{area.slug}/article.pdf', follow=True)     # the old address leads to the article
+        self.assertEqual(response.redirect_chain[0][0], '/articles/paper/he.pdf')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'application/pdf')
 
@@ -715,10 +719,13 @@ class WorkflowTests(TestCase):
         # there outside DEBUG) -- the page must link through the dedicated view instead.
         self.record()
         area = SpeciesArea.objects.get(species=self.species, country=self.country, sea=self.sea)
-        self.species.article_pdf = SimpleUploadedFile('article.pdf', b'%PDF-1.4 fake', content_type='application/pdf')
-        self.species.save()
+        from .models import Article
+        article = Article.objects.create(slug='paper', title_he='מאמר',
+                                         pdf_he=SimpleUploadedFile('article.pdf', b'%PDF-1.4 fake', content_type='application/pdf'))
+        self.species.articles.add(article)
         response = self.client.get(f'/species/{area.slug}/')
-        self.assertContains(response, f'/species/{area.slug}/article.pdf')
+        self.assertContains(response, 'href="/articles/paper/he.pdf"')
+        self.assertNotContains(response, 'media/articles/')
 
     def test_species_page_switches_description_language(self):
         self.species.description_he = 'תיאור בעברית'

@@ -88,6 +88,73 @@ class Site(Named):
     class Meta(Named.Meta): verbose_name = 'אתר צלילה'; verbose_name_plural = 'אתרי צלילה'
 
 
+ARTICLE_PDF_MAX_BYTES = 20 * 1024 * 1024
+
+
+def validate_article_pdf_size(value):
+    if getattr(value, 'size', 0) > ARTICLE_PDF_MAX_BYTES:
+        raise ValidationError(f'הקובץ גדול מדי (עד {ARTICLE_PDF_MAX_BYTES // (1024 * 1024)}MB).')
+
+
+class Article(models.Model):
+    """The site's article library. Every article (its PDF in Hebrew and/or English) is uploaded here ONCE;
+    species, orders, families, genera and dive trips then pick it from this table (their `articles`
+    field), so one article can be shown from as many pages as it concerns. Listed at /articles/, and on
+    the home page when show_on_home is ticked."""
+    slug = models.SlugField('כתובת', max_length=120, unique=True,
+        help_text='באותיות לטיניות, ספרות ומקפים -- חלק מכתובת הקובץ ומהעוגן ברשימת המאמרים.')
+    title_he = models.CharField('כותרת (עברית)', max_length=300, blank=True)
+    title_en = models.CharField('כותרת (אנגלית)', max_length=300, blank=True)
+    source = models.CharField('מקור / מחברים', max_length=300, blank=True,
+        help_text='למשל: Yonow, N. (2020). ZooKeys 1006. מוצג כפי שהוא בשתי השפות.')
+    link = models.URLField('קישור חיצוני (DOI וכד׳)', max_length=300, blank=True)
+    pdf_he = models.FileField('PDF בעברית', upload_to='articles/', blank=True,
+        validators=[FileExtensionValidator(['pdf']), validate_article_pdf_size])
+    pdf_en = models.FileField('PDF באנגלית', upload_to='articles/', blank=True,
+        validators=[FileExtensionValidator(['pdf']), validate_article_pdf_size])
+    published_on = models.DateField('תאריך פרסום באתר', default=date.today)
+    show_on_home = models.BooleanField('הצגה בדף הבית', default=False)
+    # Previews of the first page of each PDF -- made automatically (article_thumbs.py), never edited by hand.
+    thumb_he = models.FileField('תצוגה מקדימה (עברית)', upload_to='articles/thumbs/', blank=True, editable=False)
+    thumb_en = models.FileField('תצוגה מקדימה (אנגלית)', upload_to='articles/thumbs/', blank=True, editable=False)
+    class Meta:
+        ordering = ['-published_on', 'slug']
+        verbose_name = 'מאמר'; verbose_name_plural = 'מאמרים'
+    def __str__(self): return self.title_he or self.title_en or self.slug
+    def clean(self):
+        super().clean()
+        if not (self.title_he or self.title_en):
+            raise ValidationError('יש למלא כותרת בעברית או באנגלית.')
+        if not (self.pdf_he or self.pdf_en):
+            raise ValidationError('יש להעלות PDF בעברית או באנגלית.')
+    def save(self, *args, **kwargs):
+        # A replaced or removed PDF takes its preview with it (the old preview file is deleted by
+        # _delete_replaced_files); a new preview is made right after the save.
+        previous = Article.objects.filter(pk=self.pk).first() if self.pk else None
+        for code in ('he', 'en'):
+            if previous is None or getattr(previous, 'pdf_' + code).name != getattr(self, 'pdf_' + code).name:
+                setattr(self, 'thumb_' + code, '')
+        super().save(*args, **kwargs)
+        from .article_thumbs import ensure_thumbnail
+        for code in ('he', 'en'):
+            if getattr(self, 'pdf_' + code) and not getattr(self, 'thumb_' + code):
+                ensure_thumbnail(self, code)
+    def title(self, lang):
+        return (self.title_en or self.title_he) if lang == 'en' else (self.title_he or self.title_en)
+    def thumb_url(self, lang):
+        from django.urls import reverse
+        code = self.pdf_lang(lang)
+        return reverse('article-thumb', args=[self.slug, code]) if code else ''
+    def pdf_lang(self, lang):
+        """The language whose PDF a page in `lang` links to: its own when uploaded, else the other one, else None."""
+        other = 'he' if lang == 'en' else 'en'
+        return next((code for code in (lang, other) if getattr(self, 'pdf_' + code)), None)
+    def pdf_url(self, lang):
+        from django.urls import reverse
+        code = self.pdf_lang(lang)
+        return reverse('article-pdf', args=[self.slug, code]) if code else ''
+
+
 class Species(models.Model):
     # DERIVED -- never typed: always "<genus> <species>" (see sync_scientific_name). genus,
     # species (the epithet, which may also carry an open-nomenclature qualifier such as
@@ -132,7 +199,8 @@ class Species(models.Model):
     # an iNaturalist taxon page with photos when one exists, otherwise its WoRMS page. Never shown
     # on the public site; filled by the fill_reference_links command and editable by hand.
     reference_link = models.URLField('קישור עזר (תמונה / WoRMS)', max_length=300, blank=True)
-    article_pdf = models.FileField('מאמר (PDF)', upload_to='articles/species/', blank=True, validators=[FileExtensionValidator(['pdf'])])
+    articles = models.ManyToManyField('Article', blank=True, related_name='species', verbose_name='מאמרים',
+        help_text='בחירה מתוך טבלת המאמרים (מאמר מועלה פעם אחת בניהול ← מאמרים).')
     # Species-page content in both languages. habitat / food above hold the Hebrew text;
     # their English counterparts are habitat_en / food_en.
     habitat_en = models.TextField('בית גידול (אנגלית)', blank=True)
@@ -280,7 +348,8 @@ class TaxonOrder(models.Model):
     identification_en = models.TextField('סימני זיהוי (אנגלית)', blank=True)
     sources = models.TextField('מקורות (קישור בכל שורה)', blank=True)
     link = models.URLField('קישור', blank=True)
-    article_pdf = models.FileField('מאמר (PDF)', upload_to='articles/orders/', blank=True, validators=[FileExtensionValidator(['pdf'])])
+    articles = models.ManyToManyField('Article', blank=True, related_name='orders', verbose_name='מאמרים',
+        help_text='בחירה מתוך טבלת המאמרים (מאמר מועלה פעם אחת בניהול ← מאמרים).')
     class Meta:
         ordering = [models.functions.NullIf('taxonomic_order', models.Value('')).asc(nulls_last=True), 'name', 'sub_order', 'superfamily']
         verbose_name = 'סדרה / תת-סדרה / על-משפחה (טקסונומיה)'
@@ -326,7 +395,8 @@ class TaxonFamily(models.Model):
     identification_en = models.TextField('סימני זיהוי (אנגלית)', blank=True)
     sources = models.TextField('מקורות (קישור בכל שורה)', blank=True)
     link = models.URLField('קישור', blank=True)
-    article_pdf = models.FileField('מאמר (PDF)', upload_to='articles/families/', blank=True, validators=[FileExtensionValidator(['pdf'])])
+    articles = models.ManyToManyField('Article', blank=True, related_name='families', verbose_name='מאמרים',
+        help_text='בחירה מתוך טבלת המאמרים (מאמר מועלה פעם אחת בניהול ← מאמרים).')
     class Meta:
         ordering = [models.functions.NullIf('taxonomic_order', models.Value('')).asc(nulls_last=True), 'name', 'sub_family']
         verbose_name = 'משפחה (טקסונומיה)'
@@ -365,7 +435,8 @@ class TaxonGenus(models.Model):
     identification_en = models.TextField('סימני זיהוי (אנגלית)', blank=True)
     sources = models.TextField('מקורות (קישור בכל שורה)', blank=True)
     link = models.URLField('קישור', blank=True)
-    article_pdf = models.FileField('מאמר (PDF)', upload_to='articles/genera/', blank=True, validators=[FileExtensionValidator(['pdf'])])
+    articles = models.ManyToManyField('Article', blank=True, related_name='genera', verbose_name='מאמרים',
+        help_text='בחירה מתוך טבלת המאמרים (מאמר מועלה פעם אחת בניהול ← מאמרים).')
     # One scientific identification file for the genus -- a diagram, plate of photos or key
     # for telling its species apart: a PDF or an image (see IDENTIFICATION_FILE_EXTENSIONS).
     identification_file = models.FileField('קובץ זיהוי (PDF או תמונה)', upload_to='identification/genera/', blank=True,
@@ -502,7 +573,8 @@ class DiveTrip(models.Model):
     description_he = models.TextField('תיאור בעברית', blank=True)
     description_en = models.TextField('תיאור באנגלית', blank=True)
     link = models.URLField('קישור', blank=True)
-    article_pdf = models.FileField('מאמר (PDF)', upload_to='articles/trips/', blank=True, validators=[FileExtensionValidator(['pdf'])])
+    articles = models.ManyToManyField('Article', blank=True, related_name='trips', verbose_name='מאמרים',
+        help_text='בחירה מתוך טבלת המאמרים (מאמר מועלה פעם אחת בניהול ← מאמרים).')
 
     class Meta:
         db_table = 'dive_trips'
@@ -658,6 +730,11 @@ class Sample(models.Model):
     # reason as Sample.kind (see SampleKind).
     identification_qualifier = models.CharField('סימון זהות לא ודאית', max_length=8, blank=True)
     life_stage = models.CharField('שלב חיים', max_length=8, blank=True)
+    # A remark on this one observation (e.g. why its identification is uncertain), shown with it on the
+    # species page. Written by a manager; scientific names in it are set in italics on the page.
+    note_he = models.TextField('הערה לתצפית (עברית)', blank=True,
+        help_text='מוצגת ליד התצפית בעמוד המין. שמות מדעיים מוצגים בנטוי אוטומטית.')
+    note_en = models.TextField('הערה לתצפית (אנגלית)', blank=True)
     site = models.ForeignKey(Site, null=True, blank=True, on_delete=models.PROTECT, verbose_name='אתר צלילה')
     # Only for a SPECIES-kind sample whose species is not (yet) in the species table.
     species_other = models.CharField('מין אחר', max_length=200, blank=True)
@@ -1077,6 +1154,13 @@ class SpeciesArea(models.Model):
     # rename).
     slug = models.SlugField('כתובת בעמוד', max_length=220, unique=True, null=True, blank=True,
         help_text='נוצר אוטומטית משם המין+המדינה+הים בשמירה הראשונה. השאר ריק ליצירה אוטומטית, או הזן ידנית לדריסה.')
+    # A remark shown on this species+area's page only (e.g. an uncertain identification at this site). Plain
+    # text: scientific names in it are set in italics on the page, and "ראו מאמר" / "see article" links to the
+    # species' article (see views.species_note_html).
+    note_he = models.TextField('הערה בעמוד (עברית)', blank=True,
+        help_text='מוצגת בעמוד המין באזור זה בלבד. "ראו מאמר" הופך לקישור למאמר של המין.')
+    note_en = models.TextField('הערה בעמוד (אנגלית)', blank=True,
+        help_text='Shown on this page only. "see article" becomes a link to the species\' article.')
     class Meta:
         constraints = [models.UniqueConstraint(fields=['species','country','sea','undetermined_variant'], name='unique_species_area')]
         verbose_name = 'מין באזור'; verbose_name_plural = 'מינים באזורים'
@@ -1144,6 +1228,9 @@ class SpeciesArea(models.Model):
         least one published sample, each pointing at pick_defining_sample's choice. Safe to
         re-run at any time -- only this table is touched, Sample data is never changed."""
         with transaction.atomic():
+            # The hand-written notes are not derived from the samples: keep them for the rows that come back.
+            notes = {(a.species_id, a.country_id, a.sea_id, a.undetermined_variant): (a.note_he, a.note_en)
+                     for a in SpeciesArea.objects.exclude(note_he='', note_en='')}
             SpeciesArea.objects.all().delete()
             # A trip's sea is its region's sea (DiveTrip.sea), so a trip without a region
             # contributes no species area.
@@ -1161,8 +1248,10 @@ class SpeciesArea(models.Model):
             for species_id, country_id, sea_id, variant in keys:
                 defining = SpeciesArea.pick_defining_sample(species_id, country_id, sea_id, variant)
                 if defining:
+                    note_he, note_en = notes.get((species_id, country_id, sea_id, variant), ('', ''))
                     SpeciesArea.objects.create(species_id=species_id, country_id=country_id, sea_id=sea_id,
-                                                undetermined_variant=variant, defining_sample=defining)
+                                                undetermined_variant=variant, defining_sample=defining,
+                                                note_he=note_he, note_en=note_en)
                     count += 1
         return count
 
@@ -1171,8 +1260,7 @@ class SpeciesArea(models.Model):
 # The public observation form already deletes the old file itself; the Django admin ("לסלק" ticked,
 # or a new file chosen) only drops the reference and leaves the old PDF behind as an orphan. This
 # removes it for every save path. The file is kept when another row still points at the same name.
-_REPLACEABLE_FILES = ((Species, ('article_pdf',)), (TaxonOrder, ('article_pdf',)), (TaxonFamily, ('article_pdf',)),
-                      (TaxonGenus, ('article_pdf', 'identification_file')), (DiveTrip, ('article_pdf',)))
+_REPLACEABLE_FILES = ((Article, ('pdf_he', 'pdf_en', 'thumb_he', 'thumb_en')), (TaxonGenus, ('identification_file',)))
 
 
 def _delete_replaced_files(sender, instance, update_fields=None, **kwargs):
@@ -1193,6 +1281,21 @@ def _delete_replaced_files(sender, instance, update_fields=None, **kwargs):
             old.storage.delete(old.name)
         except OSError:
             pass
+
+
+def _delete_article_files(sender, instance, **kwargs):
+    """A deleted article (in the admin or from the article-files page) takes its PDFs and previews with it,
+    unless another article still points at the same file."""
+    for field in ('pdf_he', 'pdf_en', 'thumb_he', 'thumb_en'):
+        file = getattr(instance, field)
+        if file and not Article.objects.filter(**{field: file.name}).exclude(pk=instance.pk).exists():
+            try:
+                file.storage.delete(file.name)
+            except OSError:
+                pass
+
+
+models.signals.post_delete.connect(_delete_article_files, sender=Article, dispatch_uid='delete_article_files')
 
 
 for _model, _fields in _REPLACEABLE_FILES:
