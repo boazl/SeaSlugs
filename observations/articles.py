@@ -27,11 +27,15 @@ def article_links(articles, lang, binomials=None):
         binomials = known_binomials()
     links = []
     for article in articles:
+        written = article.is_written
         pdf_lang = article.pdf_lang(lang)
+        figure = article.first_figure() if written else None
+        other_language = (not getattr(article, 'title_' + lang)) if written else bool(pdf_lang and pdf_lang != lang)
         links.append({
             'slug': article.slug, 'title': italicize_names(article.title(lang), binomials), 'source': article.source,
-            'link': article.link, 'pdf_url': article.pdf_url(lang), 'other_language': bool(pdf_lang and pdf_lang != lang),
-            'thumb_url': article.thumb_url(lang),
+            'link': article.link, 'pdf_url': article.pdf_url(lang), 'other_language': other_language,
+            'written': written, 'url': article.url(lang),
+            'thumb_url': reverse('observation-photo', args=[figure.pk]) if figure else article.thumb_url(lang),
             'list_url': with_lang(reverse('article-list'), lang) + f'#{article.slug}',
         })
     return links
@@ -51,7 +55,7 @@ def note_html(row, lang, articles, binomials=None):
         return ''
     html = str(italicize_names(text, binomials))
     if articles:
-        target = articles[0].pdf_url(lang) if len(articles) == 1 else '#articles'
+        target = articles[0].url(lang) if len(articles) == 1 else '#articles'
         html = _SEE_ARTICLE[text_lang].sub(
             lambda m: str(format_html('<a href="{}">{}</a>', target, m.group(0))), html, count=1)
     return mark_safe(html)
@@ -159,7 +163,7 @@ def home_articles_html(lang):
         return ''
     items = ''.join(
         str(format_html('<li><a class="home-article-thumb" href="{0}" aria-hidden="true" tabindex="-1"><img src="{3}" alt="" width="48" height="48" loading="lazy"></a>'
-                        '<a href="{0}">{1}</a>{2}</li>', link['pdf_url'] or link['list_url'], link['title'],
+                        '<a href="{0}">{1}</a>{2}</li>', link['url'] or link['list_url'], link['title'],
                         format_html(' <small>({})</small>', 'in Hebrew' if lang == 'en' else 'באנגלית') if link['other_language'] else '',
                         link['thumb_url']))
         for link in article_links(articles, lang))
@@ -167,3 +171,60 @@ def home_articles_html(lang):
     more = 'All articles' if lang == 'en' else 'כל המאמרים'
     return format_html('<h2>{}</h2><ul class="home-articles">{}</ul><p><a href="{}">{} ›</a></p>',
                        heading, mark_safe(items), with_lang(reverse('article-list'), lang), more)
+
+
+def _figure_page(sample, lang, multi):
+    """The species+area page an article figure's observation belongs to, as {'url', 'name', 'place'} -- or None."""
+    from .seo_text import area_label
+    trip = sample.trip
+    if not (sample.species_id and trip and trip.country_id and trip.region_id):
+        return None
+    area = SpeciesArea.objects.filter(species_id=sample.species_id, country_id=trip.country_id, sea_id=trip.region.sea_id,
+                                      undetermined_variant=sample.undetermined_variant).exclude(slug='').exclude(slug__isnull=True).first()
+    if area is None:
+        return None
+    return {'url': with_lang(reverse('species-page', args=[area.slug]), lang), 'name': sample.taxon_label,
+            'place': area_label(area, lang, multi)}
+
+
+OWN_OBSERVATION_HEADINGS = {'תצפיות באתר', 'התצפיות באתר', 'Observations on the site'}
+
+
+def article_page(request, slug):
+    """An article written on the site, in the page's language (a PDF-only article: its PDF)."""
+    from .article_render import inline, plain, reference_list, render_blocks
+    from .seo_text import multi_sea_country_ids
+    lang = get_lang(request)
+    article = get_object_or_404(Article.objects.prefetch_related('blocks', 'references'), slug=slug)
+    if not article.is_written:
+        url = article.pdf_url(lang)
+        if not url:
+            raise Http404
+        return HttpResponseRedirect(url)
+    binomials = known_binomials()
+    blocks, untranslated = render_blocks(article, lang, binomials)
+    multi = multi_sea_country_ids()
+    observed = []
+    # An article that has its own "observations on the site" section (as written) does not get the automatic one.
+    own_list = any(b.kind == 'heading' and (b.text_he.strip() in OWN_OBSERVATION_HEADINGS or b.text_en.strip() in OWN_OBSERVATION_HEADINGS)
+                   for b in article.blocks.all())
+    for _html, sample, number in ([] if own_list else blocks):
+        if sample is not None:
+            page = _figure_page(sample, lang, multi)
+            if page:
+                observed.append({**page, 'figure': number})
+    other = 'he' if lang == 'en' else 'en'
+    subtitle = getattr(article, 'subtitle_' + lang) or ''
+    figure = article.first_figure()
+    return render(request, 'observations/article_page.html', {
+        'article': article, 'title': article.title(lang), 'title_html': italicize_names(article.title(lang), binomials),
+        'missing_language': not getattr(article, 'title_' + lang), 'untranslated': untranslated,
+        'subtitle': inline(subtitle, binomials, lang=lang) if subtitle else '', 'summary': plain(subtitle),
+        'byline': getattr(article, 'byline_' + lang) or getattr(article, 'byline_' + other),
+        'blocks': [html for html, _s, _n in blocks], 'observed': observed,
+        'references': reference_list(article, binomials),
+        'editorial': inline(getattr(article, 'editorial_' + lang), binomials, lang=lang) if getattr(article, 'editorial_' + lang) else '',
+        'body_line_height': '1.7' if lang == 'en' else '1.75',
+        'share_image': reverse('observation-photo', args=[figure.pk]) if figure else '',
+        'pdf_url': article.pdf_url(lang), 'pdf_other_language': bool(article.pdf_lang(lang) and article.pdf_lang(lang) != lang),
+    })

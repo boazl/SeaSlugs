@@ -12,7 +12,7 @@ from django.utils.safestring import mark_safe
 from django.urls import reverse
 from .forms import SampleForm, SampleChangelistForm, taxonomy_for_form, species_name_options
 from .reference_links import link_kind
-from .models import Article, Country, Sea, Region, Site, Species, Profile, Sample, DiveTrip, SiteImage, SpeciesArea, TaxonOrder, TaxonFamily, TaxonGenus, SampleKind, IdentificationQualifier, LifeStage
+from .models import Article, ArticleBlock, ArticleReference, Country, Sea, Region, Site, Species, Profile, Sample, DiveTrip, SiteImage, SpeciesArea, TaxonOrder, TaxonFamily, TaxonGenus, SampleKind, IdentificationQualifier, LifeStage
 
 for model in [Country,Sea,Site,Profile,SiteImage,SampleKind]: admin.site.register(model)
 
@@ -454,6 +454,43 @@ class DiveTripAdmin(admin.ModelAdmin):
         js = ['observations/js/divetrip_admin.js']
 
 
+class ArticleBlockFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        kept = [f for f in self.forms if f.cleaned_data and not f.cleaned_data.get('DELETE')]
+        article = self.instance
+        if not kept and not (article.pdf_he or article.pdf_en):
+            raise forms.ValidationError('למאמר צריך תוכן: קטעים שנכתבים כאן, או קובץ PDF בעברית או באנגלית.')
+        for f in kept:
+            if f.cleaned_data.get('kind') == ArticleBlock.Kind.FIGURE and not f.cleaned_data.get('sample'):
+                raise forms.ValidationError('באיור יש לבחור תצפית שתמונתה תוצג.')
+
+
+class ArticleBlockInline(admin.StackedInline):
+    """The sections of an article written on the site, each in Hebrew and English side by side."""
+    model = ArticleBlock
+    formset = ArticleBlockFormSet
+    extra = 0
+    fields = [('position', 'kind', 'sample'), ('title_he', 'title_en'), ('text_he', 'text_en')]
+    autocomplete_fields = ['sample']
+    formfield_overrides = {models.TextField: {'widget': forms.Textarea(attrs={'rows': 5, 'cols': 60})}}
+    def get_formset(self, request, obj=None, **kwargs):
+        formset = super().get_formset(request, obj, **kwargs)
+        widgets = formset.form.base_fields
+        if 'text_en' in widgets: widgets['text_en'].widget.attrs['dir'] = 'ltr'
+        if 'title_en' in widgets: widgets['title_en'].widget.attrs['dir'] = 'ltr'
+        return formset
+
+
+class ArticleReferenceInline(admin.TabularInline):
+    model = ArticleReference
+    extra = 0
+    fields = ['position', 'text', 'url']
+    formfield_overrides = {models.TextField: {'widget': forms.Textarea(attrs={'rows': 2, 'cols': 80, 'dir': 'ltr'})}}
+
+
 @admin.register(Article)
 class ArticleAdmin(admin.ModelAdmin):
     """The article library: each article is uploaded here once and then picked from the "מאמרים" field of
@@ -464,9 +501,15 @@ class ArticleAdmin(admin.ModelAdmin):
     prepopulated_fields = {'slug': ['title_en']}
     fieldsets = [
         (None, {'fields': ['title_he', 'title_en', 'slug', 'source', 'link']}),
-        ('קבצים', {'fields': ['pdf_he', 'pdf_en'], 'description': 'PDF אחד לפחות. בעמוד בשפה שאין לה PDF מוצג ה־PDF בשפה השנייה, עם ציון השפה.'}),
+        ('מאמר שנכתב באתר', {'fields': [('subtitle_he', 'subtitle_en'), ('byline_he', 'byline_en'), ('editorial_he', 'editorial_en')],
+                             'description': 'למאמר שנכתב כאן: הקטעים והמקורות בתחתית הדף. העמוד /articles/&lt;כתובת&gt;/ מציג אותו בשפת האתר, '
+                                            'עם כפתור הדפסה / שמירה כ־PDF.'}),
+        ('קבצים', {'fields': ['pdf_he', 'pdf_en'], 'description': 'למאמר PDF: קובץ אחד לפחות. בעמוד בשפה שאין לה PDF מוצג ה־PDF בשפה השנייה, עם ציון השפה. '
+                                                        'למאמר שנכתב באתר ה־PDF אינו חובה.'}),
         ('פרסום', {'fields': ['published_on', 'show_on_home']}),
     ]
+    inlines = [ArticleBlockInline, ArticleReferenceInline]
+    formfield_overrides = {models.TextField: {'widget': forms.Textarea(attrs={'rows': 2, 'cols': 50})}}
     def get_queryset(self, request):
         return super().get_queryset(request).prefetch_related('species', 'orders', 'families', 'genera', 'trips')
     @admin.display(description='מוצג אצל')
@@ -475,7 +518,7 @@ class ArticleAdmin(admin.ModelAdmin):
             + [str(x) for x in obj.families.all()] + [str(x) for x in obj.orders.all()] + [str(x) for x in obj.trips.all()]
         return ', '.join(names) or '—'
     def view_on_site(self, obj):
-        return reverse('article-list') + '#' + obj.slug
+        return reverse('article-page', args=[obj.slug]) if obj.is_written else reverse('article-list') + '#' + obj.slug
     def delete_view(self, request, object_id, extra_context=None):
         extra_context = {**(extra_context or {}), 'title': 'מחיקת מאמר: המאמר, קובצי ה־PDF והתצוגה המקדימה שלו יימחקו, והוא יוסר מכל העמודים שבחרו בו'}
         return super().delete_view(request, object_id, extra_context)

@@ -69,11 +69,10 @@ class ArticleFixture(MediaMixin, TestCase):
 
 
 class ArticleModelTests(ArticleFixture):
-    def test_an_article_needs_a_title_and_a_pdf(self):
+    def test_an_article_needs_a_title(self):
+        # (its content -- a PDF or sections written on the site -- is required by the admin form, see WrittenArticleTests)
         with self.assertRaisesMessage(ValidationError, 'כותרת'):
             Article(slug='x').full_clean()
-        with self.assertRaisesMessage(ValidationError, 'PDF'):
-            Article(slug='x', title_en='Paper').full_clean()
         self.make_article('ok', title_en='Paper').full_clean()
 
     def test_the_pdf_of_the_page_language_else_the_other_one(self):
@@ -838,3 +837,184 @@ class DeleteAnyArticleTests(ArticleFixture):
         self.client.force_login(staff)
         self.assertEqual(self.client.post('/admin/article-files/delete-chosen-articles/', {'slugs': ['complex']}).status_code, 403)
         self.assertTrue(Article.objects.filter(slug='complex').exists())
+
+
+HE_PAGE = '''<!DOCTYPE html><html lang="he"><head><style>body{}</style></head><body>
+<article class="article-body" lang="he" dir="rtl">
+<h1><i>Phyllidia ocellata</i> — מין אחד או קומפלקס של מינים?</h1>
+<p class="subtitle">שונות מורפולוגית בין תצפיות</p>
+<p class="byline">תצלומים ותצפיות: בעז ליבס | אוקטובר 2026</p>
+<figure><img src="/observations/408/photo/" alt="x"><figcaption>איור 1. הפרט מאילת. זיהוי: <i>Phyllidia</i> cf. <i>ocellata</i>.</figcaption></figure>
+<h2>מבוא</h2>
+<p><i>Phyllidia ocellata</i> Cuvier, 1804 היא חשופית.</p>
+<p>פסקה שנייה עם <a href="https://doi.org/10.1/x">קישור</a>.</p>
+<div class="table-wrap"><table><thead><tr><th>מאפיין</th><th>אילת</th></tr></thead><tbody><tr><td>רקע</td><td>שחור ולבן</td></tr></tbody></table></div>
+<div class="notice"><p><strong>הערה על רומבלון.</strong> הפרט דומה.</p></div>
+<h3>שתי פרשנויות</h3>
+<ul><li><strong>מופעים של מין אחד.</strong> לפי Brunckhorst.</li><li>שני מינים.</li></ul>
+<h2>התצפיות באתר</h2>
+<ul><li><a href="https://seaslugs.org.il/species/phyllidia-ocellata-israel-red-sea/?lang=he"><i>Phyllidia</i> cf. <i>ocellata</i> ממפרץ אילת (איור 1)</a></li></ul>
+<h2>מקורות וקישורים</h2>
+<ol class="refs"><li>Yonow, N. (1986). Red Sea Phyllidiidae. <em>J. Nat. Hist.</em> <a href="https://doi.org/10.1080/1">doi:10.1080/1</a></li></ol>
+<p class="editorial">הערת עריכה.</p>
+</article></body></html>'''
+EN_PAGE = (HE_PAGE.replace('התצפיות באתר', 'Observations on the site').replace('ממפרץ אילת (איור 1)', 'from the Gulf of Aqaba (Figure 1)').replace('מקורות וקישורים', 'References and links')
+           .replace('lang="he" dir="rtl"', 'lang="en" dir="ltr"')
+           .replace('מין אחד או קומפלקס של מינים?', 'One Species or a Species Complex?')
+           .replace('שונות מורפולוגית בין תצפיות', 'Morphological variation').replace('תצלומים ותצפיות: בעז ליבס | אוקטובר 2026', 'Photos: Boaz Liebes')
+           .replace('איור 1. הפרט מאילת. זיהוי:', 'Figure 1. The Eilat animal. Identification:').replace('מבוא', 'Introduction')
+           .replace('היא חשופית.', 'is a nudibranch.').replace('פסקה שנייה עם', 'A second paragraph with').replace('קישור', 'a link')
+           .replace('מאפיין', 'Character').replace('אילת', 'Eilat').replace('רקע', 'Ground').replace('שחור ולבן', 'Black and white')
+           .replace('הערה על רומבלון.', 'A note on Romblon.').replace('הפרט דומה.', 'The animal is similar.')
+           .replace('שתי פרשנויות', 'Two interpretations').replace('מופעים של מין אחד.', 'Forms of one species.')
+           .replace('לפי Brunckhorst.', 'After Brunckhorst.').replace('שני מינים.', 'Two species.')
+           .replace('הערת עריכה.', 'Editorial note.'))
+
+
+class WrittenArticleTests(ArticleFixture):
+    """An article written on the site: sections in both languages, its own page, printing instead of a PDF."""
+
+    def setUp(self):
+        super().setUp()
+        from .article_import import import_article
+        self.sample = Sample.objects.get(species=self.ocellata, trip=self.eilat_trip)
+        self.sample.image.save('eilat.jpg', ContentFile(b'\xff\xd8\xff jpeg'), save=False)
+        Sample.objects.filter(pk=self.sample.pk).update(image=self.sample.image.name)
+        self.sample.refresh_from_db()
+        self.article = import_article(Article(slug='complex'), HE_PAGE, EN_PAGE, [self.sample])
+        self.ocellata.articles.add(self.article)
+
+    def test_the_two_pages_become_one_bilingual_article(self):
+        a = Article.objects.get(slug='complex')
+        self.assertEqual(a.title_he, 'Phyllidia ocellata — מין אחד או קומפלקס של מינים?')
+        self.assertEqual((a.subtitle_en, a.byline_he), ('Morphological variation', 'תצלומים ותצפיות: בעז ליבס | אוקטובר 2026'))
+        self.assertEqual([b.kind for b in a.blocks.all()],
+                         ['figure', 'heading', 'paragraph', 'table', 'notice', 'subheading', 'list', 'heading', 'list'])
+        figure, heading, paragraph, table, notice, sub, lst, own_heading, own_list = a.blocks.all()
+        # the article's own "observations on the site" list, kept as written; links to this site made relative
+        self.assertEqual(own_heading.text_he, 'התצפיות באתר')
+        self.assertEqual(own_list.text_en, '[*Phyllidia* cf. *ocellata* from the Gulf of Aqaba (Figure 1)](/species/phyllidia-ocellata-israel-red-sea/)')
+        self.assertEqual(figure.sample, self.sample)
+        self.assertEqual(figure.text_he, 'הפרט מאילת. זיהוי: *Phyllidia* cf. *ocellata*.')       # the number is the page's own
+        self.assertEqual(paragraph.text_en, '*Phyllidia ocellata* Cuvier, 1804 is a nudibranch.\n\nA second paragraph with [a link](https://doi.org/10.1/x).')
+        self.assertEqual(table.text_he, 'מאפיין | אילת\nרקע | שחור ולבן')
+        self.assertEqual((notice.title_en, notice.text_en), ('A note on Romblon.', 'The animal is similar.'))
+        self.assertEqual(lst.text_en, '**Forms of one species.** After Brunckhorst.\nTwo species.')
+        self.assertEqual([r.text for r in a.references.all()],
+                         ['Yonow, N. (1986). Red Sea Phyllidiidae. *J. Nat. Hist.* [doi:10.1080/1](https://doi.org/10.1080/1)'])
+        self.assertEqual(a.editorial_he, 'הערת עריכה.')
+        self.assertTrue(a.is_written)
+
+    def test_the_page_shows_one_language_with_numbered_figures_and_the_observations_list(self):
+        html = self.page('/articles/complex/?lang=he')
+        self.assertIn('<h1><i>Phyllidia ocellata</i> — מין אחד או קומפלקס של מינים?</h1>', html)
+        self.assertIn(f'<img src="/observations/{self.sample.pk}/photo/"', html)
+        self.assertIn('<span class="figure-number">איור 1.</span> הפרט מאילת. זיהוי: <i>Phyllidia</i> cf. <i>ocellata</i>.', html)
+        self.assertIn('<p><i>Phyllidia ocellata</i> Cuvier, 1804 היא חשופית.</p><p>פסקה שנייה עם <a href="https://doi.org/10.1/x" target="_blank" rel="noopener">קישור</a>.</p>', html)
+        self.assertIn('<th>מאפיין</th><th>אילת</th>', html)
+        self.assertIn('<div class="notice"><p><strong>הערה על רומבלון.</strong> הפרט דומה.</p></div>', html)
+        self.assertIn('<li><strong>מופעים של מין אחד.</strong> לפי Brunckhorst.</li>', html)
+        self.assertIn('<h2>התצפיות באתר</h2>', html)
+        self.assertIn('<a href="/species/phyllidia-ocellata-israel-red-sea/"><i>Phyllidia</i> cf. <i>ocellata</i> ממפרץ אילת (איור 1)</a>', html)
+        self.assertNotIn('<h2>תצפיות באתר</h2>', html)          # no automatic list besides the article's own
+        self.assertIn('<ol class="refs" dir="ltr" lang="en">', html)
+        self.assertIn('<h2>מקורות וקישורים</h2>', html)
+        self.assertIn('הדפסה / שמירה כ־PDF', html)
+        self.assertIn('@media print', html)
+        self.assertNotIn('One Species', html)
+        english = self.page('/articles/complex/?lang=en')
+        self.assertIn('<span class="figure-number">Figure 1.</span> The Eilat animal.', english)
+        self.assertIn('Print / save as PDF', english)
+        self.assertIn('<a href="/species/phyllidia-ocellata-israel-red-sea/?lang=en">', english)
+        self.assertNotIn('מבוא', english)
+
+    def test_an_untranslated_section_says_so_in_the_page_language(self):
+        block = self.article.blocks.get(kind='subheading')
+        block.text_en = ''
+        block.save()
+        english = self.page('/articles/complex/?lang=en')
+        self.assertIn('This section has not been translated into English yet.', english)
+        self.assertIn('Some sections have not been translated yet.', english)
+        self.assertNotIn('שתי פרשנויות', english)
+
+    def test_links_to_the_article_lead_to_its_page_with_the_first_figure_as_preview(self):
+        species_page = self.page(f'/species/{self.ocellata_eilat.slug}/?lang=he')
+        self.assertIn('<a class="article-thumb" href="/articles/complex/"', species_page)
+        self.assertIn(f'<img src="/observations/{self.sample.pk}/photo/" alt="" width="64"', species_page)
+        self.assertIn('href="/articles/complex/"', self.page('/articles/?lang=he'))
+        self.assertIn('קריאת המאמר', self.page('/articles/?lang=he'))
+        self.assertIn('href="/articles/complex/?lang=en"', self.page('/articles/?lang=en'))
+
+    def test_a_pdf_article_page_leads_to_its_pdf(self):
+        self.make_article('paper', title_en='Paper')
+        self.assertRedirects(self.client.get('/articles/paper/'), '/articles/paper/en.pdf', fetch_redirect_response=False)
+
+    def test_inline_markup(self):
+        from .article_render import inline, plain
+        html = inline('**Bold** and *J. Nat. Hist.* with Phyllidia undula and [a link](https://x.org/a) <b>', set([('Phyllidia', 'undula')]))
+        self.assertEqual(html, '<strong>Bold</strong> and <i>J. Nat. Hist.</i> with <i>Phyllidia undula</i> and '
+                               '<a href="https://x.org/a" target="_blank" rel="noopener">a link</a> &lt;b&gt;')
+        self.assertEqual(plain('**a** *b* [c](/d)'), 'a b c')
+
+    def test_the_admin_edits_the_sections_and_requires_content(self):
+        self.client.force_login(self.owner)
+        html = self.page(f'/admin/observations/article/{self.article.pk}/change/')
+        self.assertIn('name="blocks-0-text_he"', html)
+        self.assertIn('name="references-0-text"', html)
+        self.assertIn('מאמר שנכתב באתר', html)
+        response = self.client.post('/admin/observations/article/add/', {
+            'title_he': 'ריק', 'slug': 'empty', 'published_on': '2026-10-23',
+            'blocks-TOTAL_FORMS': '0', 'blocks-INITIAL_FORMS': '0', 'references-TOTAL_FORMS': '0', 'references-INITIAL_FORMS': '0'})
+        self.assertContains(response, 'למאמר צריך תוכן')
+        response = self.client.post('/admin/observations/article/add/', {
+            'title_he': 'מאמר', 'slug': 'written', 'published_on': '2026-10-23',
+            'blocks-TOTAL_FORMS': '1', 'blocks-INITIAL_FORMS': '0', 'blocks-0-position': '10', 'blocks-0-kind': 'paragraph',
+            'blocks-0-text_he': 'שלום', 'references-TOTAL_FORMS': '0', 'references-INITIAL_FORMS': '0'})
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('<p>שלום</p>', self.page('/articles/written/'))
+
+    def test_the_transfer_carries_the_sections_with_figures_by_observation(self):
+        import json
+        from unittest.mock import patch
+        from pathlib import Path as _Path
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        self.client.force_login(self.owner)
+        details = self.client.get('/admin/article-files/transfer-file/', {'article': 'complex', 'part': 'details'}).content
+        content = json.loads(details)['article']['content']
+        self.assertEqual(content['blocks'][0]['sample'], str(self.sample.transfer_id))
+        self.article.delete()
+        with patch('observations.table_transfer.create_backup', return_value=_Path('t.sqlite3')):
+            response = self.client.post('/admin/article-files/', {'action': 'upload_articles',
+                                        'files': [SimpleUploadedFile('complex.article.json', details)]}, follow=True)
+        self.assertContains(response, 'הועברו 1 מאמרים')
+        article = Article.objects.get(slug='complex')
+        self.assertEqual(article.blocks.count(), 9)
+        self.assertEqual(article.blocks.first().sample, self.sample)
+        self.assertEqual(article.references.count(), 1)
+        self.assertEqual(article.subtitle_he, 'שונות מורפולוגית בין תצפיות')
+
+    def test_the_import_command(self):
+        import tempfile, os
+        from django.core.management import call_command
+        with tempfile.TemporaryDirectory() as folder:
+            he, en = os.path.join(folder, 'he.html'), os.path.join(folder, 'en.html')
+            open(he, 'w', encoding='utf-8').write(HE_PAGE); open(en, 'w', encoding='utf-8').write(EN_PAGE)
+            call_command('import_article_html', 'complex', he, en, figures=str(self.sample.pk))
+            from django.core.management.base import CommandError
+            with self.assertRaisesMessage(CommandError, 'איורים'):
+                call_command('import_article_html', 'other', he, en, figures='')
+        self.assertEqual(Article.objects.get(slug='complex').blocks.count(), 9)
+
+
+class AutomaticObservationsListTests(ArticleFixture):
+    def test_an_article_without_its_own_list_gets_one_built_from_its_figures(self):
+        from .article_import import import_article
+        sample = Sample.objects.get(species=self.ocellata, trip=self.eilat_trip)
+        sample.image.save('e.jpg', ContentFile(b'\xff\xd8\xff jpeg'), save=False)
+        Sample.objects.filter(pk=sample.pk).update(image=sample.image.name)
+        he = HE_PAGE.split('<h2>התצפיות באתר</h2>')[0] + '</article></body></html>'
+        en = EN_PAGE.split('<h2>Observations on the site</h2>')[0] + '</article></body></html>'
+        import_article(Article(slug='plain'), he, en, [Sample.objects.get(pk=sample.pk)])
+        html = self.page('/articles/plain/?lang=he')
+        self.assertIn('<h2>תצפיות באתר</h2>', html)
+        self.assertIn(f'href="/species/{self.ocellata_eilat.slug}/"', html)

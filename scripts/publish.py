@@ -11,7 +11,8 @@ EXPECTED_REMOTE = 'https://github.com/boazl/SeaSlugs.git'
 
 
 def git(*args, capture=False):
-    return subprocess.run(['git', *args], cwd=ROOT, check=True,
+    # --no-pager: a long diff/log would otherwise open in `less` and wait for "q" before the YES prompt.
+    return subprocess.run(['git', '--no-pager', *args], cwd=ROOT, check=True,
                           text=True, capture_output=capture)
 
 

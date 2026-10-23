@@ -107,6 +107,13 @@ class Article(models.Model):
     title_en = models.CharField('כותרת (אנגלית)', max_length=300, blank=True)
     source = models.CharField('מקור / מחברים', max_length=300, blank=True,
         help_text='למשל: Yonow, N. (2020). ZooKeys 1006. מוצג כפי שהוא בשתי השפות.')
+    # An article written on the site (its sections are ArticleBlock rows) also has these; a PDF-only article does not.
+    subtitle_he = models.CharField('כותרת משנה (עברית)', max_length=500, blank=True)
+    subtitle_en = models.CharField('כותרת משנה (אנגלית)', max_length=500, blank=True)
+    byline_he = models.CharField('קרדיט (עברית)', max_length=300, blank=True, help_text='למשל: תצלומים ותצפיות: בעז ליבס | אוקטובר 2026')
+    byline_en = models.CharField('קרדיט (אנגלית)', max_length=300, blank=True)
+    editorial_he = models.TextField('הערת עריכה (עברית)', blank=True, help_text='מוצגת בקטן בסוף המאמר.')
+    editorial_en = models.TextField('הערת עריכה (אנגלית)', blank=True)
     link = models.URLField('קישור חיצוני (DOI וכד׳)', max_length=300, blank=True)
     pdf_he = models.FileField('PDF בעברית', upload_to='articles/', blank=True,
         validators=[FileExtensionValidator(['pdf']), validate_article_pdf_size])
@@ -125,8 +132,7 @@ class Article(models.Model):
         super().clean()
         if not (self.title_he or self.title_en):
             raise ValidationError('יש למלא כותרת בעברית או באנגלית.')
-        if not (self.pdf_he or self.pdf_en):
-            raise ValidationError('יש להעלות PDF בעברית או באנגלית.')
+        # Content (a PDF, or sections written on the site) is checked in the admin form, where the sections are.
     def save(self, *args, **kwargs):
         # A replaced or removed PDF takes its preview with it (the old preview file is deleted by
         # _delete_replaced_files); a new preview is made right after the save.
@@ -145,6 +151,21 @@ class Article(models.Model):
         from django.urls import reverse
         code = self.pdf_lang(lang)
         return reverse('article-thumb', args=[self.slug, code]) if code else ''
+    @property
+    def is_written(self):
+        """Written on the site (has sections), rather than an uploaded PDF only."""
+        cached = getattr(self, '_prefetched_objects_cache', {}).get('blocks')
+        return bool(cached) if cached is not None else self.blocks.exists()
+    def page_url(self, lang):
+        from django.urls import reverse
+        url = reverse('article-page', args=[self.slug])
+        return url + '?lang=en' if lang == 'en' else url
+    def url(self, lang):
+        """Where a link to the article leads: its page on the site when written here, else its PDF."""
+        return self.page_url(lang) if self.is_written else self.pdf_url(lang)
+    def first_figure(self):
+        return next((b.sample for b in self.blocks.all() if b.kind == ArticleBlock.Kind.FIGURE and b.sample_id
+                     and b.sample.image and not b.sample.deleted_at), None)
     def pdf_lang(self, lang):
         """The language whose PDF a page in `lang` links to: its own when uploaded, else the other one, else None."""
         other = 'he' if lang == 'en' else 'en'
@@ -1281,6 +1302,47 @@ def _delete_replaced_files(sender, instance, update_fields=None, **kwargs):
             old.storage.delete(old.name)
         except OSError:
             pass
+
+
+class ArticleBlock(models.Model):
+    """One section of an article written on the site, in both languages, in the article's order (position).
+    Text uses a light markup: **bold**, *italics*, [text](link); scientific names of catalog species are set in
+    italics on their own. A table is one row per line with its cells separated by |, the first line its header;
+    a list is one item per line."""
+    class Kind(models.TextChoices):
+        HEADING = 'heading', 'כותרת פרק'
+        SUBHEADING = 'subheading', 'כותרת משנה בפרק'
+        PARAGRAPH = 'paragraph', 'פסקה'
+        FIGURE = 'figure', 'איור (תמונה של תצפית)'
+        TABLE = 'table', 'טבלה'
+        LIST = 'list', 'רשימה'
+        NOTICE = 'notice', 'תיבת הערה'
+    article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name='blocks', verbose_name='מאמר')
+    position = models.PositiveIntegerField('סדר', default=0, help_text='הקטעים מוצגים לפי המספר (10, 20, 30… — כך אפשר להכניס קטע באמצע).')
+    kind = models.CharField('סוג הקטע', max_length=12, choices=Kind.choices, default=Kind.PARAGRAPH)
+    title_he = models.CharField('כותרת (עברית)', max_length=300, blank=True, help_text='לתיבת הערה.')
+    title_en = models.CharField('כותרת (אנגלית)', max_length=300, blank=True)
+    text_he = models.TextField('טקסט (עברית)', blank=True,
+        help_text='**מודגש**, *נטוי*, [טקסט](קישור). טבלה: שורה לכל שורה, תאים מופרדים ב־|, השורה הראשונה כותרת. רשימה: שורה לכל פריט. באיור: הכיתוב.')
+    text_en = models.TextField('טקסט (אנגלית)', blank=True)
+    sample = models.ForeignKey('Sample', null=True, blank=True, on_delete=models.SET_NULL, related_name='+', verbose_name='תצפית (לאיור)',
+        help_text='באיור: התצפית שתמונתה מוצגת.')
+    class Meta:
+        ordering = ['position', 'pk']
+        verbose_name = 'קטע במאמר'; verbose_name_plural = 'קטעי המאמר'
+    def __str__(self): return f'{self.get_kind_display()} {self.position}'
+
+
+class ArticleReference(models.Model):
+    """An entry of an article's numbered list of references (the same in both languages)."""
+    article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name='references', verbose_name='מאמר')
+    position = models.PositiveIntegerField('סדר', default=0)
+    text = models.TextField('מקור', help_text='**מודגש**, *נטוי*, [טקסט](קישור).')
+    url = models.URLField('קישור (DOI וכד׳)', max_length=500, blank=True)
+    class Meta:
+        ordering = ['position', 'pk']
+        verbose_name = 'מקור'; verbose_name_plural = 'מקורות וקישורים'
+    def __str__(self): return self.text[:60]
 
 
 def _delete_article_files(sender, instance, **kwargs):

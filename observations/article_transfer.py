@@ -10,6 +10,7 @@ scientific name, a genus by name, a family by name + sub-family, an order row by
 superfamily, a dive trip by its code), never by database ids, which differ between the environments."""
 import hashlib
 import json
+import uuid
 from datetime import date, datetime, timezone as dt_timezone
 
 from django.core.exceptions import ValidationError
@@ -17,7 +18,10 @@ from django.core.files.base import ContentFile
 from django.db import transaction
 from django.utils import timezone
 
-from .models import Article, DiveTrip, Species, TaxonFamily, TaxonGenus, TaxonOrder
+from .models import Article, ArticleBlock, ArticleReference, DiveTrip, Sample, Species, TaxonFamily, TaxonGenus, TaxonOrder
+
+TEXT_FIELDS = ('subtitle_he', 'subtitle_en', 'byline_he', 'byline_en', 'editorial_he', 'editorial_en')
+BLOCK_FIELDS = ('position', 'kind', 'title_he', 'title_en', 'text_he', 'text_en')
 
 MANIFEST_FORMAT = 'seaslugs-article-manifest-v1'
 ARTICLE_FORMAT = 'seaslugs-article-v1'
@@ -68,11 +72,41 @@ def article_entry(article):
         'show_on_home': article.show_on_home,
         'files': {lang: _file_details(getattr(article, 'pdf_' + lang)) for lang in LANGS},
         'pages': _pages(article),
+        # An article written on the site: its texts, sections (a figure's observation by its fixed transfer id,
+        # the same in both environments) and references.
+        'content': {
+            **{f: getattr(article, f) for f in TEXT_FIELDS},
+            'blocks': [{**{f: getattr(b, f) for f in BLOCK_FIELDS}, 'sample': str(b.sample.transfer_id) if b.sample_id else ''}
+                       for b in article.blocks.select_related('sample').all()],
+            'references': [{'position': r.position, 'text': r.text, 'url': r.url} for r in article.references.all()],
+        },
     }
 
 
 def _articles():
-    return Article.objects.prefetch_related('species', 'genera', 'families', 'orders', 'trips').order_by('slug')
+    return Article.objects.prefetch_related('species', 'genera', 'families', 'orders', 'trips', 'references').order_by('slug')
+
+
+def _valid_content(content):
+    if content is None:
+        return True          # a list from before articles were written on the site
+    if not isinstance(content, dict) or not all(isinstance(content.get(f), str) for f in TEXT_FIELDS):
+        return False
+    blocks, refs = content.get('blocks'), content.get('references')
+    if not isinstance(blocks, list) or not isinstance(refs, list):
+        return False
+    kinds = set(ArticleBlock.Kind.values)
+    for b in blocks:
+        if not isinstance(b, dict) or not isinstance(b.get('position'), int) or b.get('kind') not in kinds \
+                or not all(isinstance(b.get(f), str) for f in ('title_he', 'title_en', 'text_he', 'text_en', 'sample')):
+            return False
+        if b['sample']:
+            try:
+                uuid.UUID(b['sample'])
+            except ValueError:
+                return False
+    return all(isinstance(r, dict) and isinstance(r.get('position'), int) and isinstance(r.get('text'), str)
+               and isinstance(r.get('url'), str) for r in refs)
 
 
 def build_manifest():
@@ -97,6 +131,8 @@ def _valid_entry(entry):
         if value is not None and not (isinstance(value, list) and len(value) == 3 and isinstance(value[0], str)
                                       and all(isinstance(x, int) for x in value[1:])):
             return False
+    if not _valid_content(entry.get('content')):
+        return False
     pages = entry['pages']
     if set(pages) != set(PAGE_LABELS):
         return False
@@ -140,6 +176,8 @@ def compare_manifest(manifest):
             result['only_here'].append({'slug': slug, 'title': str(article)})
             continue
         details = [DETAIL_LABELS[f] for f in DETAIL_FIELDS if here[f] != there[f]]
+        if there.get('content') is not None and here['content'] != there['content']:
+            details.append('תוכן המאמר (קטעים, כותרת משנה, קרדיט, מקורות)')
         pdfs = []
         for lang in LANGS:
             mine, theirs = here['files'][lang], there['files'][lang]
@@ -257,11 +295,27 @@ def receive(uploads, replace=False):
                                  'להחלפה יש לסמן "לאשר החלפת קובצי PDF קיימים" ולהעלות שוב.')
                     continue
                 field.save(f'{slug}-{lang}.pdf', ContentFile(data), save=False)
+            content = entry.get('content')
+            if content is not None:
+                for field in TEXT_FIELDS:
+                    setattr(article, field, content[field])
+            if not (article.pdf_he or article.pdf_en) and not (content and content['blocks']):
+                raise ValidationError(f'{slug}: למאמר אין תוכן — לא PDF ולא קטעים.')
             try:
                 article.full_clean()
             except ValidationError as exc:
                 raise ValidationError(f'{slug}: ' + '; '.join(exc.messages))
             article.save()
+            if content is not None:
+                article.blocks.all().delete()
+                article.references.all().delete()
+                for b in content['blocks']:
+                    sample = Sample.objects.filter(transfer_id=b['sample'], deleted_at__isnull=True).first() if b['sample'] else None
+                    if b['sample'] and sample is None:
+                        notes.append(f'{slug}: התצפית של איור (סדר {b["position"]}) אינה קיימת כאן — יש להעביר אותה ולהעלות שוב.')
+                    ArticleBlock.objects.create(article=article, sample=sample, **{f: b[f] for f in BLOCK_FIELDS})
+                for r in content['references']:
+                    ArticleReference.objects.create(article=article, position=r['position'], text=r['text'], url=r['url'])
             rows, missing = _resolve_pages(entry['pages'])
             for key, values in rows.items():
                 getattr(article, key).set(values)

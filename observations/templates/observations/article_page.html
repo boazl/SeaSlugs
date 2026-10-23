@@ -1,0 +1,50 @@
+{% extends 'observations/base.html' %}{% load seaslugs_i18n seo %}{% block title %}{{ title }} | SeaSlugs{% endblock %}{% block share_meta %}{% share_meta title "SeaSlugs" summary share_image %}{% endblock %}{% block site_hero %}{% endblock %}{% block content %}<style>
+.article-tools{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin:0 0 8px;font-size:15px}
+.article-tools button,.article-tools .button{background:#61dfcc;color:#08232a;padding:8px 16px;border-radius:7px;text-decoration:none;font-weight:600;font-size:15px}
+.article-language{border-inline-start:4px solid #ffcf5c;padding:10px 14px;background:#ffcf5c1a;margin:12px 0}
+.article-body{max-width:760px;margin:0 auto;padding:8px 0 64px;font-family:system-ui,"Segoe UI",Arial,sans-serif;line-height:{{ body_line_height }};border:0;border-radius:0}
+.article-body h1{font-size:2rem;line-height:1.25;margin:0 0 8px}
+.article-body h2{font-size:1.35rem;margin:40px 0 12px;color:#5de0cb}
+.article-body h3{font-size:1.1rem;margin:24px 0 8px}
+.article-body .subtitle{font-size:1.1rem;color:#9fb4bc;margin:0 0 6px}
+.article-body .byline{font-size:.9rem;color:#9fb4bc;margin:0 0 28px}
+.article-body figure{margin:28px 0;break-inside:avoid}
+.article-body figure img{width:100%;height:auto;object-fit:contain;border-radius:6px;display:block}
+.article-body figcaption{font-size:.9rem;color:#9fb4bc;margin-top:8px}
+.article-body .table-wrap{overflow-x:auto}
+.article-body table{width:100%;border-collapse:collapse;font-size:.95rem}
+.article-body th,.article-body td{padding:9px 10px;border-bottom:1px solid #ffffff22;text-align:start;vertical-align:top}
+.article-body th{color:#5de0cb}
+.article-body .notice{border-inline-start:4px solid #5de0cb;border-right-width:0;background:#0f2a36;padding:14px 16px;border-radius:4px;margin:20px 0;white-space:normal}
+.article-body a{color:#5de0cb}
+.article-body .untranslated{color:#ffcf5c;font-size:.9rem}
+.article-body .refs li{margin-bottom:8px;overflow-wrap:anywhere}
+.article-body .editorial{font-size:.85rem;color:#9fb4bc}
+@media print{
+  body{background:#fff!important;color:#000!important;font-size:12pt}
+  header.masthead,.subnav,.article-tools,.article-language,.notice:not(.article-body .notice){display:none!important}
+  main{max-width:none;padding:0}
+  .article-body{max-width:none}
+  .article-body a{color:#000}
+  .article-body h2,.article-body th{color:#000}
+  .article-body .subtitle,.article-body .byline,.article-body figcaption,.article-body .editorial{color:#333}
+  .article-body .notice{background:#f2f2f2;border-color:#555}
+  .article-body th,.article-body td{border-bottom:1px solid #999}
+  .article-body h2,.article-body h3{break-after:avoid}
+}
+</style>
+<nav class="article-tools"><a href="{% url 'article-list' as list_url %}{{ list_url|with_lang:lang }}">{{ "חזרה למאמרים"|t:lang }}</a><button type="button" onclick="window.print()">{{ "הדפסה / שמירה כ־PDF"|t:lang }}</button>{% if pdf_url %}<a class="button" href="{{ pdf_url }}" target="_blank" rel="noopener">{% if pdf_other_language %}{% if lang == 'en' %}{{ "PDF (בעברית)"|t:lang }}{% else %}{{ "PDF (באנגלית)"|t:lang }}{% endif %}{% else %}PDF{% endif %}</a>{% endif %}</nav>
+{% if missing_language %}<p class="article-language">{{ "המאמר עדיין אינו זמין בשפה זו."|t:lang }}</p>{% elif untranslated %}<p class="article-language">{{ "חלק מהקטעים עדיין לא תורגמו."|t:lang }}</p>{% endif %}
+<article class="article-body" lang="{{ lang }}">
+<h1>{{ title_html }}</h1>
+{% if subtitle %}<p class="subtitle">{{ subtitle|safe }}</p>{% endif %}
+{% if byline %}<p class="byline">{{ byline }}</p>{% endif %}
+{% for html in blocks %}{{ html|safe }}
+{% endfor %}
+{% if observed %}<h2>{{ "תצפיות באתר"|t:lang }}</h2>
+<ul class="observed">{% for o in observed %}<li><a href="{{ o.url }}"><bdi dir="ltr">{{ o.name|name_html }}</bdi> · {{ o.place }}</a> ({% if lang == 'en' %}Figure{% else %}איור{% endif %} {{ o.figure }})</li>{% endfor %}</ul>{% endif %}
+{% if references %}<h2>{{ "מקורות וקישורים"|t:lang }}</h2>
+{{ references|safe }}{% endif %}
+{% if editorial %}<p class="editorial">{{ editorial|safe }}</p>{% endif %}
+</article>
+{% endblock %}
