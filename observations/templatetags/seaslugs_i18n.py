@@ -87,6 +87,8 @@ TRANSLATIONS = {
     'תצפיות באתר': 'Observations on the site',
     'מקורות וקישורים': 'References and links',
     'קריאת המאמר': 'Read the article',
+    'הוספת מאמר': 'Add article',
+    'עריכת מאמר': 'Edit article',
     'מאמרים על חינניות ים ועל המינים שבאתר.': 'Articles about sea slugs and the species on this site.',
     'עדיין אין מאמרים באתר.': 'No articles on the site yet.',
     'פורסם באתר:': 'Added to the site:',

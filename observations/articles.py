@@ -92,8 +92,12 @@ def article_list(request):
             places.append({'url': with_lang(reverse('order-page', args=[order.pk]), lang), 'name': str(order), 'place': ''})
         for trip in article.trips.all():
             places.append({'url': with_lang(reverse('dive-trips'), lang) + f'#trip-{trip.pk}', 'name': trip.title, 'place': '', 'trip': True})
-        rows.append({**link, 'published_on': article.published_on, 'places': places})
-    return render(request, 'observations/articles.html', {'articles': rows})
+        rows.append({**link, 'published_on': article.published_on, 'places': places, 'pk': article.pk})
+    user = request.user
+    return render(request, 'observations/articles.html', {'articles': rows,
+        # managers (staff with the article permissions) get an add button and an edit button per article
+        'can_add_article': user.is_staff and user.has_perm('observations.add_article'),
+        'can_edit_article': user.is_staff and user.has_perm('observations.change_article')})
 
 
 def article_pdf(request, slug, lang):
@@ -227,4 +231,5 @@ def article_page(request, slug):
         'body_line_height': '1.7' if lang == 'en' else '1.75',
         'share_image': reverse('observation-photo', args=[figure.pk]) if figure else '',
         'pdf_url': article.pdf_url(lang), 'pdf_other_language': bool(article.pdf_lang(lang) and article.pdf_lang(lang) != lang),
+        'can_edit_article': request.user.is_staff and request.user.has_perm('observations.change_article'),
     })

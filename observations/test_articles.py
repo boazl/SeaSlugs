@@ -1018,3 +1018,28 @@ class AutomaticObservationsListTests(ArticleFixture):
         html = self.page('/articles/plain/?lang=he')
         self.assertIn('<h2>תצפיות באתר</h2>', html)
         self.assertIn(f'href="/species/{self.ocellata_eilat.slug}/"', html)
+
+
+class ArticleManagerButtonsTests(ArticleFixture):
+    def setUp(self):
+        super().setUp()
+        from .article_import import import_article
+        self.paper = self.make_article('paper', title_he='מאמר')
+        self.written = import_article(Article(slug='written'), HE_PAGE, EN_PAGE, [Sample.objects.get(species=self.ocellata, trip=self.eilat_trip)])
+
+    def test_managers_get_add_and_edit_buttons(self):
+        self.client.force_login(self.owner)
+        html = self.page('/articles/?lang=he')
+        self.assertIn('href="/admin/observations/article/add/"', html)
+        self.assertIn('הוספת מאמר', html)
+        self.assertIn(f'href="/admin/observations/article/{self.paper.pk}/change/"', html)
+        self.assertIn(f'href="/admin/observations/article/{self.written.pk}/change/"', html)
+        self.assertIn('Edit article', self.page('/articles/?lang=en'))
+        self.assertIn(f'href="/admin/observations/article/{self.written.pk}/change/"', self.page('/articles/written/'))
+
+    def test_visitors_and_members_do_not(self):
+        for user in (None, User.objects.create_user('member', password='x'), User.objects.create_user('staff', password='x', is_staff=True)):
+            if user: self.client.force_login(user)
+            html = self.page('/articles/?lang=he')
+            self.assertNotIn('/admin/observations/article/', html)
+            self.assertNotIn('עריכת מאמר', self.page('/articles/written/'))
