@@ -1,10 +1,9 @@
 """How the site words a count of gallery cards.
 
-A gallery card stands for one SpeciesArea: a species in an area (country + sea). The site calls
-such a card an "observation" (תצפית) when it counts them, so the same species seen in two areas
-is two observations but one species. Showing only one of the two numbers confused visitors, so
-every count shows both: "30 מינים (50 תצפיות)", and in the small badges and chips "30 (50)".
-dist/app.js builds the same strings for the gallery (countText / countCompact)."""
+A gallery card is one SpeciesArea: a species in an area (country + sea), which the site calls an "observation".
+The same species seen in two areas is two cards but one species, so every counter shows the number of distinct
+species ("30 מינים"); only the gallery's "All areas" button also says how many observations they are.
+dist/app.js builds the same strings (countText / observationsText)."""
 
 
 def species_count(areas):
@@ -12,20 +11,15 @@ def species_count(areas):
     return len({a.species_id for a in areas})
 
 
-def count_text(species, observations, lang='he', full=False):
-    """'30 מינים (50 תצפיות)' / '30 species (50 observations)' for headings and facts. When the two numbers are equal
-    (every species is seen in one area only) it is just '30 מינים' -- `full` keeps both ('30 מינים (30 תצפיות)'),
-    as the tooltips do."""
+def count_text(species, lang='he'):
+    """'30 מינים' / '30 species' ('מין אחד' for one)."""
     if lang == 'en':
-        sp = f'{species} species'
-        ob = f"{observations} {'observation' if observations == 1 else 'observations'}"
-    else:
-        sp = 'מין אחד' if species == 1 else f'{species} מינים'
-        ob = 'תצפית אחת' if observations == 1 else f'{observations} תצפיות'
-    return sp if species == observations and not full else f'{sp} ({ob})'
+        return f'{species} species'
+    return 'מין אחד' if species == 1 else f'{species} מינים'
 
 
-def count_compact(species, observations):
-    """'30 (50)' -- species, then observations in parentheses; one number when they are equal
-    (each species is then seen in exactly one area, so the two counts say the same thing)."""
-    return str(species) if species == observations else f'{species} ({observations})'
+def observations_text(species, observations, lang='he'):
+    """'266 מינים ב-301 תצפיות' / '266 species in 301 observations'."""
+    if lang == 'en':
+        return f"{species} species in {observations} {'observation' if observations == 1 else 'observations'}"
+    return f"{count_text(species)} ב-{'תצפית אחת' if observations == 1 else f'{observations} תצפיות'}"

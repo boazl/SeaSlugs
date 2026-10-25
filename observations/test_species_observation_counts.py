@@ -1,6 +1,6 @@
-"""Every count of gallery cards also says how many distinct species they are: "30 מינים (50 תצפיות)".
+"""Every counter shows the number of distinct species; only the gallery's "All areas" button also gives the observations.
 
-A card is a species in an area; the same species in two areas is two observations but one species."""
+A card is a species in an area; the same species in two areas is two cards but one species."""
 import io
 from pathlib import Path
 
@@ -23,19 +23,15 @@ def png(color):
 
 
 class CountWordingTests(SimpleTestCase):
-    def test_full_text_in_both_languages(self):
-        self.assertEqual(counts.count_text(30, 50), '30 מינים (50 תצפיות)')
-        self.assertEqual(counts.count_text(1, 2), 'מין אחד (2 תצפיות)')
-        self.assertEqual(counts.count_text(2, 3, 'en'), '2 species (3 observations)')
-        self.assertEqual(counts.count_text(1, 1, 'en', full=True), '1 species (1 observation)')
+    def test_species_wording_in_both_languages(self):
+        self.assertEqual(counts.count_text(30), '30 מינים')
+        self.assertEqual(counts.count_text(1), 'מין אחד')
+        self.assertEqual(counts.count_text(2, 'en'), '2 species')
 
-    def test_equal_numbers_read_as_the_species_alone(self):
-        self.assertEqual(counts.count_text(30, 30), '30 מינים')
-        self.assertEqual(counts.count_text(30, 30, full=True), '30 מינים (30 תצפיות)')
-
-    def test_compact_form_is_one_number_when_both_are_equal(self):
-        self.assertEqual(counts.count_compact(30, 50), '30 (50)')
-        self.assertEqual(counts.count_compact(7, 7), '7')
+    def test_observations_wording_for_the_all_areas_button(self):
+        self.assertEqual(counts.observations_text(266, 301), '266 מינים ב-301 תצפיות')
+        self.assertEqual(counts.observations_text(266, 301, 'en'), '266 species in 301 observations')
+        self.assertEqual(counts.observations_text(1, 1), 'מין אחד ב-תצפית אחת')
 
 
 class CountsOnTheTaxonPagesTests(TestCase):
@@ -56,45 +52,39 @@ class CountsOnTheTaxonPagesTests(TestCase):
             species, _ = Species.objects.get_or_create(scientific_name=f'Chromodoris {epithet}', defaults={'genus': 'Chromodoris', 'species': epithet})
             colour += 60
             Sample(owner=owner, trip=trips[place], species=species, image=png((colour, 40, 90))).save_reviewed()
-        self.order, self.family = order, family
+        self.order = order
 
-    def test_the_order_page_counts_species_and_observations(self):
+    def test_the_order_page_counts_species_only(self):
         html = self.client.get(reverse('order-page', args=[self.order.pk])).content.decode()
-        self.assertIn('2 מינים (3 תצפיות)', html)
-        # the family under it: "2 (3)" with the full wording as its tooltip
-        self.assertIn('<small title="2 מינים (3 תצפיות)">2 (3)</small>', html)
+        self.assertIn('<h2>2 מינים</h2>', html)
+        self.assertIn('<dd>2</dd>', html)
+        self.assertIn('<small>2</small>', html)          # the family under it
+        self.assertNotIn('תצפיות)', html)
 
     def test_the_family_and_genus_pages_too(self):
         family = self.client.get(reverse('family-page', args=['Chromodorididae'])).content.decode()
-        self.assertIn('2 מינים (3 תצפיות)', family)
-        self.assertIn('<small title="2 מינים (3 תצפיות)">2 (3)</small>', family)      # the genus under it
+        self.assertIn('<h2>2 מינים</h2>', family)
+        self.assertIn('<small>2</small>', family)        # the genus under it
         genus = self.client.get(reverse('genus-page', args=['Chromodoris'])).content.decode()
-        self.assertIn('2 מינים (3 תצפיות)', genus)
+        self.assertIn('<span class="group-count">(2)</span>', genus)
 
     def test_the_english_page_is_in_english(self):
         html = self.client.get(reverse('family-page', args=['Chromodorididae']) + '?lang=en').content.decode()
-        self.assertIn('2 species (3 observations)', html)
-        self.assertNotIn('תצפיות)', html)
+        self.assertIn('<h2>2 species</h2>', html)
 
 
 class CountsInTheGalleryTests(SimpleTestCase):
     def setUp(self):
         self.js = (ROOT / 'app.js').read_text(encoding='utf-8')
 
-    def test_the_gallery_has_the_same_wording_helpers(self):
-        for fragment in ('function countText(species, observations, full = false)', 'function countCompact(species, observations)',
-                         'function tally(list, extraCards = 0)', 'function speciesIn(list)'):
+    def test_the_gallery_counts_species(self):
+        for fragment in ('function countText(species)', 'function observationsText(species, observations)',
+                         'function tally(list)', 'function speciesIn(list)',
+                         "rank.textContent = rankText + ' · ' + countText(speciesIn(members));",
+                         'badge.textContent = memberTally.compact;', 'groupCount(filteredSpecies.length, filteredSpecies, true)',
+                         "countText(speciesIn(speciesList))"):
             self.assertIn(fragment, self.js)
 
-    def test_every_counter_goes_through_tally(self):
-        for fragment in ('const memberTally = tally(members);', 'badge.textContent = memberTally.compact;',
-                         'rank.textContent = rankText + \' · \' + countText(speciesIn(members), members.length);',
-                         'count.textContent = areaTally.compact;', 'return tally(speciesList.filter(sp => matchesAreaFilter(sp, key)));',
-                         'groupCount(filteredSpecies.length, filteredSpecies, true)', 'heading.append(groupCount(n, species));',
-                         "countText(speciesIn(speciesList), speciesList.length)"):
-            self.assertIn(fragment, self.js)
-
-    def test_the_sidebar_explains_the_numbers_in_both_languages(self):
-        html = (ROOT / 'index.html').read_text(encoding='utf-8')
-        self.assertIn('id="countLegend"', html)
-        self.assertIn("['#countLegend', 'Numbers: species (observations = species per area)']", self.js)
+    def test_only_the_all_areas_button_gives_the_observations(self):
+        self.assertIn("key === 'all' ? observationsText(areaTally.species, areaTally.observations) : areaTally.compact", self.js)
+        self.assertEqual(self.js.count('observationsText('), 2)       # its definition and that one use

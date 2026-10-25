@@ -136,7 +136,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
         </section>
         {% endif %}
         <section class="species-section">
-            <h2>{{ "מינים בסוג זה"|t:lang }} <span class="group-count">· {% areas_count_text areas lang %}</span></h2>
+            <h2>{{ "מינים בסוג זה"|t:lang }} <span class="group-count">({{ areas|species_of }})</span></h2>
             <div class="grid">
                 {% for area in areas %}
                 <article class="card">
