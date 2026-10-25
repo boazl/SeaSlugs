@@ -1,4 +1,4 @@
-{% load seaslugs_i18n seo %}<!doctype html>
+{% load seaslugs_i18n seaslugs_counts seo %}<!doctype html>
 <html lang="{{ lang }}" dir="{% if lang == 'en' %}ltr{% else %}rtl{% endif %}">
 
 <head>
@@ -136,7 +136,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
         </section>
         {% endif %}
         <section class="species-section">
-            <h2>{{ "מינים בסוג זה"|t:lang }} ({{ areas|length }})</h2>
+            <h2>{{ "מינים בסוג זה"|t:lang }} <span class="group-count">· {% areas_count_text areas lang %}</span></h2>
             <div class="grid">
                 {% for area in areas %}
                 <article class="card">

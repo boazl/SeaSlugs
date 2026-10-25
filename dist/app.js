@@ -180,19 +180,35 @@ function optionsForArea(area) {
     }
     return { regionIds, siteIds, photographers, trips, years };
 }
+// A gallery card is a species in an area, and the site counts such cards as "observations" -- but the same
+// species seen in two areas is two observations and one species, so every count shows both: "30 מינים (50 תצפיות)"
+// in headings, and "30 (50)" in the small counters (one number when they are equal). The same wording is built
+// server-side by observations/counts.py.
+function speciesIn(list) { return new Set(list.map(sp => sp.species_id)).size; }
+// Equal numbers (every species seen in one area only) read as just "30 מינים"; `full` keeps both, as the tooltips do.
+function countText(species, observations, full = false) {
+    const en = language === 'en';
+    const sp = en ? `${species} species` : (species === 1 ? 'מין אחד' : `${species} מינים`);
+    if (species === observations && !full) return sp;
+    return `${sp} (${en ? `${observations} ${observations === 1 ? 'observation' : 'observations'}` : (observations === 1 ? 'תצפית אחת' : `${observations} תצפיות`)})`;
+}
+function countCompact(species, observations) { return species === observations ? String(species) : `${species} (${observations})`; }
+// {compact, title} for a list of species cards; `extraCards` adds cards that are not species (collections).
+function tally(list, extraCards = 0) {
+    const species = speciesIn(list), observations = list.length + extraCards;
+    return { compact: countCompact(species, observations), title: countText(species, observations, true) };
+}
 function regionCount(area, id) {
-    return speciesList.filter(sp => matchesAreaFilter(sp, area) && sp.samples.some(sm => sm.region === id)).length;
+    return tally(speciesList.filter(sp => matchesAreaFilter(sp, area) && sp.samples.some(sm => sm.region === id)));
 }
 function siteCount(area, id) {
-    return speciesList.filter(sp => matchesAreaFilter(sp, area) && sp.samples.some(sm => sm.site === id && (!state.regions.size || state.regions.has(sm.region)))).length;
+    return tally(speciesList.filter(sp => matchesAreaFilter(sp, area) && sp.samples.some(sm => sm.site === id && (!state.regions.size || state.regions.has(sm.region)))));
 }
 function tripCount(area, id) {
-    return speciesList.filter(sp => matchesAreaFilter(sp, area) && sp.samples.some(sm => String(sm.trip_id) === id)).length;
+    return tally(speciesList.filter(sp => matchesAreaFilter(sp, area) && sp.samples.some(sm => String(sm.trip_id) === id)));
 }
 function photographerSpeciesCount(area, name) {
-    let n = 0;
-    for (const sp of speciesList) { if (!matchesAreaFilter(sp, area)) continue; if (sp.samples.some(sm => sm.photographer === name)) n++; }
-    return n;
+    return tally(speciesList.filter(sp => matchesAreaFilter(sp, area) && sp.samples.some(sm => sm.photographer === name)));
 }
 function photographerCollectionCount(area, name) {
     let n = 0;
@@ -200,10 +216,10 @@ function photographerCollectionCount(area, name) {
     return n;
 }
 function yearCount(area, year) {
-    let n = 0;
-    for (const sp of speciesList) { if (!matchesAreaFilter(sp, area)) continue; if (sp.samples.some(sm => String(sm.year) === year && (!state.regions.size || state.regions.has(sm.region)))) n++; }
-    for (const c of collectionsList) { if (!collectionMatchesArea(c, area)) continue; if (String(c.year) === year && (!state.regions.size || state.regions.has(c.region))) n++; }
-    return n;
+    const cards = speciesList.filter(sp => matchesAreaFilter(sp, area) && sp.samples.some(sm => String(sm.year) === year && (!state.regions.size || state.regions.has(sm.region))));
+    let collections = 0;
+    for (const c of collectionsList) { if (!collectionMatchesArea(c, area)) continue; if (String(c.year) === year && (!state.regions.size || state.regions.has(c.region))) collections++; }
+    return tally(cards, collections);
 }
 // Each of orders/subOrders/superfamilies/families is a Map of value -> species count,
 // scoped by area plus every ANCESTOR level already selected (not by a selection at its
@@ -215,19 +231,23 @@ function yearCount(area, year) {
 // value would be, and its "unclassified" count moves with the order/suborder selection.
 function taxonomyOptions(area, order, subOrder, superfamily, family) {
     const orders = new Map(), subOrders = new Map(), superfamilies = new Map(), families = new Map(), genera = new Map();
-    let ordersUnclassified = 0, subOrdersUnclassified = 0, superfamiliesUnclassified = 0, familiesUnclassified = 0;
-    const bump = (map, key) => map.set(key, (map.get(key) || 0) + 1);
+    // Each value (and each "unclassified" row) holds the species cards it covers and their distinct species,
+    // so the select shows "Doridina (12 (15))" -- species, then observations (see countCompact).
+    const acc = () => ({ ids: new Set(), n: 0 });
+    const add = (a, sp) => { a.ids.add(sp.species_id); a.n++; };
+    const ordersUnclassified = acc(), subOrdersUnclassified = acc(), superfamiliesUnclassified = acc(), familiesUnclassified = acc();
+    const bump = (map, key, sp) => { if (!map.has(key)) map.set(key, acc()); add(map.get(key), sp); };
     for (const sp of speciesList) {
         if (!matchesAreaFilter(sp, area)) continue;
-        if (sp.order) bump(orders, sp.order); else ordersUnclassified++;
+        if (sp.order) bump(orders, sp.order, sp); else add(ordersUnclassified, sp);
         if (order !== 'all' && sp.order !== order) continue;
-        if (sp.sub_order) bump(subOrders, sp.sub_order); else subOrdersUnclassified++;
+        if (sp.sub_order) bump(subOrders, sp.sub_order, sp); else add(subOrdersUnclassified, sp);
         if (subOrder !== 'all' && sp.sub_order !== subOrder) continue;
-        if (sp.superfamily) bump(superfamilies, sp.superfamily); else superfamiliesUnclassified++;
+        if (sp.superfamily) bump(superfamilies, sp.superfamily, sp); else add(superfamiliesUnclassified, sp);
         if (superfamily !== 'all' && sp.superfamily !== superfamily) continue;
-        if (sp.family) bump(families, sp.family); else familiesUnclassified++;
+        if (sp.family) bump(families, sp.family, sp); else add(familiesUnclassified, sp);
         if (family !== 'all' && sp.family !== family) continue;
-        if (sp.genus) bump(genera, sp.genus);
+        if (sp.genus) bump(genera, sp.genus, sp);
     }
     return { orders, subOrders, superfamilies, families, genera, ordersUnclassified, subOrdersUnclassified, superfamiliesUnclassified, familiesUnclassified };
 }
@@ -235,7 +255,7 @@ function taxonomyOptions(area, order, subOrder, superfamily, family) {
 // ---- sidebar rendering ----
 
 function areaSpeciesCount(key) {
-    return speciesList.filter(sp => matchesAreaFilter(sp, key)).length;
+    return tally(speciesList.filter(sp => matchesAreaFilter(sp, key)));
 }
 function renderAreaFilters() {
     const container = document.querySelector('#areaFilters');
@@ -255,7 +275,9 @@ function renderAreaFilters() {
         b.dataset.area = key;
         b.append(label);
         const count = document.createElement('small');
-        count.textContent = areaSpeciesCount(key);
+        const areaTally = areaSpeciesCount(key);
+        count.textContent = areaTally.compact;
+        b.title = areaTally.title;
         b.append(count);
         const active = state.area === key;
         b.classList.toggle('active', active);
@@ -274,7 +296,7 @@ function renderAreaFilters() {
 }
 function renderCheckboxGroup(container, entries, selectedSet, afterChange = render) {
     container.replaceChildren();
-    for (const [value, label, count] of entries) {
+    for (const [value, label, count, tip] of entries) {
         const row = document.createElement('label');
         row.className = 'filter-check';
         const input = document.createElement('input');
@@ -291,6 +313,7 @@ function renderCheckboxGroup(container, entries, selectedSet, afterChange = rend
         if (count != null) {
             const small = document.createElement('small');
             small.textContent = count;
+            if (tip) row.title = tip;
             row.append(small);
         }
         container.append(row);
@@ -323,17 +346,18 @@ function fillTaxonSelect(select, counts, unclassifiedCount, current, allLabel, u
     allOpt.textContent = allLabel;
     select.append(allOpt);
     const validValues = new Set(['all']);
-    if (unclassifiedCount > 0) {
+    const accText = a => countCompact(a.ids.size, a.n);
+    if (unclassifiedCount.n > 0) {
         const opt = document.createElement('option');
         opt.value = '';
-        opt.textContent = `${unclassifiedLabel} (${unclassifiedCount})`;
+        opt.textContent = `${unclassifiedLabel} (${accText(unclassifiedCount)})`;
         select.append(opt);
         validValues.add('');
     }
     for (const v of [...counts.keys()].sort((a, b) => a.localeCompare(b))) {
         const opt = document.createElement('option');
         opt.value = v;
-        opt.textContent = `${v} (${counts.get(v)})`;
+        opt.textContent = `${v} (${accText(counts.get(v))})`;
         select.append(opt);
         validValues.add(v);
     }
@@ -350,7 +374,7 @@ function renderTaxonomySelects() {
     const t2 = taxonomyOptions(area, state.order, 'all', 'all', 'all');
     const subOrderGroup = document.querySelector('#subOrderGroup');
     const subOrderSelect = document.querySelector('#subOrderSelect');
-    if (t2.subOrders.size || t2.subOrdersUnclassified) {
+    if (t2.subOrders.size || t2.subOrdersUnclassified.n) {
         subOrderGroup.hidden = false;
         fillTaxonSelect(subOrderSelect, t2.subOrders, t2.subOrdersUnclassified, state.subOrder, language === 'he' ? 'כל תתי-הסדרה' : 'All suborders', unclassifiedLabel);
         if (subOrderSelect.value !== state.subOrder) state.subOrder = 'all';
@@ -362,7 +386,7 @@ function renderTaxonomySelects() {
     const t2b = taxonomyOptions(area, state.order, state.subOrder, 'all', 'all');
     const superfamilyGroup = document.querySelector('#superfamilyGroup');
     const superfamilySelect = document.querySelector('#superfamilySelect');
-    if (t2b.superfamilies.size || t2b.superfamiliesUnclassified) {
+    if (t2b.superfamilies.size || t2b.superfamiliesUnclassified.n) {
         superfamilyGroup.hidden = false;
         fillTaxonSelect(superfamilySelect, t2b.superfamilies, t2b.superfamiliesUnclassified, state.superfamily, language === 'he' ? 'כל העל-משפחות' : 'All superfamilies', unclassifiedLabel);
         if (superfamilySelect.value !== state.superfamily) state.superfamily = 'all';
@@ -391,18 +415,18 @@ function renderSidebar() {
     for (const v of [...state.sites]) if (!opts.siteIds.has(v)) state.sites.delete(v);
     for (const v of [...state.years]) if (!opts.years.has(v)) state.years.delete(v);
     const regionEntries = [...opts.regionIds]
-        .map(id => [id, labelFor(id, regionLabelsData), regionCount(area, id)])
+        .map(id => { const t = regionCount(area, id); return [id, labelFor(id, regionLabelsData), t.compact, t.title]; })
         .sort((a, b) => a[1].localeCompare(b[1], language === 'he' ? 'he' : 'en'));
     renderCheckboxGroup(document.querySelector('#regionOptions'), regionEntries, state.regions, () => { renderSidebar(); render(); });
-    const multiCount = speciesList.filter(sp => matchesAreaFilter(sp, area) && sp.samples.length > 1).length;
+    const multiCount = tally(speciesList.filter(sp => matchesAreaFilter(sp, area) && sp.samples.length > 1));
     renderCheckboxGroup(document.querySelector('#observationOptions'),
-        [['multi', language === 'he' ? 'מינים עם מספר תצפיות' : 'Species with several observations', multiCount]],
+        [['multi', language === 'he' ? 'מינים עם מספר תצפיות' : 'Species with several observations', multiCount.compact, multiCount.title]],
         state.observations, () => {
             if (!state.sortChosen || (!multiObsOn() && state.sort === 'count')) { state.sort = defaultSort(); state.sortChosen = false; }
             syncSortControl(); render();
         });
     const siteEntries = [...opts.siteIds]
-        .map(id => [id, labelFor(id, siteLabelsData), siteCount(area, id)])
+        .map(id => { const t = siteCount(area, id); return [id, labelFor(id, siteLabelsData), t.compact, t.title]; })
         .sort((a, b) => a[1].localeCompare(b[1], language === 'he' ? 'he' : 'en'));
     renderCheckboxGroup(document.querySelector('#siteOptions'), siteEntries, state.sites, () => { renderSidebar(); render(); });
     // Each photographer gets two count lines under the checkbox: species cards, then collections.
@@ -413,25 +437,27 @@ function renderSidebar() {
     renderCheckboxGroup(photographerBox, photographerEntries, state.photographers);
     for (const row of [...photographerBox.querySelectorAll('.filter-check')]) {
         const name = row.querySelector('input').value;
+        const photographerTally = photographerSpeciesCount(area, name);
         const rows = [
-            [language === 'he' ? 'מינים' : 'Species', photographerSpeciesCount(area, name)],
+            [language === 'he' ? 'מינים (תצפיות)' : 'Species (observations)', photographerTally.compact, photographerTally.title],
             [language === 'he' ? 'אוספים' : 'Collections', photographerCollectionCount(area, name)],
         ];
         let anchor = row;
-        for (const [label, count] of rows) {
+        for (const [label, count, tip] of rows) {
             const sub = document.createElement('div');
             sub.className = 'filter-sub';
             const text = document.createElement('span');
             text.textContent = label;
             const small = document.createElement('small');
             small.textContent = count;
+            if (tip) sub.title = tip;
             sub.append(text, small);
             anchor.after(sub);
             anchor = sub;
         }
     }
     const yearEntries = [...opts.years]
-        .map(year => [year, year, yearCount(area, year)])
+        .map(year => { const t = yearCount(area, year); return [year, year, t.compact, t.title]; })
         .sort((a, b) => Number(b[0]) - Number(a[0]));
     renderCheckboxGroup(document.querySelector('#yearOptions'), yearEntries, state.years, () => { renderSidebar(); render(); });
     const tripEntries = [...opts.trips]
@@ -1026,10 +1052,15 @@ function taxonLabel(level, key) {
 }
 // "(7 פריטים)" after a group heading: the number of cards in the group (the gallery's item count
 // lives here; #resultCount stays only for screen readers -- see styles.css).
-function groupCount(n) {
+// `species` (the cards' species cards) adds the species and observations they hold: "(7 פריטים) · 250 מינים
+// (301 תצפיות)" over taxon cards, and just "30 מינים (50 תצפיות)" over species cards, where each card is one observation.
+function groupCount(n, species, perCard = false) {
     const span = document.createElement('span');
     span.className = 'group-count';
-    span.textContent = language === 'he' ? ` (${n} פריטים)` : ` (${n} ${n === 1 ? 'item' : 'items'})`;
+    const total = species ? countText(speciesIn(species), species.length) : '';
+    if (perCard && total) { span.textContent = total; span.className = ''; return span; }
+    const items = language === 'he' ? `${n} פריטים` : `${n} ${n === 1 ? 'item' : 'items'}`;
+    span.textContent = total ? ` (${items}) · ${total}` : ` (${items})`;
     return span;
 }
 function rankName(level) {
@@ -1132,12 +1163,11 @@ function renderTaxonLevel(species, level, frag) {
         frag.append(g.level === 'species' ? buildSpeciesCard(g.first, n) : buildTaxonCard(g.level, g.key, g.members, n, g.others));
         n++;
     }
-    heading.append(groupCount(n));
+    heading.append(groupCount(n, species));
     return n;
 }
 function buildTaxonCard(level, key, members, index, others) {
     const entry = others ? {} : (taxonEntry(level, key) || orderRowEntry(level, key) || {});
-    const count = members.length;
     const article = document.createElement('article');
     article.className = `card taxon-card taxon-level-${level}`;
     const button = document.createElement('button');
@@ -1154,7 +1184,9 @@ function buildTaxonCard(level, key, members, index, others) {
     img.loading = index < 6 ? 'eager' : 'lazy';
     const badge = document.createElement('span');
     badge.className = 'count-badge';
-    badge.textContent = count;
+    const memberTally = tally(members);
+    badge.textContent = memberTally.compact;
+    badge.title = memberTally.title;
     badge.setAttribute('aria-hidden', 'true');
     wrap.append(img, badge);
     const info = document.createElement('span');
@@ -1166,7 +1198,7 @@ function buildTaxonCard(level, key, members, index, others) {
     meta.className = 'card-meta';
     const rank = document.createElement('span');
     const rankText = others ? (language === 'he' ? 'ללא ' + rankName(level) : 'No ' + rankName(level).toLowerCase()) : rankName(level);
-    rank.textContent = rankText + ' · ' + (language === 'he' ? `${count} מינים` : `${count} species`);
+    rank.textContent = rankText + ' · ' + countText(speciesIn(members), members.length);
     meta.append(rank);
     info.append(h3, meta);
     button.append(wrap, info);
@@ -1270,8 +1302,8 @@ function render() {
     } else if (filteredSpecies.length) {
         const heading = document.createElement('h2');
         heading.className = 'gallery-group-title';
-        heading.textContent = language === 'he' ? 'מינים' : 'Species';
-        heading.append(groupCount(filteredSpecies.length));
+        // Each card is one observation: the heading says how many species and observations they are.
+        heading.append(groupCount(filteredSpecies.length, filteredSpecies, true));
         frag.append(heading);
         let prev = null;
         filteredSpecies.forEach((sp, i) => {
@@ -1480,7 +1512,7 @@ search.addEventListener('keydown', e => {
 });
 
 syncSortControl();
-document.querySelector('#total').textContent = `(${speciesList.length})`;
+document.querySelector('#total').textContent = `(${countText(speciesIn(speciesList), speciesList.length)})`;
 // Typing a name searches species, so the view switches to the species level.
 search.addEventListener('input', () => { if (search.value.trim() && state.level !== 'species') setLevel('species'); render(); });
 document.querySelector('#reset').addEventListener('click', () => {
@@ -1532,6 +1564,7 @@ const translations = [
     ['#filterSidebarTitle', 'Filters'],
     ['#filterToggleLabel', 'Filters'],
     ['#areaGroupTitle', 'Area'],
+    ['#countLegend', 'Numbers: species (observations = species per area)'],
     ['#regionGroupTitle', 'Dive region'],
     ['#observationGroupTitle', 'Observations'],
     ['#siteGroupTitle', 'Dive site'],

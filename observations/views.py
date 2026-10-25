@@ -419,21 +419,22 @@ def _taxon_page(request, rank, obj, areas, children, parent, parent_url, trail=(
 
 
 def _child_list(areas, attr, url_name, lang):
-    """[{label, latin, url, count}] for the distinct families/genera under a taxon, in
-    taxonomic order, each with the number of species cards it holds."""
+    """[{label, latin, url, count, species}] for the distinct families/genera under a taxon, in
+    taxonomic order, each with the number of species cards (observations) it holds and of distinct species."""
     seen = {}
     for area in areas:
         child = getattr(area, attr)
         if child is None:
             continue
-        entry = seen.setdefault(child.pk, {'obj': child, 'count': 0})
+        entry = seen.setdefault(child.pk, {'obj': child, 'count': 0, 'species': set()})
         entry['count'] += 1
+        entry['species'].add(area.species_id)
     out = []
     for entry in sorted(seen.values(), key=lambda e: ((e['obj'].taxonomic_order or '~'), e['obj'].name)):
         obj = entry['obj']
         common = (obj.name_en if lang == 'en' else obj.name_he) or ''
         out.append({'kind': 'genus' if url_name == 'genus-page' else 'family', 'latin': obj.name, 'common': common, 'count': entry['count'],
-                    'url': reverse(url_name, args=[obj.name])})
+                    'species': len(entry['species']), 'url': reverse(url_name, args=[obj.name])})
     return out
 
 
@@ -515,8 +516,9 @@ def row_children(row, areas, lang):
             child = family
         if child is None:
             continue
-        entry = seen.setdefault(child, {'obj': child, 'count': 0})
+        entry = seen.setdefault(child, {'obj': child, 'count': 0, 'species': set()})
         entry['count'] += 1
+        entry['species'].add(area.species_id)
     out = []
     for entry in sorted(seen.values(), key=lambda e: (isinstance(e['obj'], TaxonFamily), e['obj'].taxonomic_order or '~', str(e['obj']))):
         obj = entry['obj']
@@ -524,7 +526,7 @@ def row_children(row, areas, lang):
             kind, latin, url = 'family', obj.name, reverse('family-page', args=[obj.name])
         else:
             kind, latin, url = obj.rank, obj.own_name, reverse('order-page', args=[obj.pk])
-        out.append({'kind': kind, 'latin': latin, 'count': entry['count'], 'url': url,
+        out.append({'kind': kind, 'latin': latin, 'count': entry['count'], 'species': len(entry['species']), 'url': url,
                     'common': (obj.name_en if lang == 'en' else obj.name_he) or ''})
     return out
 

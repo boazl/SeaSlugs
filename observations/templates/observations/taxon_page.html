@@ -1,4 +1,4 @@
-{% load seaslugs_i18n seo %}<!doctype html>
+{% load seaslugs_i18n seaslugs_counts seo %}<!doctype html>
 <html lang="{{ lang }}" dir="{% if lang == 'en' %}ltr{% else %}rtl{% endif %}">
 
 <head>
@@ -114,7 +114,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
                 <h1 class="taxon-latin-title"><bdi dir="ltr">{{ latin_name }}</bdi></h1>
                 {% endif %}
                 <dl class="quick-facts">
-                    <div><dt>{{ "מינים בגלריה"|t:lang }}</dt><dd>{{ areas|length }}</dd></div>
+                    <div><dt>{{ "מינים בגלריה"|t:lang }}</dt><dd>{% areas_count_text areas lang %}</dd></div>
                     {% if children %}<div><dt>{{ children_title|t:lang }}</dt><dd>{{ children|length }}</dd></div>{% endif %}
                 </dl>
                 {% if taxon.link %}<div class="species-links"><a href="{{ taxon.link }}" target="_blank" rel="noopener">{{ "קישור נוסף ↗"|t:lang }}</a></div>{% endif %}
@@ -139,13 +139,13 @@ gtag('config', 'G-CPGTC09P2P');</script>
         <section class="species-section">
             <h2>{{ children_title|t:lang }}</h2>
             <ul class="child-list">
-                {% for c in children %}<li><a href="{{ c.url }}{% if lang == 'en' %}?lang=en{% endif %}"><i dir="ltr">{{ c.latin }}</i>{% if c.common %}<span class="common">{{ c.common }}</span>{% endif %}<small>{{ c.count }}</small></a></li>{% endfor %}
+                {% for c in children %}<li><a href="{{ c.url }}{% if lang == 'en' %}?lang=en{% endif %}"><i dir="ltr">{{ c.latin }}</i>{% if c.common %}<span class="common">{{ c.common }}</span>{% endif %}<small title="{% count_text c.species c.count lang %}">{% count_compact c.species c.count %}</small></a></li>{% endfor %}
             </ul>
         </section>
         {% endif %}
 
         <section class="species-section">
-            <h2>{{ "מינים"|t:lang }} ({{ areas|length }})</h2>
+            <h2>{% areas_count_text areas lang %}</h2>
             <div class="grid">
                 {% for area in areas %}
                 <article class="card">
