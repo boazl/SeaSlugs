@@ -175,6 +175,38 @@ class SpeciesChangeTests(SpeciesChangeBase):
         self.assertTrue(default_storage.exists(other_file))
         self.assertEqual(other.species, self.nigra)
 
+    def old_species_page(self):
+        url = f'/species/{SpeciesArea.objects.get(species=self.pust).slug}/'
+        self.assertEqual(self.client.get(url).status_code, 200)
+        return url
+
+    def test_after_a_change_you_are_not_sent_back_to_the_old_species_page_that_no_longer_exists(self):
+        # The edit link on a species page carries that page as `next`: after the observation left that species (its last one),
+        # the page is a 404 -- the editor lands on the new species' page instead.
+        old = self.old_species_page()
+        response = self.post(image=png((200, 20, 30)), next=old)
+        self.assertEqual(response.status_code, 302)
+        self.assertNotIn(old, response['Location'])
+        self.assertEqual(self.client.get(old).status_code, 404)
+        new_slug = SpeciesArea.objects.get(species=self.nigra).slug
+        self.assertTrue(response['Location'].startswith(f'/species/{new_slug}/'))
+        self.assertEqual(self.client.get(response['Location'].split('#')[0]).status_code, 200)
+
+    def test_after_a_removal_or_merge_you_land_on_the_page_that_exists(self):
+        for choice in ('remove', 'merge'):
+            with self.subTest(choice=choice):
+                Sample.objects.filter(species=self.nigra).delete()
+                SpeciesArea.objects.filter(species=self.nigra).delete()
+                self.sample.species = self.pust; self.sample.deleted_at = None; self.sample.deleted_by = None
+                self.sample.image = png((10, 20, 30)); self.sample.save_reviewed()
+                other = self.other_nigra()
+                old = self.old_species_page()
+                response = self.post(image=png((200, 20, 30)), on_conflict=choice, next=old)
+                self.assertEqual(response.status_code, 302)
+                self.assertNotIn(old, response['Location'])
+                self.assertEqual(self.client.get(response['Location'].split('#')[0]).status_code, 200)
+                self.assertIn(f'#obs-{other.pk}', response['Location'])
+
     def test_a_failure_changes_nothing(self):
         other = self.other_nigra()
         other_file = other.image.name

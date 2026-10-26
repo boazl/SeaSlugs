@@ -989,6 +989,7 @@ def edit(request,pk=None):
         if restoring: messages.success(request,'התצפית שוחזרה והוחזרה לאתר.')
         if change:
             messages.info(request,f'המין בתצפית שונה ל־{item.taxon_label}. התצפית עודכנה במקומה: המין הקודם כבר אינו מציג אותה, והתמונה נשמרה בשם של המין החדש.')
+        if change: return redirect(_url_after_species_change(item, f'{next_url}#obs-{item.pk}'))    # next_url is the old species' page
         return redirect(f'{next_url}#obs-{item.pk}')
     return render(request,'observations/form.html',{'form':form,'title':'תצפית / Observation','observation_form':True,
         'trip_new_url':reverse('trip-new'),'trip_add_url':reverse('trip-add'),'species_add_url':reverse('species-new') if manager else '','next':next_url,
@@ -1226,6 +1227,22 @@ def trip_suggest(request):
     return JsonResponse({'title': suggest_title(user, region, site, year, month, day), 'code': suggest_code(user, region, year, month, day)})
 
 
+def _url_after_species_change(sample, fallback):
+    """Where to go after an observation's species changed: the page the editor came from (`next`) is usually the OLD
+    species' page, which no longer exists when this was its last observation (a 404). So go to the new species' own
+    page when it is public, else to the observation in the observations list. `fallback` is only used for a sample
+    that is not a catalogued species observation."""
+    if sample.kind == Sample.Kind.SPECIES and sample.species_id and sample.trip_id and sample.trip.country_id and sample.trip.sea_id:
+        area = SpeciesArea.objects.select_related('defining_sample').filter(
+            species_id=sample.species_id, country_id=sample.trip.country_id, sea_id=sample.trip.sea_id,
+            undetermined_variant=sample.undetermined_variant).first()
+        if area and area.slug and area.defining_sample_id and area_samples(area).exists():
+            image_url, video_id = taxon_media(area.defining_sample)[1:3]
+            if image_url or video_id: return f'{reverse("species-page", args=[area.slug])}#obs-{sample.pk}'
+        return f'{reverse("observations")}#obs-{sample.pk}'
+    return fallback
+
+
 def _resolve_species_collision(request,form,item,change,manager):
     """An observation whose species was changed into one that is already on the same trip (the editor chose `merge` or
     `remove` in the form). merge: the existing observation takes this one's photo / video, and this one is removed;
@@ -1276,9 +1293,9 @@ def _resolve_species_collision(request,form,item,change,manager):
     if previous_target_image and choice=='merge' and previous_target_image!=target.image.name: delete_image_if_unused(previous_target_image)
     if choice=='merge':
         messages.success(request,f'המדיה של התצפית הקיימת של {target.taxon_label} במסע זה הוחלפה, והתצפית הקודמת הוסרה (כולל המדיה שלה).')
-        return f'{reverse("observations")}#obs-{target.pk}'
+        return _url_after_species_change(target, f'{reverse("observations")}#obs-{target.pk}')
     messages.success(request,'התצפית הוסרה (כולל המדיה שלה). התצפית הקיימת של המין החדש לא שונתה.')
-    return ''
+    return _url_after_species_change(target, '')
 
 
 @login_required
