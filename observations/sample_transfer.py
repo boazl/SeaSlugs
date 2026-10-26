@@ -229,4 +229,11 @@ def sample_plan(document, fields, restore_deleted=True):
         candidate._pending_gallery = pending_gallery
         result.append({'object':candidate,'label':candidate.title or str(candidate),'action':'new' if obj is None else 'update' if changes else 'same',
                        'changes':changes,'warnings':warnings})
+    if document.get('purge_missing'):
+        # Clean-up of the database: a DELETED observation here that the file does not mention at all (neither live nor
+        # deleted) is removed for good. A live observation is never touched, whatever the file says.
+        if not seen: raise ValidationError('לא ניתן למחוק סופית לפי קובץ ריק; הפעולה עלולה למחוק את כל התצפיות המחוקות.')
+        for old in Sample.objects.filter(deleted_at__isnull=False).exclude(transfer_id__in=seen).order_by('pk'):
+            result.append({'object': old, 'label': _describe(old), 'action': 'purge', 'warnings': [],
+                           'changes': [{'field': 'מחיקה סופית', 'before': 'מחוקה (ניתנת לשחזור)', 'after': 'הסרה מהמסד — התצפית אינה בקובץ'}]})
     return result

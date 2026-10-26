@@ -808,6 +808,91 @@ class MediaTransferTests(TestCase):
         doc['rows'].append(row)
         self.assertEqual([i['action'] for i in plan(doc)], ['same'])
 
+    def _deleted_sample(self, name, color='green', with_image=True):
+        other = Species.objects.create(scientific_name=name)
+        sample = Sample(owner=self.sample.owner, species=other, trip=self.sample.trip, title=name, video_url='https://youtu.be/dQw4w9WgXcQ')
+        if with_image:
+            output = io.BytesIO(); Image.new('RGB', (50, 40), color).save(output, 'JPEG')
+            sample.image.save(name.replace(' ', '-') + '.jpg', ContentFile(output.getvalue()), save=False)
+        sample.save_reviewed(actor=sample.owner, approve=True)
+        sample.soft_delete(sample.owner)
+        return sample
+
+    def test_purge_removes_only_deleted_observations_missing_from_the_file(self):
+        from django.core.files.storage import default_storage
+        gone = self._deleted_sample('Purge me', 'green')
+        kept_deleted = self._deleted_sample('Deleted both sides', 'red')
+        gone_name = gone.image.name
+        self.assertTrue(default_storage.exists(gone_name))
+        doc = export_table('samples'); doc['media_mode'] = 'separate'
+        doc['rows'] = [r for r in doc['rows'] if r['transfer_id'] != str(gone.transfer_id)]   # the other environment has no such row
+        self.assertEqual([i['action'] for i in plan(doc)], ['same'])           # off by default: nothing is purged
+        doc['purge_missing'] = True
+        items = plan(doc)
+        self.assertEqual(sorted(i['action'] for i in items), ['purge', 'same'])
+        self.assertEqual(next(i for i in items if i['action'] == 'purge')['object'].pk, gone.pk)
+        with patch('observations.table_transfer.create_backup', return_value=Path('test.sqlite3')):
+            apply(doc, fingerprint())
+        self.assertFalse(Sample.objects.filter(pk=gone.pk).exists())
+        self.assertFalse(default_storage.exists(gone_name))
+        self.assertTrue(Sample.objects.filter(pk=kept_deleted.pk, deleted_at__isnull=False).exists())   # listed as deleted in the file: stays
+        self.assertTrue(Sample.objects.filter(pk=self.sample.pk, deleted_at__isnull=True).exists())
+
+    def test_purge_never_touches_live_observations_and_keeps_a_shared_file(self):
+        from django.core.files.storage import default_storage
+        gone = self._deleted_sample('Purge shared', 'green')
+        mirror = Sample(owner=self.sample.owner, species=Species.objects.create(scientific_name='Mirror species'), trip=self.sample.trip, title='mirror',
+                        kind=Sample.Kind.SPECIES, image=gone.image.name)
+        Sample.objects.bulk_create([mirror])      # a live observation still showing the file
+        doc = export_table('samples'); doc['media_mode'] = 'separate'
+        doc['rows'] = [r for r in doc['rows'] if r['transfer_id'] in (str(self.sample.transfer_id),)]   # the live mirror is missing from the file too
+        doc['purge_missing'] = True
+        with patch('observations.table_transfer.create_backup', return_value=Path('test.sqlite3')):
+            apply(doc, fingerprint())
+        self.assertFalse(Sample.objects.filter(pk=gone.pk).exists())
+        self.assertTrue(Sample.objects.filter(pk=mirror.pk, deleted_at__isnull=True).exists())
+        self.assertTrue(default_storage.exists(gone.image.name))
+
+    def test_purge_with_an_empty_file_is_refused(self):
+        self._deleted_sample('Purge empty', 'green')
+        doc = export_table('samples'); doc['media_mode'] = 'separate'; doc['rows'] = []; doc['purge_missing'] = True
+        with self.assertRaises(ValidationError): plan(doc)
+
+    def test_purge_through_the_transfer_page_needs_the_extra_confirmation(self):
+        import json
+        gone = self._deleted_sample('Purge page', 'green')
+        doc = export_table('samples')
+        doc['rows'] = [r for r in doc['rows'] if r['transfer_id'] != str(gone.transfer_id)]
+        self.client.force_login(self.sample.owner)
+        def upload(**extra):
+            return self.client.post('/admin/table-transfer/', dict(action='preview', file=SimpleUploadedFile('s.json', json.dumps(doc).encode(), content_type='application/json'), **extra))
+        response = upload()
+        self.assertNotContains(response, 'confirm_purge')                     # no purge without the option
+        response = upload(purge_deleted='on')
+        self.assertContains(response, 'confirm_purge'); self.assertContains(response, 'מחיקה סופית מהמסד')
+        token = response.context['token']
+        with patch('observations.table_transfer.create_backup', return_value=Path('test.sqlite3')):
+            response = self.client.post('/admin/table-transfer/', {'action': 'apply', 'token': token, 'confirm': 'yes'})
+            self.assertContains(response, 'יש לאשר את המחיקה הסופית'); self.assertTrue(Sample.objects.filter(pk=gone.pk).exists())
+            response = self.client.post('/admin/table-transfer/', {'action': 'apply', 'token': token, 'confirm': 'yes', 'confirm_purge': 'yes'})
+        self.assertEqual(response.status_code, 302); self.assertFalse(Sample.objects.filter(pk=gone.pk).exists())
+
+    def test_purge_option_is_only_for_the_samples_table(self):
+        import json
+        self.client.force_login(self.sample.owner)
+        doc = export_table('countries')
+        response = self.client.post('/admin/table-transfer/', dict(action='preview', purge_deleted='on', file=SimpleUploadedFile('c.json', json.dumps(doc).encode(), content_type='application/json')))
+        self.assertContains(response, 'מחיקה סופית זמינה רק לטבלת Samples')
+
+    def test_a_file_that_only_deletes_observations_can_be_applied_from_the_page(self):
+        import json
+        doc = export_table('samples')
+        row = next(r for r in doc['rows'] if r['transfer_id'] == str(self.sample.transfer_id))
+        row['deleted'] = '1'; row['image'] = ''
+        self.client.force_login(self.sample.owner)
+        response = self.client.post('/admin/table-transfer/', dict(action='preview', file=SimpleUploadedFile('s.json', json.dumps(doc).encode(), content_type='application/json')))
+        self.assertContains(response, 'בדקתי את השינויים')      # the apply form appears
+
     def test_missing_photo_skips_only_that_row(self):
         import uuid
         doc=export_table('samples');doc['media_mode']='separate'

@@ -232,17 +232,20 @@ class WorkflowTests(TestCase):
         resp = self.client.get('/observations/species-area-status/',
             {'species': self.species.scientific_name, 'trip': self.trip.pk, 'sample': first.pk}).json()
         # no other sample of the species exists yet, so releasing it would leave the area empty
+        self.assertIsNone(resp.pop('conflict'))      # nothing else of this species on the trip
         self.assertEqual(resp, {'matched': True, 'is_defining': True, 'appears': True, 'next': {'kind': 'single'}})
 
         second = self.record()  # a second published sample of the same species+area is not
         resp = self.client.get('/observations/species-area-status/',
             {'species': self.species.scientific_name, 'trip': self.trip.pk, 'sample': second.pk}).json()
+        self.assertEqual(resp.pop('conflict')['id'], first.pk)   # the other observation of this species on the trip
         self.assertEqual(resp, {'matched': True, 'is_defining': False, 'appears': True, 'next': None})
 
         # a species with no published sample anywhere in this trip's area yet
         Species.objects.create(scientific_name='Not yet published')
         resp = self.client.get('/observations/species-area-status/',
             {'species': 'Not yet published', 'trip': self.trip.pk}).json()
+        self.assertIsNone(resp.pop('conflict'))
         self.assertEqual(resp, {'matched': True, 'is_defining': False, 'appears': False, 'next': None})
 
     def test_species_area_status_endpoint_ignores_sp_qualifier_spacing(self):
@@ -251,6 +254,7 @@ class WorkflowTests(TestCase):
         self.record(species=species)
         resp = self.client.get('/observations/species-area-status/',
             {'species': 'Tenellia sp.18', 'trip': self.trip.pk}).json()
+        self.assertEqual(resp.pop('conflict')['label'], 'Tenellia sp. 18')   # a new observation would duplicate this one
         self.assertEqual(resp, {'matched': True, 'is_defining': False, 'appears': True, 'next': None})
 
     def test_next_candidate_prefers_most_recent_with_media_then_falls_back(self):

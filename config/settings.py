@@ -163,6 +163,10 @@ STORAGES = {
     'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
     'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
 }
+if len(sys.argv) > 1 and sys.argv[1] == "test":
+    # Tests must not depend on a previously collected, possibly stale staticfiles/ manifest (a page that lists a
+    # newly added script then failed with "Missing staticfiles manifest entry"): plain storage, no manifest.
+    STORAGES['staticfiles'] = {'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'}
 
 # Server errors (HTTP 500) must leave a traceback in the host's log. With DEBUG off Django's own
 # default only mails them to ADMINS (none are configured), so an admin page that answered

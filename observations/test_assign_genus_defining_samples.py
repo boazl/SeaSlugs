@@ -66,7 +66,7 @@ class AssignDefiningSamplesTests(TestCase):
         page = self.client.get(f'/admin/observations/taxongenus/{self.genus.pk}/change/')
         field = page.context['adminform'].form.fields['defining_sample']
         self.assertEqual([s.pk for s in field.queryset], [a.pk, b.pk])
-        self.assertContains(page, 'select_search.js')
+        self.assertRegex(page.content.decode(), r'select_search(\.[0-9a-f]+)?\.js')   # the static file name carries a content hash
 
     def test_refresh_action_runs_regardless_of_selection(self):
         species = self.sample(kind=Sample.Kind.SPECIES, species=self.species)

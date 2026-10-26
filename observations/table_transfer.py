@@ -317,6 +317,10 @@ def apply(document, expected, actor=None, backup=None):
                 if clear_media:
                     sample.image = ''; sample.image_hash = ''; sample.video_url = ''; sample.gallery_source = None
                     sample.save(update_fields=['image', 'image_hash', 'video_url', 'gallery_source', 'updated_at'])
+            elif item['action'] == 'purge':
+                # a deleted observation removed for good (its file only if no other observation still shows it)
+                if item['object'].image: stale_files.append(item['object'].image.name)
+                item['object'].delete()
             elif item['action'] == 'delete':
                 # Recheck after merging/saving; PROTECT remains the final safety net.
                 if reference_counts(item['object']): raise ValidationError('נוצר קשר חדש לרשומה להסרה; יש לבדוק שוב.')

@@ -12,6 +12,7 @@ from .table_transfer import TABLES,export_table,plan,fingerprint,apply
 class UploadForm(forms.Form):
     file=forms.FileField(label='קובץ טבלה (JSON)')
     synchronize=forms.BooleanField(required=False, label='סנכרון מלא לאזורים/אתרים: הצגת מיזוגים ומחיקת רשומות שאינן בקובץ')
+    purge_deleted=forms.BooleanField(required=False, label='Samples בלבד — מחיקה סופית של תצפיות מחוקות ביעד שאינן מופיעות בקובץ (לא הפיך; תצפיות פעילות לא נמחקות)')
 
 # The species table alone is ~5MB (5,000+ rows with all their texts) and grows as texts are written.
 MAX_JSON_BYTES=20*1024*1024
@@ -41,6 +42,10 @@ def transfer(request):
                     if isinstance(doc,dict):
                         doc.pop('_media_names',None)
                         doc.pop('sync_missing',None)
+                        doc.pop('purge_missing',None)
+                        if form.cleaned_data['purge_deleted']:
+                            if doc.get('table')!='samples': raise ValidationError('מחיקה סופית זמינה רק לטבלת Samples.')
+                            doc['purge_missing']=True
                         if form.cleaned_data['synchronize']:
                             if doc.get('table') not in ('regions','sites'):
                                 raise ValidationError('סנכרון מלא זמין רק לאזורים ולאתרי צלילה.')
@@ -48,15 +53,16 @@ def transfer(request):
                         if doc.get('table')=='samples': doc['media_mode']='separate'
                     snapshot=fingerprint();items=plan(doc)
                     context.update(items=items,table_name=str(TABLES[doc['table']][0]._meta.verbose_name_plural),
-                                   changed=sum(i['action'] in ('new','update','merge','delete') for i in items),unchanged=sum(i['action']=='same' for i in items),
+                                   changed=sum(i['action'] in ('new','update','merge','delete','soft_delete','purge') for i in items),purging=sum(i['action']=='purge' for i in items),unchanged=sum(i['action']=='same' for i in items),
                                    blocked=any(i['action']=='blocked' for i in items),
-                                   token=signing.dumps({'doc':doc,'snapshot':snapshot,'user':request.user.pk},salt='table-transfer',compress=True))
+                                   token=signing.dumps({'doc':doc,'snapshot':snapshot,'user':request.user.pk,'purging':sum(i['action']=='purge' for i in items)},salt='table-transfer',compress=True))
             elif action=='apply':
                 data=signing.loads(request.POST.get('token',''),salt='table-transfer',max_age=1800)
                 if data['user']!=request.user.pk:raise PermissionDenied
                 if request.POST.get('confirm')!='yes':raise ValidationError('יש לאשר את העדכון.')
+                if data.get('purging') and request.POST.get('confirm_purge')!='yes':raise ValidationError('יש לאשר את המחיקה הסופית.')
                 items,backup=apply(data['doc'],data['snapshot'],actor=request.user)
-                messages.success(request,f"הועברו {sum(i['action'] in ('new','update') for i in items)} רשומות חדשות או מעודכנות; מוזגו {sum(i['action']=='merge' for i in items)} ונמחקו {sum(i['action']=='delete' for i in items)} רשומות. נוצר גיבוי: {backup}")
+                messages.success(request,f"הועברו {sum(i['action'] in ('new','update') for i in items)} רשומות חדשות או מעודכנות; מוזגו {sum(i['action']=='merge' for i in items)} ונמחקו {sum(i['action']=='delete' for i in items)} רשומות; תצפיות שסומנו כמחוקות: {sum(i['action']=='soft_delete' for i in items)}; תצפיות שנמחקו סופית: {sum(i['action']=='purge' for i in items)}. נוצר גיבוי: {backup}")
                 return redirect('table-transfer')
         except (ValidationError,ValueError,UnicodeError,signing.BadSignature) as exc:
             context['error']='; '.join(exc.messages) if isinstance(exc,ValidationError) else 'קובץ או אישור לא תקין/פג תוקף. העלו את הקובץ מחדש.'
