@@ -22,7 +22,7 @@ def png(color):
     return SimpleUploadedFile('p.png', buffer.getvalue(), content_type='image/png')
 
 
-class SpeciesChangeTests(TestCase):
+class SpeciesChangeBase(TestCase):
     def setUp(self):
         self.owner = User.objects.create_superuser('manager', password='pw-test-12345')
         country = Country.objects.create(name='ישראל', name_en='Israel')
@@ -58,6 +58,8 @@ class SpeciesChangeTests(TestCase):
         sample.save_reviewed()
         return sample
 
+
+class SpeciesChangeTests(SpeciesChangeBase):
     # --- the species changes, no other observation in the way
 
     def test_a_species_change_without_an_updated_photo_asks_for_one(self):
@@ -208,3 +210,47 @@ class SpeciesChangeTests(TestCase):
         self.assertIn('name="on_conflict"', html)
         self.assertIn('species-change-notice', html)
         self.assertNotIn('name="keep_old_media"', self.client.get('/observations/new/').content.decode())
+
+
+class RestoreDeletedObservationTests(SpeciesChangeBase):
+    """A manager brings a deleted observation back by completing its media (or changing its species) in the edit form."""
+    def delete_sample(self):
+        self.sample.soft_delete(self.owner)
+        self.sample.image = ''; self.sample.image_hash = ''; self.sample.video_url = ''
+        self.sample.save(update_fields=['image', 'image_hash', 'video_url', 'updated_at'])
+
+    def test_a_deleted_observation_stays_deleted_unless_restore_is_ticked(self):
+        self.delete_sample()
+        self.post(species='pustulosa', image=png((1, 2, 3)))
+        self.sample.refresh_from_db()
+        self.assertIsNotNone(self.sample.deleted_at)
+
+    def test_restoring_needs_media(self):
+        self.delete_sample()
+        response = self.post(species='pustulosa', restore='on')
+        self.assertEqual(response.status_code, 200)
+        self.sample.refresh_from_db()
+        self.assertIsNotNone(self.sample.deleted_at)
+
+    def test_restoring_with_a_photo_puts_it_back_in_the_gallery(self):
+        self.delete_sample()
+        self.assertEqual(self.gallery(), [])
+        response = self.post(species='pustulosa', restore='on', image=png((1, 2, 3)))
+        self.assertEqual(response.status_code, 302)
+        self.sample.refresh_from_db()
+        self.assertIsNone(self.sample.deleted_at)
+        self.assertEqual(self.sample.status, 'published')
+        self.assertEqual(self.gallery(), ['Phyllidiella pustulosa'])
+
+    def test_restoring_together_with_a_species_change(self):
+        self.delete_sample()
+        response = self.post(restore='on', image=png((1, 2, 3)))             # species -> nigra
+        self.assertEqual(response.status_code, 302)
+        self.sample.refresh_from_db()
+        self.assertIsNone(self.sample.deleted_at)
+        self.assertEqual(self.sample.species, self.nigra)
+        self.assertEqual(self.gallery(), ['Phyllidiella nigra'])
+
+    def test_the_form_of_a_deleted_observation_offers_the_restore_tick(self):
+        self.delete_sample()
+        self.assertIn('name="restore"', self.client.get(f'/observations/{self.sample.pk}/edit/').content.decode())

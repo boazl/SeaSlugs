@@ -9,7 +9,7 @@
 {% for item in items %}{% for warning in item.warnings %}<p class="errorlist">{{item.label}} — {{warning}}</p>{% endfor %}{% endfor %}
 <h2>{{table_name}} — {{changed}} רשומות להוספה, עדכון, מיזוג או מחיקה, {{unchanged}} ללא שינוי</h2>
 {% for item in items %}{% if item.action != 'same' and item.action != 'skipped' %}
-<article><h3>{{item.label}} — {% if item.action == 'new' %}חדש{% elif item.action == 'merge' %}מיזוג ושמירת הקשרים{% elif item.action == 'delete' %}מחיקה{% elif item.action == 'blocked' %}מחיקה חסומה{% else %}עדכון{% endif %}</h3>
+<article><h3>{{item.label}} — {% if item.action == 'new' %}חדש{% elif item.action == 'merge' %}מיזוג ושמירת הקשרים{% elif item.action == 'delete' %}מחיקה{% elif item.action == 'soft_delete' %}מחיקת תצפית (כולל המדיה){% elif item.action == 'blocked' %}מחיקה חסומה{% else %}עדכון{% endif %}</h3>
 <table><tr><th>שדה</th><th>לפני</th><th>אחרי</th></tr>{% for diff in item.changes %}<tr><td>{{diff.field}}</td><td>{{diff.before}}</td><td>{{diff.after}}</td></tr>{% endfor %}</table></article>
 {% endif %}{% endfor %}
 {% if blocked %}<p class="errorlist">לא ניתן להחיל את הסנכרון עד לפתרון הרשומות החסומות. הנתונים לא השתנו.</p>

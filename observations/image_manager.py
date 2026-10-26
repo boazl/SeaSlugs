@@ -538,7 +538,7 @@ def manager(request):
                 with transaction.atomic():
                     from .models import Species, SpeciesArea
                     Species.objects.filter(pk=-1).update(scientific_name='')
-                    items=sample_plan(doc,TABLES['samples'][1])
+                    items=sample_plan(doc,TABLES['samples'][1],restore_deleted=False)
                     old_names=[];used_in_batch=set();skip_reasons=[]
                     for row,result in zip(doc['rows'],items):
                         candidate=result['object']

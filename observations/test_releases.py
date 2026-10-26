@@ -39,18 +39,15 @@ class ReleaseTests(TestCase):
         doc['rows'][0]['owner'] = 'missing-user'
         with self.assertRaises(ValidationError): plan(doc)
 
-    def test_deleted_target_with_no_live_replacement_is_skipped_not_blocked(self):
-        # A deleted target with nothing to fall back to (no other active sample shares its
-        # video) can't be auto-resolved -- reviving it is an admin call, not the transfer
-        # tool's -- but it must only skip THIS row, not abort the whole batch the way a
-        # raised ValidationError would (see observations/test_media_transfer.py for the
-        # fuller regression coverage of this and the related "deleted sample superseded by
-        # an active replacement" cases).
+    def test_a_live_row_for_a_deleted_target_restores_it_instead_of_blocking(self):
+        # Deleted observations are transferred too, so the source is the truth: a live row for an observation that is
+        # deleted here means it was restored there. The plan lists the restoration (see observations/test_media_transfer.py
+        # for the rest of the deleted / restored coverage); it never raises.
         doc = export_table('samples')
         self.sample.soft_delete(self.user)
         items = plan(doc)  # must not raise
-        self.assertEqual(items[0]['action'], 'skipped')
-        self.assertIn('מסומנת כמחוקה', items[0]['reason'])
+        self.assertEqual(items[0]['action'], 'update')
+        self.assertEqual(items[0]['changes'][0]['field'], 'שחזור')
 
     def test_incomplete_draft_can_transfer_but_not_publish(self):
         doc = export_table('samples')

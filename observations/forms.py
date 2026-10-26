@@ -243,6 +243,10 @@ class SampleForm(forms.ModelForm):
         # the species was actually changed (and the server checks them either way, see species_change below).
         self._original_identity = None
         self.species_change = None
+        if self.instance.pk and self.instance.deleted_at:
+            # only a manager can open a deleted observation (views.edit)
+            self.fields['restore'] = forms.BooleanField(required=False, label='שחזור התצפית (ביטול המחיקה)',
+                help_text='התצפית מחוקה. סמנו כדי להחזיר אותה לאתר אחרי שהשלמתם לה מדיה (תמונה או קישור סרטון). אפשר גם לשנות את המין באותו טופס: השינוי מתבצע באותו מנגנון כמו בכל תצפית. בלי הסימון השמירה משאירה אותה מחוקה.')
         if self.instance.pk and self.instance.kind == Sample.Kind.SPECIES and self.instance.species_id:
             self._original_identity = (self.instance.species_id, self.instance.undetermined_variant)
             self.fields['keep_old_media'] = forms.BooleanField(required=False, label='להמשיך עם התמונה הקיימת (עליה עדיין כתוב השם הקודם)',

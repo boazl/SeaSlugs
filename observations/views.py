@@ -921,6 +921,8 @@ def edit(request,pk=None):
         for name in ('note_he', 'note_en'): form.fields.pop(name, None)
     if request.method=='POST' and form.is_valid():
         item=form.save(commit=False)
+        restoring=bool(item.deleted_at and form.cleaned_data.get('restore'))
+        if restoring: item.deleted_at=None; item.deleted_by=None       # a manager brings a deleted observation back
         change=form.species_change
         if change and change['conflict'] and change['choice'] in ('merge','remove'):
             # The species was changed into one already observed on this trip, and the editor chose what happens to the two.
@@ -984,6 +986,7 @@ def edit(request,pk=None):
         form.save_taxon_files(item)
         messages.success(request,'התצפית פורסמה.' if item.status=='published' else 'התצפית נשמרה וממתינה להשלמת נתונים ולאישור מנהל.',
             extra_tags='new-observation' if is_new_observation else '')
+        if restoring: messages.success(request,'התצפית שוחזרה והוחזרה לאתר.')
         if change:
             messages.info(request,f'המין בתצפית שונה ל־{item.taxon_label}. התצפית עודכנה במקומה: המין הקודם כבר אינו מציג אותה, והתמונה נשמרה בשם של המין החדש.')
         return redirect(f'{next_url}#obs-{item.pk}')

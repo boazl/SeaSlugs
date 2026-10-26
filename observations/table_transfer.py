@@ -50,7 +50,7 @@ def row(obj, fields):
         return account_row(obj, fields)
     if isinstance(obj, Sample):
         from .sample_transfer import sample_row
-        return sample_row(obj, fields)
+        return sample_row(obj, fields, include_deleted=True)
     result = {}
     for f in fields:
         if f in ('country','sea','region','site') or (isinstance(obj, SpeciesArea) and f in ('species','defining_sample')):
@@ -74,7 +74,7 @@ def export_table(table):
     if table not in TABLES: raise ValidationError('טבלה לא נתמכת.')
     model,fields=TABLES[table]
     return {'format':'seaslugs-reference-v1','table':table,'exported_at':timezone.now().isoformat(),
-            'rows':[row(obj,fields) for obj in (model.objects.filter(deleted_at__isnull=True) if table == 'samples' else model.objects.all()).order_by('pk')]}
+            'rows':[row(obj,fields) for obj in model.objects.all().order_by('pk')]}
 
 
 def fingerprint():
@@ -278,6 +278,7 @@ def create_backup():
 
 def apply(document, expected, actor=None, backup=None):
     backup = backup or create_backup()
+    stale_files = []
     with transaction.atomic():
         # A write statement obtains SQLite's reservation before re-reading preview state.
         Species.objects.filter(pk=-1).update(scientific_name=F('scientific_name'))
@@ -305,6 +306,17 @@ def apply(document, expected, actor=None, backup=None):
                 if isinstance(item['target'], Site):
                     site = item['target']
                     DiveTrip.objects.filter(site=site).update(region=site.region, country=site.region.country)
+            elif item['action'] == 'soft_delete':
+                # an observation deleted at the source: deleted here too, its media with it (the files go after the commit)
+                sample = item['object']
+                if sample.image and not sample.gallery_source_id and not sample.gallery_references.filter(deleted_at__isnull=True).exists():
+                    stale_files.append(sample.image.name)
+                    clear_media = True
+                else: clear_media = False
+                sample.soft_delete(actor)
+                if clear_media:
+                    sample.image = ''; sample.image_hash = ''; sample.video_url = ''; sample.gallery_source = None
+                    sample.save(update_fields=['image', 'image_hash', 'video_url', 'gallery_source', 'updated_at'])
             elif item['action'] == 'delete':
                 # Recheck after merging/saving; PROTECT remains the final safety net.
                 if reference_counts(item['object']): raise ValidationError('נוצר קשר חדש לרשומה להסרה; יש לבדוק שוב.')
@@ -339,6 +351,9 @@ def apply(document, expected, actor=None, backup=None):
                         defaults={'defining_sample': SpeciesArea.pick_defining_sample(
                             sample.species_id, sample.trip.country_id, sample.trip.sea_id, sample.undetermined_variant)},
                     )
+    if stale_files:
+        from .media_transfer import delete_image_if_unused
+        for name in stale_files: delete_image_if_unused(name)
     return items,backup.name
 
 

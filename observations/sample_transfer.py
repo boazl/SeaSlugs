@@ -20,7 +20,9 @@ def _describe(sample):
     return f'#{sample.pk} ({identity}, מסע {sample.trip_id})'
 
 
-def sample_row(obj, fields):
+def sample_row(obj, fields, include_deleted=False):
+    """The transferable row of a sample. `include_deleted` (the table export) marks a soft-deleted sample with
+    'deleted': '1' -- an extra key beside `fields` that the importer takes out first (see sample_plan)."""
     result = {}
     for field in fields:
         if field == 'trip':
@@ -37,13 +39,21 @@ def sample_row(obj, fields):
         elif field == 'site': value = {'name': value.name, 'region': value.region.name, 'country': value.region.country.name} if value else None
         elif field == 'depth': value = str(value) if value is not None else None
         result[field] = value
+    if include_deleted and obj.deleted_at: result['deleted'] = '1'
     return result
 
 
-def sample_plan(document, fields):
+def sample_plan(document, fields, restore_deleted=True):
+    """`restore_deleted`: a live row whose observation is deleted here restores it (a table transfer: the source is the
+    truth about deletions). The image manager's uploads pass False and skip such a row instead."""
     from .table_transfer import unique
     result = []; seen = set(); targets = set()
     for incoming in document['rows']:
+        # A deleted observation travels as its normal row plus 'deleted': '1' (an older environment that does not know
+        # the key rejects such a file, like any other format change). It only ever deletes: see below.
+        deleted = False
+        if isinstance(incoming, dict) and 'deleted' in incoming:
+            incoming = dict(incoming); deleted = incoming.pop('deleted') in ('1', 1, True)
         missing = set(fields) - set(incoming) if isinstance(incoming, dict) else None
         keep_notes = bool(missing) and set(NOTE_FIELDS) <= missing
         if missing and set(incoming) <= set(fields) and missing - set(TAXONOMY_FIELDS) - {'gallery_source', 'title_en'} - set(NOTE_FIELDS) in (set(), {'transfer_id','image'}):
@@ -69,6 +79,22 @@ def sample_plan(document, fields):
             if field not in ('day','depth','gallery_order','species','site','trip','source_metadata') and not isinstance(values[field], str):
                 raise ValidationError('ערך טקסט לא תקין: ' + field)
         if not isinstance(values['source_metadata'], dict): raise ValidationError('מידע מקור לא תקין.')
+        if deleted:
+            # Only the identity matters for a deleted observation: the one with this transfer id here is deleted too
+            # (its media is removed with it, as the deletion did at the source); an observation that does not exist
+            # here, or is already deleted, needs nothing -- it is never created just to be deleted.
+            import uuid
+            try: identity = str(uuid.UUID(values['transfer_id']))
+            except (ValueError, TypeError): raise ValidationError('מזהה תצפית לא תקין.')
+            if identity in seen: raise ValidationError('תצפית כפולה בקובץ.')
+            seen.add(identity)
+            target = unique(Sample, transfer_id=identity)
+            if target is not None and not target.deleted_at:
+                if target.pk in targets: raise ValidationError(f'כמה רשומות בקובץ המועבר מצביעות על אותו יעד: {_describe(target)}. יש לבדוק את הקובץ המועבר.')
+                targets.add(target.pk)
+                result.append({'object': target, 'label': _describe(target), 'action': 'soft_delete', 'warnings': [],
+                               'changes': [{'field': 'מחיקה', 'before': 'פעילה', 'after': 'מחוקה (כולל המדיה)'}]})
+            continue
         if values['trip'] is not None:
             if not isinstance(values['trip'],str): raise ValidationError('קוד מסע לא תקין.')
             values['trip'] = unique(DiveTrip, code=values['trip'])
@@ -101,13 +127,11 @@ def sample_plan(document, fields):
         if obj and obj.pk in targets:
             raise ValidationError(f'כמה רשומות בקובץ המועבר מצביעות על אותו יעד: {_describe(obj)}. יש לבדוק את הקובץ המועבר.')
         if obj: targets.add(obj.pk)
-        if obj and obj.deleted_at:
-            # Unlike the rescue above, there is no live sample to fall back to here -- this
-            # video's only local representation is a deleted one, and reviving it (or
-            # silently creating a second, competing sample for the same video) is an admin
-            # judgment call, not something a batch transfer should decide on its own. Skip
-            # only this row (matching the missing-image skip below) so the rest of the file
-            # still transfers.
+        # A live row whose observation is deleted here: it was restored at the source (deleted observations are transferred
+        # too, so a live row is the source's current state) -- the preview lists the restoration and the row's values replace
+        # the old ones. (Matching is by transfer id, or through a live observation with the same video, see above.)
+        restoring = bool(obj and obj.deleted_at)
+        if restoring and not restore_deleted:
             result.append({'object':None,'label':_describe(obj),'action':'skipped','changes':[],
                            'reason':f'התצפית ביעד ({_describe(obj)}) מסומנת כמחוקה. אם יש להחזיר אותה יש לעשות זאת בניהול ואז לייבא שוב; אחרת השורה הזו לא תועבר.'})
             continue
@@ -201,6 +225,7 @@ def sample_plan(document, fields):
         after = sample_row(candidate, fields)
         if pending_gallery and 'gallery_source' in after: after['gallery_source'] = pending_gallery
         changes = [{'field':str(Sample._meta.get_field(f).verbose_name),'before':before.get(f,''),'after':after[f]} for f in fields if before.get(f) != after[f]]
+        if restoring: changes.insert(0, {'field': 'שחזור', 'before': 'מחוקה', 'after': 'פעילה'})
         candidate._pending_gallery = pending_gallery
         result.append({'object':candidate,'label':candidate.title or str(candidate),'action':'new' if obj is None else 'update' if changes else 'same',
                        'changes':changes,'warnings':warnings})

@@ -761,38 +761,52 @@ class MediaTransferTests(TestCase):
         self.assertContains(response,'Nonexistent site')
         self.assertContains(response,'אינו קיים בטבלת האתרים')
         self.assertNotIn('token',response.context)
-    def test_deleted_target_with_no_live_replacement_skips_only_that_row(self):
-        # When a video's only local representation is a deleted sample (no active
-        # replacement exists for it), reviving it -- or silently creating a second,
-        # competing sample for the same video -- is an admin judgment call the transfer
-        # tool must not make on its own. That row is skipped, with a reason naming the
-        # deleted record, but the rest of the file (here, self.sample's own row) still
-        # transfers normally -- it must not block the whole table the way a hard error would.
+    def test_a_deleted_observation_is_exported_and_a_live_row_for_a_deleted_target_restores_it(self):
+        # Deleted observations travel too (marked 'deleted'), so the source is the truth about deletions: a LIVE row whose
+        # observation is deleted here means it was restored at the source -- the preview lists the restoration.
         other_species = Species.objects.create(scientific_name='Other species 4')
         deleted = Sample(owner=self.sample.owner, species=other_species, trip=self.sample.trip,
                          title='Gone', video_url='https://youtu.be/dQw4w9WgXcQ')
         deleted.save_reviewed(actor=deleted.owner, approve=True)
-        deleted_pk = deleted.pk
         deleted.soft_delete(deleted.owner)
         doc = export_table('samples'); doc['media_mode'] = 'separate'
-        # export_table excludes deleted samples -- reconstruct the row as if it had been
-        # exported BEFORE deletion and is only now being re-imported (the realistic shape:
-        # the source environment hasn't changed, the target deleted its own copy since).
-        deleted_row = dict(doc['rows'][0], transfer_id=str(deleted.transfer_id), video_url=deleted.video_url,
-                           title=deleted.title, species=other_species.scientific_name, image='')
-        doc['rows'][0]['title'] = 'Updated title'  # self.sample's own row, unrelated
-        doc['rows'].append(deleted_row)
-        items = plan(doc)  # must not raise
-        self.assertEqual(len(items), 2)
-        updated = next(i for i in items if i['action'] == 'update')
-        self.assertEqual(updated['object'].pk, self.sample.pk)
-        skipped = next(i for i in items if i['action'] == 'skipped')
-        self.assertIn(f'#{deleted_pk}', skipped['reason'])
-        self.assertIn('מסומנת כמחוקה', skipped['reason'])
+        marked = [r for r in doc['rows'] if r.get('deleted') == '1']
+        self.assertEqual([r['transfer_id'] for r in marked], [str(deleted.transfer_id)])
+        doc['rows'][0]['title'] = 'Updated title'   # self.sample's own row, unrelated
+        items = plan(doc)
+        self.assertEqual([i['action'] for i in items], ['update'])           # the deleted one is already deleted here: nothing to do
+        # the same row, live: restored
+        live = [dict(r) for r in doc['rows']]
+        for r in live: r.pop('deleted', None)
+        items = plan(dict(doc, rows=live))
+        restored = next(i for i in items if i['object'].pk == deleted.pk)
+        self.assertEqual(restored['action'], 'update')
+        self.assertEqual(restored['changes'][0]['field'], 'שחזור')
+        with patch('observations.table_transfer.create_backup', return_value=Path('test.sqlite3')):
+            apply(dict(doc, rows=live), fingerprint())
+        deleted.refresh_from_db(); self.assertIsNone(deleted.deleted_at)
+        self.sample.refresh_from_db(); self.assertEqual(self.sample.title, 'Updated title')
+
+    def test_a_deleted_row_deletes_the_live_observation_here_with_its_media(self):
+        from django.core.files.storage import default_storage
+        doc = export_table('samples'); doc['media_mode'] = 'separate'
+        name = self.sample.image.name
+        row = next(r for r in doc['rows'] if r['transfer_id'] == str(self.sample.transfer_id))
+        row['deleted'] = '1'; row['image'] = ''
+        items = plan(doc)
+        self.assertEqual([i['action'] for i in items], ['soft_delete'])
         with patch('observations.table_transfer.create_backup', return_value=Path('test.sqlite3')):
             apply(doc, fingerprint())
-        self.sample.refresh_from_db(); self.assertEqual(self.sample.title, 'Updated title')
-        deleted.refresh_from_db(); self.assertIsNotNone(deleted.deleted_at)  # left untouched
+        self.sample.refresh_from_db()
+        self.assertIsNotNone(self.sample.deleted_at)
+        self.assertEqual(self.sample.image.name, '')
+        if name: self.assertFalse(default_storage.exists(name))
+
+    def test_a_deleted_row_for_an_observation_that_is_not_here_creates_nothing(self):
+        doc = export_table('samples'); doc['media_mode'] = 'separate'
+        row = dict(doc['rows'][0], transfer_id='12345678-1234-5678-1234-567812345678', deleted='1')
+        doc['rows'].append(row)
+        self.assertEqual([i['action'] for i in plan(doc)], ['same'])
 
     def test_missing_photo_skips_only_that_row(self):
         import uuid
@@ -825,7 +839,7 @@ class MediaTransferTests(TestCase):
                          video_url=video_url)
         active.save_reviewed(actor=active.owner, approve=True)
         doc = export_table('samples'); doc['media_mode'] = 'separate'
-        row = next(r for r in doc['rows'] if r['video_url'] == video_url)
+        row = next(r for r in doc['rows'] if r['video_url'] == video_url and not r.get('deleted'))
         # An incoming row for the same video from another environment, with a transfer_id
         # that matches nothing locally (as if this video had never been transferred before).
         row['transfer_id'] = str(uuid.uuid4())
@@ -855,6 +869,7 @@ class MediaTransferTests(TestCase):
                              title='Replacement', video_url=video_url)
         replacement.save_reviewed(actor=replacement.owner, approve=True)
         doc = export_table('samples'); doc['media_mode'] = 'separate'
+        doc['rows'] = [r for r in doc['rows'] if not r.get('deleted')]      # the source has only the live row under that id
         row = next(r for r in doc['rows'] if r['video_url'] == video_url)
         row['transfer_id'] = original_transfer_id  # as if re-exported from the source, unchanged
         row['title'] = 'Updated from source'
@@ -883,7 +898,7 @@ class MediaTransferTests(TestCase):
                         title='Second copy', video_url=video_url)
         second.save()
         doc = export_table('samples'); doc['media_mode'] = 'separate'
-        row = next(r for r in doc['rows'] if r['video_url'] == video_url)
+        row = next(r for r in doc['rows'] if r['video_url'] == video_url and not r.get('deleted'))
         import uuid
         row['transfer_id'] = str(uuid.uuid4())
         with self.assertRaises(ValidationError) as ctx:
