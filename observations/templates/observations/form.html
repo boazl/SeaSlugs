@@ -165,15 +165,36 @@ function setDefiningControls(isDefining){
   if(deleteVideoBtn)deleteVideoBtn.disabled=isDefining||!hasVideo;
 }
 setDefiningControls(true);
+// Changing the species of an existing observation: the notice, the "keep the current photo" tick and (when the new species is
+// already on the trip) the choice between merging and removing show up only then. The server checks them again on saving.
+const keepEl=document.getElementById('id_keep_old_media');
+const conflictEl=document.getElementById('id_on_conflict');
+const keepRow=keepEl?keepEl.closest('p'):null;
+const conflictRow=conflictEl?conflictEl.closest('p'):null;
+const changeNotice=document.createElement('p');
+changeNotice.id='species-change-notice';changeNotice.hidden=true;changeNotice.className='notice';
+changeNotice.textContent='שינוי המין: התצפית תעודכן במקומה, והמין הקודם יפסיק להציג אותה. התמונה מכילה את שם המין הקודם — העלו תמונה מעודכנת (עם שם המין החדש על גבי התמונה). הקובץ הקודם יימחק.';
+if(keepRow)keepRow.before(changeNotice);
+let originalSpecies=null;     // the full name as the page loaded (the taxonomy script that defines fullSpeciesText runs after this one)
+window.addEventListener('load',()=>{if(speciesEl&&sampleId!==null&&window.fullSpeciesText){originalSpecies=window.fullSpeciesText().trim();updateDefiningStatus();}});
+function showChangeControls(changed,conflict){
+  changeNotice.hidden=!changed;
+  if(keepRow)keepRow.hidden=!changed;
+  if(conflictRow)conflictRow.hidden=!(changed&&conflict);
+  if(conflict&&conflictRow){const legend=conflictRow.querySelector('label');if(legend)legend.dataset.conflict=conflict.label;}
+}
+showChangeControls(false,null);
 function updateDefiningStatus(){
   if(!speciesEl||!tripEl||!statusEl)return;
   // the species field holds the epithet only -- the status check needs the full name
   const species=(window.fullSpeciesText?window.fullSpeciesText():speciesEl.value).trim();const trip=tripEl.value;
-  if(!species||!trip){statusEl.hidden=true;setDefiningControls(true);return;}
+  const changed=originalSpecies!==null&&species!==originalSpecies;
+  if(!species||!trip){statusEl.hidden=true;setDefiningControls(true);showChangeControls(changed,null);return;}
   const params=new URLSearchParams({species,trip});
   if(sampleId!==null)params.set('sample',sampleId);
   fetch('{% url "species-area-status" %}?'+params).then(r=>r.ok?r.json():{matched:false}).then(data=>{
-    if(!data.matched){statusEl.hidden=true;setDefiningControls(true);return;}
+    if(!data.matched){statusEl.hidden=true;setDefiningControls(true);showChangeControls(changed,null);return;}
+    showChangeControls(changed,data.conflict);
     statusEl.hidden=false;
     setDefiningControls(data.is_defining);
     if(data.is_defining){

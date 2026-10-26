@@ -239,6 +239,18 @@ class SampleForm(forms.ModelForm):
         if self.instance.pk:
             self.initial['site'] = str(self.instance.site_id or ('other' if self.instance.site_other else ''))
         self.fields['site_other'].widget.attrs['data-other-for'] = 'site'
+        # Changing the species of an existing observation: two extra choices, shown by the form's script only when
+        # the species was actually changed (and the server checks them either way, see species_change below).
+        self._original_identity = None
+        self.species_change = None
+        if self.instance.pk and self.instance.kind == Sample.Kind.SPECIES and self.instance.species_id:
+            self._original_identity = (self.instance.species_id, self.instance.undetermined_variant)
+            self.fields['keep_old_media'] = forms.BooleanField(required=False, label='להמשיך עם התמונה הקיימת (עליה עדיין כתוב השם הקודם)',
+                help_text='שינוי המין מחייב תמונה מעודכנת עם שם המין החדש: העלו אותה בשדה התמונה. אם לא — סמנו כאן כדי להמשיך עם התמונה הנוכחית, שתישמר בשם של המין החדש.')
+            self.fields['on_conflict'] = forms.ChoiceField(required=False, widget=forms.RadioSelect, label='כבר קיימת במסע תצפית של המין החדש — מה לעשות?',
+                choices=[('merge', 'להחליף את התמונה/הסרטון של התצפית הקיימת במדיה של תצפית זו, ולמחוק את תצפית זו'),
+                         ('remove', 'למחוק את תצפית זו (כולל המדיה שלה) ולהשאיר את התצפית הקיימת כמות שהיא')],
+                help_text='לביטול הפעולה — אל תשמרו, והשאירו את התצפית כפי שהיא.')
         # Whether this sample is the species' defining (gallery-representative) sample is
         # now checked live against the current species+trip fields (see form.html and
         # views.species_area_status), since either one changing changes the answer.
@@ -461,8 +473,38 @@ class SampleForm(forms.ModelForm):
         else:
             data['site'] = None
             data['site_other'] = ''
+        self.species_change = self._check_species_change(data)
         self.clean_taxon_files(data)
         return data
+    def _check_species_change(self, data):
+        """None unless an existing species observation is being given another catalogued species (or sp. letter). Then
+        {'conflict': the observation of that species already on the trip or None, 'choice': 'merge' / 'remove' / '',
+        'keep': keep the current photo}. Raises the form errors that stop the save until the editor has said what to do:
+        an updated photo (or a deliberate keep of the current one) and, when the new species is already on the trip,
+        what becomes of the two observations."""
+        if not self._original_identity or data.get('kind') != Sample.Kind.SPECIES or 'on_conflict' not in self.fields: return None
+        species = data.get('species')
+        identity = (species.pk if species else None, self.instance.undetermined_variant)
+        if not species or identity == self._original_identity: return None
+        trip = data.get('trip')
+        conflict = None
+        if trip:
+            conflict = Sample.objects.filter(kind=Sample.Kind.SPECIES, species=species, trip=trip, deleted_at__isnull=True,
+                undetermined_variant=self.instance.undetermined_variant).exclude(pk=self.instance.pk).first()
+        choice = data.get('on_conflict') or ''
+        keep = bool(data.get('keep_old_media'))
+        change = {'conflict': conflict, 'choice': choice if conflict else '', 'keep': keep}
+        if conflict:
+            self.instance._allow_species_collision = True       # decided here instead of by Sample.clean's hard block
+            if not choice:
+                self.add_error('on_conflict', f'המין החדש כבר קיים במסע זה בתצפית אחרת ({conflict}). בחרו מה לעשות בשתי התצפיות.')
+        if choice != 'remove':
+            original = Sample.objects.filter(pk=self.instance.pk).first()
+            own_image = bool(original and original.image and not original.gallery_source_id)
+            new_media = bool(self.files.get(self.add_prefix('image'))) or bool(getattr(self.instance, '_gallery_choice', False))
+            if own_image and not new_media and not keep:
+                self.add_error('keep_old_media', 'שינוי המין מחייב תמונה מעודכנת עם שם המין החדש. העלו תמונה בשדה התמונה, או סמנו שברצונכם להמשיך עם התמונה הקיימת.')
+        return change
     def clean_image(self):
         file = self.cleaned_data.get('image')
         if not file or not hasattr(file, 'content_type'): return file

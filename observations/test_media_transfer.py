@@ -989,7 +989,8 @@ class DuplicateSpeciesInTripTests(TestCase):
         response=self.client.post(f'/observations/{other.pk}/edit/',dict(self.base,species=self.species.scientific_name,trip=self.trip.pk,
             video_url='https://youtu.be/44444444444'))
         self.assertEqual(response.status_code,200)
-        self.assertContains(response,'כבר נקלט למסע זה')
+        # the change of species into one already on the trip now asks what to do (see test_species_change.py) -- nothing is merged silently
+        self.assertContains(response,'כבר קיים במסע זה בתצפית אחרת')
         other.refresh_from_db();self.existing.refresh_from_db()
         self.assertEqual(other.species_id,other_species.pk)
         self.assertNotEqual(self.existing.video_url,'https://youtu.be/44444444444')

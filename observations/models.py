@@ -1005,7 +1005,9 @@ class Sample(models.Model):
         # and folds the submission into the existing sample (updating its image/video) instead
         # of ever calling full_clean() on a second, colliding new instance.
         self.undetermined_variant = (self.undetermined_variant or '').strip()
-        if self.pk and self.kind == self.Kind.SPECIES and self.species_id and self.trip_id:
+        # (The observation form lifts the block when the editor is changing the species into a collision and has
+        # chosen what to do with the observation that is already there -- see SampleForm.species_change.)
+        if self.pk and self.kind == self.Kind.SPECIES and self.species_id and self.trip_id and not getattr(self, '_allow_species_collision', False):
             duplicate = Sample.objects.exclude(pk=self.pk).filter(
                 kind=self.Kind.SPECIES, species_id=self.species_id, trip_id=self.trip_id, deleted_at__isnull=True,
                 undetermined_variant=self.undetermined_variant,
@@ -1112,8 +1114,18 @@ class Sample(models.Model):
         taxon_level = self.kind in (self.Kind.ORDER, self.Kind.FAMILY, self.Kind.GENUS)
         other = bool(self.species_other) or bool(self.site_other)
         return bool((taxon_level or self.trip_id and self.trip.year) and (self.species_id if self.kind == self.Kind.SPECIES else True) and not other)
+    def gallery_identity(self):
+        """(species, country, sea, undetermined variant) of the SpeciesArea this observation belongs to, or None when
+        it is not a species observation of a trip with a country and a sea."""
+        if self.kind == self.Kind.SPECIES and self.species_id and self.trip_id and self.trip.country_id and self.trip.sea_id:
+            return (self.species_id, self.trip.country_id, self.trip.sea_id, self.undetermined_variant)
+        return None
     def save_reviewed(self, actor=None, approve=False):
         self.full_clean(validate_constraints=False)
+        # Where this observation was (in the database) before this save: a change of species, variant or trip moves
+        # it to another SpeciesArea, and the one it leaves must not keep it as its defining sample.
+        previous = Sample.objects.select_related('trip').filter(pk=self.pk).first() if self.pk else None
+        previous_identity = previous.gallery_identity() if previous else None
         with transaction.atomic():
             # Acquire SQLite's write lock before checking first occurrence.
             if self.species_id:
@@ -1136,6 +1148,12 @@ class Sample(models.Model):
                     defaults={'defining_sample': SpeciesArea.pick_defining_sample(
                         self.species_id, self.trip.country_id, self.trip.sea_id, self.undetermined_variant)},
                 )
+            if previous_identity and (previous_identity != self.gallery_identity() or self.status != self.Status.PUBLISHED):
+                # the area it left (or stopped being published in) hands its card to another observation, or to none
+                SpeciesArea.objects.filter(
+                    species_id=previous_identity[0], country_id=previous_identity[1], sea_id=previous_identity[2],
+                    undetermined_variant=previous_identity[3], defining_sample_id=self.pk,
+                ).update(defining_sample=SpeciesArea.pick_defining_sample(*previous_identity))
     def soft_delete(self, actor):
         self.deleted_at = timezone.now(); self.deleted_by = actor
         self.save(update_fields=['deleted_at','deleted_by','updated_at'])

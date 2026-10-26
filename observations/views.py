@@ -3,6 +3,8 @@ from django.contrib.auth import get_user_model, login
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group
+from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.db.models import Q
 from django import forms
 import hashlib
@@ -833,7 +835,13 @@ def species_area_status(request):
     if is_defining:
         candidate = SpeciesArea.next_candidate(species.pk, trip.country_id, trip.sea, sample_id, variant)
         next_info = {'kind': 'with_media', 'id': candidate['sample'].pk} if candidate['kind'] == 'with_media' else {'kind': candidate['kind']}
-    return JsonResponse({'matched': True, 'is_defining': is_defining, 'appears': appears, 'next': next_info})
+    # Another active observation of this species on the same trip: the form asks what to do when the species of the
+    # observation being edited is changed into it (see SampleForm.species_change).
+    conflict = Sample.objects.filter(kind=Sample.Kind.SPECIES, species=species, trip=trip, deleted_at__isnull=True, undetermined_variant=variant)
+    if sample_id: conflict = conflict.exclude(pk=sample_id)
+    conflict = conflict.first()
+    return JsonResponse({'matched': True, 'is_defining': is_defining, 'appears': appears, 'next': next_info,
+                         'conflict': {'id': conflict.pk, 'label': conflict.taxon_label} if conflict else None})
 
 
 @staff_member_required
@@ -913,6 +921,14 @@ def edit(request,pk=None):
         for name in ('note_he', 'note_en'): form.fields.pop(name, None)
     if request.method=='POST' and form.is_valid():
         item=form.save(commit=False)
+        change=form.species_change
+        if change and change['conflict'] and change['choice'] in ('merge','remove'):
+            # The species was changed into one already observed on this trip, and the editor chose what happens to the two.
+            done=_resolve_species_collision(request,form,item,change,manager)
+            if done is not None: return redirect(done or next_url)
+            return render(request,'observations/form.html',{'form':form,'title':'תצפית / Observation','observation_form':True,
+                'trip_new_url':reverse('trip-new'),'trip_add_url':reverse('trip-add'),'species_add_url':reverse('species-new') if manager else '','next':next_url,
+                'species_options':species_name_options(),'taxonomy':taxonomy_for_form(),'locations':trip_picker_data()})
         def canonical_image_write(source_sample, target_sample=None):
             # Store under the same stable, meaningful name the bulk folder importer and
             # the image manager use (see Sample.canonical_image_name) -- target_sample's
@@ -946,6 +962,8 @@ def edit(request,pk=None):
             return redirect(f'{next_url}#obs-{existing.pk}')
         if 'image' in form.changed_data and item.image:
             item.image = canonical_image_write(item)
+        elif change and change['keep'] and item.image and not item.gallery_source_id:
+            item.image = canonical_image_write(item)       # the photo is kept, under the new species' file name
         # A brand-new observation (never one being edited) is the message worth the reader's
         # eye first among the run-of-the-mill notices this page and others show (profile
         # saved, trip added, etc.) -- extra_tags carries that distinction through to
@@ -960,12 +978,14 @@ def edit(request,pk=None):
         # publish themselves when complete, the rest wait for a manager's approval.
         approve_now = manager and item.is_complete()
         item.save_reviewed(actor=request.user if approve_now else None, approve=approve_now)
-        if getattr(item,'_gallery_choice',False) and old_image_name and old_image_name!=item.image.name:
+        if old_image_name and old_image_name!=item.image.name:
             from .media_transfer import delete_image_if_unused
             delete_image_if_unused(old_image_name)        # the file this observation used to have, if nothing else uses it
         form.save_taxon_files(item)
         messages.success(request,'התצפית פורסמה.' if item.status=='published' else 'התצפית נשמרה וממתינה להשלמת נתונים ולאישור מנהל.',
             extra_tags='new-observation' if is_new_observation else '')
+        if change:
+            messages.info(request,f'המין בתצפית שונה ל־{item.taxon_label}. התצפית עודכנה במקומה: המין הקודם כבר אינו מציג אותה, והתמונה נשמרה בשם של המין החדש.')
         return redirect(f'{next_url}#obs-{item.pk}')
     return render(request,'observations/form.html',{'form':form,'title':'תצפית / Observation','observation_form':True,
         'trip_new_url':reverse('trip-new'),'trip_add_url':reverse('trip-add'),'species_add_url':reverse('species-new') if manager else '','next':next_url,
@@ -1201,6 +1221,61 @@ def trip_suggest(request):
     user = user or request.user
     if day is not None and not 1 <= day <= 31: day = None
     return JsonResponse({'title': suggest_title(user, region, site, year, month, day), 'code': suggest_code(user, region, year, month, day)})
+
+
+def _resolve_species_collision(request,form,item,change,manager):
+    """An observation whose species was changed into one that is already on the same trip (the editor chose `merge` or
+    `remove` in the form). merge: the existing observation takes this one's photo / video, and this one is removed;
+    remove: this one is removed, with its media, and the existing one stays as it is. All or nothing: the database work
+    is one transaction (this observation is removed and the other updated, or nothing changes), and files are touched
+    last, the old ones only after it succeeded. Returns the URL to go to ('' for the form's next page), or None after
+    adding errors to the form."""
+    from .media_transfer import delete_image_if_unused, save_images
+    target=change['conflict']; choice=change['choice']
+    original=Sample.objects.select_related('trip').get(pk=item.pk)
+    old_files=set()
+    if original.gallery_references.filter(deleted_at__isnull=True).exists():
+        others=', '.join(str(x) for x in original.gallery_references.filter(deleted_at__isnull=True)[:5])
+        form.add_error(None,f'התמונה של תצפית זו מוצגת גם בתצפיות אחרות כתמונה קיימת בגלריה ({others}). יש להסיר אותה מהן קודם.')
+        return None
+    if original.image and not original.gallery_source_id: old_files.add(original.image.name)
+    raw=gallery=None
+    if choice=='merge':
+        if 'image' in form.changed_data and item.image: item.image.seek(0); raw=item.image.read()
+        elif getattr(item,'_gallery_choice',False) and item.gallery_source_id: gallery=item.gallery_source
+        elif original.gallery_source_id: gallery=original.gallery_source
+        elif original.image:
+            with original.image.open('rb') as handle: raw=handle.read()
+        if not (raw or gallery or item.video_url):
+            form.add_error(None,'אין מדיה להעביר לתצפית הקיימת: העלו תמונה או הזינו קישור סרטון.')
+            return None
+    previous_target_image=target.image.name if target.image and not target.gallery_source_id else ''
+    try:
+        with transaction.atomic():
+            original.soft_delete(request.user)          # frees its video and gives its area to another observation
+            original.image=''; original.image_hash=''; original.video_url=''; original.gallery_source=None
+            original.save(update_fields=['image','image_hash','video_url','gallery_source','updated_at'])
+            new_name=''
+            if choice=='merge':
+                if raw:
+                    new_name=target.canonical_image_name()
+                    target.image=new_name; target.gallery_source=None
+                elif gallery:
+                    target.gallery_source=gallery; target.image=gallery.image.name
+                if item.video_url: target.video_url=item.video_url
+                target.save_reviewed()
+                if raw: save_images({new_name:raw})     # last, so a failure above leaves every file as it was
+    except ValidationError as exc:
+        for message in exc.messages: form.add_error(None,message)
+        return None
+    for name in old_files:
+        if name!=(target.image.name if choice=='merge' else None): delete_image_if_unused(name)
+    if previous_target_image and choice=='merge' and previous_target_image!=target.image.name: delete_image_if_unused(previous_target_image)
+    if choice=='merge':
+        messages.success(request,f'המדיה של התצפית הקיימת של {target.taxon_label} במסע זה הוחלפה, והתצפית הקודמת הוסרה (כולל המדיה שלה).')
+        return f'{reverse("observations")}#obs-{target.pk}'
+    messages.success(request,'התצפית הוסרה (כולל המדיה שלה). התצפית הקיימת של המין החדש לא שונתה.')
+    return ''
 
 
 @login_required
