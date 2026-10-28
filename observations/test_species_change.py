@@ -286,3 +286,24 @@ class RestoreDeletedObservationTests(SpeciesChangeBase):
     def test_the_form_of_a_deleted_observation_offers_the_restore_tick(self):
         self.delete_sample()
         self.assertIn('name="restore"', self.client.get(f'/observations/{self.sample.pk}/edit/').content.decode())
+
+    def admin_restore(self):
+        return self.client.post('/admin/observations/sample/?_facets=True&reason=1',
+                                {'action': 'restore', '_selected_action': [self.sample.pk], 'index': 0}, follow=True)
+
+    def test_the_admin_restore_action_of_an_observation_without_media_explains_instead_of_failing(self):
+        # It used to end in a server error: a deleted observation has lost its photo / video.
+        self.delete_sample()
+        response = self.admin_restore()
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'לא שוחזרה')
+        self.assertContains(response, f'/observations/{self.sample.pk}/edit/')
+        self.sample.refresh_from_db()
+        self.assertIsNotNone(self.sample.deleted_at)
+
+    def test_the_admin_restore_action_still_restores_an_observation_that_has_media(self):
+        self.sample.soft_delete(self.owner)
+        response = self.admin_restore()
+        self.assertEqual(response.status_code, 200)
+        self.sample.refresh_from_db()
+        self.assertIsNone(self.sample.deleted_at)

@@ -700,5 +700,12 @@ class SampleAdmin(admin.ModelAdmin):
     @admin.action(description='שחזור לבדיקה מחדש',permissions=['change'])
     def restore(self,request,queryset):
         for item in queryset:
+            deleted_at,deleted_by=item.deleted_at,item.deleted_by
             item.deleted_at=None;item.deleted_by=None
-            item.save_reviewed()
+            try: item.save_reviewed()
+            except ValidationError as exc:
+                # Nothing was saved: it stays deleted. Typically its media was removed with it (a deleted observation
+                # loses its photo / video), so it is restored from its edit page, where a photo or link is added.
+                item.deleted_at,item.deleted_by=deleted_at,deleted_by
+                self.message_user(request,format_html('{} לא שוחזרה: {} לשחזור יש להוסיף מדיה ב<a href="{}">עריכת התצפית</a> ולסמן שם "שחזור".',
+                    item,' '.join(exc.messages),reverse('observation-edit',args=[item.pk])),messages.ERROR)
