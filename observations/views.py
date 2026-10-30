@@ -235,6 +235,8 @@ def species_page(request, slug):
         'info': info, 'size_short': size_short, 'depth_short': depth_short, 'sources': sources,
         'image_url': image_url, 'video_id': video_id, 'thumbnail': thumbnail,
         'taxon_order': order_obj, 'taxon_family': family_obj, 'taxon_genus': genus_obj,
+        'gallery_url': gallery_up_url('genus', genus_obj.pk) if genus_obj else gallery_up_url('family', family_obj.pk) if family_obj
+                       else gallery_up_url('order', area.species.order or ''),
         'taxon_order_label': taxon_label(order_obj), 'taxon_family_label': taxon_label(family_obj),
         'taxon_genus_label': taxon_label(genus_obj),
         'common_name': common_name, 'description': description, 'size_text': species.size_text(lang),
@@ -319,6 +321,7 @@ def genus_page(request, name):
         'genus': genus, 'areas': areas,
         'image_url': image_url, 'video_id': video_id, 'thumbnail': thumbnail,
         'taxon_order': taxon_order, 'taxon_family': taxon_family,
+        'gallery_url': gallery_up_url('genus', genus.pk),
         'order_trail': order_trail(
             (TaxonOrder.objects.filter(name=taxon_order.name, superfamily=taxon_family.superfamily).first() if taxon_order and taxon_family.superfamily else None) or taxon_order,
             lang),
@@ -343,6 +346,13 @@ def genus_identification_context(genus, lang):
     return {'identification_url': genus.identification_open_url(code),
             'identification_preview_url': genus.identification_preview_url(code),
             'identification_is_image': genus.identification_is_image_in(code)}
+
+
+def gallery_up_url(level, key):
+    """The page's "back to the gallery": the gallery's taxonomic view one rank above this taxon (dist/app.js, ?up=),
+    on top of the view the visitor left (?restore=1)."""
+    from urllib.parse import quote
+    return f'/?restore=1&up={quote(f"{level}:{key}", safe=":")}' if key else '/?restore=1'
 
 
 def taxon_hero_media(defining_sample, areas):
@@ -419,6 +429,8 @@ def _taxon_page(request, rank, obj, areas, children, parent, parent_url, trail=(
         'parent_label': ((parent.name_en if lang == 'en' else parent.name_he) or parent.name) if parent else '',
         'parent_url': parent_url,
         'trail': list(trail),
+        'gallery_url': gallery_up_url('family', obj.pk) if rank == 'family'
+                       else gallery_up_url(obj.rank, {'order': obj.name, 'suborder': obj.sub_order, 'superfamily': obj.superfamily}.get(obj.rank, '')),
         # What this page is: order / suborder / superfamily (a row of the orders table) or family.
         'level': obj.rank if rank == 'order' else rank,
         'children_title': children_title(children) if children else '',

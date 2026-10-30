@@ -169,12 +169,14 @@ class WholeOrderPageTests(TestCase):
         family.refresh_from_db(); self.assertEqual(family.name_he, 'משפחה בדוקה')
 
     def test_every_level_page_has_a_back_to_the_gallery_button_that_restores_the_view(self):
-        """"/?restore=1": the gallery comes back to the view the visitor left (same rank, taxon, filters, place)."""
+        """"/?restore=1&up=<rank>:<key>": the gallery comes back to the view the visitor left (filters, place), one rank
+        above the page's taxon -- among its siblings (dist/app.js)."""
         pages = [reverse('order-page', args=[row.pk]) for row in (self.base, self.group, self.superfamily)] + [
             '/family/Chromodorididae/', '/genus/Chromodoris/', '/species/' + Species.objects.get(scientific_name='Chromodoris annae').areas.first().slug + '/']
         for url in pages:
-            self.assertIn('href="/?restore=1">חזרה לגלריה</a>', self.client.get(url).content.decode(), url)
-        self.assertIn('href="/?restore=1&amp;lang=en">Back to the gallery</a>', self.client.get('/genus/Chromodoris/?lang=en').content.decode())
+            self.assertRegex(self.client.get(url).content.decode(), r'href="/\?restore=1&amp;up=(order|suborder|superfamily|family|genus):[^"&]+">חזרה לגלריה</a>', url)
+        genus = TaxonGenus.objects.get(name='Chromodoris')
+        self.assertIn(f'href="/?restore=1&amp;up=genus:{genus.pk}&amp;lang=en">Back to the gallery</a>', self.client.get('/genus/Chromodoris/?lang=en').content.decode())
 
 
 class RetiredNudibranchiaGroupRedirectTests(TestCase):

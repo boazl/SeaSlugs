@@ -1200,6 +1200,13 @@ function buildTaxonCard(level, key, members, index, others) {
     info.append(h3, meta);
     button.append(wrap, info);
     button.addEventListener('click', () => {
+        // A genus opens its own page (description, identification, its species with their details) --
+        // a fuller view than the gallery's species cards of that genus.
+        if (level === 'genus' && !others && href) {
+            saveGalleryView(); keepScrollInHistory();
+            window.location.href = href + (language === 'en' ? '?lang=en' : '');
+            return;
+        }
         if (others && state.drill) state.drill = { ...state.drill, blanks: [...(state.drill.blanks || []), level] };
         else if (others) state.drill = { level: 'order', id: members[0].order || '', blanks: [level] };
         else state.drill = { level, id: String(key) };
@@ -1267,6 +1274,48 @@ function restoreGalleryView() {
     return saved.scrollY || 0;
 }
 window.addEventListener('pagehide', () => { saveGalleryView(); keepScrollInHistory(); });
+
+// ---- "back to the gallery" from a page: one level up ----
+// A species / genus / family / order page links back to "/?up=<rank>:<key>" (e.g. up=genus:12): the gallery
+// opens in the taxonomic view one rank above that page's taxon -- among its siblings, e.g. the genera of its
+// family -- keeping the visitor's area and filters unless they would hide that taxon.
+const FRESH_VIEW = { ...state, regions: null, sites: null, photographers: null, years: null, observations: null };
+let upFocus = null;      // the card to bring into view once the gallery is drawn
+function applyUpParam() {
+    const params = new URLSearchParams(window.location.search);
+    const up = params.get('up');
+    if (!up) return false;
+    params.delete('up');
+    const query = params.toString();
+    window.history.replaceState(null, '', window.location.pathname + (query ? '?' + query : '') + window.location.hash);
+    const cut = up.indexOf(':');
+    const from = { level: up.slice(0, cut), id: up.slice(cut + 1) };
+    if (cut < 1 || !LEVELS.includes(from.level) || from.level === 'species') return false;
+    const parent = drillParent(from);
+    state.sort = 'taxonomic'; state.sortChosen = true; state.collection = null;
+    search.value = '';
+    state.drill = parent;
+    setLevel(parent ? nextLevel(parent.level, drillMembers(parent)) : 'order');
+    // filters that would hide the taxon itself are dropped
+    if (!speciesList.some(sp => rankKey(sp, from.level) === from.id && speciesMatches(sp, ''))) {
+        Object.keys(FRESH_VIEW).forEach(k => { if (FRESH_VIEW[k] !== null && !['sort', 'sortChosen', 'drill', 'level'].includes(k)) state[k] = FRESH_VIEW[k]; });
+        GALLERY_VIEW_SETS.forEach(k => { state[k] = new Set(); });
+    }
+    syncSortControl();
+    levelSelect.value = state.level;
+    upFocus = from;
+    return true;
+}
+// After drawing: scroll to the card of the taxon the visitor came from (its page link).
+function focusUpCard() {
+    if (!upFocus) return;
+    const from = upFocus; upFocus = null;
+    const entry = taxonEntry(from.level, from.id);
+    let link = null;
+    if ((from.level === 'family' || from.level === 'genus') && entry && entry.name) link = document.querySelector(`.taxon-card-page[href^="/${from.level}/${encodeURIComponent(entry.name)}/"]`);
+    const card = link ? link.closest('article') : null;
+    window.requestAnimationFrame(() => (card || document.querySelector('#resultCount')).scrollIntoView({ block: card ? 'center' : 'start' }));
+}
 
 // ---- the browser's back / forward buttons ----
 // Every change of view (area, sort, level, a taxon clicked into, filters) is its own entry in the browser's
@@ -1737,6 +1786,8 @@ languageButton.addEventListener('click', () => setLanguage(language === 'he' ? '
 let preferredLanguage = 'he';
 try { preferredLanguage = localStorage.getItem('seaslugs-language') || 'he'; } catch (_) {}
 let restoredScroll = restoreGalleryView();
-if (restoredScroll === null) restoredScroll = restoreFromHistory();
+if (applyUpParam()) restoredScroll = null;
+else if (restoredScroll === null) restoredScroll = restoreFromHistory();
 setLanguage(new URLSearchParams(window.location.search).get('lang') || readLanguageCookie() || preferredLanguage);
 if (restoredScroll) window.requestAnimationFrame(() => window.scrollTo(0, restoredScroll));
+focusUpCard();

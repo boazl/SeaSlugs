@@ -44,7 +44,8 @@ class GenusPageTests(TestCase):
         self.genus.family = None
         self.genus.save()
         response = self.client.get(f'/genus/{self.genus.name}/')
-        self.assertContains(response, '<a class="back-button" href="/?restore=1">')
+        # one level up in the gallery: the genus among its siblings (dist/app.js, ?up=)
+        self.assertContains(response, f'<a class="back-button" href="/?restore=1&amp;up=genus:{self.genus.pk}">')
         self.assertContains(response, 'חזרה לגלריה')
 
     def test_family_page_has_a_back_button_to_its_order(self):
@@ -59,10 +60,10 @@ class GenusPageTests(TestCase):
     def test_order_page_has_a_back_button_to_the_gallery(self):
         url = f'/order/{self.order.pk}/'
         response = self.client.get(url)
-        self.assertContains(response, '<a class="back-button" href="/?restore=1">חזרה לגלריה</a>')
+        self.assertContains(response, '<a class="back-button" href="/?restore=1&amp;up=order:Nudibranchia">חזרה לגלריה</a>')
         self.assertNotContains(response, 'חזרה לסדרה')
         response = self.client.get(url + '?lang=en')
-        self.assertContains(response, '<a class="back-button" href="/?restore=1&amp;lang=en">Back to the gallery</a>')
+        self.assertContains(response, '<a class="back-button" href="/?restore=1&amp;up=order:Nudibranchia&amp;lang=en">Back to the gallery</a>')
 
     def _taxon_sample(self, kind, owner=None, **names):
         self._video = getattr(self, '_video', 60000000000) + 1
