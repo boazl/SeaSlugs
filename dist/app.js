@@ -639,6 +639,7 @@ function showMedia(video_id, image_url, title, subtitle) {
         media.alt = title;
     }
     container.replaceChildren(media);
+    if (video_id && window.youtubeFallback) window.youtubeFallback(media, image_url, title);
 }
 function openDialog() {
     document.body.style.overflow = 'hidden';

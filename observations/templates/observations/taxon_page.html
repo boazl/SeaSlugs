@@ -102,7 +102,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
                     <span class="play" aria-hidden="true">⤢</span>
                 </a>
                 {% elif video_id %}
-                <div class="species-video"><iframe src="https://www.youtube-nocookie.com/embed/{{ video_id }}" title="{{ latin_name }}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
+                <div class="species-video"><iframe src="https://www.youtube-nocookie.com/embed/{{ video_id }}?enablejsapi=1" data-fallback-image="{{ thumbnail|default:'' }}" data-fallback-alt="{{ latin_name }}" title="{{ latin_name }}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
                 {% endif %}
             </div>
             <div class="species-summary">
@@ -204,6 +204,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
     })();
     </script>
 {% include 'observations/_menu_script.html' %}
+<script src="/youtube-fallback.js" defer></script>
 </body>
 
 </html>

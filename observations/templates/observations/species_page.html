@@ -48,7 +48,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
         .species-thumb span{position:absolute;bottom:4px;left:4px;width:22px;height:22px;display:grid;place-items:center;font-size:12px;background:#05141dcc;border-radius:50%;color:var(--ink)}
         .lightbox{width:auto;max-width:96vw;max-height:94vh;padding:0;background:transparent;border:0;overflow:visible}
         .lightbox img{display:block;max-width:96vw;max-height:90vh;width:auto;height:auto;border-radius:8px}
-        .lightbox-video{width:min(1000px,94vw);aspect-ratio:16/9;background:#000;border-radius:8px;overflow:hidden}
+        .lightbox-video{position:relative;width:min(1000px,94vw);aspect-ratio:16/9;background:#000;border-radius:8px;overflow:hidden}
         .lightbox-video iframe{width:100%;height:100%;border:0;display:block}
         .lightbox .close{z-index:1;position:absolute;top:10px;inset-inline-end:10px;background:#05141dcc}
         .species-video{position:relative;padding-top:56.25%;border-radius:10px;overflow:hidden}
@@ -128,7 +128,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
             <div class="species-media">
                 {% with s=main_sample %}
                 {% if video_id %}
-                <div class="species-video"><iframe src="https://www.youtube-nocookie.com/embed/{{ video_id }}" title="{{ species_label }}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
+                <div class="species-video"><iframe src="https://www.youtube-nocookie.com/embed/{{ video_id }}?enablejsapi=1" data-fallback-image="{{ thumbnail|default:'' }}" data-fallback-alt="{{ species_label }}" title="{{ species_label }}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
                 {% elif image_url %}
                 {# The hero photo itself opens the main observation's photo full-size, or its video. #}
                 <a class="species-hero-link lightbox-link" href="{% if s.video_url %}{{ s.video_url }}{% else %}{% url 'observation-photo' s.pk %}{% endif %}"{% if s.video_url %} data-video="1"{% endif %} aria-label="{% if s.video_url %}{{ "צפייה בסרטון"|t:lang }}{% else %}{{ "הגדלת התמונה"|t:lang }}{% endif %}">
@@ -267,6 +267,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
             f.allowFullscreen = true;
             f.referrerPolicy = 'strict-origin-when-cross-origin';
             frame.replaceChildren(f); frame.hidden = false; box.showModal();
+            if (window.youtubeFallback) window.youtubeFallback(f, '', f.title);
         };
         document.querySelectorAll('.species-thumb').forEach(function(b){
             b.addEventListener('click', function(){ open(b.dataset.full); });
@@ -302,6 +303,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
     })();
     </script>
 {% include 'observations/_menu_script.html' %}
+<script src="/youtube-fallback.js" defer></script>
 </body>
 
 </html>
