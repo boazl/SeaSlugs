@@ -458,11 +458,22 @@ class TaxonGenus(models.Model):
     link = models.URLField('קישור', blank=True)
     articles = models.ManyToManyField('Article', blank=True, related_name='genera', verbose_name='מאמרים',
         help_text='בחירה מתוך טבלת המאמרים (מאמר מועלה פעם אחת בניהול ← מאמרים).')
-    # One scientific identification file for the genus -- a diagram, plate of photos or key
-    # for telling its species apart: a PDF or an image (see IDENTIFICATION_FILE_EXTENSIONS).
-    identification_file = models.FileField('קובץ זיהוי (PDF או תמונה)', upload_to='identification/genera/', blank=True,
+    # The scientific identification file of the genus -- a diagram, plate of photos or key for telling
+    # its species apart: a PDF or an image (see IDENTIFICATION_FILE_EXTENSIONS) -- in Hebrew and in
+    # English. Each language's page shows its own file, or the other one when it has none. A PDF is
+    # shown as a preview of one chosen page (made automatically, article_thumbs.py) and opens at that page.
+    identification_file = models.FileField('קובץ זיהוי בעברית (PDF או תמונה)', upload_to='identification/genera/', blank=True,
         validators=[FileExtensionValidator(IDENTIFICATION_FILE_EXTENSIONS), validate_identification_file_size],
         help_text='תרשים, לוח תמונות או מפתח לזיהוי המינים בסוג: PDF או תמונה (JPG, PNG, WebP, GIF), עד 20MB.')
+    identification_page = models.PositiveSmallIntegerField('עמוד לתצוגה מקדימה (עברית)', default=1, validators=[MinValueValidator(1)],
+        help_text='העמוד ב-PDF שמוצג בריבוע התצוגה המקדימה ושבו הקובץ נפתח.')
+    identification_file_en = models.FileField('קובץ זיהוי באנגלית (PDF או תמונה)', upload_to='identification/genera/', blank=True,
+        validators=[FileExtensionValidator(IDENTIFICATION_FILE_EXTENSIONS), validate_identification_file_size],
+        help_text='מוצג באתר באנגלית (בלעדיו מוצג שם הקובץ העברי), עד 20MB.')
+    identification_page_en = models.PositiveSmallIntegerField('עמוד לתצוגה מקדימה (אנגלית)', default=1, validators=[MinValueValidator(1)],
+        help_text='העמוד ב-PDF האנגלי שמוצג בריבוע התצוגה המקדימה ושבו הקובץ נפתח.')
+    identification_thumb = models.FileField('תצוגה מקדימה של קובץ הזיהוי (עברית)', upload_to='identification/thumbs/', blank=True, editable=False)
+    identification_thumb_en = models.FileField('תצוגה מקדימה של קובץ הזיהוי (אנגלית)', upload_to='identification/thumbs/', blank=True, editable=False)
     identification_caption = models.CharField('כיתוב לקובץ הזיהוי', max_length=300, blank=True)
     identification_caption_en = models.CharField('כיתוב לקובץ הזיהוי (אנגלית)', max_length=300, blank=True)
     identification_source = models.CharField('מקור קובץ הזיהוי', max_length=300, blank=True,
@@ -474,8 +485,49 @@ class TaxonGenus(models.Model):
     def __str__(self): return self.name
     @property
     def identification_is_image(self):
-        name = self.identification_file.name if self.identification_file else ''
-        return name.rsplit('.', 1)[-1].lower() in IDENTIFICATION_IMAGE_EXTENSIONS
+        return self.identification_is_image_in('he')
+    # --- the identification file in one language ('he' / 'en') ---
+    IDENTIFICATION_SUFFIX = {'he': '', 'en': '_en'}
+    def identification_file_in(self, code):
+        return getattr(self, 'identification_file' + self.IDENTIFICATION_SUFFIX[code])
+    def identification_page_in(self, code):
+        return getattr(self, 'identification_page' + self.IDENTIFICATION_SUFFIX[code]) or 1
+    def identification_is_image_in(self, code):
+        file = self.identification_file_in(code)
+        return bool(file) and file.name.rsplit('.', 1)[-1].lower() in IDENTIFICATION_IMAGE_EXTENSIONS
+    def identification_code(self, lang):
+        """The language of the file the page in `lang` shows: its own, else the other one; '' when there is none."""
+        order = ('en', 'he') if lang == 'en' else ('he', 'en')
+        return next((code for code in order if self.identification_file_in(code)), '')
+    def identification_url(self, code):
+        from django.urls import reverse
+        return reverse('genus-identification', args=[self.name]) if code == 'he' else reverse('genus-identification-lang', args=[self.name, code])
+    def identification_preview_url(self, code):
+        from django.urls import reverse
+        return reverse('genus-identification-preview', args=[self.name, code])
+    def identification_open_url(self, code):
+        """The file's address; a PDF opens at the preview page."""
+        url, page = self.identification_url(code), self.identification_page_in(code)
+        return url if self.identification_is_image_in(code) or page <= 1 else f'{url}#page={page}'
+    def save(self, *args, **kwargs):
+        # A replaced/removed file or a different preview page drops the old preview (its file is deleted
+        # by _delete_replaced_files); a new one is made right after the save.
+        previous = TaxonGenus.objects.filter(pk=self.pk).first() if self.pk else None
+        dropped = []
+        for code, suffix in self.IDENTIFICATION_SUFFIX.items():
+            thumb = 'identification_thumb' + suffix
+            if getattr(self, thumb) and (previous is None
+                    or previous.identification_file_in(code).name != self.identification_file_in(code).name
+                    or previous.identification_page_in(code) != self.identification_page_in(code)):
+                setattr(self, thumb, '')
+                dropped.append(thumb)
+        if dropped and kwargs.get('update_fields') is not None:
+            kwargs['update_fields'] = list(kwargs['update_fields']) + dropped
+        super().save(*args, **kwargs)
+        from .article_thumbs import ensure_identification_thumbnail
+        for code, suffix in self.IDENTIFICATION_SUFFIX.items():
+            if self.identification_file_in(code) and not getattr(self, 'identification_thumb' + suffix):
+                ensure_identification_thumbnail(self, code)
     @staticmethod
     def pick_defining_sample(name):
         """The genus-kind sample that represents a genus by this exact name: the NEWEST published,
@@ -1299,7 +1351,7 @@ class SpeciesArea(models.Model):
 # The public observation form already deletes the old file itself; the Django admin ("לסלק" ticked,
 # or a new file chosen) only drops the reference and leaves the old PDF behind as an orphan. This
 # removes it for every save path. The file is kept when another row still points at the same name.
-_REPLACEABLE_FILES = ((Article, ('pdf_he', 'pdf_en', 'thumb_he', 'thumb_en')), (TaxonGenus, ('identification_file',)))
+_REPLACEABLE_FILES = ((Article, ('pdf_he', 'pdf_en', 'thumb_he', 'thumb_en')), (TaxonGenus, ('identification_file', 'identification_file_en', 'identification_thumb', 'identification_thumb_en')))
 
 
 def _delete_replaced_files(sender, instance, update_fields=None, **kwargs):

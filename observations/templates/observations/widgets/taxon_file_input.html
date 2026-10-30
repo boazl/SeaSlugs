@@ -1,4 +1,4 @@
-{% if widget.is_initial %}{% if widget.show_image %}<a href="{{ widget.link_url }}" target="_blank" rel="noopener"><img src="{{ widget.link_url }}" alt="" style="max-width:220px;max-height:220px;object-fit:contain;display:block;margin-bottom:6px"></a>
+{% if widget.is_initial %}{% if widget.preview_url %}<a href="{{ widget.link_url }}" target="_blank" rel="noopener"><img src="{{ widget.preview_url }}" alt="" style="width:220px;height:220px;object-fit:contain;object-position:top;display:block;margin-bottom:6px;background:#fff;border:1px solid #2a4a55;border-radius:8px"></a>
 {% endif %}{{ widget.initial_text }}: <a href="{{ widget.link_url }}" target="_blank" rel="noopener">{{ widget.value }}</a>{% if not widget.required %}
 <input type="checkbox" name="{{ widget.checkbox_name }}" id="{{ widget.checkbox_id }}"{% if widget.attrs.disabled %} disabled{% endif %}{% if widget.attrs.checked %} checked{% endif %}>
 <label for="{{ widget.checkbox_id }}">{{ widget.clear_checkbox_label }}</label>{% endif %}<br>

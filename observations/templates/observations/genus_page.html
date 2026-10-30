@@ -58,6 +58,8 @@ gtag('config', 'G-CPGTC09P2P');</script>
         .identification-file img{display:block;width:100%;height:auto}
         .identification-file figcaption{margin-top:8px;font-size:14px;color:var(--muted)}
         .identification-file .identification-source{display:block;font-size:13px}
+        .identification-file a.identification-preview{display:block;width:min(300px,100%);margin-bottom:10px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff;transition:border-color .2s}
+        .identification-file a.identification-preview:hover{border-color:var(--accent)}
         .identification-pdf{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--accent);text-decoration:none}
         .identification-pdf:hover{border-color:var(--accent)}
         .species-sources{margin-top:28px;font-size:14px;color:var(--muted)}
@@ -117,16 +119,17 @@ gtag('config', 'G-CPGTC09P2P');</script>
         {% endif %}
         {% include 'observations/_articles_section.html' %}
 
-        {% if identification or genus.identification_file %}
+        {% if identification or identification_url %}
         <section class="species-section" id="identification">
             <h2>{{ "זיהוי"|t:lang }}</h2>
             {% if identification %}<p>{{ identification|linebreaksbr }}</p>{% endif %}
-            {% if genus.identification_file %}
+            {% if identification_url %}
             <figure class="identification-file">
-                {% if genus.identification_is_image %}
-                <a class="identification-image" href="{% url 'genus-identification' genus.name %}" target="_blank" rel="noopener" aria-label="{{ "פתיחת תרשים הזיהוי בגודל מלא"|t:lang }}"><img src="{% url 'genus-identification' genus.name %}" alt="{{ identification_caption|default:genus.name }}" loading="lazy"></a>
+                {% if identification_is_image %}
+                <a class="identification-image" href="{{ identification_url }}" target="_blank" rel="noopener" aria-label="{{ "פתיחת תרשים הזיהוי בגודל מלא"|t:lang }}"><img src="{{ identification_url }}" alt="{{ identification_caption|default:genus.name }}" loading="lazy"></a>
                 {% else %}
-                <a class="identification-pdf" href="{% url 'genus-identification' genus.name %}" target="_blank" rel="noopener">{{ "מפתח זיהוי (PDF) ↗"|t:lang }}</a>
+                <a class="identification-preview" href="{{ identification_url }}" target="_blank" rel="noopener"><img src="{{ identification_preview_url }}" alt="{{ identification_caption|default:genus.name }}" loading="lazy"></a>
+                <a class="identification-pdf" href="{{ identification_url }}" target="_blank" rel="noopener">{{ "מפתח זיהוי (PDF) ↗"|t:lang }}</a>
                 {% endif %}
                 {% if identification_caption or genus.identification_source %}
                 <figcaption>{% if identification_caption %}{{ identification_caption }}{% endif %}{% if genus.identification_source %}<span class="identification-source">{{ "מקור:"|t:lang }} {{ genus.identification_source }}</span>{% endif %}</figcaption>

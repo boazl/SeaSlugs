@@ -28,6 +28,8 @@ SORT_OPTIONS={'alpha':'לפי סדר אלפביתי (סוג ומין)','kind':'�
 # 'kind' groups the cards by what the image is for, in this order, each group alphabetical:
 # genus identification files, then order, family, genus and species observations, then the
 # rest (collections, uncatalogued "other" species, orphans).
+# every TaxonGenus file field (the identification file in Hebrew / English and their page previews)
+IDENTIFICATION_FIELDS=('identification_file','identification_file_en','identification_thumb','identification_thumb_en')
 KIND_GROUPS=('identification','order','suborder','superfamily','family','genus','species','other')
 KIND_GROUP_LABELS=('קבצי זיהוי של סוגים','תמונות של סדרות','תמונות של תתי-סדרות','תמונות של על-משפחות','תמונות של משפחות','תמונות של סוגים','תמונות של מינים','אחר (תמונות שאינן מוצגות באף רמה)')
 DEFAULT_SORT='alpha'
@@ -187,8 +189,10 @@ def files(sort=DEFAULT_SORT):
     # page) lives in the same media folder but is referenced from TaxonGenus, not Sample --
     # it is in use, never redundant, and must not be deleted from here.
     identification={}
-    for genus in TaxonGenus.objects.exclude(identification_file=''):
-        identification.setdefault(genus.identification_file.name,[]).append(genus)
+    for genus in TaxonGenus.objects.all():
+        for field in IDENTIFICATION_FIELDS:
+            file=getattr(genus,field)
+            if file and genus not in identification.get(file.name,[]): identification.setdefault(file.name,[]).append(genus)
     rows=[];paths=[];levels=taxon_levels()
     for path in sorted(root.rglob('*')):
         if not path.is_file() or path.is_symlink() or not path.resolve().is_relative_to(root): continue
@@ -495,7 +499,7 @@ def manager(request):
                     for name,path in selected:
                         if Sample.objects.filter(image=name,video_url='',deleted_at__isnull=True).exists():
                             raise ValidationError('לא ניתן למחוק תמונה שהיא המדיה היחידה בתצפית פעילה. הוסיפו סרטון או הסירו את התצפית תחילה.')
-                        if TaxonGenus.objects.filter(identification_file=name).exists():
+                        if any(TaxonGenus.objects.filter(**{field:name}).exists() for field in IDENTIFICATION_FIELDS):
                             raise ValidationError('לא ניתן למחוק קובץ זיהוי של סוג מכאן. יש להחליף או להסיר אותו בעריכת הסוג.')
                         if SiteImage.objects.filter(image=name).exists():
                             raise ValidationError('לא ניתן למחוק את תמונת הבית מכאן. יש להחליף או להסיר אותה דרך "תמונת הבית" למטה.')

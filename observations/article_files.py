@@ -28,7 +28,10 @@ KINDS = (
     (ARTICLE, 'מאמר (אנגלית)', Article, 'pdf_en', 'admin:observations_article_change'),
     (ARTICLE, 'תצוגה מקדימה (עברית)', Article, 'thumb_he', 'admin:observations_article_change'),
     (ARTICLE, 'תצוגה מקדימה (אנגלית)', Article, 'thumb_en', 'admin:observations_article_change'),
-    (IDENTIFICATION, 'סוג', TaxonGenus, 'identification_file', 'admin:observations_taxongenus_change'),
+    (IDENTIFICATION, 'סוג (עברית)', TaxonGenus, 'identification_file', 'admin:observations_taxongenus_change'),
+    (IDENTIFICATION, 'סוג (אנגלית)', TaxonGenus, 'identification_file_en', 'admin:observations_taxongenus_change'),
+    (IDENTIFICATION, 'תצוגה מקדימה של סוג (עברית)', TaxonGenus, 'identification_thumb', 'admin:observations_taxongenus_change'),
+    (IDENTIFICATION, 'תצוגה מקדימה של סוג (אנגלית)', TaxonGenus, 'identification_thumb_en', 'admin:observations_taxongenus_change'),
 )
 FOLDERS = ('articles', 'identification')
 EXTENSIONS = {'.pdf', '.jpg', '.jpeg', '.png', '.webp', '.gif', '.html', '.htm'}

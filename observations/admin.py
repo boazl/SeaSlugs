@@ -426,7 +426,7 @@ class TaxonGenusAdmin(DefiningSampleChoicesMixin, TaxonSitePageMixin, admin.Mode
     fieldsets = [
         ('זיהוי וסיווג', {'fields': ['name', 'name_he', 'name_en', 'family', 'taxonomic_order', 'defining_sample']}),
         ('תיאור וזיהוי', {'fields': ['description_he', 'description_en', 'identification_he', 'identification_en']}),
-        ('קובץ זיהוי (תרשים, תמונות או מפתח)', {'fields': ['identification_file', 'identification_caption', 'identification_caption_en', 'identification_source']}),
+        ('קובץ זיהוי (תרשים, תמונות או מפתח)', {'fields': ['identification_file', 'identification_page', 'identification_file_en', 'identification_page_en', 'identification_caption', 'identification_caption_en', 'identification_source']}),
         ('מקורות ומאמרים', {'fields': ['sources', 'link', 'articles']}),
     ]
     actions = ['refresh_defining_samples']

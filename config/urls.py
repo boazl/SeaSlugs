@@ -10,7 +10,7 @@ from observations.release_views import releases
 from observations.image_manager import manager as image_manager, image_file
 
 from observations.folder_import import folder_import
-from observations.views import site_image, species_page, genus_page, genus_identification, order_page, family_page, divetrip_locations
+from observations.views import site_image, species_page, genus_page, genus_identification, genus_identification_preview, order_page, family_page, divetrip_locations
 from observations.articles import article_list, article_page, article_pdf, article_thumb, species_article, genus_article, family_article, order_article
 from observations.db_replace import db_replace, db_replace_download
 from observations.article_files import article_files, article_file_open, article_file_delete, unused_article_delete, article_transfer_file, article_delete
@@ -46,6 +46,8 @@ urlpatterns = [
     path('family/<str:name>/', family_page, name='family-page'),
     path('genus/<str:name>/article.pdf', genus_article, name='genus-article'),
     path('genus/<str:name>/identification/', genus_identification, name='genus-identification'),
+    path('genus/<str:name>/identification/<str:lang>/', genus_identification, name='genus-identification-lang'),
+    path('genus/<str:name>/identification/<str:lang>/preview.jpg', genus_identification_preview, name='genus-identification-preview'),
     path('family/<str:name>/article.pdf', family_article, name='family-article'),
     path('order/<int:pk>/article.pdf', order_article, name='order-article'),
     # Must come before the catch-all gallery-file pattern below, or that route (which only

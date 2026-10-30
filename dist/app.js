@@ -1265,7 +1265,61 @@ function restoreGalleryView() {
     levelSelect.value = state.level;
     return saved.scrollY || 0;
 }
-window.addEventListener('pagehide', () => saveGalleryView());
+window.addEventListener('pagehide', () => { saveGalleryView(); keepScrollInHistory(); });
+
+// ---- the browser's back / forward buttons ----
+// Every change of view (area, sort, level, a taxon clicked into, filters) is its own entry in the browser's
+// history, so "back" returns to the previous view of the gallery. The entry keeps the view and the place on the
+// page, so coming back from a species / taxon page with "back" also lands on the view that was left. Typing in
+// the search box updates the current entry rather than adding one per keystroke.
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+let applyingHistory = false;
+function galleryEntry() {
+    const saved = { ...state };
+    GALLERY_VIEW_SETS.forEach(k => { saved[k] = [...state[k]]; });
+    return { state: saved, search: search.value };
+}
+function sameView(a, b) {
+    return !!a && !!b && JSON.stringify(a.state) === JSON.stringify(b.state);
+}
+function keepScrollInHistory() {
+    const entry = history.state && history.state.gallery;
+    if (entry) history.replaceState({ ...history.state, gallery: { ...entry, scrollY: window.scrollY } }, '', window.location.href);
+}
+function recordGalleryHistory() {
+    if (applyingHistory) return;
+    const entry = galleryEntry();
+    const current = history.state && history.state.gallery;
+    if (!current || sameView(current, entry)) {
+        // first render, or the search text only: update this entry in place
+        history.replaceState({ ...(history.state || {}), gallery: { ...entry, scrollY: current ? current.scrollY || 0 : 0 } }, '', window.location.href);
+        return;
+    }
+    keepScrollInHistory();
+    history.pushState({ gallery: { ...entry, scrollY: 0 } }, '', window.location.href);
+}
+function applyGalleryEntry(entry) {
+    Object.assign(state, entry.state);
+    GALLERY_VIEW_SETS.forEach(k => { state[k] = new Set(entry.state[k] || []); });
+    search.value = entry.search || '';
+    syncSortControl();
+    levelSelect.value = state.level;
+}
+window.addEventListener('popstate', e => {
+    const entry = e.state && e.state.gallery;
+    if (!entry || !entry.state) return;
+    applyGalleryEntry(entry);
+    applyingHistory = true;
+    try { renderSidebar(); render(); } finally { applyingHistory = false; }
+    window.requestAnimationFrame(() => window.scrollTo(0, entry.scrollY || 0));
+});
+// The page was loaded again for an entry that already has a view (back / forward from another page, or a reload).
+function restoreFromHistory() {
+    const entry = history.state && history.state.gallery;
+    if (!entry || !entry.state) return null;
+    applyGalleryEntry(entry);
+    return entry.scrollY || 0;
+}
 
 function render() {
     updateCollectionStatus();
@@ -1321,6 +1375,7 @@ function render() {
     document.querySelector('#empty').hidden = total > 0;
     updateFilterToggleCount();
     saveGalleryView();
+    recordGalleryHistory();
 }
 
 // ---- mobile filter drawer ----
@@ -1671,7 +1726,7 @@ function setLanguage(value) {
     description.content = seoText[language].description;
     const url = new URL(window.location.href);
     url.searchParams.set('lang', language);
-    window.history.replaceState(null, '', url);
+    window.history.replaceState(window.history.state, '', url);
     rememberLanguage(language);
     keepMenuLinksInLanguage();
     renderSidebar();
@@ -1680,6 +1735,7 @@ function setLanguage(value) {
 languageButton.addEventListener('click', () => setLanguage(language === 'he' ? 'en' : 'he'));
 let preferredLanguage = 'he';
 try { preferredLanguage = localStorage.getItem('seaslugs-language') || 'he'; } catch (_) {}
-const restoredScroll = restoreGalleryView();
+let restoredScroll = restoreGalleryView();
+if (restoredScroll === null) restoredScroll = restoreFromHistory();
 setLanguage(new URLSearchParams(window.location.search).get('lang') || readLanguageCookie() || preferredLanguage);
 if (restoredScroll) window.requestAnimationFrame(() => window.scrollTo(0, restoredScroll));

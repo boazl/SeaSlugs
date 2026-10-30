@@ -9,7 +9,7 @@ from django.db.models import Q
 from django import forms
 import hashlib
 
-from django.http import Http404, FileResponse, HttpResponseNotModified, JsonResponse
+from django.http import Http404, HttpResponse, FileResponse, HttpResponseNotModified, JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
 from django.urls import reverse
@@ -327,11 +327,22 @@ def genus_page(request, name):
         'article_links': article_links(genus.articles.all(), lang),
         'identification': (genus.identification_en or genus.identification_he) if lang == 'en' else (genus.identification_he or genus.identification_en),
         'identification_caption': (genus.identification_caption_en or genus.identification_caption) if lang == 'en' else (genus.identification_caption or genus.identification_caption_en),
+        **genus_identification_context(genus, lang),
         'sources': parse_sources(genus.sources),
         'canonical_url': request.build_absolute_uri(request.path),
         'edit_url': taxon_edit_url(request, Sample.Kind.GENUS, genus),
         'taxon_admin_url': taxon_admin_url(request.user, genus),
     })
+
+
+def genus_identification_context(genus, lang):
+    """What the genus page's identification box shows in `lang`: the file of that language, else the other one."""
+    code = genus.identification_code(lang)
+    if not code:
+        return {'identification_url': ''}
+    return {'identification_url': genus.identification_open_url(code),
+            'identification_preview_url': genus.identification_preview_url(code),
+            'identification_is_image': genus.identification_is_image_in(code)}
 
 
 def taxon_hero_media(defining_sample, areas):
@@ -598,16 +609,36 @@ def family_page(request, name):
                        reverse('order-page', args=[order.pk]) if order else '', trail=order_trail(parent, get_lang(request)))
 
 
-def genus_identification(request, name):
-    """Streams a genus' identification file (a PDF or an image -- see TaxonGenus.
-    identification_file), inline, with the content type its extension implies."""
+def genus_identification(request, name, lang='he'):
+    """Streams a genus' identification file in `lang` (a PDF or an image -- see TaxonGenus.
+    identification_file / identification_file_en), inline, with the content type its extension implies."""
     import mimetypes
     genus = get_object_or_404(TaxonGenus, name=name)
-    if not genus.identification_file:
+    file = genus.identification_file_in(lang) if lang in TaxonGenus.IDENTIFICATION_SUFFIX else None
+    if not file:
         raise Http404
-    content_type = mimetypes.guess_type(genus.identification_file.name)[0] or 'application/octet-stream'
-    extension = genus.identification_file.name.rsplit('.', 1)[-1].lower()
-    return _article_response(request, genus.identification_file, genus.name, content_type, '%s-identification.%s' % (genus.name, extension))
+    content_type = mimetypes.guess_type(file.name)[0] or 'application/octet-stream'
+    extension = file.name.rsplit('.', 1)[-1].lower()
+    suffix = '' if lang == 'he' else '-' + lang
+    return _article_response(request, file, genus.name, content_type, '%s-identification%s.%s' % (genus.name, suffix, extension))
+
+
+def genus_identification_preview(request, name, lang):
+    """The preview of a genus' identification file in `lang`: the chosen page of a PDF (made now if it was
+    never made), the image itself for an image, a document icon when the PDF cannot be rendered."""
+    from .article_thumbs import ensure_identification_thumbnail
+    from .articles import DOCUMENT_ICON
+    genus = get_object_or_404(TaxonGenus, name=name)
+    if lang not in TaxonGenus.IDENTIFICATION_SUFFIX or not genus.identification_file_in(lang):
+        raise Http404
+    if genus.identification_is_image_in(lang):
+        return genus_identification(request, name, lang)
+    thumb = ensure_identification_thumbnail(genus, lang)
+    if thumb is None:
+        response = HttpResponse(DOCUMENT_ICON, content_type='image/svg+xml')
+        response['Cache-Control'] = 'public, no-cache'
+        return response
+    return _article_response(request, thumb, genus.name, content_type='image/jpeg', filename=f'{genus.name}-identification-{lang}.jpg')
 
 SORT_OPTIONS = {
     'newest': ('-created_at',),

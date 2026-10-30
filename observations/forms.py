@@ -84,12 +84,19 @@ class TaxonFileInput(forms.ClearableFileInput):
     usual "clear" checkbox."""
     template_name = 'observations/widgets/taxon_file_input.html'
     link_url = ''
-    show_image = False
+    preview_url = ''      # a preview picture of the current file (an image itself, or one page of a PDF)
     def get_context(self, name, value, attrs):
         context = super().get_context(name, value, attrs)
         context['widget']['link_url'] = self.link_url
-        context['widget']['show_image'] = self.show_image
+        context['widget']['preview_url'] = self.preview_url
         return context
+
+
+class PreviewPageField(forms.IntegerField):
+    """The PDF page shown as an identification file's preview. Left empty it is not a change: the field
+    stays on the page (hidden) for every kind of sample, and an empty box must not count as an edit."""
+    def has_changed(self, initial, data):
+        return data not in (None, '') and super().has_changed(initial, data)
 
 
 TAXON_FILE_MAX_BYTES = 20 * 1024 * 1024      # identification diagram / key (PDF or image)
@@ -299,10 +306,20 @@ class SampleForm(forms.ModelForm):
             label='מאמרים של הסדרה / המשפחה / הסוג',
             widget=forms.SelectMultiple(attrs={'data-taxon-file': 'any', 'size': 6}),
             help_text='בחירה מתוך המאמרים שכבר הועלו (Ctrl/Cmd לבחירה של כמה). מאמר חדש מעלים פעם אחת בניהול ← מאמרים.')
-        self.fields['taxon_identification_file'] = forms.FileField(required=False, label='קובץ זיהוי של הסוג (PDF או תמונה)',
+        self.fields['taxon_identification_file'] = forms.FileField(required=False, label='קובץ זיהוי של הסוג בעברית (PDF או תמונה)',
             widget=TaxonFileInput(attrs={'data-taxon-file': 'genus'}),
             validators=[FileExtensionValidator(IDENTIFICATION_FILE_EXTENSIONS), validate_taxon_file_size],
             help_text='תרשים, לוח תמונות או מפתח לזיהוי המינים בסוג: PDF או תמונה (JPG, PNG, WebP, GIF), עד 20MB.')
+        self.fields['taxon_identification_page'] = PreviewPageField(required=False, min_value=1, initial=1, label='עמוד לתצוגה מקדימה (עברית)',
+            widget=forms.NumberInput(attrs={'data-taxon-file': 'genus', 'min': 1, 'style': 'width:6em'}),
+            help_text='העמוד ב-PDF שמוצג בריבוע התצוגה המקדימה ושבו הקובץ נפתח.')
+        self.fields['taxon_identification_file_en'] = forms.FileField(required=False, label='קובץ זיהוי של הסוג באנגלית (PDF או תמונה)',
+            widget=TaxonFileInput(attrs={'data-taxon-file': 'genus'}),
+            validators=[FileExtensionValidator(IDENTIFICATION_FILE_EXTENSIONS), validate_taxon_file_size],
+            help_text='מוצג באתר באנגלית (בלעדיו מוצג שם הקובץ העברי), עד 20MB.')
+        self.fields['taxon_identification_page_en'] = PreviewPageField(required=False, min_value=1, initial=1, label='עמוד לתצוגה מקדימה (אנגלית)',
+            widget=forms.NumberInput(attrs={'data-taxon-file': 'genus', 'min': 1, 'style': 'width:6em'}),
+            help_text='העמוד ב-PDF האנגלי שמוצג בריבוע התצוגה המקדימה ושבו הקובץ נפתח.')
         self.fields['taxon_identification_caption'] = forms.CharField(required=False, max_length=300, label='כיתוב לקובץ הזיהוי',
             widget=forms.TextInput(attrs={'data-taxon-file': 'genus'}))
         self.fields['taxon_identification_caption_en'] = forms.CharField(required=False, max_length=300, label='כיתוב לקובץ הזיהוי (אנגלית)',
@@ -320,12 +337,17 @@ class SampleForm(forms.ModelForm):
                 self.initial['taxon_' + attr] = getattr(taxon, attr)
             self.initial['taxon_articles'] = list(taxon.articles.values_list('pk', flat=True))
             if kind == Sample.Kind.GENUS:
-                self.initial['taxon_identification_file'] = taxon.identification_file or None
+                for code, suffix in taxon.IDENTIFICATION_SUFFIX.items():
+                    file = taxon.identification_file_in(code)
+                    self.initial['taxon_identification_file' + suffix] = file or None
+                    self.initial['taxon_identification_page' + suffix] = taxon.identification_page_in(code)
+                    if file:
+                        widget = self.fields['taxon_identification_file' + suffix].widget
+                        widget.link_url = taxon.identification_open_url(code)
+                        widget.preview_url = taxon.identification_preview_url(code)
                 self.initial['taxon_identification_caption'] = taxon.identification_caption
                 self.initial['taxon_identification_caption_en'] = taxon.identification_caption_en
                 self.initial['taxon_identification_source'] = taxon.identification_source
-                self.fields['taxon_identification_file'].widget.link_url = reverse('genus-identification', args=[taxon.name])
-                self.fields['taxon_identification_file'].widget.show_image = taxon.identification_is_image
 
     # (TaxonOrder/Family/Genus attribute, label, textarea rows) -- the page texts every taxon-level sample can edit
     TAXON_TEXT_FIELDS = (
@@ -336,9 +358,9 @@ class SampleForm(forms.ModelForm):
         ('sources', 'מקורות', 3),
     )
     TAXON_FILE_FIELDS = (tuple('taxon_' + attr for attr, _l, _r in TAXON_TEXT_FIELDS)
-                         + ('taxon_articles', 'taxon_identification_file', 'taxon_identification_caption', 'taxon_identification_caption_en', 'taxon_identification_source'))
+                         + ('taxon_articles', 'taxon_identification_file', 'taxon_identification_page', 'taxon_identification_file_en', 'taxon_identification_page_en', 'taxon_identification_caption', 'taxon_identification_caption_en', 'taxon_identification_source'))
     # the identification file, its captions and its source exist for genera only
-    GENUS_ONLY_FIELDS = ('taxon_identification_file', 'taxon_identification_caption', 'taxon_identification_caption_en', 'taxon_identification_source')
+    GENUS_ONLY_FIELDS = ('taxon_identification_file', 'taxon_identification_page', 'taxon_identification_file_en', 'taxon_identification_page_en', 'taxon_identification_caption', 'taxon_identification_caption_en', 'taxon_identification_source')
 
     def clean_taxon_files(self, data):
         """Rejects an upload/clear that has no taxon row to attach to or that does not match
@@ -384,6 +406,11 @@ class SampleForm(forms.ModelForm):
                 changed.append(attr)
         if sample.kind == Sample.Kind.GENUS:
             apply('identification_file', 'taxon_identification_file')
+            apply('identification_file_en', 'taxon_identification_file_en')
+            for attr in ('identification_page', 'identification_page_en'):
+                if 'taxon_' + attr in self.changed_data:
+                    setattr(taxon, attr, self.cleaned_data.get('taxon_' + attr) or 1)
+                    changed.append(attr)
             for attr, field in (('identification_caption', 'taxon_identification_caption'), ('identification_caption_en', 'taxon_identification_caption_en'),
                             ('identification_source', 'taxon_identification_source')):
                 if field in self.changed_data:
