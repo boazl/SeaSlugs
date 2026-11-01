@@ -434,7 +434,14 @@ def resolve(token):
 def image_file(request):
     if not request.user.is_superuser: raise PermissionDenied
     name,path=resolve(request.GET.get('file',''))
-    item=Sample.objects.filter(image=name).first()
+    # Every observation showing this file travels with it: the observation that owns the photo
+    # first, then the ones showing it as a gallery image (e.g. a dive-trip collection built from a
+    # species photo). Embedding only one of them (formerly .first(), i.e. the newest) left the
+    # others -- the species observation itself -- behind on the other side.
+    users=Sample.objects.filter(image=name)
+    items=sorted(users.filter(deleted_at__isnull=True),key=lambda r:(bool(r.gallery_source_id),r.created_at,r.pk))
+    if not items: items=list(users[:1])
+    item=items[0] if items else None
     # The file's own stored name -- after the canonical-naming migration (trip code +
     # kind-dependent identity, see Sample.canonical_image_name) this is already the
     # meaningful, human-readable name shown throughout the admin (the image comparison's
@@ -451,8 +458,11 @@ def image_file(request):
         # any other non-ASCII text) would otherwise come back unrecoverably mangled on the
         # other end. Base64-encoding the UTF-8 JSON keeps the embedded string itself pure
         # ASCII, immune to that.
-        row=sample_row(item,TABLES['samples'][1]);row['image']=''
-        metadata=json.dumps(row,ensure_ascii=False)
+        rows=[]
+        for each in items:
+            row=sample_row(each,TABLES['samples'][1]);row['image']='';rows.append(row)
+        # one observation: a single row object (the format older versions read); several: a list
+        metadata=json.dumps(rows[0] if len(rows)==1 else rows,ensure_ascii=False)
         encoded=base64.b64encode(metadata.encode('utf-8')).decode('ascii')
         if len(encoded)>60000:
             source.close();raise Http404('נתוני התצפית גדולים מדי להעברה בתמונה.')
@@ -516,7 +526,7 @@ def manager(request):
                 from .sample_transfer import sample_plan, _describe
                 from .table_transfer import TABLES
                 from .media_transfer import save_images
-                doc={'rows':[],'_media_names':[]};images={}
+                doc={'rows':[],'_media_names':[]};images={};file_rows=[]
                 for upload in uploads:
                     try:
                         with Image.open(upload) as original: metadata=original.getexif().get(270,'')
@@ -533,20 +543,31 @@ def manager(request):
                             # only by re-downloading it now that the fix is in place.
                             row=json.loads(metadata[len('SeaSlugs:'):])
                         else: raise ValueError()
-                        if not isinstance(row,dict): raise ValueError()
+                        # a file shown by several observations carries all of them, its owner first
+                        rows=row if isinstance(row,list) else [row]
+                        if not rows or not all(isinstance(r,dict) for r in rows): raise ValueError()
                     except (ValueError,OSError): raise ValidationError('בחרו תמונות שהורדו מכלי ניהול התמונות. קובץ ללא נתוני תצפית ניתן להעלות בעריכת התצפית.')
                     upload.seek(0)
                     form=SampleForm();form.cleaned_data={'image':upload};content=form.clean_image();raw=content.read()
                     name='observations/transfer/'+hashlib.sha256(raw).hexdigest()+'.jpg'
-                    row['image']=name;doc['rows'].append(row);doc['_media_names'].append(name);images[name]=raw
+                    for index,row in enumerate(rows):
+                        row['image']=name;doc['rows'].append(row);file_rows.append((name,index))
+                    doc['_media_names'].append(name);images[name]=raw
                 with transaction.atomic():
                     from .models import Species, SpeciesArea
                     Species.objects.filter(pk=-1).update(scientific_name='')
                     items=sample_plan(doc,TABLES['samples'][1],restore_deleted=False)
-                    old_names=[];used_in_batch=set();skip_reasons=[]
-                    for row,result in zip(doc['rows'],items):
+                    old_names=[];used_in_batch=set();skip_reasons=[];owners={}
+                    for row,result,(file_name,index) in zip(doc['rows'],items,file_rows):
                         candidate=result['object']
+                        if index and candidate is not None and owners.get(file_name) is None:
+                            # the file's owning observation was not transferred, so neither is
+                            # the photo it would show here
+                            result['object']=None
+                            skip_reasons.append(f'{_describe(candidate)}: התמונה המשותפת לא הועברה כי התצפית שהיא שייכת לה לא הועברה.')
+                            continue
                         if candidate is None:
+                            if not index: owners[file_name]=None
                             # sample_plan() itself declined to resolve this one row (most
                             # often: its transfer_id matches a sample that exists here only
                             # as a soft-deleted record, with no live replacement -- see its
@@ -567,6 +588,15 @@ def manager(request):
                                                  'יש לסמן את תיבת "לאשר החלפת תמונות קיימות" ולהעלות שוב כדי להחליף אותה.')
                             result['object']=None;continue
                         final=existing or candidate
+                        if index:
+                            # Another observation showing the same photo: it takes the file the
+                            # owner just got (no second copy), linked as a gallery image when it
+                            # was one at the source.
+                            owner=owners[file_name]
+                            if existing: old_names.append(existing.image.name)
+                            final.image=owner.image.name
+                            final._gallery_owner=owner if row.get('gallery_source') else None
+                            result['object']=final;continue
                         if existing:
                             # Image transfer preserves all existing observation fields.
                             old_names.append(existing.image.name)
@@ -583,11 +613,13 @@ def manager(request):
                         used_in_batch.add(Path(canonical).stem)
                         if canonical!=temp_name and temp_name in images:
                             images[canonical]=images.pop(temp_name)
-                        final.image=canonical;result['object']=final
+                        final.image=canonical;result['object']=final;owners[file_name]=final
                     save_images(images)
                     transferred=[result for result in items if result['object'] is not None]
                     for result in transferred:
-                        sample=result['object'];sample.save()
+                        sample=result['object']
+                        if getattr(sample,'_gallery_owner',None): sample.gallery_source=sample._gallery_owner
+                        sample.save()
                         # Mirror Sample.save_reviewed()'s own side effect (also mirrored by
                         # table_transfer.apply() for a plain table transfer) -- a sample
                         # transferred here and already published must register itself in
