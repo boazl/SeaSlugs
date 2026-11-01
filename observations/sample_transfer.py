@@ -72,12 +72,87 @@ def _same_species_on_trip(values, exclude):
     return query.order_by('pk').first()
 
 
+def _natural_key(kind, trip, species, variant, title, taxon):
+    """What an observation is, independent of its transfer id: a species on a trip (a trip records a species
+    once), a dive-trip collection by its title, an order/family/genus observation by its taxon. None when that
+    is not enough to tell it apart."""
+    if not trip: return None
+    if kind == 'species': return ('species', trip, species, (variant or '').strip()) if species else None
+    if kind == 'collection': return ('collection', trip, title.strip()) if (title or '').strip() else None
+    if kind in ('order', 'family', 'genus'): return (kind, trip, taxon.strip()) if (taxon or '').strip() else None
+    return None
+
+
+def _row_key(row):
+    kind = row.get('kind')
+    return _natural_key(kind, row.get('trip'), row.get('species'), row.get('undetermined_variant'),
+                        row.get('title') or '', row.get(kind) if kind in ('order', 'family', 'genus') else '')
+
+
+def _sample_key(sample):
+    return _natural_key(sample.kind, sample.trip.code if sample.trip_id else None,
+                        sample.species.scientific_name if sample.species_id else None, sample.undetermined_variant,
+                        sample.title or '', getattr(sample, sample.kind, '') if sample.kind in ('order', 'family', 'genus') else '')
+
+
+def crossed_transfer_ids(document):
+    """{file transfer id: the live observation here it really is} for rows whose transfer id belongs here to a
+    DIFFERENT observation. Two observations that share one photo (a species observation and the dive-trip
+    collection made from it) can end up here with each other's transfer id, or with an id the source never had.
+    A row whose id names an observation of another kind is matched by what it is instead: the one live
+    observation here with the row's natural key (see _natural_key) whose own id is not in the file.
+    The observation that held the id is then free, and a row of the file with no match here that is exactly that
+    observation is matched to it. The matched observations take the file's transfer ids (see free_transfer_ids)."""
+    rows = {}
+    for row in document.get('rows', []):
+        if not isinstance(row, dict) or row.get('deleted') in ('1', 1, True) or not isinstance(row.get('transfer_id'), str): continue
+        try: rows[str(uuid.UUID(row['transfer_id']))] = row
+        except ValueError: continue
+    if not rows: return {}
+    live = Sample.objects.filter(deleted_at__isnull=True).select_related('trip', 'species')
+    holders = {str(s.transfer_id): s for s in live.filter(transfer_id__in=list(rows))}
+    by_key = {}
+    for tid, row in rows.items():
+        holder = holders.get(tid)
+        key = _row_key(row)
+        # only an id held by another KIND of observation (a collection holding a species observation's id, or the
+        # reverse): a species observation changing its species keeps its id (see the same-species check in sample_plan)
+        if holder is None or key is None or holder.kind == row.get('kind'): continue
+        by_key.setdefault(key, []).append(tid)
+    if not by_key: return {}
+    trips = {key[1] for key in by_key}
+    candidates = {}
+    for sample in live.filter(trip__code__in=trips):
+        candidates.setdefault(_sample_key(sample), []).append(sample)
+    result = {}; released = []
+    for key, tids in by_key.items():
+        found = [s for s in candidates.get(key, []) if str(s.transfer_id) not in rows]
+        if len(tids) != 1 or len(found) != 1: continue
+        result[tids[0]] = found[0]; released.append(holders[tids[0]])
+    taken = {s.pk for s in result.values()}
+    for holder in released:
+        if holder.pk in taken: continue
+        key = _sample_key(holder)
+        matches = [tid for tid, row in rows.items() if tid not in holders and tid not in result and _row_key(row) == key]
+        if len(matches) == 1: result[matches[0]] = holder; taken.add(holder.pk)
+    return result
+
+
+def free_transfer_ids(samples):
+    """Before saving observations that take a transfer id another observation here still holds (see
+    crossed_transfer_ids), park the holders on fresh ids -- each takes its own final id when it is saved."""
+    for sample in samples:
+        if getattr(sample, '_retid', False):
+            Sample.objects.filter(transfer_id=sample.transfer_id).exclude(pk=sample.pk).update(transfer_id=uuid.uuid4())
+
+
 def sample_plan(document, fields, restore_deleted=True):
     """`restore_deleted`: a live row whose observation is deleted here restores it (a table transfer: the source is the
     truth about deletions). The image manager's uploads pass False and skip such a row instead."""
     from .table_transfer import unique
     result = []; seen = set(); targets = set()
     file_keys = _file_species_keys(document)
+    crossed = crossed_transfer_ids(document)
     for incoming in document['rows']:
         # A deleted observation travels as its normal row plus 'deleted': '1' (an older environment that does not know
         # the key rejects such a file, like any other format change). It only ever deletes: see below.
@@ -134,7 +209,7 @@ def sample_plan(document, fields, restore_deleted=True):
         except (ValueError, TypeError): raise ValidationError('מזהה תצפית לא תקין.')
         if identity in seen: raise ValidationError('תצפית כפולה בקובץ.')
         seen.add(identity)
-        obj = unique(Sample, transfer_id=identity)
+        obj = crossed[identity] if identity in crossed else unique(Sample, transfer_id=identity)
         video = youtube_id(values['video_url']) if values['video_url'] else None
         # Deleted samples are excluded here on purpose: a soft-deleted sample and a later,
         # active replacement can legitimately share one video (the photographer re-entered
@@ -186,7 +261,8 @@ def sample_plan(document, fields, restore_deleted=True):
             result.append({'object':None,'label':_describe(obj),'action':'skipped','changes':[],
                            'reason':f'התצפית ביעד ({_describe(obj)}) מסומנת כמחוקה. אם יש להחזיר אותה יש לעשות זאת בניהול ואז לייבא שוב; אחרת השורה הזו לא תועבר.'})
             continue
-        if obj: values['transfer_id'] = str(obj.transfer_id)
+        retid = identity in crossed and obj is crossed[identity]
+        if obj and not retid: values['transfer_id'] = str(obj.transfer_id)
         if keep_notes and obj:
             for field in NOTE_FIELDS: values[field] = getattr(obj, field)
         warnings = []; pending_gallery = None
@@ -201,7 +277,7 @@ def sample_plan(document, fields, restore_deleted=True):
             if gallery_tid:
                 try: gallery_tid = str(uuid.UUID(gallery_tid))
                 except (ValueError, TypeError): raise ValidationError('מזהה תמונה קיימת בגלריה לא תקין.')
-                source = Sample.objects.filter(transfer_id=gallery_tid, deleted_at__isnull=True).first()
+                source = crossed[gallery_tid] if gallery_tid in crossed else Sample.objects.filter(transfer_id=gallery_tid, deleted_at__isnull=True).first()
                 if source and source.gallery_source_id: source = source.gallery_source
                 if source:
                     values['gallery_source'] = source; values['image'] = source.image.name if source.image else ''
@@ -263,7 +339,8 @@ def sample_plan(document, fields, restore_deleted=True):
             candidate.pk = obj.pk; candidate._state.adding = False
             for field in ('created_at','approved_by_id','approved_at'):
                 setattr(candidate,field,getattr(obj,field))
-        try: candidate.full_clean()
+        # a transfer id still held here by the observation it is being taken from (see free_transfer_ids)
+        try: candidate.full_clean(exclude=['transfer_id'] if retid else None)
         except ValidationError as exc:
             # Incomplete legacy drafts may transfer, but cannot become public.
             errors = dict(exc.message_dict)
@@ -280,6 +357,7 @@ def sample_plan(document, fields, restore_deleted=True):
         changes = [{'field':str(Sample._meta.get_field(f).verbose_name),'before':before.get(f,''),'after':after[f]} for f in fields if before.get(f) != after[f]]
         if restoring: changes.insert(0, {'field': 'שחזור', 'before': 'מחוקה', 'after': 'פעילה'})
         candidate._pending_gallery = pending_gallery
+        if retid: candidate._retid = True
         result.append({'object':candidate,'label':candidate.title or str(candidate),'action':'new' if obj is None else 'update' if changes else 'same',
                        'changes':changes,'warnings':warnings})
     if document.get('purge_missing'):

@@ -291,6 +291,9 @@ def apply(document, expected, actor=None, backup=None):
                 user = item['object']
                 if actor and user.pk == actor.pk and not (user.is_active and user.is_staff and user.is_superuser):
                     raise ValidationError('לא ניתן להסיר את גישת המנהל שמבצע את ההעברה. יש לבצע שינוי זה דרך מנהל אחר.')
+        if document['table'] == 'samples':
+            from .sample_transfer import free_transfer_ids
+            free_transfer_ids([item['object'] for item in items if item['action'] in ('new','update')])
         for item in items:
             if item['action'] in ('new','update'):
                 item['object'].save()

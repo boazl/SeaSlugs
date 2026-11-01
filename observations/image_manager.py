@@ -597,6 +597,10 @@ def manager(request):
                                                  'יש לסמן את תיבת "לאשר החלפת תמונות קיימות" ולהעלות שוב כדי להחליף אותה.')
                             result['object']=None;continue
                         final=existing or candidate
+                        if existing and getattr(candidate,'_retid',False):
+                            # the file's transfer id for an observation that held another one here
+                            # (see sample_transfer.crossed_transfer_ids)
+                            existing.transfer_id=candidate.transfer_id;existing._retid=True
                         if index:
                             # Another observation showing the same photo: it takes the file the
                             # owner just got (no second copy), linked as a gallery image when it
@@ -625,6 +629,8 @@ def manager(request):
                         final.image=canonical;result['object']=final;owners[file_name]=final
                     save_images(images)
                     transferred=[result for result in items if result['object'] is not None]
+                    from .sample_transfer import free_transfer_ids
+                    free_transfer_ids([result['object'] for result in transferred])
                     for result in transferred:
                         sample=result['object']
                         if getattr(sample,'_gallery_owner',None): sample.gallery_source=sample._gallery_owner
