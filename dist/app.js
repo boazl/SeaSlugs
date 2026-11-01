@@ -155,13 +155,16 @@ function optionsForArea(area) {
     // since narrowing those wasn't asked for and would remove options the user might still
     // want to combine across regions.
     const regionIds = new Set(), siteIds = new Set(), photographers = new Set(), trips = new Set(), years = new Set();
+    // The filter keys on the raw credit (entry.photographer, language-invariant) but shows
+    // the name in the page's language (photographerLabel), so English shows the English name.
+    const photographerLabels = new Map();
     for (const sp of speciesList) {
         if (!matchesAreaFilter(sp, area)) continue;
         for (const sm of sp.samples) {
             regionIds.add(sm.region);
             const inSelectedRegions = !state.regions.size || state.regions.has(sm.region);
             if (sm.site && inSelectedRegions) siteIds.add(sm.site);
-            if (sm.photographer) photographers.add(sm.photographer);
+            if (sm.photographer) { photographers.add(sm.photographer); if (!photographerLabels.has(sm.photographer)) photographerLabels.set(sm.photographer, photographerLabel(sm)); }
             // A trip is offered only when one of its observations fits the place (region, site)
             // and year already chosen above it in the sidebar.
             if (sm.trip_id != null && inSelectedRegions && (!state.sites.size || (sm.site && state.sites.has(sm.site)))
@@ -172,13 +175,13 @@ function optionsForArea(area) {
     for (const c of collectionsList) {
         if (!collectionMatchesArea(c, area)) continue;
         regionIds.add(c.region);
-        if (c.photographer) photographers.add(c.photographer);
+        if (c.photographer) { photographers.add(c.photographer); if (!photographerLabels.has(c.photographer)) photographerLabels.set(c.photographer, photographerLabel(c)); }
         const collectionInRegion = !state.regions.size || state.regions.has(c.region);
         if (c.trip_id != null && collectionInRegion && !state.sites.size
             && (!state.years.size || state.years.has(String(c.year)))) trips.add(String(c.trip_id));
         if (c.year != null && collectionInRegion) years.add(String(c.year));
     }
-    return { regionIds, siteIds, photographers, trips, years };
+    return { regionIds, siteIds, photographers, photographerLabels, trips, years };
 }
 // A gallery card is a species in an area (the site calls that an "observation"), so the same species seen in two
 // areas is two cards. Every counter therefore shows the number of distinct SPECIES ("30 מינים"); only the "All
@@ -428,8 +431,8 @@ function renderSidebar() {
     renderCheckboxGroup(document.querySelector('#siteOptions'), siteEntries, state.sites, () => { renderSidebar(); render(); });
     // Each photographer gets two count lines under the checkbox: species cards, then collections.
     const photographerEntries = [...opts.photographers]
-        .map(name => [name, name, null])
-        .sort((a, b) => a[1].localeCompare(b[1]));
+        .map(name => [name, opts.photographerLabels.get(name) || name, null])
+        .sort((a, b) => a[1].localeCompare(b[1], language === 'he' ? 'he' : 'en'));
     const photographerBox = document.querySelector('#photographerOptions');
     renderCheckboxGroup(photographerBox, photographerEntries, state.photographers);
     for (const row of [...photographerBox.querySelectorAll('.filter-check')]) {
@@ -509,7 +512,7 @@ function speciesSearchText(sp) {
         if (r) parts.push(r.label, r.label_en);
         const s = sm.site ? siteLabelsData[sm.site] : null;
         if (s) parts.push(s.label, s.label_en);
-        parts.push(sm.photographer);
+        parts.push(sm.photographer, photographerLabel(sm));
     }
     return normalize(parts.filter(Boolean).join(' '));
 }

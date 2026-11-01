@@ -43,11 +43,41 @@ def sample_row(obj, fields, include_deleted=False):
     return result
 
 
+def _file_species_keys(document):
+    """transfer id -> (trip code, species, variant) of every live species row in the file, or None for a row
+    that deletes its observation -- what each observation in the file will be once the import is done."""
+    keys = {}
+    for row in document.get('rows', []):
+        if not isinstance(row, dict) or not isinstance(row.get('transfer_id'), str): continue
+        try: tid = str(uuid.UUID(row['transfer_id']))
+        except ValueError: continue
+        if row.get('deleted') in ('1', 1, True): keys[tid] = None
+        elif row.get('kind') == 'species' and row.get('species'):
+            keys[tid] = (row.get('trip'), row.get('species'), (row.get('undetermined_variant') or '').strip())
+        else: keys[tid] = ('', '', '')
+    return keys
+
+
+def _same_species_on_trip(values, exclude):
+    """The live species observation already here for this row's trip + species + variant (one trip records a
+    species once -- see Sample.clean), other than `exclude`."""
+    from .table_transfer import unique
+    if values.get('kind') != 'species' or not isinstance(values.get('species'), str) or not isinstance(values.get('trip'), DiveTrip):
+        return None
+    species = unique(Species, scientific_name=values['species'])
+    if species is None: return None
+    query = Sample.objects.filter(kind=Sample.Kind.SPECIES, species=species, trip=values['trip'], deleted_at__isnull=True,
+                                  undetermined_variant=(values.get('undetermined_variant') or '').strip())
+    if exclude is not None: query = query.exclude(pk=exclude.pk)
+    return query.order_by('pk').first()
+
+
 def sample_plan(document, fields, restore_deleted=True):
     """`restore_deleted`: a live row whose observation is deleted here restores it (a table transfer: the source is the
     truth about deletions). The image manager's uploads pass False and skip such a row instead."""
     from .table_transfer import unique
     result = []; seen = set(); targets = set()
+    file_keys = _file_species_keys(document)
     for incoming in document['rows']:
         # A deleted observation travels as its normal row plus 'deleted': '1' (an older environment that does not know
         # the key rejects such a file, like any other format change). It only ever deletes: see below.
@@ -124,6 +154,27 @@ def sample_plan(document, fields, restore_deleted=True):
             raise ValidationError(f'מזהה התצפית מצביע על {_describe(obj)}, אך הסרטון {video} מצביע על {_describe(candidates[0])} ביעד. יש לבדוק ולתקן את ההתאמה בניהול לפני ההעברה.')
         else:
             obj = obj or (candidates[0] if candidates else None)
+        # One trip records a species once. The observation already here for this row's trip + species is the same
+        # observation even when it carries another transfer id (e.g. it was re-entered here after the one with this
+        # id was deleted): a row whose observation here is deleted updates that live one instead of failing. When the
+        # row's own observation would become a second one, the import is blocked with both named -- unless the file
+        # itself moves the other observation away (a species swap between two rows), which leaves no duplicate behind.
+        # A brand-new row is left alone, as Sample.clean() leaves a new observation alone.
+        allow_collision = False
+        same = _same_species_on_trip(values, obj if obj and not obj.deleted_at else None) if obj else None
+        if same is not None:
+            row_text = f'{values["species"]}, מסע {values["trip"].code}, מזהה {identity}'
+            same_tid = str(same.transfer_id)
+            in_file = same_tid in file_keys and same_tid != identity
+            moves_away = in_file and file_keys[same_tid] != (values['trip'].code, values['species'], (values.get('undetermined_variant') or '').strip())
+            if moves_away:
+                allow_collision = True
+            elif not in_file and obj.deleted_at and same.pk not in targets:
+                obj = same
+            elif not moves_away:
+                target_text = f' מתאימה ביעד ל-{_describe(obj)} (מזהה {obj.transfer_id}), אך' if not obj.deleted_at else ''
+                raise ValidationError(f'השורה בקובץ ({row_text}){target_text} ביעד כבר קיימת תצפית לאותו מין באותו מסע: '
+                                      f'{_describe(same)} (מזהה {same_tid}). יש למחוק או לתקן אחת מהן בניהול ביעד, ואז לייבא שוב.')
         if obj and obj.pk in targets:
             raise ValidationError(f'כמה רשומות בקובץ המועבר מצביעות על אותו יעד: {_describe(obj)}. יש לבדוק את הקובץ המועבר.')
         if obj: targets.add(obj.pk)
@@ -207,6 +258,7 @@ def sample_plan(document, fields, restore_deleted=True):
         if values['status'] not in ('pending','published'): raise ValidationError('מצב פרסום לא תקין.')
         candidate = Sample(**values)
         candidate._image_shared_with = document.get('_shared_image_tids', {}).get(values.get('image') or '', ())
+        if allow_collision: candidate._allow_species_collision = True
         if obj:
             candidate.pk = obj.pk; candidate._state.adding = False
             for field in ('created_at','approved_by_id','approved_at'):
