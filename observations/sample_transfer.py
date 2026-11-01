@@ -206,6 +206,7 @@ def sample_plan(document, fields, restore_deleted=True):
         except InvalidOperation: raise ValidationError('עומק לא תקין.')
         if values['status'] not in ('pending','published'): raise ValidationError('מצב פרסום לא תקין.')
         candidate = Sample(**values)
+        candidate._image_shared_with = document.get('_shared_image_tids', {}).get(values.get('image') or '', ())
         if obj:
             candidate.pk = obj.pk; candidate._state.adding = False
             for field in ('created_at','approved_by_id','approved_at'):

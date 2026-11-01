@@ -78,23 +78,39 @@ class SharedImageTransferTests(TestCase):
         self.assertEqual((collection.gallery_source_id, collection.image.name), (owner.pk, owner.image.name))
         self.assertEqual(Sample.objects.count(), 2)
 
+    def only_collection(self, raw):
+        """The same download as an older version made it: the collection's row alone."""
+        with Image.open(io.BytesIO(raw)) as image:
+            rows = json.loads(base64.b64decode(image.getexif()[270][len('SeaSlugsB64:'):]).decode('utf-8'))
+            exif = Image.Exif()
+            exif[270] = 'SeaSlugsB64:' + base64.b64encode(json.dumps(rows[1], ensure_ascii=False).encode('utf-8')).decode('ascii')
+            output = io.BytesIO(); image.convert('RGB').save(output, 'JPEG', quality=90, exif=exif)
+        return output.getvalue()
+
     def test_upload_where_only_the_collection_arrived_adds_the_species_and_relinks_the_collection(self):
-        # the state an older version left behind: the collection came with its own copy of the
-        # photo under its own name, the species observation never arrived
+        # The state an older version left behind on the other side: the collection came alone,
+        # holding the very same photo as its own file; the species observation never arrived.
+        # Uploading the full file must not be refused as "this photo already exists".
         raw = self.download()
-        owner_tid = self.owner.transfer_id
+        owner_tid, collection_tid = self.owner.transfer_id, self.collection.transfer_id
         old = Path(self.owner.image.path)
-        Sample.objects.filter(pk=self.collection.pk).update(gallery_source=None)
-        self.owner.delete(); old.unlink()
-        copy = io.BytesIO(); Image.new('RGB', (100, 80), 'blue').save(copy, 'JPEG')
-        self.collection.refresh_from_db()
-        self.collection.image.save('z1-collection-copy.jpg', ContentFile(copy.getvalue()), save=False)
-        Sample.objects.filter(pk=self.collection.pk).update(image=self.collection.image.name)
-        stale = Path(self.collection.image.path)
+        Sample.objects.all().delete(); old.unlink()
+        self.assertEqual(self.upload(self.only_collection(raw)).status_code, 302)
+        collection = Sample.objects.get(transfer_id=collection_tid)
+        stale = Path(collection.image.path); self.assertTrue(stale.exists())
+        response = self.upload(raw, replace='yes')
+        self.assertEqual(response.status_code, 302, response.content.decode()[:3000])
+        owner = Sample.objects.get(transfer_id=owner_tid); collection.refresh_from_db()
+        self.assertEqual(owner.image.name, 'observations/z1-aplysia-dactylomela.jpg')
+        self.assertEqual((collection.gallery_source_id, collection.image.name), (owner.pk, owner.image.name))
+        self.assertFalse(stale.exists())
+        self.assertEqual(Sample.objects.count(), 2)
+
+    def test_a_shared_photo_uploaded_again_on_a_side_that_has_both_is_accepted(self):
+        raw = self.download()
         response = self.upload(raw, replace='yes')
         self.assertEqual(response.status_code, 302)
-        owner = Sample.objects.get(transfer_id=owner_tid); self.collection.refresh_from_db()
-        self.assertEqual(self.collection.gallery_source_id, owner.pk)
-        self.assertEqual(self.collection.image.name, owner.image.name)
-        self.assertFalse(stale.exists())
+        self.collection.refresh_from_db(); self.owner.refresh_from_db()
+        self.assertEqual((self.collection.gallery_source_id, self.collection.image.name), (self.owner.pk, self.owner.image.name))
+        self.assertTrue(Path(self.owner.image.path).exists())
         self.assertEqual(Sample.objects.count(), 2)

@@ -1115,6 +1115,11 @@ class Sample(models.Model):
                     # this sample's OWN image while another active sample already has them --
                     # to show an existing photo, use the gallery-image field instead.
                     others = Sample.objects.exclude(pk=self.pk).filter(deleted_at__isnull=True).exclude(gallery_source_id=self.pk) if self.pk else Sample.objects.filter(deleted_at__isnull=True)
+                    # An image transfer of a photo shared by several observations brings them all
+                    # together; the ones arriving with it are relinked to the owner's file in the
+                    # same step, so they are not a duplicate of it.
+                    shared = getattr(self, '_image_shared_with', ())
+                    if shared: others = others.exclude(transfer_id__in=shared)
                     duplicate = others.filter(models.Q(image_hash=digest) | models.Q(image=self.image.name)).first()
                     if duplicate: errors['image'] = (f'התמונה הזו כבר קיימת בתצפית אחרת ({duplicate}). לא ניתן להעלות את אותה תמונה פעמיים — '
                                                      'כדי להציג אותה גם כאן, בחרו אותה בשדה "תמונה קיימת בגלריה".')

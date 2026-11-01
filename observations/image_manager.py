@@ -3,6 +3,7 @@ import base64
 import hashlib
 import io
 import json
+import uuid
 from datetime import datetime, timezone as dt_timezone
 from PIL import Image, ImageOps
 from django.core.files.base import ContentFile
@@ -553,6 +554,14 @@ def manager(request):
                     for index,row in enumerate(rows):
                         row['image']=name;doc['rows'].append(row);file_rows.append((name,index))
                     doc['_media_names'].append(name);images[name]=raw
+                    if len(rows)>1:
+                        # the observations sharing this file may already hold the same photo here
+                        # (e.g. a collection that arrived alone before) -- not a duplicate of it
+                        shared=[]
+                        for r in rows:
+                            try: shared.append(uuid.UUID(str(r.get('transfer_id'))))
+                            except ValueError: pass
+                        doc.setdefault('_shared_image_tids',{})[name]=shared
                 with transaction.atomic():
                     from .models import Species, SpeciesArea
                     Species.objects.filter(pk=-1).update(scientific_name='')
