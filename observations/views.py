@@ -322,6 +322,9 @@ def genus_page(request, name):
     taxon_order = taxon_family.order if (taxon_family and taxon_family.order_id) else None
     common_name = genus.name_en if lang == 'en' else genus.name_he
     description = (genus.description_en or genus.description_he) if lang == 'en' else (genus.description_he or genus.description_en)
+    if is_manager(request.user):
+        from .local_videos import annotate_areas
+        annotate_areas(areas)   # the manager's red ▶ on a card whose video has no local copy
     return render(request, 'observations/genus_page.html', {
         'genus': genus, 'areas': areas,
         'image_url': image_url, 'video_id': video_id, 'thumbnail': thumbnail,
@@ -421,6 +424,9 @@ def _taxon_page(request, rank, obj, areas, children, parent, parent_url, trail=(
     pick = lambda he, en: (en or he) if lang == 'en' else (he or en)
     from .defining import display_sample
     thumbnail, image_url, video_id = taxon_hero_media(display_sample(obj), areas)
+    if is_manager(request.user):
+        from .local_videos import annotate_areas
+        annotate_areas(areas)   # the manager's red ▶ on a card whose video has no local copy
     sub = getattr(obj, 'sub_order', '') or getattr(obj, 'sub_family', '')
     below_order = rank == 'order' and bool(obj.sub_order or obj.superfamily)     # a sub-order or a superfamily row
     return render(request, 'observations/taxon_page.html', {

@@ -211,6 +211,14 @@ def annotate(samples):
         sample.local_video_missing = status in NO_LOCAL_STATUSES
 
 
+def annotate_areas(areas):
+    """Set .local_video_missing on each gallery-area card: one of its observations has a video with no local copy."""
+    from .gallery_data import area_samples
+    for area in areas:
+        samples = list(area_samples(area).exclude(video_url='').select_related('trip'))
+        area.local_video_missing = any(s in NO_LOCAL_STATUSES for s in statuses(samples).values())
+
+
 def file_response(request, path):
     """The file with HTTP Range support -- Safari only plays a <video> whose server answers byte ranges (206)."""
     from django.http import FileResponse, HttpResponse, StreamingHttpResponse

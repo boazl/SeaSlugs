@@ -133,3 +133,27 @@ class LocalVideoToolTests(LocalVideoDisplayBase):
         self.without_copy.refresh_from_db(); self.assertEqual(self.without_copy.local_video_file, '')
         self.client.post('/admin/local-videos/', {'trip': 'V', 'action': 'folder', 'folder': '/Users/boazliebes/Other'})
         self.trip.refresh_from_db(); self.assertEqual(self.trip.local_video_folder, '/Users/boazliebes/Other')
+
+
+class LocalVideoTaxonCardTests(LocalVideoDisplayBase):
+    """The genus / family / order pages' species cards carry the same red ▶ for a manager when one of the card's
+    observations has a video without a local copy; visitors' cards never change."""
+    def setUp(self):
+        super().setUp()
+        from .models import TaxonGenus, TaxonFamily, TaxonOrder
+        order = TaxonOrder.objects.create(name='Nudibranchia')
+        family = TaxonFamily.objects.create(order=order, name='Chromodorididae')
+        TaxonGenus.objects.create(family=family, name='Chromodoris', defining_sample=self.with_copy)
+        TaxonGenus.objects.create(family=family, name='Aegires', defining_sample=self.without_copy)
+        Species.objects.update(family='Chromodorididae', order='Nudibranchia')
+
+    def test_genus_page(self):
+        self.assertNotIn('no-local', self.client.get('/genus/Aegires/').content.decode())
+        self.client.force_login(self.admin)
+        self.assertIn('class="play no-local"', self.client.get('/genus/Aegires/').content.decode())
+        self.assertNotIn('class="play no-local"', self.client.get('/genus/Chromodoris/').content.decode())
+
+    def test_family_page(self):
+        self.client.force_login(self.admin)
+        html = self.client.get('/family/Chromodorididae/').content.decode()
+        self.assertEqual(html.count('class="play no-local"'), 1)
