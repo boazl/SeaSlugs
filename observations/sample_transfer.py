@@ -10,6 +10,9 @@ from .models import Sample, Species, Country, Region, Site, DiveTrip, youtube_id
 TAXONOMY_FIELDS = ('order', 'family', 'genus', 'identification_qualifier', 'life_stage')
 # The observation note, added later still: an older row without it leaves the target's note as it is.
 NOTE_FIELDS = ('note_he', 'note_en')
+# The observation's Mac video file name (local_videos.py), added later still: an older row (an older file, or an
+# image carrying its row from an environment without the field) leaves the target's file name as it is.
+LOCAL_VIDEO_FIELDS = ('local_video_file',)
 
 
 def _describe(sample):
@@ -161,7 +164,8 @@ def sample_plan(document, fields, restore_deleted=True):
             incoming = dict(incoming); deleted = incoming.pop('deleted') in ('1', 1, True)
         missing = set(fields) - set(incoming) if isinstance(incoming, dict) else None
         keep_notes = bool(missing) and set(NOTE_FIELDS) <= missing
-        if missing and set(incoming) <= set(fields) and missing - set(TAXONOMY_FIELDS) - {'gallery_source', 'title_en'} - set(NOTE_FIELDS) in (set(), {'transfer_id','image'}):
+        keep_local_video = bool(missing) and set(LOCAL_VIDEO_FIELDS) <= missing
+        if missing and set(incoming) <= set(fields) and missing - set(TAXONOMY_FIELDS) - {'gallery_source', 'title_en'} - set(NOTE_FIELDS) - set(LOCAL_VIDEO_FIELDS) in (set(), {'transfer_id','image'}):
             # A row from an older environment/file: no order/family/genus/qualifier/life stage
             # (a taxon-level sample then carried its name in species_other), and possibly no
             # transfer_id/image either (the oldest EXIF rows).
@@ -172,7 +176,7 @@ def sample_plan(document, fields, restore_deleted=True):
             for field in TAXONOMY_FIELDS: incoming.setdefault(field, '')
             if 'gallery_source' in fields: incoming.setdefault('gallery_source', '')
             if 'title_en' in fields: incoming.setdefault('title_en', '')
-            for field in NOTE_FIELDS:
+            for field in NOTE_FIELDS + LOCAL_VIDEO_FIELDS:
                 if field in fields: incoming.setdefault(field, '')
             legacy_field = {'order': 'order', 'family': 'family', 'genus': 'genus'}.get(incoming.get('kind'))
             if legacy_field and not incoming[legacy_field] and isinstance(incoming.get('species_other'), str):
@@ -265,6 +269,8 @@ def sample_plan(document, fields, restore_deleted=True):
         if obj and not retid: values['transfer_id'] = str(obj.transfer_id)
         if keep_notes and obj:
             for field in NOTE_FIELDS: values[field] = getattr(obj, field)
+        if keep_local_video and obj:
+            for field in LOCAL_VIDEO_FIELDS: values[field] = getattr(obj, field)
         warnings = []; pending_gallery = None
         gallery_tid = values.pop('gallery_source', '') if 'gallery_source' in values else ''
         values['gallery_source'] = None

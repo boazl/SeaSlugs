@@ -196,4 +196,4 @@ body:has(.controls-panel) .collection-selection:empty{margin:0}
 .home-articles li{display:flex;gap:12px;align-items:center}
 .home-article-thumb{flex:0 0 48px;width:48px;height:48px;border-radius:6px;overflow:hidden;border:1px solid var(--line)}
 .home-article-thumb img{width:48px;height:48px;object-fit:cover;object-position:top;display:block}
-
+.play.no-local{color:#ff3b3b;border-color:#ff3b3b}.play-both.no-local i{color:var(--ink)}

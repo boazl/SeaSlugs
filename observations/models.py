@@ -10,6 +10,7 @@ from django.core.validators import MinValueValidator, MaxValueValidator, FileExt
 from django.db import models, transaction
 from django.utils import timezone
 from django.utils.text import slugify
+from .local_videos import validate_local_video_folder, validate_local_video_file
 
 
 def normalize_sp_spacing(text):
@@ -648,6 +649,10 @@ class DiveTrip(models.Model):
     link = models.URLField('קישור', blank=True)
     articles = models.ManyToManyField('Article', blank=True, related_name='trips', verbose_name='מאמרים',
         help_text='בחירה מתוך טבלת המאמרים (מאמר מועלה פעם אחת בניהול ← מאמרים).')
+    # The Mac folder holding this trip's videos as uploaded to YouTube (see local_videos.py).
+    local_video_folder = models.CharField('תיקיית הסרטונים במק', max_length=500, blank=True, validators=[validate_local_video_folder],
+        help_text='נתיב מלא לתיקייה במק שבה שמורים הסרטונים של המסע כפי שהועלו ל-YouTube, למשל /Users/boazliebes/Movies/Anilao 2025. '
+                  'משמש לצפייה בסרטונים ללא אינטרנט.')
 
     class Meta:
         db_table = 'dive_trips'
@@ -828,6 +833,9 @@ class Sample(models.Model):
     depth = models.DecimalField('עומק במטרים', max_digits=6, decimal_places=1, null=True, blank=True, validators=[MinValueValidator(0)])
     transfer_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     video_url = models.URLField('קישור YouTube', blank=True, validators=[youtube_id])
+    # The file name of this observation's video inside its trip's local_video_folder (see local_videos.py).
+    local_video_file = models.CharField('שם קובץ הסרטון במק', max_length=255, blank=True, validators=[validate_local_video_file],
+        help_text='שם הקובץ בלבד (למשל Phyllidia ocellata.mp4), בתוך תיקיית הסרטונים של מסע הצלילה.')
     image = models.ImageField('תמונה חלופית (רשות)', upload_to='observations/', blank=True)
     # "תמונה קיימת בגלריה": this observation shows the image of ANOTHER observation (the file's
     # one owner) instead of a file of its own. Each stored photo has exactly one owner -- the
@@ -1350,6 +1358,48 @@ class SpeciesArea(models.Model):
                                                 note_he=note_he, note_en=note_en)
                     count += 1
         return count
+
+
+# --- a trip that moves (country / region) or a region whose sea changes moves its observations' gallery areas -----
+# Sample.save_reviewed() keeps SpeciesArea in step when an OBSERVATION changes; a trip or region edit changes the
+# area of every observation under it without saving them. Before such a save the old (species, country, sea,
+# variant) keys are remembered; after it, each new key gets its area (created when missing) and each old key that
+# lost its observations gives up its defining sample -- so it disappears from every page (gallery_data.area_is_live).
+def _area_keys(samples):
+    return set(samples.filter(kind=Sample.Kind.SPECIES, status=Sample.Status.PUBLISHED, deleted_at__isnull=True,
+                              species__isnull=False, trip__country__isnull=False, trip__region__isnull=False)
+               .order_by().values_list('species_id', 'trip__country_id', 'trip__region__sea_id', 'undetermined_variant').distinct())
+
+
+def resync_species_areas(keys):
+    for species_id, country_id, sea_id, variant in keys:
+        defining = SpeciesArea.pick_defining_sample(species_id, country_id, sea_id, variant)
+        lookup = dict(species_id=species_id, country_id=country_id, sea_id=sea_id, undetermined_variant=variant)
+        if defining:
+            SpeciesArea.objects.update_or_create(**lookup, defaults={'defining_sample': defining})
+        else:
+            SpeciesArea.objects.filter(**lookup).update(defining_sample=None)
+
+
+def _trip_samples(sender, instance):
+    if sender is DiveTrip: return Sample.objects.filter(trip_id=instance.pk)
+    return Sample.objects.filter(trip__region_id=instance.pk)
+
+
+def _remember_area_keys(sender, instance, **kwargs):
+    instance._old_area_keys = _area_keys(_trip_samples(sender, instance)) if instance.pk else set()
+
+
+def _resync_area_keys(sender, instance, raw=False, **kwargs):
+    if raw: return
+    old = getattr(instance, '_old_area_keys', set())
+    new = _area_keys(_trip_samples(sender, instance))
+    if old != new: resync_species_areas(old | new)
+
+
+for _model in (DiveTrip, Region):
+    models.signals.pre_save.connect(_remember_area_keys, sender=_model, dispatch_uid='remember_area_keys_%s' % _model.__name__)
+    models.signals.post_save.connect(_resync_area_keys, sender=_model, dispatch_uid='resync_area_keys_%s' % _model.__name__)
 
 
 # --- uploaded files that are replaced or cleared must not stay on disk ---------------------------

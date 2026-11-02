@@ -53,6 +53,13 @@ gtag('config', 'G-CPGTC09P2P');</script>
         .lightbox .close{z-index:1;position:absolute;top:10px;inset-inline-end:10px;background:#05141dcc}
         .species-video{position:relative;padding-top:56.25%;border-radius:10px;overflow:hidden}
         .species-video iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+        /* A manager's local (Mac, offline) copy of the video -- observations/local_videos.py */
+        .local-video-box{margin-top:12px;padding:10px;border:1px solid var(--accent);border-radius:10px}
+        .local-video-box p{margin:0 0 6px;font-size:13px;color:var(--accent)}
+        .local-video-box video{display:block;width:100%;aspect-ratio:16/9;background:#000;border-radius:6px}
+        .local-video-missing{margin:8px 0 0;font-size:13px;color:#ff3b3b}
+        .local-video-link{display:inline-block;margin-top:8px;font-size:13px;color:var(--accent)}
+        .lightbox-video video{width:100%;height:100%;display:block;background:#000}
         .species-summary h1{font-family:Georgia,"Times New Roman",serif;font-weight:400;font-size:24px;line-height:1.25;margin:0 0 6px;color:var(--ink)}
         .species-common{color:var(--muted);font-size:17px;margin:0 0 6px}
         .species-area{color:var(--muted);font-size:14px;margin:0 0 14px}
@@ -133,9 +140,10 @@ gtag('config', 'G-CPGTC09P2P');</script>
                 {# The hero photo itself opens the main observation's photo full-size, or its video. #}
                 <a class="species-hero-link lightbox-link" href="{% if s.video_url %}{{ s.video_url }}{% else %}{% url 'observation-photo' s.pk %}{% endif %}"{% if s.video_url %} data-video="1"{% endif %} aria-label="{% if s.video_url %}{{ "צפייה בסרטון"|t:lang }}{% else %}{{ "הגדלת התמונה"|t:lang }}{% endif %}">
                     <img src="{{ image_url }}" alt="{{ species_label }}" width="800" height="600">
-                    <span class="play" aria-hidden="true">{% if s.video_url %}▶{% else %}⤢{% endif %}</span>
+                    <span class="play{% if s.local_video_missing %} no-local{% endif %}" aria-hidden="true">{% if s.video_url %}▶{% else %}⤢{% endif %}</span>
                 </a>
                 {% endif %}
+                {% if s.local_video_url %}<div class="local-video-box"><p>{{ "סרטון מקומי (offline)"|t:lang }}</p><video controls playsinline preload="metadata" src="{{ s.local_video_url }}" title="{{ species_label }}"></video></div>{% elif s.local_video_missing %}<p class="local-video-missing">{{ "אין גרסה מקומית (offline) לסרטון"|t:lang }}</p>{% endif %}
                 {# The main observation's caption: site · date · photographer, separators only between parts present. #}
                 {% with photog=s|photographer_name:lang %}
                 <p class="species-caption">{% if s.site %}{{ s.site|loc:lang }}{% endif %}{% if s.trip.year %}{% if s.site %} · {% endif %}{% if s.day and s.trip.month %}{{ s.day }}/{{ s.trip.month }}/{{ s.trip.year }}{% else %}{{ s.trip.year }}{% endif %}{% endif %}{% if photog %}{% if s.site or s.trip.year %} · {% endif %}{{ "צילום:"|t:lang }} {{ photog }}{% endif %}</p>
@@ -230,7 +238,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
                 {% for s in other_samples %}
                 <article class="card" id="obs-{{ s.pk }}">
                     <a class="video-button lightbox-link" href="{% if s.video_url %}{{ s.video_url }}{% else %}{% url 'observation-photo' s.pk %}{% endif %}"{% if s.video_url %} data-video="1"{% endif %}>
-                        <span class="image-wrap"><img src="{% if s.image %}{% url 'observation-photo' s.pk %}{% else %}{{ s.thumbnail }}{% endif %}" alt="" width="640" height="360" loading="lazy">{% if s.image and s.video_url %}<span class="play play-both" aria-hidden="true"><b>▶</b><i>⤢</i></span>{% elif s.video_url %}<span class="play" aria-hidden="true">▶</span>{% else %}<span class="play" aria-hidden="true">⤢</span>{% endif %}</span>
+                        <span class="image-wrap"><img src="{% if s.image %}{% url 'observation-photo' s.pk %}{% else %}{{ s.thumbnail }}{% endif %}" alt="" width="640" height="360" loading="lazy">{% if s.image and s.video_url %}<span class="play play-both{% if s.local_video_missing %} no-local{% endif %}" aria-hidden="true"><b>▶</b><i>⤢</i></span>{% elif s.video_url %}<span class="play{% if s.local_video_missing %} no-local{% endif %}" aria-hidden="true">▶</span>{% else %}<span class="play" aria-hidden="true">⤢</span>{% endif %}</span>
                         {% if s.show_name %}<h3 class="sample-name" dir="ltr">{{ s.name_main|name_html }}{% if s.name_author %} <span class="sample-author">{{ s.name_author }}</span>{% endif %}{% if s.name_stage %} {{ s.name_stage }}{% endif %}</h3>{% endif %}
                         <span class="card-info">
                             <span class="card-meta"><span>{% if s.site %}{{ s.site|loc:lang }}{% endif %}{% if s.trip.year %}{% if s.site %} · {% endif %}{% if s.day and s.trip.month %}{{ s.day }}/{{ s.trip.month }}/{{ s.trip.year }}{% else %}{{ s.trip.year }}{% endif %}{% endif %}</span></span>
@@ -238,6 +246,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
                         </span>
                     </a>
                     {% if s.note %}<p class="observation-note" role="note">{{ s.note }}</p>{% endif %}
+                    {% if s.local_video_url %}<a class="local-video-link" href="{{ s.local_video_url }}" data-local-video="1">▶ {{ "סרטון מקומי (offline)"|t:lang }}</a>{% elif s.local_video_missing %}<p class="local-video-missing">{{ "אין גרסה מקומית (offline) לסרטון"|t:lang }}</p>{% endif %}
                     {% if can_copy_image and s.image %}<button type="button" class="copy-photo-url" data-copy-url="{% url 'observation-photo' s.pk %}" data-done="{{ "הכתובת הועתקה"|t:lang }}" style="margin-top:8px;padding:4px 10px;font-size:13px">{{ "העתקת כתובת התמונה"|t:lang }}</button>{% endif %}
                 </article>
                 {% endfor %}
@@ -282,6 +291,17 @@ gtag('config', 'G-CPGTC09P2P');</script>
                     if (!id) return;          // not a YouTube link: follow it normally
                     e.preventDefault(); openVideo(id);
                 } else { e.preventDefault(); open(a.href); }
+            });
+        });
+        // A manager's local (Mac) copy of an observation's video plays in the same lightbox.
+        document.querySelectorAll('.local-video-link').forEach(function(a){
+            a.addEventListener('click', function(e){
+                if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                e.preventDefault();
+                img.hidden = true; img.removeAttribute('src');
+                var v = document.createElement('video');
+                v.src = a.href; v.controls = true; v.autoplay = true; v.playsInline = true;
+                frame.replaceChildren(v); frame.hidden = false; box.showModal();
             });
         });
         document.getElementById('lightbox-close').addEventListener('click', function(){ box.close(); });

@@ -28,12 +28,14 @@ TABLES = {'groups': ACCOUNT_TABLES['groups'], 'users': ACCOUNT_TABLES['users'],
           'profiles': ACCOUNT_TABLES['profiles'],
           'orders': TAXON_TABLES['orders'][::2], 'families': TAXON_TABLES['families'][::2], 'genera': TAXON_TABLES['genera'][::2],
           'species': (Species, ['scientific_name','name_he','name_en','source_id','genus','species','author','order','family','superfamily','accepted_genus','accepted_species','common_name','transliteration','language','formatted_author','distribution','phylogenetic_order','full_species_name_with_order','reference_author','is_migrant','habitat','food','first_observed_year','last_observed_year','size_from','size_to','size_max','description_he','description_en','link','reference_link']),
-          'trips': (DiveTrip, ['code','title','source_sort','year','month','start_day','duration_days','country','region','site','country_name','region_name','reserve','sea_name','species_count','source_metadata','kind','description_he','description_en','link']),
+          'trips': (DiveTrip, ['code','title','source_sort','year','month','start_day','duration_days','country','region','site','country_name','region_name','reserve','sea_name','species_count','source_metadata','kind','description_he','description_en','link','local_video_folder']),
           'qualifiers': (IdentificationQualifier,['code','name','name_en']), 'lifestages': (LifeStage,['code','name','name_en']),
-          'samples': (Sample, ['title','title_en','kind','trip','owner','order','family','genus','species','identification_qualifier','life_stage','site','species_other','undetermined_variant','site_other','day','depth','video_url','status','source_id','gallery_order','source_metadata','transfer_id','image','gallery_source','note_he','note_en']),
+          'samples': (Sample, ['title','title_en','kind','trip','owner','order','family','genus','species','identification_qualifier','life_stage','site','species_other','undetermined_variant','site_other','day','depth','video_url','status','source_id','gallery_order','source_metadata','transfer_id','image','gallery_source','note_he','note_en','local_video_file']),
           'speciesareas': (SpeciesArea, ['species','country','sea','undetermined_variant','defining_sample','note_he','note_en'])}
 # Fields a file exported before they existed may lack: the target then keeps its own values.
 NOTE_FIELDS = ('note_he', 'note_en')
+# The trip's Mac video folder (local_videos.py), added later: a trip row without it keeps the target's value.
+TRIP_LOCAL_FIELDS = ('local_video_folder',)
 
 
 def reference(obj):
@@ -136,7 +138,9 @@ def plan(document):
     for number,incoming in enumerate(document['rows'],1):
         # A species-area row from a file exported before the page notes existed has no note fields: the target keeps its own.
         older_area_row = model is SpeciesArea and isinstance(incoming,dict) and set(incoming)==set(fields)-set(NOTE_FIELDS)
-        if not isinstance(incoming,dict) or (set(incoming)!=set(fields) and not older_area_row): raise ValidationError(f'שדות לא תואמים בשורה {number}; יש לעדכן את הקוד בשתי הסביבות.')
+        # A trip row from a file exported before the Mac video folder existed: the target keeps its own folder.
+        older_trip_row = model is DiveTrip and isinstance(incoming,dict) and set(incoming)==set(fields)-set(TRIP_LOCAL_FIELDS)
+        if not isinstance(incoming,dict) or (set(incoming)!=set(fields) and not older_area_row and not older_trip_row): raise ValidationError(f'שדות לא תואמים בשורה {number}; יש לעדכן את הקוד בשתי הסביבות.')
         values={}
         for f,v in incoming.items():
             if f in ('country','sea','region','site'): values[f]=related(f,v,required=not (model is DiveTrip))
@@ -209,6 +213,9 @@ def plan(document):
         candidate=model(pk=obj.pk if obj else None,**values)
         if model is Region and obj:
             candidate.trip_code = obj.trip_code
+        if model is DiveTrip and obj:
+            for field in TRIP_LOCAL_FIELDS:
+                if field not in values: setattr(candidate, field, getattr(obj, field))
         if model is Species and obj:
             for field in TABLES['species'][1]:
                 if field not in values: setattr(candidate,field,getattr(obj,field))

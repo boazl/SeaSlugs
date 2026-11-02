@@ -137,6 +137,8 @@ TRANSLATIONS = {
     'אין לתצפית תמונה משלה. זו התמונה של התצפית המגדירה:': 'This observation has no photo of its own. This is the photo of the defining observation:',
     'עריכה': 'Edit',
     'עריכת תצפית': 'Edit observation',
+    'סרטון מקומי (offline)': 'Local video (offline)',
+    'אין גרסה מקומית (offline) לסרטון': 'No local (offline) copy of the video',
     'עריכת מין': 'Edit species',
     'עריכת הסדרה': 'Edit order',
     'עריכת המשפחה': 'Edit family',

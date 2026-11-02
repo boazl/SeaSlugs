@@ -33,9 +33,15 @@ def gallery_file(request, filename='index.html'):
             sections_both[code] = {**sections_both[code], 'articles': str(html)}
         sections = sections_both[lang]
         template = engines['django'].from_string((settings.BASE_DIR / 'dist' / filename).read_text())
+        # A manager's gallery marks videos with no local (Mac) copy in red (observations/local_videos.py, app.js).
+        from observations.views import is_manager
+        local_videos = None
+        if is_manager(request.user):
+            from observations.local_videos import gallery_statuses
+            local_videos = gallery_statuses()
         response = HttpResponse(template.render({
             'has_site_image': has_site_image, 'lang': lang, 'home': HOME_TEXT[lang], 'home_text': HOME_TEXT,
-            'sections': sections, 'sections_both': sections_both,
+            'sections': sections, 'sections_both': sections_both, 'local_videos': local_videos,
         }, request))
         response['Cache-Control'] = 'private, no-store'
         return response

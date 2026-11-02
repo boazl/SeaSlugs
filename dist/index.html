@@ -19,6 +19,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
 {% if has_site_image %}{% share_meta home.share_title description=home.description image="/site-image/intro_photo.jpg" %}{% else %}{% share_meta home.share_title description=home.description image="/intro-photo.jpg" %}{% endif %}
 {{ home_text|json_script:"seo-text" }}
 {{ sections_both|json_script:"home-content" }}
+{% if local_videos is not None %}{{ local_videos|json_script:"local-videos" }}{% endif %}
     <meta name="referrer" content="strict-origin-when-cross-origin">
     <link rel="icon" type="image/svg+xml"
         href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23091e28'/%3E%3Cpath d='M7 11c10-9 8 14 18 5M7 18c10-9 8 14 18 5' stroke='%235de0cb' stroke-width='3' fill='none'/%3E%3C/svg%3E">

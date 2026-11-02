@@ -29,10 +29,13 @@ class MappingValidationTests(SimpleTestCase):
         # 37 approved sources, the merged page, and (2026-10-15) Hexabranchus sanguineus' Israel Red Sea
         # page, whose only observation moved to the Sinai area (Tiran) -- flagged as 404 by Search Console
         moved = 'hexabranchus-sanguineus-israel-red-sea-gulf-of-aqaba'
-        self.assertEqual(len(set(HISTORICAL_SPECIES_REDIRECTS) - {MERGED, moved}), 37)
+        # (2026-11-02) Goniobranchus geminus' "Djibouti · Gulf of Eilat" page: its trip moved to Bab el-Mandeb
+        # (migration 0085 removed the stale area, see test_stale_species_areas)
+        geminus = 'goniobranchus-geminus-djibouti-red-sea-gulf-of-aqaba'
+        self.assertEqual(len(set(HISTORICAL_SPECIES_REDIRECTS) - {MERGED, moved, geminus}), 37)
         self.assertEqual(set(HISTORICAL_SPECIES_REDIRECTS) & {MERGED}, {MERGED})
         self.assertEqual(HISTORICAL_SPECIES_REDIRECTS[moved][0], 'hexabranchus-sanguineus-sinai-red-sea-gulf-of-aqaba')
-        self.assertEqual(len(HISTORICAL_SPECIES_REDIRECTS), 39)
+        self.assertEqual(len(HISTORICAL_SPECIES_REDIRECTS), 40)
         self.assertEqual(HISTORICAL_SPECIES_REDIRECTS[OLD][0], CURRENT)
         for stem in UNRESOLVED:
             self.assertNotIn(stem + '-phillipines-indo-pacific', HISTORICAL_SPECIES_REDIRECTS)

@@ -193,5 +193,10 @@
     "old_slug": "hexabranchus-sanguineus-israel-red-sea-gulf-of-aqaba",
     "current_slug": "hexabranchus-sanguineus-sinai-red-sea-gulf-of-aqaba",
     "sample_transfer_id": "406d9393-2582-4893-b199-6e0ff110799b"
+  },
+  {
+    "old_slug": "goniobranchus-geminus-djibouti-red-sea-gulf-of-aqaba",
+    "current_slug": "goniobranchus-geminus-djibouti-red-sea-bab-el-mandeb-strait-gulf-of-aden",
+    "sample_transfer_id": "205cceeb3c3e4fb3874b6ed3a1446fdb"
   }
 ]

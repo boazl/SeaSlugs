@@ -1,6 +1,20 @@
 'use strict';
 const catalog = window.SEASLUGS || {};
 const speciesList = catalog.species || [];
+// A manager's page carries {sample id: local copy status} (observations/local_videos.py); a video with no local
+// (offline, Mac) copy gets a red mark. Visitors' pages carry nothing, so their marks never change.
+const localVideos = (() => {
+    const node = document.getElementById('local-videos');
+    try { return node ? JSON.parse(node.textContent) : null; } catch (e) { return null; }
+})();
+const NO_LOCAL = ['missing', 'not_found'];
+function lacksLocalVideo(item) {
+    return !!(localVideos && item.video_id && NO_LOCAL.includes(localVideos[String(item.sample_id)]));
+}
+function markNoLocal(mark) {
+    mark.classList.add('no-local');
+    mark.title = language === 'en' ? 'No local (offline) copy of the video' : 'אין גרסה מקומית (offline) לסרטון';
+}
 const collectionsList = catalog.collections || [];
 const areaLabelsData = catalog.areas || {};
 const regionLabelsData = catalog.regions || {};
@@ -615,6 +629,7 @@ function mediaMarks(samples) {
         mark.className = 'play';
         mark.textContent = hasVideo ? '▶' : '⤢';
     }
+    if (hasVideo && samples.some(lacksLocalVideo)) markNoLocal(mark);
     return [mark];
 }
 
@@ -724,6 +739,7 @@ function buildCollectionCard(c, index) {
     icon.className = 'play';
     icon.textContent = c.video_id ? '▶' : '⤢';
     icon.setAttribute('aria-hidden', 'true');
+    if (lacksLocalVideo(c)) markNoLocal(icon);
     wrap.append(img, icon);
     const info = document.createElement('span');
     info.className = 'card-info';

@@ -181,6 +181,10 @@ def species_page(request, slug):
     # The main observation is the area's defining sample (the one behind the hero photo/
     # video); the observations grid below lists only the other ones.
     main_sample = next((s for s in samples if s.pk == area.defining_sample_id), samples[0])
+    if is_manager(request.user):
+        # The manager's local (Mac) copies: a player for each observation that has one, a red note where a video has none.
+        from .local_videos import annotate
+        annotate(samples)
     other_samples = [s for s in samples if s is not main_sample]
     def pick(he, en):
         # The current language's text, falling back to the other language when it's blank.
@@ -301,7 +305,8 @@ def genus_page(request, name):
         _, _, genus_obj = resolver.resolve(area.species)
         if genus_obj and genus_obj.pk == genus.pk:
             annotate_area_cards(area)   # observation count (as the gallery card) + photo / video marks
-            areas.append(area)
+            if area.observation_count:  # an area with no observations of its own left is not shown (gallery_data.area_is_live)
+                areas.append(area)
     if not areas:
         raise Http404
     from .defining import display_sample
@@ -383,7 +388,8 @@ def gallery_areas():
             continue
         area.taxon_order, area.taxon_family, area.taxon_genus = resolver.resolve(area.species)
         annotate_area_cards(area)
-        out.append(area)
+        if area.observation_count:  # see gallery_data.area_is_live
+            out.append(area)
     return out
 
 
@@ -1417,6 +1423,17 @@ def site_image(request,key):
     response=FileResponse(item.image.open('rb'),content_type='image/jpeg')
     response['Cache-Control']='public, max-age=600'
     return response
+
+
+def local_video(request, pk):
+    """The observation's local (Mac) copy of its YouTube video -- managers only (local_videos.py). 404 when the copy
+    is not recorded or not on this machine (e.g. the live site)."""
+    from .local_videos import local_video_path, file_response
+    if not is_manager(request.user): raise Http404
+    item = get_object_or_404(Sample.objects.select_related('trip'), pk=pk)
+    path = local_video_path(item) if item.video_url else None
+    if path is None or not path.is_file(): raise Http404
+    return file_response(request, path)
 
 
 def photo(request,pk):

@@ -428,6 +428,19 @@ never serves `MEDIA_ROOT` directly.** Every file goes through a view that checks
   without metadata. Originals are not kept.
 - **Videos:** never stored. Only YouTube URLs are kept, embedded via `youtube-nocookie`. Thumbnails come
   from `i.ytimg.com`.
+- **Local (offline) video copies** (`local_videos.py`): the Mac keeps the exported files that were uploaded to
+  YouTube. `DiveTrip.local_video_folder` = the absolute Mac folder, `Sample.local_video_file` = the bare file name in
+  it. Both travel through table transfer (an older row without them keeps the target's value). Only the Mac can
+  reach the files.
+  - Status per video observation: `ok`, `missing` (not set), `not_found` (folder here, file not), `unreachable`
+    (folder not on this machine -- the live site), `none` (no YouTube video).
+  - Manager only: the gallery page carries `{sample id: status}` (`<script id="local-videos">`); `app.js` marks the
+    ▶ red for `missing`/`not_found`. The species page shows a local `<video>` box (main observation) and a "local
+    video" link (other observations), or a red "no local copy" note.
+  - `/observations/<pk>/local-video/` serves the file to managers with HTTP Range (Safari needs 206).
+  - Filling: `python manage.py match_local_videos` (dry run; `--apply`, `--trip/--folder/--set ID=FILE`; launcher
+    `_Match local videos.command`) and the page `/admin/local-videos/`. Matching is by species name without the
+    author (cf./sp. N/variant/juv. as written, optional place word like "RedSea"); `.mov` wins over a second export.
 - **Cleanup of replaced or cleared files**
   - The `_delete_replaced_files` pre-save signal deletes the old file unless another row still uses it.
     It applies to Article PDFs and thumbs and to all TaxonGenus file fields.
@@ -462,6 +475,7 @@ never serves `MEDIA_ROOT` directly.** Every file goes through a view that checks
 | `/admin/images/` | Image manager: every media image with the observations using it, sort by file/alpha/taxonomy, kind groups, redundant-image detection, safe delete, rename. **Compare with the other environment** (export a list, upload it on the other side) and **transfer images** (up to 150 photos / 300 MB per upload). A downloaded photo carries every live observation that shows it (owner first, then gallery-image users such as a trip collection); the upload creates/updates all of them and links the others to the owner's file. |
 | `/admin/images/folder/` | Folder import: reviewed bulk import of a folder of images with an Excel sheet. One species selector per image (≤500). Staging in `folder-import-staging/`, auto-cleaned. |
 | `/admin/table-transfer/` | Table transfer (§10.2) |
+| `/admin/local-videos/` | Local (offline) video copies: per-trip Mac folder, each video observation's file (auto-match pre-selected), automatic fill, local playback (§8) |
 | `/admin/article-files/` | Article PDFs and genus identification files: which row uses each, open, delete orphans and unused library articles, article transfer between environments |
 | `/admin/releases/` | Download a ZIP of a verified DB backup plus all media (contains private data; never upload it to GitHub). Mac launcher: `Release Manager.command`. |
 | `/admin/db-replace/` | Full DB replacement: back up → lock the site (flag file, `MaintenanceModeMiddleware`; staff, `/admin/` and `/healthz` pass) → download live DB → upload replacement + missing images → review → apply → release |

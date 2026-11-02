@@ -1,0 +1,29 @@
+{% extends 'observations/base.html' %}{% block site_hero %}{% endblock %}
+{% block content %}<a href="{% url 'admin:index' %}">חזרה לניהול האתר</a>
+<h1>סרטונים מקומיים (offline)</h1>
+<p class="helptext">לכל מסע: תיקיית הסרטונים במק, ולכל תצפית עם סרטון YouTube — שם הקובץ בתיקייה. בגלריה, למנהל, חץ אדום מסמן סרטון בלי גרסה מקומית, ובדף התצפית מוצג נגן לסרטון המקומי.</p>
+<table class="local-videos-summary">
+<thead><tr><th>מסע</th><th>תיקייה במק</th><th>סרטונים</th><th>קיימים במק</th><th>חסרים</th></tr></thead>
+<tbody>{% for row in summary %}<tr{% if trip and row.trip.pk == trip.pk %} class="current"{% endif %}><td><a href="?trip={{ row.trip.code|urlencode }}">{{ row.trip.title }} [{{ row.trip.code }}]</a></td><td dir="ltr">{{ row.trip.local_video_folder|default:"—" }}</td><td>{{ row.total }}</td><td>{{ row.ok }}</td><td{% if row.missing %} style="color:#ff3b3b;font-weight:600"{% endif %}>{{ row.missing }}</td></tr>{% endfor %}</tbody>
+</table>
+{% if trip %}
+<h2>{{ trip.title }} [{{ trip.code }}]</h2>
+<form method="post">{% csrf_token %}<input type="hidden" name="trip" value="{{ trip.code }}"><input type="hidden" name="action" value="folder">
+<p><label>תיקיית הסרטונים במק: <input type="text" name="folder" value="{{ trip.local_video_folder }}" dir="ltr" size="70" placeholder="/Users/boazliebes/…/Video Output"></label> <button>שמירת התיקייה</button>
+{% if trip.local_video_folder and not folder_ok %}<br><strong style="color:#ff3b3b">התיקייה לא נגישה במחשב הזה.</strong>{% endif %}</p></form>
+{% if folder_ok %}<form method="post">{% csrf_token %}<input type="hidden" name="trip" value="{{ trip.code }}"><input type="hidden" name="action" value="auto"><p><button>מילוי אוטומטי של כל השמות הריקים לפי שם המין</button></p></form>{% endif %}
+<form method="post">{% csrf_token %}<input type="hidden" name="trip" value="{{ trip.code }}"><input type="hidden" name="action" value="files">
+<table class="local-videos">
+<thead><tr><th>#</th><th>תצפית</th><th>YouTube</th><th>קובץ במק</th><th>מצב</th><th></th></tr></thead>
+<tbody>{% for row in rows %}<tr>
+<td><a href="{% url 'admin:observations_sample_change' row.sample.pk %}">{{ row.sample.pk }}</a></td>
+<td dir="ltr">{{ row.sample.taxon_name|default:row.sample.title }}</td>
+<td><a href="{{ row.sample.video_url }}" target="_blank" rel="noopener">▶</a></td>
+<td>{% if files %}<select name="file-{{ row.sample.pk }}" dir="ltr"><option value="">— ללא —</option>{% if row.choice and row.choice not in files %}<option value="{{ row.choice }}" selected>{{ row.choice }} (לא בתיקייה)</option>{% endif %}{% for f in files %}<option value="{{ f }}"{% if f == row.choice %} selected{% endif %}>{{ f }}</option>{% endfor %}</select>{% else %}<input type="text" name="file-{{ row.sample.pk }}" value="{{ row.sample.local_video_file }}" dir="ltr" size="40">{% endif %}{% if row.suggested %} <small>(הצעה — טרם נשמרה)</small>{% endif %}</td>
+<td{% if row.status == 'missing' or row.status == 'not_found' %} style="color:#ff3b3b"{% endif %}>{{ row.status_label }}</td>
+<td>{% if row.play_url %}<a href="{{ row.play_url }}" target="_blank" rel="noopener">צפייה במקומי</a>{% endif %}</td>
+</tr>{% endfor %}</tbody></table>
+<p><button>שמירת שמות הקבצים</button></p></form>
+{% if unused %}<h3>קבצים בתיקייה שאינם משויכים לאף תצפית ({{ unused|length }})</h3><ul dir="ltr">{% for f in unused %}<li>{{ f }}</li>{% endfor %}</ul>{% endif %}
+{% endif %}
+{% endblock %}

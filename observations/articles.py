@@ -62,13 +62,12 @@ def note_html(row, lang, articles, binomials=None):
 
 
 def _area_links(species, lang):
-    from .gallery_data import taxon_media
+    from .gallery_data import area_is_live
     from .seo_text import area_label, multi_sea_country_ids
     multi = multi_sea_country_ids()
     links = []
     for area in species.areas.select_related('country', 'sea', 'defining_sample').exclude(slug__isnull=True).exclude(slug=''):
-        _thumb, image_url, video_id = taxon_media(area.defining_sample)
-        if image_url or video_id:
+        if area_is_live(area):
             links.append({'url': with_lang(reverse('species-page', args=[area.slug]), lang),
                           'name': species.scientific_name, 'place': area_label(area, lang, multi)})
     return links

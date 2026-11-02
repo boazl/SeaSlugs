@@ -22,6 +22,12 @@ def area_samples(area):
         species_other='', site_other='', undetermined_variant=area.undetermined_variant)
 
 
+def area_is_live(area):
+    """An area is shown (card, link, page) only when its defining sample is publicly showable AND it still has
+    observations of its own -- an area left behind when its trip moved to another country/sea is not."""
+    return bool(any(taxon_media(area.defining_sample)[1:]) and area_samples(area).exists())
+
+
 def annotate_area_cards(area):
     """Sets, on a gallery area shown as a card, what the card's observations contain:
     observation_count (the number the card shows), has_photo and has_video (any observation of the

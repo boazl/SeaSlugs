@@ -107,9 +107,9 @@ class SaveAndViewMixin:
 def species_site_pages(species):
     """[(button label, url)] for every public gallery page of the species -- areas whose defining
     sample is a published, publicly showable one (the same rule the gallery itself uses)."""
-    from .gallery_data import taxon_media
+    from .gallery_data import area_is_live
     areas = [a for a in species.areas.select_related('country', 'sea', 'defining_sample').order_by('country__name', 'sea__name', 'undetermined_variant', 'pk')
-             if a.slug and any(taxon_media(a.defining_sample))]
+             if a.slug and area_is_live(a)]
     pages = []
     for area in areas:
         label = 'צפייה בדף המין' if len(areas) == 1 else f'צפייה בדף המין — {area.country} · {area.sea}' + (f' ({area.undetermined_variant})' if area.undetermined_variant else '')
@@ -441,7 +441,7 @@ class TaxonGenusAdmin(DefiningSampleChoicesMixin, TaxonSitePageMixin, admin.Mode
 
 @admin.register(DiveTrip)
 class DiveTripAdmin(admin.ModelAdmin):
-    list_display = ['code','title','kind','year','month','country','region','site','species_count']
+    list_display = ['code','title','kind','year','month','country','region','site','species_count','local_video_folder']
     list_filter = ['kind','year','country','region','site']
     search_fields = ['code','title','region_name','reserve','site__name']
     readonly_fields = ['source_metadata']
@@ -601,9 +601,15 @@ class SampleStatusFilter(admin.ChoicesFieldListFilter):
         return queryset
 
 
+class AdminSampleBaseForm(SampleForm):
+    """The observation form plus the admin-only Mac video file name (local_videos.py) -- not on the members' form."""
+    class Meta(SampleForm.Meta):
+        fields = SampleForm.Meta.fields + ['local_video_file']
+
+
 @admin.register(Sample)
 class SampleAdmin(admin.ModelAdmin):
-    form = SampleForm
+    form = AdminSampleBaseForm
     list_display=['id','title','kind','order','family','genus','species','identification_qualifier','life_stage','trip_code','owner','status','publication_warning','deleted_at']
     # Like the Species list, the identification columns are editable straight from the list.
     list_editable=['order','family','genus','species','identification_qualifier','life_stage']
