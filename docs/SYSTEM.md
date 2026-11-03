@@ -372,8 +372,12 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
   - Cards per rank, framed by rank colour: order `#5555ff` 8px … genus `#ffffff` 2px; species cards are
     unframed.
   - Clicking an order, sub-order, superfamily or family card drills in (`state.drill={level,id}`,
-    `nextLevel()` skips ranks that add nothing).
+    `nextLevel()` skips ranks that add nothing, but never the genus: when one genus is left, even with one species, its genus card is shown).
   - **Clicking a genus card opens the genus page.**
+    In a filtered view (trip, region, site, photographer, year, area, search…) the card carries the filter:
+    `/genus/<name>/?areas=<area ids>&samples=<matching observation ids>&trip=<trip id>` (`genusPageHref`).
+    The genus page (`views.genus_page_focus`) then lists those species first, each card with the matching
+    observation's photo and count, a link to all the species, and the genus's other species as small cards.
   - "Others" cards collect species missing the shown rank.
 - **Player dialog:** opens a video or photo. `youtube-fallback.js` swaps a video that cannot be embedded
   (IFrame API `onError`, for example error 150) for the photo, with a "Watch on YouTube" link. The same
@@ -652,6 +656,7 @@ Catalogue of test modules (test count) and what each guards:
 | `tests` | 67 | Core workflow: registration privileges, first/repeat/Other publication, moderation completeness, owner-only edit/delete, hidden deleted records, image resizing, language cookie, listing defaults/filters |
 | `test_sample_taxonomy` | 65 | Sample order/family/genus/species by kind, cf./aff./juv., full name, image file name, form, transfer format compatibility |
 | `test_genus_page` | 58 | Genus page: identification file, captions, back/edit buttons, taxon pages' buttons, save messages |
+| `test_genus_page_filter` | 8 | The gallery's filter carried to the genus page: filtered species first with their matching observations, the others as small cards, stale parameters ignored |
 | `test_media_transfer` | 57 | One observation per species per trip; image storage, canonical names, replacing photos, environment image comparison and transfer |
 | `test_articles` | 73 | Article library, sections on pages, PDFs, previews, site-written articles, home articles |
 | `test_home_content` | 47 | SEO phase 3: server-rendered home content in both languages, editable home texts |

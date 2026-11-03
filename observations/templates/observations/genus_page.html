@@ -69,6 +69,12 @@ gtag('config', 'G-CPGTC09P2P');</script>
         .species-sources a:hover{color:var(--accent)}
         .species-share{margin-top:18px;font-size:14px;color:var(--muted);display:flex;flex-wrap:wrap;align-items:center;gap:10px}
         .species-share a{color:var(--accent);word-break:break-all}
+        .filter-note{margin:-6px 0 16px;font-size:15px}
+        .filter-note a{color:var(--accent)}
+        .grid.grid-small{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px 12px}
+        .grid-small .card h3{font-size:14px}
+        .grid-small .card-meta{font-size:12px}
+        .grid-small .play{width:28px;height:28px;font-size:12px;bottom:8px;left:8px}
         .species-share button{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:4px 10px;font-size:13px;cursor:pointer}
     </style>
 </head>
@@ -138,22 +144,23 @@ gtag('config', 'G-CPGTC09P2P');</script>
             {% endif %}
         </section>
         {% endif %}
-        <section class="species-section">
-            <h2>{{ "מינים בסוג זה"|t:lang }} <span class="group-count">({{ areas|species_of }})</span></h2>
+        <section class="species-section" id="species">
+{# A genus card clicked in a filtered gallery view (a trip, region, photographer...) brings that filter here
+   (views.genus_page_focus): its species first, the genus's other species after them as small cards. #}
+            <h2>{{ "מינים בסוג זה"|t:lang }}{% if filtered %} — {% if filter_trip %}{{ "במסע"|t:lang }} {{ filter_trip.title }}{% else %}{{ "לפי הסינון בגלריה"|t:lang }}{% endif %}{% endif %} <span class="group-count">({{ areas|species_of }})</span></h2>
+            {% if filtered %}<p class="filter-note"><a href="{{ request.path|with_lang:lang }}#species">{{ "הצגת כל המינים בסוג"|t:lang }}</a></p>{% endif %}
             <div class="grid">
-                {% for area in areas %}
-                <article class="card">
-                    <a class="video-button" href="{% url 'species-page' area.slug %}{% if lang == 'en' %}?lang=en{% endif %}">
-                        <span class="image-wrap"><img src="{% if area.defining_sample.image %}{% url 'observation-photo' area.defining_sample.pk %}{% else %}{{ area.defining_sample.thumbnail }}{% endif %}" alt="" width="640" height="360" loading="lazy">{% if area.has_photo and area.has_video %}<span class="play play-both{% if area.local_video_missing %} no-local{% endif %}" aria-hidden="true"><b>▶</b><i>⤢</i></span>{% elif area.has_video %}<span class="play{% if area.local_video_missing %} no-local{% endif %}" aria-hidden="true">▶</span>{% else %}<span class="play" aria-hidden="true">⤢</span>{% endif %}{% if area.observation_count > 1 %}<span class="count-badge" aria-hidden="true">{{ area.observation_count }}</span>{% endif %}</span>
-                        <span class="card-info">
-                            <h3 class="hebrew" dir="ltr">{{ area.species.scientific_name|name_html }}{% if area.undetermined_variant %} {{ area.undetermined_variant }}{% endif %}{% if area.species.author %} <span class="card-author">{{ area.species.author }}</span>{% endif %}</h3>
-                            <span class="card-meta"><span>{{ area.country|loc:lang }} · {{ area.sea|loc:lang }}</span>{% if area.observation_count > 1 %}<span>{{ area.observation_count }} {{ "תצפיות"|t:lang }}</span>{% endif %}</span>
-                        </span>
-                    </a>
-                </article>
-                {% endfor %}
+                {% for area in areas %}{% include 'observations/_genus_species_card.html' %}{% endfor %}
             </div>
         </section>
+        {% if other_areas %}
+        <section class="species-section genus-others">
+            <h2>{{ "מינים נוספים בסוג זה"|t:lang }} <span class="group-count">({{ other_areas|species_of }})</span></h2>
+            <div class="grid grid-small">
+                {% for area in other_areas %}{% include 'observations/_genus_species_card.html' %}{% endfor %}
+            </div>
+        </section>
+        {% endif %}
 
         {% if sources %}
         <details class="species-sources">

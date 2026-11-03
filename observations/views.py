@@ -312,6 +312,7 @@ def genus_page(request, name):
     from .defining import display_sample
     thumbnail, image_url, video_id = taxon_hero_media(display_sample(genus), areas)
     lang = get_lang(request)
+    focus = genus_page_focus(request, areas)
 
     def taxon_label(obj):
         if not obj:
@@ -326,7 +327,9 @@ def genus_page(request, name):
         from .local_videos import annotate_areas
         annotate_areas(areas)   # the manager's red ▶ on a card whose video has no local copy
     return render(request, 'observations/genus_page.html', {
-        'genus': genus, 'areas': areas,
+        'genus': genus, 'areas': focus['areas'] if focus else areas,
+        'filtered': bool(focus), 'filter_trip': focus['trip'] if focus else None,
+        'other_areas': focus['others'] if focus else [],
         'image_url': image_url, 'video_id': video_id, 'thumbnail': thumbnail,
         'taxon_order': taxon_order, 'taxon_family': taxon_family,
         'gallery_url': gallery_up_url('genus', genus.pk),
@@ -344,6 +347,54 @@ def genus_page(request, name):
         'edit_url': taxon_edit_url(request, Sample.Kind.GENUS, genus),
         'taxon_admin_url': taxon_admin_url(request.user, genus),
     })
+
+
+GENUS_FOCUS_LIMIT = 1000   # ids read from one query parameter, at most
+
+
+def _id_list(value):
+    """The positive integers in a comma-separated query value ('12,45,x' -> [12, 45]); junk is ignored."""
+    out = []
+    for part in (value or '').split(',')[:GENUS_FOCUS_LIMIT]:
+        part = part.strip()
+        if part.isdigit() and int(part) > 0:
+            out.append(int(part))
+    return out
+
+
+def genus_page_focus(request, areas):
+    """The gallery's filter, carried to the genus page. A genus card clicked in a filtered gallery view
+    (a dive trip, region, site, photographer, year, area, search...) opens the genus page with
+    ?areas=<SpeciesArea ids>&samples=<observation ids>[&trip=<trip id>] (dist/app.js, genusPageHref):
+    the page then shows those species first, each card with the matching observation's photo and the
+    matching observations' count -- as on the gallery's species cards -- and the genus's other
+    species after them as small cards. None when there is no (still valid) filter, so the page
+    shows every species as usual.
+    Returns {'areas': [...], 'others': [...], 'trip': DiveTrip or None}."""
+    wanted = set(_id_list(request.GET.get('areas')))
+    if not wanted:
+        return None
+    chosen = [area for area in areas if area.pk in wanted]
+    if not chosen:
+        return None   # a stale link (the species moved away): the whole genus, as without a filter
+    sample_ids = set(_id_list(request.GET.get('samples')))
+    for area in chosen:
+        if not sample_ids:
+            break
+        # the area's observations that match the filter; the whole area when none of them is in the list
+        # (scopedSamples in app.js narrows the same way: only when that leaves something)
+        scoped = list(area_samples(area).filter(pk__in=sample_ids).order_by('created_at', 'pk'))
+        if not scoped:
+            continue
+        area.card_sample = scoped[0]
+        area.observation_count = len(scoped)
+        area.has_photo = any(s.image for s in scoped)
+        area.has_video = any(s.video_url for s in scoped)
+        if not (area.has_photo or area.has_video):
+            area.has_photo = True
+    trip_ids = _id_list(request.GET.get('trip'))
+    trip = DiveTrip.objects.filter(pk=trip_ids[0]).first() if trip_ids else None
+    return {'areas': chosen, 'others': [area for area in areas if area.pk not in wanted], 'trip': trip}
 
 
 def genus_identification_context(genus, lang):

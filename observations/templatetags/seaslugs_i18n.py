@@ -115,6 +115,11 @@ TRANSLATIONS = {
     'פתיחה או סגירה של דגימות המסע': 'Show or hide the trip observations',
     'מינים בגלריה': 'Species in the gallery',
     'מינים בסוג זה': 'Species in this genus',
+    # the gallery's filter carried to the genus page (views.genus_page_focus)
+    'במסע': 'on the trip',
+    'לפי הסינון בגלריה': 'matching the gallery filter',
+    'הצגת כל המינים בסוג': 'Show all the species of the genus',
+    'מינים נוספים בסוג זה': 'More species of this genus',
     'תצפיות, תמונות ומידע מאתר SeaSlugs, אתר חינניות הים.': 'Observations, photos and information from SeaSlugs, the sea slugs website.',
     'משפחות': 'Families',
     'סוגים': 'Genera',

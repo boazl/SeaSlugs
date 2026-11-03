@@ -1093,6 +1093,10 @@ function nextLevel(level, species) {
         const keys = new Set(species.map(sp => rankKey(sp, LEVELS[i])).filter(Boolean));
         if (keys.size > 1) return LEVELS[i];
     }
+    // Drilling never jumps over the genus: when what is left is one genus (e.g. a filtered view with a single
+    // species), its genus card is shown, and it opens the genus page (with the gallery's filter, genusPageHref).
+    if (LEVELS.indexOf(level) < LEVELS.indexOf('genus') && species.length && species.every(sp => rankKey(sp, 'genus'))
+        && new Set(species.map(sp => rankKey(sp, 'genus'))).size === 1) return 'genus';
     return 'species';
 }
 // A drilled-into taxon {level, id}, optionally narrowed to its "Others": the species with no
@@ -1223,7 +1227,7 @@ function buildTaxonCard(level, key, members, index, others) {
         // a fuller view than the gallery's species cards of that genus.
         if (level === 'genus' && !others && href) {
             saveGalleryView(); keepScrollInHistory();
-            window.location.href = href + (language === 'en' ? '?lang=en' : '');
+            window.location.href = genusPageHref(href, key, members);
             return;
         }
         if (others && state.drill) state.drill = { ...state.drill, blanks: [...(state.drill.blanks || []), level] };
@@ -1253,11 +1257,30 @@ function buildTaxonCard(level, key, members, index, others) {
     if (href) {
         const page = document.createElement('a');
         page.className = 'taxon-card-page';
-        page.href = href + (language === 'en' ? '?lang=en' : '');
+        page.href = level === 'genus' ? genusPageHref(href, key, members) : href + (language === 'en' ? '?lang=en' : '');
         page.textContent = language === 'he' ? 'לדף ↗' : 'Page ↗';
         article.append(page);
     }
     return article;
+}
+// The genus page of a genus card. In a filtered view (a dive trip, region, site, photographer, year, area,
+// search...) the card stands for only some of the genus's species, so the filter goes with it: the page shows
+// those species first -- each with the observation(s) matching the filter, as on the gallery's species cards --
+// and the genus's other species after them as small cards (views.genus_page_focus):
+//   ?areas=<the cards' area ids>&samples=<the matching observations' ids>&trip=<the chosen trip>
+function genusPageHref(href, key, members) {
+    const params = new URLSearchParams();
+    const wholeGenus = speciesList.filter(sp => rankKey(sp, 'genus') === String(key)).length;
+    const scoped = members.map(sp => scopedSamples(sp));
+    if (members.length < wholeGenus || scoped.some(Boolean)) {
+        params.set('areas', members.map(sp => sp.area_id).join(','));
+        const sampleIds = scoped.flatMap(list => (list || []).map(sm => sm.sample_id));
+        if (sampleIds.length) params.set('samples', sampleIds.join(','));
+        if (state.collection) params.set('trip', state.collection);
+    }
+    if (language === 'en') params.set('lang', 'en');
+    const query = params.toString();
+    return href + (query ? '?' + query : '');
 }
 levelSelect.addEventListener('change', e => { setLevel(e.target.value); render(); });
 
