@@ -11,13 +11,13 @@ from .models import Sample, SpeciesArea, TaxonGenus
 
 
 class StaticViewSitemap(Sitemap):
-    """The one page every visitor starts from."""
+    """The pages every visitor starts from: the gallery and the news & activity page."""
     protocol = 'https'
     changefreq = 'daily'
     priority = 0.8
 
     def items(self):
-        return ['gallery']
+        return ['gallery', 'news']
 
     def location(self, item):
         return reverse(item)

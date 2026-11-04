@@ -27,5 +27,10 @@ class GalleryViewRestoreSourceTests(SimpleTestCase):
     def test_the_gallery_saves_its_view_and_restores_it_for_restore_1(self):
         self.assertIn("sessionStorage.setItem(GALLERY_VIEW_KEY", APP_JS)
         self.assertIn("if (!params.has('restore')) return null;", APP_JS)
-        self.assertIn("window.addEventListener('pagehide', () => saveGalleryView());", APP_JS)
-        self.assertIn("const restoredScroll = restoreGalleryView();", APP_JS)
+        # leaving the page also keeps the scroll position in the history entry, for the browser Back button
+        self.assertIn("window.addEventListener('pagehide', () => { saveGalleryView(); keepScrollInHistory(); });", APP_JS)
+        # the saved view is restored first; "back to the gallery" (?up=) then moves to the taxon's rank, and without a
+        # saved view the browser's history entry (Back/Forward) is used
+        self.assertIn("let restoredScroll = restoreGalleryView();", APP_JS)
+        self.assertIn("if (applyUpParam()) restoredScroll = null;", APP_JS)
+        self.assertIn("else if (restoredScroll === null) restoredScroll = restoreFromHistory();", APP_JS)

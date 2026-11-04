@@ -4,7 +4,7 @@
 > what the system is for, how it is built, the rules it follows, and how to change it safely. It contains
 > enough detail to rebuild the system from scratch.
 >
-> Last verified against the code: 2026-10-31 (git `main`, migration `0083`).
+> Last verified against the code: 2026-11-04 (git `main`, migration `0087`).
 > Repository: `https://github.com/boazl/SeaSlugs` · Local copy: `/Users/boazliebes/SeaSlugs` (macOS)
 >
 > Companion files: `CLAUDE.md` (short working rules, read first), `TABLE-TRANSFER.md` (data-transfer
@@ -157,6 +157,8 @@ observations/
   counts.py          species/observation counter wording (mirrors app.js)
   trip_naming.py     suggested dive-trip name and code
   notifications.py   new-user email
+  activity.py        activity log (signals) and the visit counter middleware (§7.4)
+  news.py            the /news/ page: activity feed, posts, progress chart, management data (§7.4)
   reference_links.py admin-only iNaturalist/WoRMS link per species
   management/commands/   one-off imports and maintenance commands (§9.3)
   migrations/        0001…0083 (many are data migrations that fix the catalogue; keep them)
@@ -266,6 +268,8 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
   - `bio`, `trip_code` (the photographer letter), and M2M `regions` and `countries`.
 - **`HomeText`**: (`key`, `lang`) → editable home-page section text.
 - **`SiteImage`**: (`key`) → home intro photo.
+- **`ActivityEvent`**, **`NewsPost`**, **`DailyPageView`**, **`DailyVisitor`**: the activity log, the manager's
+  news posts and the visit counter (§7.4). Per environment; none of them travels between the Mac and the site.
 - **Users:** Django `auth.User` with groups created by `setup_community`:
   - New user, Macro diver, Subscriber, Macro photographer, Artist, Scientist, Administrator.
   - A guest photographer without an account is an **inactive user** who owns their observations.
@@ -357,7 +361,8 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
 | `/observations/signup/`, `login/`, `logout/`, `profile/`, `partners/` | Community |
 | `/observations/home-text/` | Manager editor for home-page sections |
 | `/sitemap.xml`, `/robots.txt`, `/healthz` | SEO and health |
-| `/analytics/exclude/`, `/analytics/include/` | Owner's GA opt-out cookie (not linked anywhere) |
+| `/analytics/exclude/`, `/analytics/include/` | Owner's GA opt-out cookie (not linked anywhere); also stops the site's own visit counter |
+| `/news/` | News & activity (§7.4): public activity feed, posts, planned trips, progress chart; management data for staff |
 
 ### 7.2 The gallery (`dist/app.js`)
 
@@ -414,6 +419,32 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
 - **Gallery strings:** `app.js` has its own lookup and swaps both languages without a reload.
 - The header (`dist/site-header.css`, `account_menu.html`) is identical on all pages: brand, credit
   line, icon menu, language button and opening panel.
+
+### 7.4 News & activity page and the activity log (`activity.py`, `news.py`, migrations `0086`–`0087`)
+
+- **Activity log (`ActivityEvent`)** is written by model signals, so every path is covered (form, admin, table/image
+  transfer, scripts). **Each environment keeps its own log**: on the live site an observation enters the log when it
+  is transferred there; the log itself is never transferred.
+  - `observation_added` (species or collection observation becomes public for the first time, once per `transfer_id`),
+    `video_added` (once per YouTube id), `species_new` (a new SpeciesArea; `detail.new_to_site` / `new_to_sea`),
+    `species_changed` (species / cf. / variant of a public observation; old and new names), `observation_updated`
+    (photo hash, notes, site, depth, day, titles, life stage; folded into one line per 24 h; saves within 10 minutes
+    of adding are part of adding), `signup` and `login` (private).
+  - Not logged: pending observations, taxon-kind observations, `SpeciesArea.rebuild()` (`activity.suppressed()`),
+    accounts with an unusable password (table transfer) or inactive guests, and the owner (superusers and
+    `ACTIVITY_EXCLUDED_USERNAMES`, default `boazl`).
+  - Migration `0087` back-fills the log from existing data (`detail.backfill`).
+- **Visit counter** (`activity.VisitCounterMiddleware`): views of public HTML pages per page per day
+  (`DailyPageView`) and visitors per day (`DailyVisitor`, a salted daily hash of IP + browser; no cookie). Skips
+  `/admin/`, bots, the owner, and the `exclude_analytics=1` cookie. Counting can never break a page.
+- **`/news/`** (public, in the sitemap): posts (`NewsPost`, written in the admin of each site, with simple markup),
+  planned dive trips (`NewsPost` kind `trip`, shown until `trip_end`; `DiveTrip` cannot hold future years),
+  period (last week by default, or a month and/or year from two lists; only years and months with activity are offered) and sea filter, the feed sections (only lines whose observation/card is still public),
+  and a cumulative bar chart of published observations and species since the first observation (one bar pair per
+  day across the same width; the species number written in the bar only on days it changes; the observations bar behind the species bar, same width, no gaps; new observations shown as small picture cards; the y axis is labelled with the observation totals the bars reach, nudged apart when close; follows the sea
+  filter; y axis from 0 with grid lines every 20; x axis month names with the year
+  under its months). Staff also see visits,
+  top pages, users (joined, last login, logins in 30 days, observations) and recent logins.
 
 ## 8. Storage of media and documents
 
@@ -551,7 +582,7 @@ The owner curates data mostly on the Mac and moves it to production. Rules that 
 Done between 2026-09-26 and 2026-10-11:
 
 1. **`/sitemap.xml`** (`django.contrib.sitemaps`, `SITEMAPS` in `observations/sitemaps.py`): the home
-   page plus species, genus, family and order pages. It lists **only pages that answer 200**, applying
+   page, the news page, plus species, genus, family and order pages. It lists **only pages that answer 200**, applying
    the same rule as the page views. HTTPS on the Site domain.
 2. **`/robots.txt`**
    - Disallows `/admin/`, `/analytics/`, the members-only listing (`/observations/$`), and the forms,
@@ -658,6 +689,7 @@ Catalogue of test modules (test count) and what each guards:
 | `test_genus_page` | 58 | Genus page: identification file, captions, back/edit buttons, taxon pages' buttons, save messages |
 | `test_genus_page_filter` | 8 | The gallery's filter carried to the genus page: filtered species first with their matching observations, the others as small cards, stale parameters ignored |
 | `test_media_transfer` | 57 | One observation per species per trip; image storage, canonical names, replacing photos, environment image comparison and transfer |
+| `test_news_activity` | 25 | Activity log events, visit counter exclusions, /news/ page, posts, backfill |
 | `test_articles` | 73 | Article library, sections on pages, PDFs, previews, site-written articles, home articles |
 | `test_home_content` | 47 | SEO phase 3: server-rendered home content in both languages, editable home texts |
 | `test_gallery` | 37 | `/observations/` filters, manager-only owner filter, sort, dropdown options |

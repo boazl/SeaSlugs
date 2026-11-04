@@ -715,3 +715,32 @@ class SampleAdmin(admin.ModelAdmin):
                 item.deleted_at,item.deleted_by=deleted_at,deleted_by
                 self.message_user(request,format_html('{} לא שוחזרה: {} לשחזור יש להוסיף מדיה ב<a href="{}">עריכת התצפית</a> ולסמן שם "שחזור".',
                     item,' '.join(exc.messages),reverse('observation-edit',args=[item.pk])),messages.ERROR)
+
+
+# --- the /news/ page: manager-written posts and the activity log (see activity.py) ---------------------------------
+from .models import ActivityEvent, NewsPost  # noqa: E402
+
+
+@admin.register(NewsPost)
+class NewsPostAdmin(admin.ModelAdmin):
+    list_display = ('title_he', 'kind', 'published_on', 'trip_start', 'pinned', 'is_published')
+    list_filter = ('kind', 'is_published', 'pinned')
+    list_editable = ('pinned', 'is_published')
+    search_fields = ('title_he', 'title_en', 'body_he', 'body_en')
+    fieldsets = ((None, {'fields': ('kind', 'published_on', 'pinned', 'is_published')}),
+                 ('עברית', {'fields': ('title_he', 'body_he')}),
+                 ('English', {'fields': ('title_en', 'body_en')}),
+                 ('מסע צלילה מתוכנן', {'fields': ('trip_start', 'trip_end')}))
+    def view_on_site(self, obj): return reverse('news')
+
+
+@admin.register(ActivityEvent)
+class ActivityEventAdmin(admin.ModelAdmin):
+    """Read-only view of the log; a line can be deleted (e.g. a mistaken entry) to hide it from the news page."""
+    list_display = ('created_at', 'kind', 'name', 'old_name', 'user', 'country', 'sea', 'public', 'count')
+    list_filter = ('kind', 'public', 'sea')
+    search_fields = ('name', 'old_name', 'user__username')
+    date_hierarchy = 'created_at'
+    list_select_related = ('user', 'country', 'sea')
+    def has_add_permission(self, request): return False
+    def has_change_permission(self, request, obj=None): return False

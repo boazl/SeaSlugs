@@ -1331,7 +1331,8 @@ class SpeciesArea(models.Model):
         that currently exist: one row per species+country+sea+undetermined_variant with at
         least one published sample, each pointing at pick_defining_sample's choice. Safe to
         re-run at any time -- only this table is touched, Sample data is never changed."""
-        with transaction.atomic():
+        from .activity import suppressed
+        with transaction.atomic(), suppressed():   # recreated cards are not new species (activity log)
             # The hand-written notes are not derived from the samples: keep them for the rows that come back.
             notes = {(a.species_id, a.country_id, a.sea_id, a.undetermined_variant): (a.note_he, a.note_en)
                      for a in SpeciesArea.objects.exclude(note_he='', note_en='')}
@@ -1487,3 +1488,92 @@ models.signals.post_delete.connect(_delete_article_files, sender=Article, dispat
 
 for _model, _fields in _REPLACEABLE_FILES:
     models.signals.pre_save.connect(_delete_replaced_files, sender=_model, dispatch_uid='delete_replaced_files_%s' % _model.__name__)
+
+
+# --- the activity log, news posts and the visit counter (see activity.py and the /news/ page) -------------------
+class ActivityEvent(models.Model):
+    """One line of the site's activity log, written automatically (activity.py) wherever the change happens -- the
+    observation form, the admin, a table transfer or a script. Each environment keeps its own log (it never travels
+    between the Mac and the live site): on the live site an observation appears in the log when it arrives there.
+    Public kinds are shown on the /news/ page; signup and login are seen by managers only."""
+    class Kind(models.TextChoices):
+        OBSERVATION_ADDED = 'observation_added', 'תצפית חדשה'
+        VIDEO_ADDED = 'video_added', 'סרטון חדש'
+        SPECIES_NEW = 'species_new', 'מין חדש באזור'
+        OBSERVATION_UPDATED = 'observation_updated', 'עדכון תצפית'
+        SPECIES_CHANGED = 'species_changed', 'שינוי בהגדרת המין'
+        SIGNUP = 'signup', 'הרשמה'
+        LOGIN = 'login', 'כניסה'
+    PUBLIC_KINDS = ('observation_added', 'video_added', 'species_new', 'observation_updated', 'species_changed')
+    kind = models.CharField('סוג', max_length=30, choices=Kind.choices, db_index=True)
+    created_at = models.DateTimeField('זמן', default=timezone.now, db_index=True)
+    public = models.BooleanField('מוצג בדף החדשות', default=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+',
+                             verbose_name='משתמש / צלם')
+    sample = models.ForeignKey('Sample', null=True, blank=True, on_delete=models.SET_NULL, related_name='+', verbose_name='תצפית')
+    sample_transfer_id = models.UUIDField(null=True, blank=True, db_index=True)
+    species = models.ForeignKey(Species, null=True, blank=True, on_delete=models.SET_NULL, related_name='+', verbose_name='מין')
+    species_area = models.ForeignKey('SpeciesArea', null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+    country = models.ForeignKey(Country, null=True, blank=True, on_delete=models.SET_NULL, related_name='+', verbose_name='מדינה')
+    sea = models.ForeignKey(Sea, null=True, blank=True, on_delete=models.SET_NULL, related_name='+', verbose_name='ים')
+    name = models.CharField('שם (בזמן האירוע)', max_length=300, blank=True)
+    old_name = models.CharField('שם קודם', max_length=300, blank=True)
+    detail = models.JSONField(default=dict, blank=True)
+    count = models.PositiveIntegerField('מספר עדכונים', default=1)
+    class Meta:
+        ordering = ['-created_at', '-pk']
+        verbose_name = 'אירוע ביומן הפעילות'; verbose_name_plural = 'יומן פעילות'
+    def __str__(self): return f'{self.get_kind_display()} · {self.name} · {self.created_at:%Y-%m-%d %H:%M}'
+
+
+class NewsPost(models.Model):
+    """A message the manager writes for the /news/ page: site developments, instructions, a planned dive trip or
+    general news. Written in the admin of the site it should appear on (it does not travel between environments)."""
+    class Kind(models.TextChoices):
+        NEWS = 'news', 'חדשות'
+        DEVELOPMENT = 'development', 'פיתוח באתר'
+        INSTRUCTIONS = 'instructions', 'הוראות והדרכה'
+        TRIP = 'trip', 'מסע צלילה מתוכנן'
+    kind = models.CharField('סוג', max_length=20, choices=Kind.choices, default=Kind.NEWS)
+    title_he = models.CharField('כותרת (עברית)', max_length=200)
+    title_en = models.CharField('כותרת (אנגלית)', max_length=200, blank=True)
+    body_he = models.TextField('תוכן (עברית)', blank=True, help_text='**מודגש**, [טקסט](קישור), - רשימה, שורה ריקה = פסקה חדשה.')
+    body_en = models.TextField('תוכן (אנגלית)', blank=True)
+    published_on = models.DateField('תאריך פרסום', default=date.today)
+    trip_start = models.DateField('תחילת המסע', null=True, blank=True, help_text='למסע מתוכנן: מוצג ברשימת המסעות המתוכננים עד סיומו.')
+    trip_end = models.DateField('סיום המסע', null=True, blank=True)
+    pinned = models.BooleanField('נעוץ בראש הדף', default=False)
+    is_published = models.BooleanField('מפורסם', default=True)
+    class Meta:
+        ordering = ['-pinned', '-published_on', '-pk']
+        verbose_name = 'הודעה בדף החדשות'; verbose_name_plural = 'הודעות בדף החדשות'
+    def __str__(self): return self.title_he
+    def title(self, lang): return (self.title_en or self.title_he) if lang == 'en' else (self.title_he or self.title_en)
+    def body(self, lang): return (self.body_en or self.body_he) if lang == 'en' else (self.body_he or self.body_en)
+    def clean(self):
+        super().clean()
+        if self.trip_start and self.trip_end and self.trip_end < self.trip_start:
+            raise ValidationError({'trip_end': 'סיום המסע לפני תחילתו.'})
+
+
+class DailyPageView(models.Model):
+    """Page views of one public page on one day (the visit counter, activity.VisitCounterMiddleware)."""
+    day = models.DateField(db_index=True)
+    path = models.CharField(max_length=300)
+    views = models.PositiveIntegerField(default=0)
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['day', 'path'], name='unique_daily_page_view')]
+        verbose_name = 'צפיות בדף ביום'; verbose_name_plural = 'צפיות בדפים'
+
+
+class DailyVisitor(models.Model):
+    """One anonymous visitor on one day: a salted hash of the day, IP and browser -- not reversible to an address and
+    different every day, so visitors are counted per day without being followed."""
+    day = models.DateField(db_index=True)
+    key = models.CharField(max_length=64)
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['day', 'key'], name='unique_daily_visitor')]
+        verbose_name = 'מבקר ביום'; verbose_name_plural = 'מבקרים'
+
+
+from . import activity  # noqa: E402,F401  (connects the activity-log signals)

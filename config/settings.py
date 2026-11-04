@@ -85,6 +85,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'observations.middleware.MaintenanceModeMiddleware',
     'observations.middleware.LanguagePreferenceMiddleware',
+    'observations.activity.VisitCounterMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
