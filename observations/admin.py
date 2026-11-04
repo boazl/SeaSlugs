@@ -604,7 +604,7 @@ class SampleStatusFilter(admin.ChoicesFieldListFilter):
 class AdminSampleBaseForm(SampleForm):
     """The observation form plus the admin-only Mac video file name (local_videos.py) -- not on the members' form."""
     class Meta(SampleForm.Meta):
-        fields = SampleForm.Meta.fields + ['local_video_file']
+        fields = SampleForm.Meta.fields + ['local_video_file', 'drive_video_id']
 
 
 @admin.register(Sample)

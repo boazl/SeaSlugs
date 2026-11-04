@@ -23,6 +23,7 @@ STATUS_MISSING = 'missing'    # it has a YouTube video but no local copy is reco
 STATUS_NOT_FOUND = 'not_found'  # recorded, the folder is reachable here, but the file is not in it
 STATUS_OK = 'ok'              # recorded and the file exists here
 STATUS_UNREACHABLE = 'unreachable'  # recorded, but the folder is not reachable on this machine (live site, unplugged drive)
+STATUS_DRIVE = 'drive'        # not playable from this machine's disk, but its copy in Google Drive is (the live site)
 
 
 def validate_local_video_folder(value):
@@ -33,6 +34,21 @@ def validate_local_video_folder(value):
         raise ValidationError('יש להזין נתיב מלא לתיקייה במק, שמתחיל ב-"/" (למשל /Users/boazliebes/Movies/…).')
     if '\x00' in value or any(part == '..' for part in PurePosixPath(value).parts):
         raise ValidationError('נתיב התיקייה אינו תקין.')
+
+
+DRIVE_ID_RE = r'[A-Za-z0-9_-]{10,100}'
+
+
+def validate_drive_video_id(value):
+    """Blank, or a Google Drive file id (letters, digits, - and _)."""
+    import re as _re
+    if value and not _re.fullmatch(DRIVE_ID_RE, value):
+        raise ValidationError('מזהה קובץ Google Drive אינו תקין.')
+
+
+def drive_preview_url(sample):
+    """Google Drive's player for the observation's copy in the shared Videos folder ('' when there is none)."""
+    return f'https://drive.google.com/file/d/{sample.drive_video_id}/preview' if getattr(sample, 'drive_video_id', '') else ''
 
 
 def validate_local_video_file(value):
@@ -192,6 +208,9 @@ def statuses(samples):
         parent = path.parent
         if parent not in folders: folders[parent] = parent.is_dir()
         result[sample.pk] = STATUS_UNREACHABLE if not folders[parent] else STATUS_OK if path.is_file() else STATUS_NOT_FOUND
+    for sample in samples:
+        if result.get(sample.pk) not in (None, STATUS_OK) and getattr(sample, 'drive_video_id', ''):
+            result[sample.pk] = STATUS_DRIVE
     return result
 
 
@@ -208,6 +227,8 @@ def annotate(samples):
     for sample in samples:
         status = found.get(sample.pk)
         sample.local_video_url = local_video_url(sample) if status == STATUS_OK else ''
+        # Off the Mac (the live site) the copy in the shared Google Drive folder plays instead.
+        sample.drive_video_url = drive_preview_url(sample) if status == STATUS_DRIVE else ''
         sample.local_video_missing = status in NO_LOCAL_STATUSES
 
 

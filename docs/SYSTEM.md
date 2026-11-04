@@ -476,6 +476,13 @@ never serves `MEDIA_ROOT` directly.** Every file goes through a view that checks
   - Filling: `python manage.py match_local_videos` (dry run; `--apply`, `--trip/--folder/--set ID=FILE`; launcher
     `_Match local videos.command`) and the page `/admin/local-videos/`. Matching is by species name without the
     author (cf./sp. N/variant/juv. as written, optional place word like "RedSea"); `.mov` wins over a second export.
+  - **Live site:** `copy_to_drive` (launcher `_Copy SeaSlugs to Google Drive.command`) copies the site (without
+    `.venv`, `.git`, `.env`, `.secret_key`; the DB as an online backup) and every local video to the Google Drive
+    folder `SeaSlugs.org.il`, videos under `Videos/<path under home>` (mirrored). Only `Videos` is shared
+    ("anyone with the link"). `fill_drive_video_ids` (launcher `_Fill Drive video ids.command`) reads each copy's
+    Drive id (xattr `com.google.drivefs.item-id#S`) into `Sample.drive_video_id`, which travels with the samples
+    table. Where the Mac file is unreachable but a Drive id exists (status `drive`), a manager sees Drive's player
+    (`/file/d/<id>/preview`) instead of the red mark.
 - **Cleanup of replaced or cleared files**
   - The `_delete_replaced_files` pre-save signal deletes the old file unless another row still uses it.
     It applies to Article PDFs and thumbs and to all TaxonGenus file fields.

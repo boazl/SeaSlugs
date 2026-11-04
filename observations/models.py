@@ -10,7 +10,7 @@ from django.core.validators import MinValueValidator, MaxValueValidator, FileExt
 from django.db import models, transaction
 from django.utils import timezone
 from django.utils.text import slugify
-from .local_videos import validate_local_video_folder, validate_local_video_file
+from .local_videos import validate_local_video_folder, validate_local_video_file, validate_drive_video_id
 
 
 def normalize_sp_spacing(text):
@@ -836,6 +836,9 @@ class Sample(models.Model):
     # The file name of this observation's video inside its trip's local_video_folder (see local_videos.py).
     local_video_file = models.CharField('שם קובץ הסרטון במק', max_length=255, blank=True, validators=[validate_local_video_file],
         help_text='שם הקובץ בלבד (למשל Phyllidia ocellata.mp4), בתוך תיקיית הסרטונים של מסע הצלילה.')
+    # The same file's copy in the shared Google Drive folder (copy_to_drive / fill_drive_video_ids): plays on the live site.
+    drive_video_id = models.CharField('מזהה הסרטון ב-Google Drive', max_length=100, blank=True, validators=[validate_drive_video_id],
+        help_text='מזהה הקובץ בתיקיית Videos המשותפת ב-Google Drive. מתמלא אוטומטית (fill_drive_video_ids).')
     image = models.ImageField('תמונה חלופית (רשות)', upload_to='observations/', blank=True)
     # "תמונה קיימת בגלריה": this observation shows the image of ANOTHER observation (the file's
     # one owner) instead of a file of its own. Each stored photo has exactly one owner -- the

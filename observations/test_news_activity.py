@@ -203,6 +203,13 @@ class NewsPageTests(Base):
         self.assertNotIn('תצפיות שעודכנו</span>', html)
         self.assertNotIn('<b>0</b>', html)
 
+    def test_a_new_video_links_to_its_observation(self):
+        self.observe()
+        html = self.client.get('/news/').content.decode()
+        card = html.split('class="video-card"')[1].split('>')[0]
+        self.assertIn('/species/', card)                                               # the observation's page
+        self.assertNotIn('youtu', card)
+
     def test_a_removed_observation_drops_out(self):
         sample = self.observe()
         sample.soft_delete(self.member)

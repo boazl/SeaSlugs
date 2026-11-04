@@ -12,7 +12,7 @@ TAXONOMY_FIELDS = ('order', 'family', 'genus', 'identification_qualifier', 'life
 NOTE_FIELDS = ('note_he', 'note_en')
 # The observation's Mac video file name (local_videos.py), added later still: an older row (an older file, or an
 # image carrying its row from an environment without the field) leaves the target's file name as it is.
-LOCAL_VIDEO_FIELDS = ('local_video_file',)
+LOCAL_VIDEO_FIELDS = ('local_video_file', 'drive_video_id')
 
 
 def _describe(sample):
@@ -164,7 +164,8 @@ def sample_plan(document, fields, restore_deleted=True):
             incoming = dict(incoming); deleted = incoming.pop('deleted') in ('1', 1, True)
         missing = set(fields) - set(incoming) if isinstance(incoming, dict) else None
         keep_notes = bool(missing) and set(NOTE_FIELDS) <= missing
-        keep_local_video = bool(missing) and set(LOCAL_VIDEO_FIELDS) <= missing
+        # each local-video field a row lacks (an older file) keeps the target's own value
+        keep_local_video = [f for f in LOCAL_VIDEO_FIELDS if missing and f in missing]
         if missing and set(incoming) <= set(fields) and missing - set(TAXONOMY_FIELDS) - {'gallery_source', 'title_en'} - set(NOTE_FIELDS) - set(LOCAL_VIDEO_FIELDS) in (set(), {'transfer_id','image'}):
             # A row from an older environment/file: no order/family/genus/qualifier/life stage
             # (a taxon-level sample then carried its name in species_other), and possibly no
@@ -270,7 +271,7 @@ def sample_plan(document, fields, restore_deleted=True):
         if keep_notes and obj:
             for field in NOTE_FIELDS: values[field] = getattr(obj, field)
         if keep_local_video and obj:
-            for field in LOCAL_VIDEO_FIELDS: values[field] = getattr(obj, field)
+            for field in keep_local_video: values[field] = getattr(obj, field)
         warnings = []; pending_gallery = None
         gallery_tid = values.pop('gallery_source', '') if 'gallery_source' in values else ''
         values['gallery_source'] = None

@@ -59,7 +59,8 @@ gtag('config', 'G-CPGTC09P2P');</script>
         .local-video-box video{display:block;width:100%;aspect-ratio:16/9;background:#000;border-radius:6px}
         .local-video-missing{margin:8px 0 0;font-size:13px;color:#ff3b3b}
         .local-video-link{display:inline-block;margin-top:8px;font-size:13px;color:var(--accent)}
-        .lightbox-video video{width:100%;height:100%;display:block;background:#000}
+        .lightbox-video video,.lightbox-video iframe.drive-video{width:100%;height:100%;display:block;background:#000;border:0}
+        .local-video-box iframe.drive-video{display:block;width:100%;aspect-ratio:16/9;border:0;background:#000;border-radius:6px}
         .species-summary h1{font-family:Georgia,"Times New Roman",serif;font-weight:400;font-size:24px;line-height:1.25;margin:0 0 6px;color:var(--ink)}
         .species-common{color:var(--muted);font-size:17px;margin:0 0 6px}
         .species-area{color:var(--muted);font-size:14px;margin:0 0 14px}
@@ -143,7 +144,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
                     <span class="play{% if s.local_video_missing %} no-local{% endif %}" aria-hidden="true">{% if s.video_url %}▶{% else %}⤢{% endif %}</span>
                 </a>
                 {% endif %}
-                {% if s.local_video_url %}<div class="local-video-box"><p>{{ "סרטון מקומי (offline)"|t:lang }}</p><video controls playsinline preload="metadata" src="{{ s.local_video_url }}" title="{{ species_label }}"></video></div>{% elif s.local_video_missing %}<p class="local-video-missing">{{ "אין גרסה מקומית (offline) לסרטון"|t:lang }}</p>{% endif %}
+                {% if s.local_video_url %}<div class="local-video-box"><p>{{ "סרטון מקומי (offline)"|t:lang }}</p><video controls playsinline preload="metadata" src="{{ s.local_video_url }}" title="{{ species_label }}"></video></div>{% elif s.drive_video_url %}<div class="local-video-box"><p>{{ "סרטון מקומי (offline)"|t:lang }} · Google Drive</p><iframe class="drive-video" src="{{ s.drive_video_url }}" title="{{ species_label }}" allow="autoplay; fullscreen" allowfullscreen loading="lazy"></iframe></div>{% elif s.local_video_missing %}<p class="local-video-missing">{{ "אין גרסה מקומית (offline) לסרטון"|t:lang }}</p>{% endif %}
                 {# The main observation's caption: site · date · photographer, separators only between parts present. #}
                 {% with photog=s|photographer_name:lang %}
                 <p class="species-caption">{% if s.site %}{{ s.site|loc:lang }}{% endif %}{% if s.trip.year %}{% if s.site %} · {% endif %}{% if s.day and s.trip.month %}{{ s.day }}/{{ s.trip.month }}/{{ s.trip.year }}{% else %}{{ s.trip.year }}{% endif %}{% endif %}{% if photog %}{% if s.site or s.trip.year %} · {% endif %}{{ "צילום:"|t:lang }} {{ photog }}{% endif %}</p>
@@ -246,7 +247,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
                         </span>
                     </a>
                     {% if s.note %}<p class="observation-note" role="note">{{ s.note }}</p>{% endif %}
-                    {% if s.local_video_url %}<a class="local-video-link" href="{{ s.local_video_url }}" data-local-video="1">▶ {{ "סרטון מקומי (offline)"|t:lang }}</a>{% elif s.local_video_missing %}<p class="local-video-missing">{{ "אין גרסה מקומית (offline) לסרטון"|t:lang }}</p>{% endif %}
+                    {% if s.local_video_url %}<a class="local-video-link" href="{{ s.local_video_url }}" data-local-video="1">▶ {{ "סרטון מקומי (offline)"|t:lang }}</a>{% elif s.drive_video_url %}<a class="local-video-link" href="{{ s.drive_video_url }}" data-drive-video="1">▶ {{ "סרטון מקומי (offline)"|t:lang }} · Google Drive</a>{% elif s.local_video_missing %}<p class="local-video-missing">{{ "אין גרסה מקומית (offline) לסרטון"|t:lang }}</p>{% endif %}
                     {% if can_copy_image and s.image %}<button type="button" class="copy-photo-url" data-copy-url="{% url 'observation-photo' s.pk %}" data-done="{{ "הכתובת הועתקה"|t:lang }}" style="margin-top:8px;padding:4px 10px;font-size:13px">{{ "העתקת כתובת התמונה"|t:lang }}</button>{% endif %}
                 </article>
                 {% endfor %}
@@ -299,8 +300,14 @@ gtag('config', 'G-CPGTC09P2P');</script>
                 if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
                 e.preventDefault();
                 img.hidden = true; img.removeAttribute('src');
-                var v = document.createElement('video');
-                v.src = a.href; v.controls = true; v.autoplay = true; v.playsInline = true;
+                var v;
+                if (a.dataset.driveVideo) {   // the Google Drive copy (live site): Drive's own player
+                    v = document.createElement('iframe'); v.className = 'drive-video'; v.src = a.href;
+                    v.allow = 'autoplay; fullscreen'; v.allowFullscreen = true;
+                } else {
+                    v = document.createElement('video');
+                    v.src = a.href; v.controls = true; v.autoplay = true; v.playsInline = true;
+                }
                 frame.replaceChildren(v); frame.hidden = false; box.showModal();
             });
         });
