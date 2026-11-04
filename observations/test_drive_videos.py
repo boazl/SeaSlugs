@@ -96,3 +96,55 @@ class DriveVideoDisplayTests(DriveVideoBase):
             call_command('copy_to_drive', dest=str(dest), videos_only=True, stdout=io.StringIO())
             call_command('fill_drive_video_ids', dest=str(dest), apply=True, stdout=io.StringIO())
         self.sample.refresh_from_db(); self.assertEqual(self.sample.drive_video_id, '1AbC-dEf_123456789')
+
+
+class TransferErrorNamesTheRowTests(DriveVideoBase):
+    """A samples-table row that fails validation names the observation (title/species, trip, transfer id)."""
+    def test_message_names_the_row(self):
+        from .table_transfer import plan
+        doc = export_table('samples'); doc['media_mode'] = 'separate'
+        doc['rows'][0]['local_video_file'] = 'bad/name.mov'
+        items = plan(doc)
+        self.assertEqual(items[0]['action'], 'skipped')
+        text = items[0]['reason']
+        self.assertIn('Chromodoris kalawakan', text); self.assertIn('מסע V', text); self.assertIn(str(self.sample.transfer_id), text)
+
+
+class SampleTransferRowByRowTests(DriveVideoBase):
+    """The samples transfer applies row by row: a row that cannot be applied is skipped with its reason and the
+    others are applied. A row whose transfer id is unknown here, for an observation that exists here under another
+    id the file does not use (entered separately on each side), is matched by trip + species (or a collection's
+    title) and updated in place -- taking the file's id -- instead of clashing with it as a second copy."""
+    def _apply(self, doc):
+        from .table_transfer import apply, fingerprint
+        with patch('observations.table_transfer.create_backup', return_value=Path('b.sqlite3')):
+            apply(doc, fingerprint())
+
+    def test_same_observation_under_another_id_is_updated_in_place(self):
+        import uuid
+        from .table_transfer import plan
+        doc = export_table('samples'); doc['media_mode'] = 'separate'
+        source_id = str(uuid.uuid4())
+        doc['rows'][0]['transfer_id'] = source_id; doc['rows'][0]['drive_video_id'] = '1AbC-dEf_123456789'
+        self.assertEqual(plan(doc)[0]['action'], 'update')
+        self._apply(doc)
+        self.assertEqual(Sample.objects.count(), 1)
+        self.sample.refresh_from_db()
+        self.assertEqual(self.sample.drive_video_id, '1AbC-dEf_123456789')
+        self.assertEqual(str(self.sample.transfer_id), source_id)   # the two environments' ids now agree
+
+    def test_bad_row_is_skipped_and_the_rest_applied(self):
+        from .table_transfer import plan
+        other = Species.objects.create(scientific_name='Aegires villosus', genus='Aegires', species='villosus', author='Farran, 1905')
+        second = Sample(owner=self.admin, trip=self.trip, kind=Sample.Kind.SPECIES, species=other, status=Sample.Status.PUBLISHED,
+                        video_url='https://youtu.be/22222222222')
+        second.save_reviewed()
+        doc = export_table('samples'); doc['media_mode'] = 'separate'
+        rows = {r['species']: r for r in doc['rows']}
+        rows['Aegires villosus']['species'] = 'Nonexistent species'
+        rows['Chromodoris kalawakan']['drive_video_id'] = '1AbC-dEf_123456789'
+        self.assertEqual(sorted(i['action'] for i in plan(doc)), ['skipped', 'update'])
+        self._apply(doc)
+        self.sample.refresh_from_db(); second.refresh_from_db()
+        self.assertEqual(self.sample.drive_video_id, '1AbC-dEf_123456789')
+        self.assertEqual(second.species_id, other.pk)

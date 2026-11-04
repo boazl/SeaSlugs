@@ -469,7 +469,7 @@ class ReferenceTableTests(TaxonomyBase):
         self.assertEqual((doc['rows'][0]['identification_qualifier'], doc['rows'][0]['life_stage']), ('cf.', 'juv.'))
         self.assertEqual(plan(doc)[0]['action'], 'same')
         IdentificationQualifier.objects.filter(code='cf.').delete()      # target environment without the table row
-        with self.assertRaises(ValidationError): plan(doc)
+        self.assertEqual(plan(doc)[0]['action'], 'skipped')             # that row is not transferred
 
 
 class FullNameColourTests(TaxonomyBase):

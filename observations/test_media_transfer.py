@@ -721,10 +721,10 @@ class MediaTransferTests(TestCase):
         # exactly what to add to the species table (or fix) before importing again.
         from .table_transfer import plan
         doc=export_table('samples');doc['media_mode']='separate';doc['rows'][0]['species']='Nonexistent species'
-        with self.assertRaises(ValidationError) as ctx:
-            plan(doc)
-        self.assertIn('Nonexistent species',str(ctx.exception))
-        self.assertIn('אינו קיים בטבלת המינים',str(ctx.exception))
+        # the row is skipped with the reason (the rest of a file would still be applied)
+        message = ' '.join(i['reason'] for i in plan(doc) if i['action'] == 'skipped')
+        self.assertIn('Nonexistent species',message)
+        self.assertIn('אינו קיים בטבלת המינים',message)
     def test_table_transfer_preview_reports_the_missing_species_by_name(self):
         # Same check, exercised through the actual file-upload endpoint (a samples-table
         # JSON file), rather than calling plan() directly -- the preview step must surface
@@ -737,7 +737,8 @@ class MediaTransferTests(TestCase):
         self.assertEqual(response.status_code,200)
         self.assertContains(response,'Nonexistent species')
         self.assertContains(response,'אינו קיים בטבלת המינים')
-        self.assertNotIn('token',response.context)
+        # the row is reported and skipped: applying would not import it
+        self.assertTrue(all(i['action'] == 'skipped' for i in response.context['items']))
     def test_sample_transfer_names_the_missing_site_instead_of_a_generic_message(self):
         # Same treatment as the missing-species case just above -- a samples-table row
         # referencing a site that doesn't exist in this environment's sites table must name
@@ -746,10 +747,9 @@ class MediaTransferTests(TestCase):
         from .table_transfer import plan
         doc=export_table('samples');doc['media_mode']='separate'
         doc['rows'][0]['site']={'name':'Nonexistent site','region':'Eilat','country':'Israel'}
-        with self.assertRaises(ValidationError) as ctx:
-            plan(doc)
-        self.assertIn('Nonexistent site',str(ctx.exception))
-        self.assertIn('אינו קיים בטבלת האתרים',str(ctx.exception))
+        message = ' '.join(i['reason'] for i in plan(doc) if i['action'] == 'skipped')
+        self.assertIn('Nonexistent site',message)
+        self.assertIn('אינו קיים בטבלת האתרים',message)
     def test_table_transfer_preview_reports_the_missing_site_by_name(self):
         import json
         self.client.force_login(self.sample.owner)
@@ -760,7 +760,8 @@ class MediaTransferTests(TestCase):
         self.assertEqual(response.status_code,200)
         self.assertContains(response,'Nonexistent site')
         self.assertContains(response,'אינו קיים בטבלת האתרים')
-        self.assertNotIn('token',response.context)
+        # the row is reported and skipped: applying would not import it
+        self.assertTrue(all(i['action'] == 'skipped' for i in response.context['items']))
     def test_a_deleted_observation_is_exported_and_a_live_row_for_a_deleted_target_restores_it(self):
         # Deleted observations travel too (marked 'deleted'), so the source is the truth about deletions: a LIVE row whose
         # observation is deleted here means it was restored at the source -- the preview lists the restoration.
@@ -986,9 +987,7 @@ class MediaTransferTests(TestCase):
         row = next(r for r in doc['rows'] if r['video_url'] == video_url and not r.get('deleted'))
         import uuid
         row['transfer_id'] = str(uuid.uuid4())
-        with self.assertRaises(ValidationError) as ctx:
-            plan(doc)
-        message = str(ctx.exception)
+        message = ' '.join(i['reason'] for i in plan(doc) if i['action'] == 'skipped')
         self.assertIn('dQw4w9WgXcQ', message)
         self.assertIn(f'#{first.pk}', message); self.assertIn('First copy', message)
         self.assertIn(f'#{second.pk}', message); self.assertIn('Second copy', message)

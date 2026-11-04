@@ -63,8 +63,8 @@ class SampleTransferSameSpeciesTests(TestCase):
         a = self.sample(self.minor, '11111111111'); b = self.sample(self.gardineri, '22222222222')
         doc = export_table('samples')
         doc['rows'] = [self.row(doc, a)]; doc['rows'][0]['species'] = 'Notodoris gardineri'
-        with self.assertRaises(ValidationError) as caught:
-            plan(doc)
-        message = ' '.join(caught.exception.messages)
+        items = plan(doc)   # the row is skipped with the reason; the rest of a file would still be applied
+        self.assertEqual([i['action'] for i in items], ['skipped'])
+        message = items[0]['reason']
         self.assertIn(str(a.transfer_id), message); self.assertIn(str(b.transfer_id), message)
         self.assertIn(f'#{b.pk}', message); self.assertIn('מסע G', message)

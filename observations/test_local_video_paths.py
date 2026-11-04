@@ -131,7 +131,7 @@ class LocalVideoTransferTests(LocalVideoBase):
         doc = export_table('samples')
         doc['rows'][0]['local_video_file'] = '../../etc/passwd.mp4'
         doc['media_mode'] = 'separate'
-        with self.assertRaises(ValidationError): plan(doc)
+        self.assertEqual(plan(doc)[0]['action'], 'skipped')
 
 
 class LocalVideoAdminTests(LocalVideoBase):

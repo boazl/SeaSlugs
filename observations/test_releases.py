@@ -37,7 +37,7 @@ class ReleaseTests(TestCase):
     def test_missing_user_blocks(self):
         doc = export_table('samples')
         doc['rows'][0]['owner'] = 'missing-user'
-        with self.assertRaises(ValidationError): plan(doc)
+        self.assertEqual(plan(doc)[0]['action'], 'skipped')   # that row is not transferred (the rest of a file would be)
 
     def test_a_live_row_for_a_deleted_target_restores_it_instead_of_blocking(self):
         # Deleted observations are transferred too, so the source is the truth: a live row for an observation that is
@@ -54,7 +54,7 @@ class ReleaseTests(TestCase):
         doc['rows'][0].update(trip=None, species=None, status='pending')
         self.assertEqual(plan(doc)[0]['action'], 'update')
         doc['rows'][0]['status'] = 'published'
-        with self.assertRaises(ValidationError): plan(doc)
+        self.assertEqual(plan(doc)[0]['action'], 'skipped')
 
     def test_release_page_access_and_backup_contents(self):
         self.assertEqual(self.client.get('/admin/releases/').status_code, 302)

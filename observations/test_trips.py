@@ -173,7 +173,7 @@ class DiveTripTests(TestCase):
         self.assertEqual(doc['rows'][0]['trip'],'V')
         self.assertEqual(plan(doc)[0]['action'],'same')
         doc['rows'][0]['trip']='missing'
-        with self.assertRaises(ValidationError): plan(doc)
+        self.assertEqual(plan(doc)[0]['action'],'skipped')   # a row whose trip is missing here is not transferred
 
     def test_single_species_still_requires_identification(self):
         sample=self.collection();sample.kind='species'
