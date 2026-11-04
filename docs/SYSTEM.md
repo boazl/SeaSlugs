@@ -470,7 +470,7 @@ never serves `MEDIA_ROOT` directly.** Every file goes through a view that checks
   - Status per video observation: `ok`, `missing` (not set), `not_found` (folder here, file not), `unreachable`
     (folder not on this machine -- the live site), `none` (no YouTube video).
   - Manager only: the gallery page carries `{sample id: status}` (`<script id="local-videos">`); `app.js` marks the
-    ▶ red for `missing`/`not_found`. The species page shows a local `<video>` box (main observation) and a "local
+    ▶ red for `missing`/`not_found`/`unreachable` (no copy that plays here; `drive` and `ok` are not red). The species page shows a local `<video>` box (main observation) and a "local
     video" link (other observations), or a red "no local copy" note.
   - `/observations/<pk>/local-video/` serves the file to managers with HTTP Range (Safari needs 206).
   - Filling: `python manage.py match_local_videos` (dry run; `--apply`, `--trip/--folder/--set ID=FILE`; launcher

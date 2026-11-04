@@ -185,9 +185,10 @@ def match_trip(samples, folder):
 # ---------------------------------------------------------------------------------------------------------------
 # Phase 3: showing the local copy to a manager (gallery marks, the observation page's local player)
 # ---------------------------------------------------------------------------------------------------------------
-# Marked red in the gallery for a manager: the observation has a YouTube video but no usable local copy. A copy that
-# is recorded but simply not reachable here (the live site, an unplugged drive) is not red -- the fields are filled.
-NO_LOCAL_STATUSES = (STATUS_MISSING, STATUS_NOT_FOUND)
+# Marked red for a manager: the observation has a YouTube video but no copy that plays here -- not recorded, not in
+# its folder, or (the live site, an unplugged drive) its Mac folder is not reachable and it has no Google Drive copy
+# yet. A Drive copy (STATUS_DRIVE) or the Mac file itself (STATUS_OK) is not red.
+NO_LOCAL_STATUSES = (STATUS_MISSING, STATUS_NOT_FOUND, STATUS_UNREACHABLE)
 VIDEO_CONTENT_TYPE = 'video/mp4'   # .mp4/.m4v/.mov (H.264/HEVC): Safari and Chrome both play it under this type
 CHUNK = 1024 * 1024
 

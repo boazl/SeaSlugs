@@ -148,3 +148,16 @@ class SampleTransferRowByRowTests(DriveVideoBase):
         self.sample.refresh_from_db(); second.refresh_from_db()
         self.assertEqual(self.sample.drive_video_id, '1AbC-dEf_123456789')
         self.assertEqual(second.species_id, other.pk)
+
+
+class LiveSiteRedMarkTests(DriveVideoBase):
+    """On the live site (the Mac folder is unreachable) a video is red for a manager until its Google Drive copy is
+    recorded; with a Drive id it is not."""
+    def test_red_until_drive_copy(self):
+        DiveTrip.objects.filter(pk=self.trip.pk).update(local_video_folder='/no/such/folder')
+        self.client.force_login(self.admin)
+        html = self.client.get(f'/species/{self.area.slug}/').content.decode()
+        self.assertIn('<p class="local-video-missing">', html)
+        Sample.objects.filter(pk=self.sample.pk).update(drive_video_id='1AbC-dEf_123456789')
+        html = self.client.get(f'/species/{self.area.slug}/').content.decode()
+        self.assertNotIn('<p class="local-video-missing">', html)

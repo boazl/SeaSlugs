@@ -7,7 +7,7 @@ const localVideos = (() => {
     const node = document.getElementById('local-videos');
     try { return node ? JSON.parse(node.textContent) : null; } catch (e) { return null; }
 })();
-const NO_LOCAL = ['missing', 'not_found'];
+const NO_LOCAL = ['missing', 'not_found', 'unreachable'];   // a Drive copy ('drive') or the Mac file ('ok') is not red
 function lacksLocalVideo(item) {
     return !!(localVideos && item.video_id && NO_LOCAL.includes(localVideos[String(item.sample_id)]));
 }

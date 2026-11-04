@@ -69,7 +69,7 @@ class LocalVideoFileViewTests(LocalVideoDisplayBase):
 
 class LocalVideoGalleryTests(LocalVideoDisplayBase):
     """The gallery page carries {sample id: status} for a manager only; app.js marks a video red when its status is
-    "missing"/"not_found" (a recorded copy that is merely unreachable -- the live site -- is not red)."""
+    "missing"/"not_found"/"unreachable" -- no copy that plays here: on the live site, a video not yet in Google Drive."""
     def data(self, response):
         match = re.search(r'<script id="local-videos" type="application/json">(.*?)</script>', response.content.decode(), re.S)
         return json.loads(match.group(1)) if match else None
@@ -84,7 +84,7 @@ class LocalVideoGalleryTests(LocalVideoDisplayBase):
     def test_app_js_marks(self):
         js = (settings.BASE_DIR / 'dist' / 'app.js').read_text()
         self.assertIn("document.getElementById('local-videos')", js)
-        self.assertIn("const NO_LOCAL = ['missing', 'not_found'];", js)
+        self.assertIn("const NO_LOCAL = ['missing', 'not_found', 'unreachable'];", js)
         self.assertIn('if (hasVideo && samples.some(lacksLocalVideo)) markNoLocal(mark);', js)
         self.assertIn('if (lacksLocalVideo(c)) markNoLocal(icon);', js)
         self.assertIn('.play.no-local{color:#ff3b3b', (settings.BASE_DIR / 'dist' / 'styles.css').read_text())
