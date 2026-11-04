@@ -10,6 +10,8 @@ The full system reference is **`docs/SYSTEM.md`**. Read it before planning a fea
   - a public gallery (`dist/app.js`, data from the generated `/catalog.js`)
   - per-species, genus, family and order pages
   - a member community (observations, dive trips, partners)
+  - a news & activity page (`/news/`): activity log, manager posts, planned trips, progress chart; visits,
+    sign-ups and logins for managers (`activity.py`, `news.py`)
   - admin tools for moving data between the Mac and production
 - **Hosting:** Render (`seaslugs.onrender.com`), domain **https://seaslugs.org.il/**.
 - **Owner:** Boaz Liebes. In Hebrew, address him in the masculine form.
@@ -52,6 +54,9 @@ node -e "new Function(require('fs').readFileSync('dist/app.js','utf8'))"   # app
 7. **Published URLs never change:** `SpeciesArea.slug` is permanent. A rename needs a 301
    (`species_redirects.py`).
 8. Ask before deleting files or rows, or before any irreversible data operation.
+9. **Per-environment data:** the activity log (`ActivityEvent`), news posts (`NewsPost`) and the visit counter are
+   written separately on the Mac and on the live site and never transfer. The owner's own visits and logins are never
+   counted (superusers, `ACTIVITY_EXCLUDED_USERNAMES`, the `exclude_analytics` cookie).
 
 ## Domain rules (details in `docs/SYSTEM.md` §6)
 
@@ -60,6 +65,9 @@ node -e "new Function(require('fs').readFileSync('dist/app.js','utf8'))"   # app
   - "הוספת תצפית" / "Add an observation".
   - "תצפית" in the gallery = a SpeciesArea (species in an area); "מינים" = distinct species.
   - Counters show species only. The exception is "כל האזורים": "N מינים ב-M תצפיות".
+  - On the news page "תצפיות חדשות" counts published observation records (repeat observations of a species in an
+    area and trip collections included) -- deliberately more than the gallery's cards. "מינים חדשים" = species new to
+    the site; "מינים חדשים לאזור" = new gallery cards.
 - **Names:** scientific names are italic for genus + epithet only, never for cf./aff./sp./author/juv.
   Every full species needs an author. Merge duplicates into the WoRMS accepted name. When checking a
   list, fix the catalogue, not the list. The labels burned into photos are deliberately fully slanted;

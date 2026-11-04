@@ -4,7 +4,7 @@
 > what the system is for, how it is built, the rules it follows, and how to change it safely. It contains
 > enough detail to rebuild the system from scratch.
 >
-> Last verified against the code: 2026-11-04 (git `main`, migration `0087`).
+> Last verified against the code: 2026-11-04 (git `main` + the news & activity page, migration `0087`).
 > Repository: `https://github.com/boazl/SeaSlugs` · Local copy: `/Users/boazliebes/SeaSlugs` (macOS)
 >
 > Companion files: `CLAUDE.md` (short working rules, read first), `TABLE-TRANSFER.md` (data-transfer
@@ -324,6 +324,10 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
    - "תצפית" = a SpeciesArea; "מינים" = distinct species.
    - Every counter shows species only.
    - The one exception is the gallery's "כל האזורים" button: "266 מינים ב-301 תצפיות".
+   - The news page (§7.4) is the other exception, decided by the owner: "תצפיות חדשות" counts published observation
+     records, including repeat observations of a species in an area and trip collections (411 records = 351 cards
+     + 46 repeats + 14 collections on 2026-11-04). "מינים חדשים" = species new to the site, "מינים חדשים לאזור" = new
+     cards.
 8. **Scientific names** (`names.py` and `setLatinName` in app.js)
    - Only genus + epithet are in italics. cf./aff., "sp. 7", the variant letter, the author and the
      life stage are upright.
@@ -356,7 +360,7 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
 | `/articles/`, `/articles/<slug>/`, `/articles/<slug>/<lang>.pdf` and `.jpg` | Article library |
 | `/observations/` | Members' listing (filters, sort). Owners also see their pending observations; managers see everything. |
 | `/observations/new/`, `<pk>/edit/`, `<pk>/remove/`, `<pk>/action/`, `<pk>/photo/` | Observation form and actions. `photo/` is the **only** way images are served in production (access-controlled). |
-| `/observations/trips/` | Public dive trips: trip videos, then a sortable table with expandable species rows |
+| `/observations/trips/` | Public dive trips: trip videos, then a sortable table with expandable species rows; a species picture opens that observation on its species page (`#obs-<pk>`) |
 | `/observations/trips/manage/`, `trips/add/`, `trips/suggest/` | Trip management for members (suggested name/code, see `trip_naming.py`) |
 | `/observations/signup/`, `login/`, `logout/`, `profile/`, `partners/` | Community |
 | `/observations/home-text/` | Manager editor for home-page sections |
@@ -437,14 +441,24 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
 - **Visit counter** (`activity.VisitCounterMiddleware`): views of public HTML pages per page per day
   (`DailyPageView`) and visitors per day (`DailyVisitor`, a salted daily hash of IP + browser; no cookie). Skips
   `/admin/`, bots, the owner, and the `exclude_analytics=1` cookie. Counting can never break a page.
-- **`/news/`** (public, in the sitemap): posts (`NewsPost`, written in the admin of each site, with simple markup),
-  planned dive trips (`NewsPost` kind `trip`, shown until `trip_end`; `DiveTrip` cannot hold future years),
-  period (last week by default, or a month and/or year from two lists; only years and months with activity are offered) and sea filter, the feed sections (only lines whose observation/card is still public),
-  and a cumulative bar chart of published observations and species since the first observation (one bar pair per
-  day across the same width; the species number written in the bar only on days it changes; the observations bar behind the species bar, same width, no gaps; new observations shown as small picture cards; the y axis is labelled with the observation totals the bars reach, nudged apart when close; follows the sea
-  filter; y axis from 0 with grid lines every 20; x axis month names with the year
-  under its months). Staff also see visits,
-  top pages, users (joined, last login, logins in 30 days, observations) and recent logins.
+- **`/news/`** (public, in the sitemap, linked from the main menu as "חדשות ופעילות"):
+  - **Posts** (`NewsPost`, written in the admin of each site, simple markup like the home texts) and **planned dive
+    trips** (`NewsPost` kind `trip`, shown until `trip_end`; `DiveTrip` cannot hold a future year).
+  - **Period:** "last week" by default (the month list then shows the current month); otherwise a month and/or year
+    from two lists, which offer only years and months with activity. "All months" = the whole chosen year. A sea
+    (area) filter applies to the feed and the chart.
+  - **Tiles** (a tile whose value is 0 is hidden): new observations (records, see §6.7), new videos, new species
+    (species new to the site), new species in an area (new cards), identification changes, updated observations.
+  - **Feed:** new species = species new to the site, each once, with a small photo, date and name only; new videos as
+    cards that open the observation (its species page); new observations as small picture cards; identification
+    changes (old ← new); updated observations. Only lines whose observation / card is still public.
+  - **Progress chart** (since the first observation, follows the sea filter): one bar a day across a fixed width,
+    the running totals at the end of the day; the observations bar behind the species bar, same width, no gaps, solid
+    colours; the species number written upright and bold inside its bar only on days it changes; y axis from 0 with
+    a faint grid every 20, labelled with the observation totals the bars reach (close values nudged apart, a crowded
+    one left out); x axis month names with the year under its months.
+  - **Managers** also see visits (today / 7 / 30 days, a daily chart, top pages), sign-ups, the users table (joined,
+    last login, logins in 30 days, observations) and recent logins.
 
 ## 8. Storage of media and documents
 
@@ -696,6 +710,7 @@ Catalogue of test modules (test count) and what each guards:
 | `test_genus_page` | 58 | Genus page: identification file, captions, back/edit buttons, taxon pages' buttons, save messages |
 | `test_genus_page_filter` | 8 | The gallery's filter carried to the genus page: filtered species first with their matching observations, the others as small cards, stale parameters ignored |
 | `test_media_transfer` | 57 | One observation per species per trip; image storage, canonical names, replacing photos, environment image comparison and transfer |
+| `test_trip_species_links` | 2 | Trip page species pictures open the observation on its species page |
 | `test_news_activity` | 25 | Activity log events, visit counter exclusions, /news/ page, posts, backfill |
 | `test_articles` | 73 | Article library, sections on pages, PDFs, previews, site-written articles, home articles |
 | `test_home_content` | 47 | SEO phase 3: server-rendered home content in both languages, editable home texts |

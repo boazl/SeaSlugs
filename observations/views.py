@@ -66,6 +66,11 @@ def trips(request):
         trip.video_cards = [x for x in trip.public_samples if x.kind == 'collection']
         trip.species_samples = [x for x in trip.public_samples if x.kind == 'species']
         trip.species_total = trip.display_species_count
+    # A species picture opens that observation on its species page (not the bare photo or the YouTube video).
+    page_urls = gallery_urls([x for trip in rows for x in trip.species_samples], lang)
+    for trip in rows:
+        for x in trip.species_samples:
+            x.page_url = page_urls.get(x.pk, '')
     return render(request, 'observations/trips.html', {'trips':rows, **filters,
         'trips_with_video': [t for t in rows if t.video_cards]})
 
