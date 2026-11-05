@@ -57,7 +57,7 @@ def _line(event, lang, slugs):
     is_collection = bool(sample and sample.kind == 'collection')
     name = (sample.gallery_title(lang) or event.name) if is_collection else event.name
     return {
-        'kind': event.kind, 'when': timezone.localtime(event.created_at), 'name': name, 'is_collection': is_collection,
+        'kind': event.kind, 'sample_id': event.sample_id, 'video_id': event.detail.get('video', ''), 'when': timezone.localtime(event.created_at), 'name': name, 'is_collection': is_collection,
         'old_name': event.old_name, 'link': link, 'place': place, 'count': event.count,
         'photographer': full_name_for(event.user, lang) if event.user_id else '',
         'video_url': sample.video_url if sample and event.kind == ActivityEvent.Kind.VIDEO_ADDED else '',
@@ -300,6 +300,56 @@ def chosen_period(request, lang):
     return {'since': start, 'until': end, 'year': year, 'month': month, 'week': False, 'label': label, 'months': months}
 
 
+def _period_query(request):
+    """The page's period and sea, as a query string for the slideshow (and back)."""
+    from django.utils.http import urlencode
+    params = {k: request.GET[k] for k in ('year', 'month', 'sea', 'lang') if request.GET.get(k)}
+    return '?' + urlencode(params) if params else ''
+
+
+def news_slideshow(request):
+    """The new videos of the news page's period and sea, played one after another in a loop -- open to everyone.
+
+    Each video plays from YouTube through its IFrame player API, embedded from www.youtube.com (checked by the owner:
+    no ads), moving on when it ends; a video YouTube refuses to embed is skipped. Nothing passes through this server.
+    A manager on the Mac plays the offline copy instead wherever there is one on this computer (local_videos.py), so
+    the slideshow also works without internet; ?source=youtube makes a manager use YouTube for everything."""
+    from .local_videos import STATUS_OK, local_video_url, statuses
+    lang = get_lang(request)
+    try:
+        sea_id = int(request.GET.get('sea') or 0) or None
+    except ValueError:
+        sea_id = None
+    period = chosen_period(request, lang)
+    lines, seen = [], set()
+    for line in public_feed(period['since'], period['until'], sea_id, lang)['video_added']:
+        if line['sample_id'] and line['sample_id'] not in seen:
+            seen.add(line['sample_id']); lines.append(line)
+    manager = is_manager(request.user)
+    force_youtube = request.GET.get('source') == 'youtube'
+    found, samples = {}, {}
+    if manager and not force_youtube:
+        samples = {x.pk: x for x in Sample.objects.filter(pk__in=seen).select_related('trip')}
+        found = statuses(list(samples.values()))
+    items = []
+    for line in reversed(lines):                             # oldest first, in the order they were added
+        sample = samples.get(line['sample_id'])
+        src = local_video_url(sample) if sample and found.get(sample.pk) == STATUS_OK else ''
+        if src or line['video_id']:
+            items.append({**line, 'src': src})
+    query = _period_query(request)
+    local_count = sum(1 for item in items if item['src'])
+    switch_url = ''
+    if manager and force_youtube:
+        switch_url = reverse('news-slideshow') + query                      # back to the Mac copies
+    elif manager and local_count:
+        switch_url = reverse('news-slideshow') + query + ('&' if query else '?') + 'source=youtube'
+    return render(request, 'observations/news_slideshow.html', {
+        'items': items, 'period': period, 'missing': len(lines) - len(items), 'local_count': local_count,
+        'force_youtube': force_youtube, 'switch_url': switch_url, 'back_url': reverse('news') + query,
+    })
+
+
 def news(request):
     lang = get_lang(request)
     try:
@@ -341,6 +391,7 @@ def news(request):
         'species_total_text': count_text((live_areas.filter(sea_id=sea_id) if sea_id else live_areas)
                                          .values('species_id').distinct().count(), lang),
         'manager': is_manager(request.user),
+        'slideshow_url': reverse('news-slideshow') + _period_query(request),
         # section headings in the page's language (passed to the shared list template)
         'h_new': t('מינים חדשים', lang), 'h_added': t('תצפיות חדשות', lang),
         'h_changed': t('שינויים בהגדרת המין', lang), 'h_updated': t('תצפיות שעודכנו', lang),

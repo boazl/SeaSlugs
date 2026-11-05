@@ -11,7 +11,7 @@ from observations.image_manager import manager as image_manager, image_file
 from observations.local_video_views import local_videos
 
 from observations.folder_import import folder_import
-from observations.news import news
+from observations.news import news, news_slideshow
 from observations.views import site_image, species_page, genus_page, genus_identification, genus_identification_preview, order_page, family_page, divetrip_locations
 from observations.articles import article_list, article_page, article_pdf, article_thumb, species_article, genus_article, family_article, order_article
 from observations.db_replace import db_replace, db_replace_download
@@ -39,6 +39,7 @@ urlpatterns = [
     path('analytics/include/', analytics_include, name='analytics-include'),
     path('site-image/<slug:key>.jpg', site_image, name='site-image'),
     path('news/', news, name='news'),
+    path('news/slideshow/', news_slideshow, name='news-slideshow'),
     path('articles/', article_list, name='article-list'),
     path('articles/<slug:slug>/', article_page, name='article-page'),
     path('articles/<slug:slug>/<str:lang>.pdf', article_pdf, name='article-pdf'),

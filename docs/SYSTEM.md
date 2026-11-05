@@ -464,6 +464,13 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
     colours; the species number written upright and bold inside its bar only on days it changes; y axis from 0 with
     a faint grid every 20, labelled with the observation totals the bars reach (close values nudged apart, a crowded
     one left out); x axis month names with the year under its months.
+  - **Slideshow** (`/news/slideshow/`, open to everyone): a red ▶ above the new-videos tile opens it with the same
+    period and sea. The new videos play oldest first, in a loop, from YouTube through the IFrame player API embedded
+    from `www.youtube.com` (the owner checked: no ads), moving on when a video ends; one that cannot be embedded is
+    skipped. Nothing passes through Render. A manager on the Mac plays the offline copy instead wherever this computer
+    has one (`local_videos.statuses` = `ok`, `/observations/<pk>/local-video/`), so it also works without internet
+    (YouTube-only videos are then skipped); `?source=youtube` makes a manager use YouTube for everything. The caption
+    and buttons sit under the video; full screen shows the video alone. Keys: arrows, space, `f`.
   - **Managers** also see visits (today / 7 / 30 days, a daily chart, top pages), sign-ups, the users table (joined,
     last login, logins in 30 days, observations) and recent logins.
 
@@ -718,7 +725,7 @@ Catalogue of test modules (test count) and what each guards:
 | `test_genus_page_filter` | 8 | The gallery's filter carried to the genus page: filtered species first with their matching observations, the others as small cards, stale parameters ignored |
 | `test_media_transfer` | 57 | One observation per species per trip; image storage, canonical names, replacing photos, environment image comparison and transfer |
 | `test_trip_species_links` | 2 | Trip page species pictures open the observation on its species page |
-| `test_news_activity` | 25 | Activity log events, visit counter exclusions, /news/ page, posts, backfill |
+| `test_news_activity` | 31 | Activity log events, visit counter exclusions, /news/ page, posts, backfill |
 | `test_articles` | 73 | Article library, sections on pages, PDFs, previews, site-written articles, home articles |
 | `test_home_content` | 47 | SEO phase 3: server-rendered home content in both languages, editable home texts |
 | `test_gallery` | 37 | `/observations/` filters, manager-only owner filter, sort, dropdown options |

@@ -273,6 +273,17 @@ TRANSLATIONS = {
     'מנהל': 'Manager',
     'כניסות אחרונות': 'Recent logins',
     'הצגת כל הרשימה': 'Show the whole list',
+    'מצגת הסרטונים החדשים': 'New videos slideshow',
+    'ניגון מהעותקים במק': 'Play from the copies on the Mac',
+    'ניגון מ-YouTube': 'Play from YouTube',
+    'מהסרטונים מתנגנים מהעותקים במחשב הזה, והשאר מ-YouTube.': 'of the videos play from the copies on this computer, the rest from YouTube.',
+    'אין סרטונים חדשים בתקופה זו.': 'No new videos in this period.',
+    'חזרה לחדשות ופעילות': 'Back to News & activity',
+    'הסרטון הקודם': 'Previous video',
+    'הסרטון הבא': 'Next video',
+    'השהיה / המשך': 'Pause / play',
+    'קול': 'Sound',
+    'מסך מלא': 'Full screen',
     'אין עדיין תצפיות שפורסמו באזור זה.': 'No published observations in this area yet.',
 }
 

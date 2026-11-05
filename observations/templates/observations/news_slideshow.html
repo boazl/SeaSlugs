@@ -1,0 +1,122 @@
+{% extends 'observations/base.html' %}{% load seaslugs_i18n %}{% block html_lang %}{{ lang }}{% endblock %}{% block html_dir %}{% if lang == 'en' %}ltr{% else %}rtl{% endif %}{% endblock %}{% block title %}SeaSlugs · {{ "מצגת הסרטונים החדשים"|t:lang }}{% endblock %}{% block site_hero %}{% endblock %}{% block content %}<style>
+main{max-width:1400px}
+.show-head{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:baseline;justify-content:space-between;margin:0 0 14px}.show-head h1{margin:0;font-size:28px}.show-head .period{color:#b8ccd0}
+.stage{position:relative;background:#000;border-radius:10px;overflow:hidden;aspect-ratio:16/9;max-height:78vh;margin:auto}
+.stage [hidden]{display:none!important}.stage #yt-box{width:100%;height:100%}.stage iframe,.stage #yt{width:100%;height:100%;display:block;border:0}.stage video{width:100%;height:100%;display:block;background:#000;object-fit:contain}
+.stage:fullscreen{border-radius:0;max-height:none}
+.show-bar{display:flex;flex-wrap:wrap;gap:10px 24px;align-items:center;justify-content:space-between;margin:12px 0}
+.caption{min-width:0;flex:1 1 320px}.caption b{display:block;font-size:22px;font-weight:600;font-family:Georgia,"Times New Roman",serif;line-height:1.3}.caption small{display:inline;color:#b8ccd0;font-size:15px}
+.counter{display:inline-block;color:#08232a;background:#b8ccd0;border-radius:999px;padding:0 9px;font-size:13px;direction:ltr;unicode-bidi:isolate;margin-inline-start:12px}
+.show-controls{display:flex;flex-wrap:wrap;gap:10px}
+.show-controls button{min-width:52px;font-size:18px;padding:9px 16px}
+.show-controls a{align-self:center}
+.sound-hint{background:#ffcf5c;color:#2a2000}
+.show-list{list-style:none;padding:0;margin:18px 0 0;display:flex;flex-wrap:wrap;gap:6px}
+.show-list button{background:transparent;color:#64dfce;border:1px solid #36515a;padding:4px 10px;font-size:13px;border-radius:999px}
+.show-list button[aria-current=true]{background:#61dfcc;color:#08232a}
+</style>
+<div class="show-head"><h1>{{ "מצגת הסרטונים החדשים"|t:lang }}</h1><span class="period">{{ period.label }}</span><span>{% if switch_url %}<a href="{{ switch_url }}">{% if force_youtube %}{{ "ניגון מהעותקים במק"|t:lang }}{% else %}{{ "ניגון מ-YouTube"|t:lang }}{% endif %}</a> · {% endif %}<a href="{{ back_url }}">{{ "חזרה לחדשות ופעילות"|t:lang }}</a></span></div>
+{% if items %}
+<div class="stage" id="stage"><video id="player" playsinline preload="auto" hidden></video><div id="yt-box" hidden><div id="yt"></div></div></div>
+<div class="show-bar"><div class="caption"><span id="caption"></span><span class="counter" id="counter"></span></div>
+<div class="show-controls">
+<button type="button" id="prev" aria-label="{{ 'הסרטון הקודם'|t:lang }}" title="{{ 'הסרטון הקודם'|t:lang }}">{% if lang == 'en' %}⏮{% else %}⏭{% endif %}</button>
+<button type="button" id="pause" aria-label="{{ 'השהיה / המשך'|t:lang }}" title="{{ 'השהיה / המשך'|t:lang }}">⏸</button>
+<button type="button" id="next" aria-label="{{ 'הסרטון הבא'|t:lang }}" title="{{ 'הסרטון הבא'|t:lang }}">{% if lang == 'en' %}⏭{% else %}⏮{% endif %}</button>
+<button type="button" id="sound" aria-label="{{ 'קול'|t:lang }}" title="{{ 'קול'|t:lang }}">🔇</button>
+<button type="button" id="full" aria-label="{{ 'מסך מלא'|t:lang }}" title="{{ 'מסך מלא'|t:lang }}">⛶</button>
+</div></div>
+<ol class="show-list" id="list">{% for item in items %}<li><button type="button" data-i="{{ forloop.counter0 }}" {% if item.src %}data-src="{{ item.src }}"{% endif %} data-yt="{{ item.video_id }}">{{ forloop.counter }}. {% if item.is_collection %}{{ item.name }}{% else %}{{ item.name|name_html }}{% endif %}</button>
+<template><b>{% if item.is_collection %}{{ item.name }}{% else %}{{ item.name|name_html }}{% endif %}</b><small>{{ item.place }}{% if item.photographer %} · {{ "צילום:"|t:lang }} {{ item.photographer }}{% endif %} · {{ item.when|date:"d/m/Y" }}</small></template></li>{% endfor %}</ol>
+{% if local_count %}<p><small>{{ local_count }} {{ "מהסרטונים מתנגנים מהעותקים במחשב הזה, והשאר מ-YouTube."|t:lang }}</small></p>{% endif %}
+<script>
+(() => {
+  const stage = document.getElementById('stage'), video = document.getElementById('player'), ytBox = document.getElementById('yt-box');
+  const buttons = [...document.querySelectorAll('#list button')];
+  const caption = document.getElementById('caption'), counter = document.getElementById('counter');
+  const pauseBtn = document.getElementById('pause'), soundBtn = document.getElementById('sound');
+  let index = 0, muted = false, current = null;            // current: 'local' or 'yt'
+  const next = () => show(index + 1);
+
+  // Each video plays from its copy on this computer (a manager on the Mac) or else from YouTube.
+  let yt = null, ytReady = false, ytFailed = false, ytPending = null;
+  const needsYouTube = buttons.some(b => !b.dataset.src);
+  if (needsYouTube) {
+    window.onYouTubeIframeAPIReady = () => {
+      yt = new YT.Player('yt', {
+        width: '100%', height: '100%', videoId: ytPending || '',
+        playerVars: {autoplay: 1, playsinline: 1, rel: 0},
+        events: {
+          onReady: () => { ytReady = true; if (current === 'yt' && ytPending) { yt.loadVideoById(ytPending); } },
+          onStateChange: e => { if (e.data === YT.PlayerState.ENDED && current === 'yt') next(); },   // ended: the next one
+          onError: () => { if (current === 'yt') setTimeout(next, 1500); },   // 101/150: embedding not allowed -- skipped
+        },
+      });
+    };
+    const tag = document.createElement('script');
+    tag.src = 'https://www.youtube.com/iframe_api';
+    tag.onerror = () => { ytFailed = true; if (current === 'yt') next(); };    // no internet: only the local copies play
+    document.head.appendChild(tag);
+    setTimeout(() => { if (!ytReady) { ytFailed = true; if (current === 'yt') next(); } }, 10000);
+  }
+  function playVideo() {
+    video.muted = muted;
+    const p = video.play();
+    if (p && p.catch) p.catch(() => {                           // the browser refused sound without a click: start muted
+      muted = true; video.muted = true; soundBtn.textContent = '🔇'; soundBtn.classList.add('sound-hint');
+      video.play().catch(() => {});
+    });
+  }
+  video.addEventListener('ended', () => { if (current === 'local') next(); });
+  video.addEventListener('error', () => { if (current === 'local' && video.getAttribute('src')) setTimeout(next, 1500); });
+
+  function show(i, tries = 0) {
+    if (tries > buttons.length) return;                        // nothing here can play (e.g. offline, no copies)
+    index = (i + buttons.length) % buttons.length;            // loops: after the last comes the first again
+    const b = buttons[index];
+    if (!b.dataset.src && ytFailed) return show(index + 1, tries + 1);
+    buttons.forEach(x => x.setAttribute('aria-current', x === b ? 'true' : 'false'));
+    caption.innerHTML = b.parentElement.querySelector('template').innerHTML;
+    counter.textContent = `${index + 1} / ${buttons.length}`;
+    if (b.dataset.src) {
+      current = 'local';
+      if (ytReady) yt.pauseVideo();
+      ytBox.hidden = true; video.hidden = false;
+      video.src = b.dataset.src;
+      playVideo();
+    } else {
+      current = 'yt';
+      video.pause(); video.removeAttribute('src'); video.hidden = true; ytBox.hidden = false;
+      ytPending = b.dataset.yt;
+      if (ytReady) { yt.loadVideoById(b.dataset.yt); muted ? yt.mute() : yt.unMute(); }
+    }
+    pauseBtn.textContent = '⏸';
+    soundBtn.textContent = muted ? '🔇' : '🔊';
+  }
+  const paused = () => current === 'local' ? video.paused : (ytReady && yt.getPlayerState() === YT.PlayerState.PAUSED);
+  document.getElementById('next').onclick = next;
+  document.getElementById('prev').onclick = () => show(index - 1);
+  pauseBtn.onclick = () => {
+    if (paused()) { current === 'local' ? playVideo() : yt.playVideo(); pauseBtn.textContent = '⏸'; }
+    else { current === 'local' ? video.pause() : ytReady && yt.pauseVideo(); pauseBtn.textContent = '▶'; }
+  };
+  soundBtn.onclick = () => {
+    muted = !muted; video.muted = muted; if (ytReady) { muted ? yt.mute() : yt.unMute(); }
+    soundBtn.textContent = muted ? '🔇' : '🔊'; soundBtn.classList.remove('sound-hint');
+  };
+  document.getElementById('full').onclick = () => { if (document.fullscreenElement) document.exitFullscreen(); else (stage.requestFullscreen || stage.webkitRequestFullscreen).call(stage); };
+  buttons.forEach(b => b.onclick = () => show(+b.dataset.i));
+  video.addEventListener('click', () => pauseBtn.click());
+  document.addEventListener('keydown', e => {
+    if (e.key === ' ') { e.preventDefault(); pauseBtn.click(); }
+    else if (e.key === 'ArrowRight') show(index + (document.dir === 'rtl' ? -1 : 1));
+    else if (e.key === 'ArrowLeft') show(index + (document.dir === 'rtl' ? 1 : -1));
+    else if (e.key === 'f') document.getElementById('full').click();
+  });
+  show(0);
+})();
+</script>
+{% else %}
+<p>{{ "אין סרטונים חדשים בתקופה זו."|t:lang }}</p>
+{% endif %}
+{% endblock %}

@@ -365,3 +365,58 @@ class ProgressChartTests(Base):
         self.assertEqual(labels[:3], [0, 20, 40])
         self.assertTrue(all(b - a == 20 for a, b in zip(labels, labels[1:])))
         self.assertIn('font-weight:700', self.client.get('/news/').content.decode())
+
+
+class SlideshowTests(Base):
+    """A red play button over the new-videos tile opens /news/slideshow/ for the same period and sea, for everyone.
+    Each new video plays from YouTube (www.youtube.com) in a loop; a manager on the Mac plays the offline copy
+    wherever there is one on this computer (local_videos.py), and can switch to YouTube for everything."""
+
+    def setUp(self):
+        super().setUp()
+        import tempfile
+        from pathlib import Path
+        self.folder = Path(tempfile.mkdtemp())
+        (self.folder / 'Phyllidia ocellata.mov').write_bytes(b'video')
+        DiveTrip.objects.filter(pk=self.trip.pk).update(local_video_folder=str(self.folder))
+        self.trip.refresh_from_db()
+        self.with_copy = self.observe(local_video_file='Phyllidia ocellata.mov')
+        self.without_copy = self.observe(species=self.varicosa, video='mmmmmmmmmmm')
+        self.boss = User.objects.create_superuser('boss', password='pw-test-12345')
+
+    def test_button_for_everyone(self):
+        html = self.client.get(f'/news/?sea={self.red.pk}').content.decode()
+        self.assertIn(f'class="play-show" href="/news/slideshow/?sea={self.red.pk}"', html)
+
+    def test_visitors_play_everything_from_youtube(self):
+        response = self.client.get('/news/slideshow/')
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        self.assertEqual([(i['video_id'], i['src']) for i in response.context['items']],
+                         [('aaaaaaaaaaa', ''), ('mmmmmmmmmmm', '')])
+        self.assertNotIn('/local-video/', html)
+        self.assertIn("tag.src = 'https://www.youtube.com/iframe_api'", html)
+        self.assertNotIn('youtube-nocookie', html.split('<main>')[1])
+        self.assertIn("if (e.data === YT.PlayerState.ENDED && current === 'yt') next();", html)   # moves on, loops
+        self.assertNotIn('source=youtube', html)
+
+    def test_manager_on_the_mac_plays_the_local_copies(self):
+        self.client.login(username='boss', password='pw-test-12345')
+        response = self.client.get('/news/slideshow/')
+        html = response.content.decode()
+        self.assertEqual([bool(i['src']) for i in response.context['items']], [True, False])     # the copy, then YouTube
+        self.assertIn(f'data-src="/observations/{self.with_copy.pk}/local-video/" data-yt="aaaaaaaaaaa"', html)
+        self.assertIn('href="/news/slideshow/?source=youtube"', html)
+        forced = self.client.get('/news/slideshow/?source=youtube')
+        self.assertFalse(any(i['src'] for i in forced.context['items']))
+        self.assertIn('href="/news/slideshow/"', forced.content.decode())
+
+    def test_layout(self):
+        # the caption sits under the picture, in the row of buttons: the full-screen stage holds the players alone
+        html = self.client.get('/news/slideshow/?lang=en').content.decode()
+        self.assertIn('<div class="stage" id="stage"><video id="player" playsinline preload="auto" hidden></video>'
+                      '<div id="yt-box" hidden><div id="yt"></div></div></div>', html)
+        self.assertIn('<div class="show-bar"><div class="caption">', html)
+        ActivityEvent = E
+        ActivityEvent.objects.filter(kind='video_added').delete()
+        self.assertIn('No new videos in this period.', self.client.get('/news/slideshow/?lang=en').content.decode())
