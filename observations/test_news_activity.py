@@ -414,8 +414,20 @@ class SlideshowTests(Base):
     def test_layout(self):
         # the caption sits under the picture, in the row of buttons: the full-screen stage holds the players alone
         html = self.client.get('/news/slideshow/?lang=en').content.decode()
-        self.assertIn('<div class="stage" id="stage"><video id="player" playsinline preload="auto" hidden></video>'
-                      '<div id="yt-box" hidden><div id="yt"></div></div></div>', html)
+        self.assertIn('<div class="stage" id="stage" tabindex="-1"><video id="player" playsinline preload="auto" hidden></video>'
+                      '<div id="yt-box" hidden><div id="yt"></div></div>', html)
+        # arrows on the picture itself, so the next video can be chosen in full screen; where the browser has no
+        # element full screen (iPhone) the stage fills the window instead, with a close button
+        self.assertIn('id="stage-next" aria-label="Next video"', html)
+        self.assertIn('id="stage-prev" aria-label="Previous video"', html)
+        self.assertIn('id="stage-close" aria-label="Exit full screen"', html)
+        self.assertIn("if (!request) return setPseudo(true);", html)
+        self.assertIn("stage.focus({preventScroll: true})", html)                     # keys come back from YouTube
+        self.assertIn('.stage-nav{display:none;', html)                               # no arrows outside full screen
+        self.assertIn('.stage:fullscreen .stage-nav,.stage:-webkit-full-screen .stage-nav,.stage.pseudo-full .stage-nav{display:flex}', html)
+        self.assertIn('.stage-nav:focus,.stage-nav:focus-visible{outline:none}', html)   # no blue frame after a click
+        self.assertIn('user-select:none', html)
+        self.assertIn('fs: 0', html)                       # YouTube's own full screen would hide the arrows: turned off
         self.assertIn('<div class="show-bar"><div class="caption">', html)
         ActivityEvent = E
         ActivityEvent.objects.filter(kind='video_added').delete()

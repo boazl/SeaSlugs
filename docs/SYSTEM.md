@@ -470,7 +470,11 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
     skipped. Nothing passes through Render. A manager on the Mac plays the offline copy instead wherever this computer
     has one (`local_videos.statuses` = `ok`, `/observations/<pk>/local-video/`), so it also works without internet
     (YouTube-only videos are then skipped); `?source=youtube` makes a manager use YouTube for everything. The caption
-    and buttons sit under the video; full screen shows the video alone. Keys: arrows, space, `f`.
+    and buttons sit under the video; full screen shows the video alone; previous/next arrows exist only in full screen, as
+    clear strips down each side that show the arrow on hover and for 2.5 s after entering full screen or changing video
+    (faintly visible on touch screens). YouTube's own full-screen button is off (`fs: 0`): it would hide the arrows. Where the browser has no element full screen (iPhone Safari) the stage fills the
+    window instead, with a ✕ to close. After a click inside the YouTube player the keyboard focus returns to the page,
+    so the keys keep working: arrows, space, `f`, Esc.
   - **Managers** also see visits (today / 7 / 30 days, a daily chart, top pages), sign-ups, the users table (joined,
     last login, logins in 30 days, observations) and recent logins.
 

@@ -4,6 +4,21 @@ main{max-width:1400px}
 .stage{position:relative;background:#000;border-radius:10px;overflow:hidden;aspect-ratio:16/9;max-height:78vh;margin:auto}
 .stage [hidden]{display:none!important}.stage #yt-box{width:100%;height:100%}.stage iframe,.stage #yt{width:100%;height:100%;display:block;border:0}.stage video{width:100%;height:100%;display:block;background:#000;object-fit:contain}
 .stage:fullscreen{border-radius:0;max-height:none}
+.stage:focus{outline:none}
+.stage.pseudo-full{position:fixed;inset:0;z-index:1000;border-radius:0;max-height:none;aspect-ratio:auto;margin:0}
+body.show-locked{overflow:hidden}
+.stage-close{position:absolute;top:10px;inset-inline-end:10px;z-index:3;display:none;width:44px;height:44px;padding:0;border:0;border-radius:50%;background:#0008;color:#fff;font-size:24px;cursor:pointer}
+.stage.pseudo-full .stage-close{display:block}
+/* The arrows exist only in full screen: a clear strip down each side of the picture (above the YouTube player, clear of
+   its control bar at the bottom); the arrow shows while the mouse is on the strip, and for a moment after entering
+   full screen or moving to another video. On a touch screen it stays faintly visible. */
+.stage-nav{display:none;position:absolute;top:0;bottom:72px;z-index:3;width:96px;padding:0;border:0;border-radius:0;background:transparent;cursor:pointer;align-items:center;justify-content:center;outline:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+.stage-nav:focus,.stage-nav:focus-visible{outline:none}   /* a click must not leave a focus frame or a text selection on the arrow */
+.stage-prev{inset-inline-start:0}.stage-next{inset-inline-end:0}
+.stage-nav span{direction:ltr;unicode-bidi:isolate;display:block;width:56px;height:96px;line-height:96px;border-radius:10px;background:#0009;color:#fff;font-size:38px;text-align:center;opacity:0;transition:opacity .25s}
+.stage:fullscreen .stage-nav,.stage:-webkit-full-screen .stage-nav,.stage.pseudo-full .stage-nav{display:flex}
+.stage-nav:hover span,.stage.peek .stage-nav span{opacity:1}
+@media (hover:none){.stage-nav span{opacity:.55}}
 .show-bar{display:flex;flex-wrap:wrap;gap:10px 24px;align-items:center;justify-content:space-between;margin:12px 0}
 .caption{min-width:0;flex:1 1 320px}.caption b{display:block;font-size:22px;font-weight:600;font-family:Georgia,"Times New Roman",serif;line-height:1.3}.caption small{display:inline;color:#b8ccd0;font-size:15px}
 .counter{display:inline-block;color:#08232a;background:#b8ccd0;border-radius:999px;padding:0 9px;font-size:13px;direction:ltr;unicode-bidi:isolate;margin-inline-start:12px}
@@ -17,7 +32,7 @@ main{max-width:1400px}
 </style>
 <div class="show-head"><h1>{{ "מצגת הסרטונים החדשים"|t:lang }}</h1><span class="period">{{ period.label }}</span><span>{% if switch_url %}<a href="{{ switch_url }}">{% if force_youtube %}{{ "ניגון מהעותקים במק"|t:lang }}{% else %}{{ "ניגון מ-YouTube"|t:lang }}{% endif %}</a> · {% endif %}<a href="{{ back_url }}">{{ "חזרה לחדשות ופעילות"|t:lang }}</a></span></div>
 {% if items %}
-<div class="stage" id="stage"><video id="player" playsinline preload="auto" hidden></video><div id="yt-box" hidden><div id="yt"></div></div></div>
+<div class="stage" id="stage" tabindex="-1"><video id="player" playsinline preload="auto" hidden></video><div id="yt-box" hidden><div id="yt"></div></div><button type="button" class="stage-nav stage-prev" id="stage-prev" aria-label="{{ 'הסרטון הקודם'|t:lang }}" title="{{ 'הסרטון הקודם'|t:lang }}"><span>{% if lang == 'en' %}‹{% else %}›{% endif %}</span></button><button type="button" class="stage-nav stage-next" id="stage-next" aria-label="{{ 'הסרטון הבא'|t:lang }}" title="{{ 'הסרטון הבא'|t:lang }}"><span>{% if lang == 'en' %}›{% else %}‹{% endif %}</span></button><button type="button" class="stage-close" id="stage-close" aria-label="{{ 'יציאה ממסך מלא'|t:lang }}" title="{{ 'יציאה ממסך מלא'|t:lang }}">✕</button></div>
 <div class="show-bar"><div class="caption"><span id="caption"></span><span class="counter" id="counter"></span></div>
 <div class="show-controls">
 <button type="button" id="prev" aria-label="{{ 'הסרטון הקודם'|t:lang }}" title="{{ 'הסרטון הקודם'|t:lang }}">{% if lang == 'en' %}⏮{% else %}⏭{% endif %}</button>
@@ -45,7 +60,7 @@ main{max-width:1400px}
     window.onYouTubeIframeAPIReady = () => {
       yt = new YT.Player('yt', {
         width: '100%', height: '100%', videoId: ytPending || '',
-        playerVars: {autoplay: 1, playsinline: 1, rel: 0},
+        playerVars: {autoplay: 1, playsinline: 1, rel: 0, fs: 0},   // fs:0 -- full screen is the slideshow's own
         events: {
           onReady: () => { ytReady = true; if (current === 'yt' && ytPending) { yt.loadVideoById(ytPending); } },
           onStateChange: e => { if (e.data === YT.PlayerState.ENDED && current === 'yt') next(); },   // ended: the next one
@@ -92,6 +107,8 @@ main{max-width:1400px}
     }
     pauseBtn.textContent = '⏸';
     soundBtn.textContent = muted ? '🔇' : '🔊';
+    if (document.activeElement && document.activeElement.tagName === 'IFRAME') stage.focus({preventScroll: true});
+    if (typeof peek === 'function' && (stage.classList.contains('pseudo-full') || realFull())) peek();
   }
   const paused = () => current === 'local' ? video.paused : (ytReady && yt.getPlayerState() === YT.PlayerState.PAUSED);
   document.getElementById('next').onclick = next;
@@ -104,14 +121,40 @@ main{max-width:1400px}
     muted = !muted; video.muted = muted; if (ytReady) { muted ? yt.mute() : yt.unMute(); }
     soundBtn.textContent = muted ? '🔇' : '🔊'; soundBtn.classList.remove('sound-hint');
   };
-  document.getElementById('full').onclick = () => { if (document.fullscreenElement) document.exitFullscreen(); else (stage.requestFullscreen || stage.webkitRequestFullscreen).call(stage); };
+  // Full screen: the browser's own where it allows it for an element; otherwise (iPhone Safari) the stage fills the
+  // window. Either way the arrows on the picture stay, so the next video can be chosen in full screen too.
+  const realFull = () => document.fullscreenElement || document.webkitFullscreenElement;
+  let peekTimer;
+  const peek = () => { stage.classList.add('peek'); clearTimeout(peekTimer); peekTimer = setTimeout(() => stage.classList.remove('peek'), 2500); };
+  const setPseudo = on => { stage.classList.toggle('pseudo-full', on); document.body.classList.toggle('show-locked', on); if (on) peek(); };
+  ['fullscreenchange', 'webkitfullscreenchange'].forEach(ev => document.addEventListener(ev, () => { if (realFull()) peek(); }));
+  const toggleFull = () => {
+    if (stage.classList.contains('pseudo-full')) return setPseudo(false);
+    if (realFull()) return (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    const request = (document.fullscreenEnabled || document.webkitFullscreenEnabled) && (stage.requestFullscreen || stage.webkitRequestFullscreen);
+    if (!request) return setPseudo(true);
+    const p = request.call(stage);
+    if (p && p.catch) p.catch(() => setPseudo(true));
+    setTimeout(() => { if (!realFull()) setPseudo(true); }, 600);   // refused without an error (older Safari)
+  };
+  document.getElementById('full').onclick = toggleFull;
+  document.getElementById('stage-close').onclick = () => setPseudo(false);
+  // after a click the focus goes back to the stage (no focus frame on the arrow; the keys keep working)
+  document.getElementById('stage-next').onclick = e => { e.stopPropagation(); e.currentTarget.blur(); stage.focus({preventScroll: true}); next(); };
+  document.getElementById('stage-prev').onclick = e => { e.stopPropagation(); e.currentTarget.blur(); stage.focus({preventScroll: true}); show(index - 1); };
+  ['stage-next', 'stage-prev'].forEach(id => document.getElementById(id).addEventListener('mousedown', e => e.preventDefault()));   // no focus, no selection
+  // Keys keep working after a click inside the YouTube player: the focus comes back to the page.
+  window.addEventListener('blur', () => setTimeout(() => {
+    if (document.activeElement && document.activeElement.tagName === 'IFRAME') stage.focus({preventScroll: true});
+  }, 300));
   buttons.forEach(b => b.onclick = () => show(+b.dataset.i));
   video.addEventListener('click', () => pauseBtn.click());
   document.addEventListener('keydown', e => {
     if (e.key === ' ') { e.preventDefault(); pauseBtn.click(); }
     else if (e.key === 'ArrowRight') show(index + (document.dir === 'rtl' ? -1 : 1));
     else if (e.key === 'ArrowLeft') show(index + (document.dir === 'rtl' ? 1 : -1));
-    else if (e.key === 'f') document.getElementById('full').click();
+    else if (e.key === 'f') toggleFull();
+    else if (e.key === 'Escape' && stage.classList.contains('pseudo-full')) setPseudo(false);
   });
   show(0);
 })();

@@ -284,6 +284,7 @@ TRANSLATIONS = {
     'השהיה / המשך': 'Pause / play',
     'קול': 'Sound',
     'מסך מלא': 'Full screen',
+    'יציאה ממסך מלא': 'Exit full screen',
     'אין עדיין תצפיות שפורסמו באזור זה.': 'No published observations in this area yet.',
 }
 
