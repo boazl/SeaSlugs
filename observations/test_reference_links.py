@@ -140,7 +140,7 @@ class AdminAndTransferTests(TestCase):
                 self.assertNotIn('inaturalist.org/taxa/21', response.content.decode())
 
     def test_travels_with_the_species_table_and_old_exports_still_import(self):
-        self.assertEqual(TABLES['species'][1][-1], 'reference_link')
+        self.assertIn('reference_link', TABLES['species'][1])
         doc = export_table('species')
         self.assertIn('reference_link', doc['rows'][0])
         self.assertTrue(all(i['action'] == 'same' for i in plan(doc)))

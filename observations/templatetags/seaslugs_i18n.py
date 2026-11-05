@@ -106,6 +106,7 @@ TRANSLATIONS = {
     'עדיין אין מסעות עם תמונות או סרטונים מפורסמים.': 'No trips with published photos or videos yet.',
     'סרטוני המסעות': 'Trip videos',
     'העתקת כתובת התמונה': 'Copy image address',
+    'הפוך לתצפית הראשית': 'Make this the main observation',
     'הכתובת הועתקה': 'Address copied',
     'רשימת המינים במסע': 'Species list of this trip',
     'טבלת המסעות': 'Table of trips',

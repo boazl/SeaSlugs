@@ -18,6 +18,7 @@ urlpatterns=[
  path('<int:pk>/edit/',views.edit,name='observation-edit'),
  path('<int:pk>/remove/',views.remove,name='observation-remove'),
  path('<int:pk>/action/',views.observation_action,name='observation-action'),
+ path('<int:pk>/make-main/',views.make_main_observation,name='observation-make-main'),
  path('<int:pk>/photo/',views.photo,name='observation-photo'),
  path('<int:pk>/local-video/',views.local_video,name='observation-local-video'),
  path('signup/',views.signup,name='signup'),

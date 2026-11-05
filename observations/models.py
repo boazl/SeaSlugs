@@ -1254,6 +1254,12 @@ class SpeciesArea(models.Model):
                    'תתמזג עם תצפיות של צורה אחרת מאותו סוג באותו אזור.')
     defining_sample = models.ForeignKey(Sample, null=True, blank=True, on_delete=models.SET_NULL, related_name='+', verbose_name='דגימה מגדירה',
         help_text='הדגימה שתמונתה או שרטון היוטיוב שלה יוצגו בכרטיס המין בגלריה. ניתן לבחור דגימה אחרת מבין דגימות המין באזור זה.')
+    # The observation a manager chose as the main one ("הפוך לתצפית הראשית" on the species page). While it is
+    # still a valid observation of this area with a photo or video, pick_defining_sample keeps returning it, so a
+    # later save, publish, transfer or rebuild does not replace the manager's choice with the automatic one.
+    chosen_sample = models.ForeignKey(Sample, null=True, blank=True, on_delete=models.SET_NULL, related_name='+',
+        verbose_name='תצפית ראשית שנבחרה',
+        help_text='נבחרה בידי מנהל בעמוד המין. כל עוד היא תצפית תקפה של האזור עם תמונה או סרטון, היא הדגימה המגדירה.')
     # Identifies this species+area's own dedicated public page (species name is not unique
     # on its own across areas -- the same species observed in two areas gets two pages).
     # Generated once from species+country+sea(+variant) and left alone after that so
@@ -1291,10 +1297,12 @@ class SpeciesArea(models.Model):
         super().save(*args, **kwargs)
 
     @staticmethod
-    def pick_defining_sample(species_id, country_id, sea_id, undetermined_variant=''):
-        """Best sample to represent this species(+variant) in this country+sea: prefer one
-        with an uploaded image over a video-only one, only among published/non-deleted
-        samples, tie-broken by whichever was created first."""
+    def pick_defining_sample(species_id, country_id, sea_id, undetermined_variant='', chosen_id=None):
+        """Best sample to represent this species(+variant) in this country+sea: the manager's
+        chosen main observation (SpeciesArea.chosen_sample) while it is still a valid one with a
+        photo or video; otherwise prefer one with an uploaded image over a video-only one, only
+        among published/non-deleted samples, tie-broken by whichever was created first.
+        chosen_id is passed by rebuild(), which has already deleted the area rows."""
         # A trip's sea is its region's sea (DiveTrip.sea).
         sea_match = models.Q(trip__region__sea_id=sea_id)
         candidates = list(Sample.objects.filter(
@@ -1303,6 +1311,14 @@ class SpeciesArea(models.Model):
         ).order_by('created_at', 'pk'))
         if not candidates:
             return None
+        if chosen_id is None:
+            chosen_id = SpeciesArea.objects.filter(
+                species_id=species_id, country_id=country_id, sea_id=sea_id, undetermined_variant=undetermined_variant,
+            ).values_list('chosen_sample_id', flat=True).first()
+        if chosen_id:
+            chosen = next((c for c in candidates if c.pk == chosen_id and (c.image or c.video_url)), None)
+            if chosen:
+                return chosen
         with_image = [c for c in candidates if c.image]
         return (with_image or candidates)[0]
 
@@ -1339,6 +1355,9 @@ class SpeciesArea(models.Model):
             # The hand-written notes are not derived from the samples: keep them for the rows that come back.
             notes = {(a.species_id, a.country_id, a.sea_id, a.undetermined_variant): (a.note_he, a.note_en)
                      for a in SpeciesArea.objects.exclude(note_he='', note_en='')}
+            # So is the manager's chosen main observation.
+            chosen = {(a.species_id, a.country_id, a.sea_id, a.undetermined_variant): a.chosen_sample_id
+                      for a in SpeciesArea.objects.filter(chosen_sample__isnull=False)}
             SpeciesArea.objects.all().delete()
             # A trip's sea is its region's sea (DiveTrip.sea), so a trip without a region
             # contributes no species area.
@@ -1354,12 +1373,13 @@ class SpeciesArea(models.Model):
             # for the same species+area have different created_at timestamps.
             count = 0
             for species_id, country_id, sea_id, variant in keys:
-                defining = SpeciesArea.pick_defining_sample(species_id, country_id, sea_id, variant)
+                key = (species_id, country_id, sea_id, variant)
+                defining = SpeciesArea.pick_defining_sample(species_id, country_id, sea_id, variant, chosen_id=chosen.get(key, 0))
                 if defining:
-                    note_he, note_en = notes.get((species_id, country_id, sea_id, variant), ('', ''))
+                    note_he, note_en = notes.get(key, ('', ''))
                     SpeciesArea.objects.create(species_id=species_id, country_id=country_id, sea_id=sea_id,
                                                 undetermined_variant=variant, defining_sample=defining,
-                                                note_he=note_he, note_en=note_en)
+                                                chosen_sample_id=chosen.get(key), note_he=note_he, note_en=note_en)
                     count += 1
         return count
 

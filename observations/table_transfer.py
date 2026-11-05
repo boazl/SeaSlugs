@@ -27,13 +27,19 @@ TABLES = {'groups': ACCOUNT_TABLES['groups'], 'users': ACCOUNT_TABLES['users'],
           'regions': (Region,['name','name_en','country','sea']), 'sites': (Site,['name','name_en','region']),
           'profiles': ACCOUNT_TABLES['profiles'],
           'orders': TAXON_TABLES['orders'][::2], 'families': TAXON_TABLES['families'][::2], 'genera': TAXON_TABLES['genera'][::2],
-          'species': (Species, ['scientific_name','name_he','name_en','source_id','genus','species','author','order','family','superfamily','accepted_genus','accepted_species','common_name','transliteration','language','formatted_author','distribution','phylogenetic_order','full_species_name_with_order','reference_author','is_migrant','habitat','food','first_observed_year','last_observed_year','size_from','size_to','size_max','description_he','description_en','link','reference_link']),
+          'species': (Species, ['scientific_name','name_he','name_en','source_id','genus','species','author','order','family','superfamily','accepted_genus','accepted_species','common_name','transliteration','language','formatted_author','distribution','phylogenetic_order','full_species_name_with_order','reference_author','is_migrant','habitat','food','first_observed_year','last_observed_year','size_from','size_to','size_max','description_he','description_en','link','reference_link',
+                                'habitat_en','food_en','identification_he','identification_en','similar_species_he','similar_species_en',
+                                'native_range_he','native_range_en','depth_min','depth_max','introduction_route_he','introduction_route_en',
+                                'med_status_he','med_status_en','first_record_place_he','first_record_place_en',
+                                'last_record_place_he','last_record_place_en','sources']),
           'trips': (DiveTrip, ['code','title','source_sort','year','month','start_day','duration_days','country','region','site','country_name','region_name','reserve','sea_name','species_count','source_metadata','kind','description_he','description_en','link','local_video_folder']),
           'qualifiers': (IdentificationQualifier,['code','name','name_en']), 'lifestages': (LifeStage,['code','name','name_en']),
           'samples': (Sample, ['title','title_en','kind','trip','owner','order','family','genus','species','identification_qualifier','life_stage','site','species_other','undetermined_variant','site_other','day','depth','video_url','status','source_id','gallery_order','source_metadata','transfer_id','image','gallery_source','note_he','note_en','local_video_file','drive_video_id']),
-          'speciesareas': (SpeciesArea, ['species','country','sea','undetermined_variant','defining_sample','note_he','note_en'])}
+          'speciesareas': (SpeciesArea, ['species','country','sea','undetermined_variant','defining_sample','note_he','note_en','chosen_sample'])}
 # Fields a file exported before they existed may lack: the target then keeps its own values.
 NOTE_FIELDS = ('note_he', 'note_en')
+# The manager's chosen main observation, added later still: a row without it keeps the target's choice.
+AREA_CHOICE_FIELDS = ('chosen_sample',)
 # The trip's Mac video folder (local_videos.py), added later: a trip row without it keeps the target's value.
 TRIP_LOCAL_FIELDS = ('local_video_folder',)
 
@@ -55,7 +61,7 @@ def row(obj, fields):
         return sample_row(obj, fields, include_deleted=True)
     result = {}
     for f in fields:
-        if f in ('country','sea','region','site') or (isinstance(obj, SpeciesArea) and f in ('species','defining_sample')):
+        if f in ('country','sea','region','site') or (isinstance(obj, SpeciesArea) and f in ('species','defining_sample','chosen_sample')):
             # Species' OWN 'species' field (the epithet, a plain string) shares a name with
             # SpeciesArea's 'species' FK -- only treat it as a reference on SpeciesArea itself.
             result[f] = reference(getattr(obj,f))
@@ -137,13 +143,18 @@ def plan(document):
         fields=[f for f in fields if f in document['rows'][0]]
     for number,incoming in enumerate(document['rows'],1):
         # A species-area row from a file exported before the page notes existed has no note fields: the target keeps its own.
-        older_area_row = model is SpeciesArea and isinstance(incoming,dict) and set(incoming)==set(fields)-set(NOTE_FIELDS)
+        older_area_row = (model is SpeciesArea and isinstance(incoming,dict) and set(incoming) < set(fields)
+                          and set(fields)-set(incoming) <= set(NOTE_FIELDS)|set(AREA_CHOICE_FIELDS))
         # A trip row from a file exported before the Mac video folder existed: the target keeps its own folder.
         older_trip_row = model is DiveTrip and isinstance(incoming,dict) and set(incoming)==set(fields)-set(TRIP_LOCAL_FIELDS)
         if not isinstance(incoming,dict) or (set(incoming)!=set(fields) and not older_area_row and not older_trip_row): raise ValidationError(f'שדות לא תואמים בשורה {number}; יש לעדכן את הקוד בשתי הסביבות.')
         values={}
         for f,v in incoming.items():
             if f in ('country','sea','region','site'): values[f]=related(f,v,required=not (model is DiveTrip))
+            elif model is SpeciesArea and f == 'chosen_sample':
+                # Like defining_sample, a chosen observation that hasn't reached this environment yet is simply None.
+                if v is not None and not isinstance(v,str): raise ValidationError('מפתח קשר לא תקין.')
+                values[f]=unique(Sample,transfer_id=v) if v else None
             elif model is SpeciesArea and f in ('species','defining_sample'):
                 # Same name collision as in row() above -- only SpeciesArea's own 'species'
                 # and 'defining_sample' fields are references; Species.species (the
@@ -158,7 +169,7 @@ def plan(document):
             elif model is Species and f == 'is_migrant':
                 if not isinstance(v,bool): raise ValidationError('נדרש ערך בוליאני: is_migrant.')
                 values[f] = v
-            elif model is Species and f in ('first_observed_year','last_observed_year'):
+            elif model is Species and f in ('first_observed_year','last_observed_year','depth_min','depth_max'):
                 if v is not None and type(v) is not int: raise ValidationError('נדרש מספר שלם: '+f)
                 values[f] = v
             elif model is Species and f in ('size_from','size_to','size_max'):
@@ -225,7 +236,7 @@ def plan(document):
             # stable) -- carry the existing one over rather than letting a plain update
             # reset it to '' and have save() mint a fresh one.
             candidate.slug = obj.slug
-            for field in NOTE_FIELDS:
+            for field in NOTE_FIELDS + AREA_CHOICE_FIELDS:
                 if field not in values: setattr(candidate, field, getattr(obj, field))
         if obj: candidate._state.adding = False
         candidate.full_clean()

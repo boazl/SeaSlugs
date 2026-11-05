@@ -1420,6 +1420,29 @@ def remove(request,pk):
 
 @login_required
 @require_POST
+def make_main_observation(request, pk):
+    """A manager's "make this the main observation" button on a species page: the observation becomes the area's
+    defining sample (hero photo, gallery card) and is remembered as the manager's choice (SpeciesArea.chosen_sample),
+    so later automatic picks keep it. Only an observation shown on that page, with a photo or a video."""
+    if not is_manager(request.user):
+        raise Http404
+    item = get_object_or_404(Sample.objects.select_related('trip', 'trip__region'), pk=pk, deleted_at__isnull=True,
+                             kind=Sample.Kind.SPECIES)
+    if not (item.trip_id and item.trip.country_id and item.trip.sea):
+        raise Http404
+    area = get_object_or_404(SpeciesArea, species_id=item.species_id, country_id=item.trip.country_id, sea=item.trip.sea,
+                             undetermined_variant=item.undetermined_variant)
+    if not area_samples(area).filter(pk=item.pk).exists() or not (item.image or item.video_url):
+        raise Http404
+    area.chosen_sample = item
+    area.defining_sample = item
+    area.save(update_fields=['chosen_sample', 'defining_sample'])
+    url = reverse('species-page', args=[area.slug])
+    return redirect(url + ('?lang=en' if get_lang(request) == 'en' else ''))
+
+
+@login_required
+@require_POST
 def observation_action(request, pk):
     """Three destructive-ish actions available from the observation edit form, all scoped
     to the owner's own non-deleted sample: releasing it from the species it currently
@@ -1442,7 +1465,9 @@ def observation_action(request, pk):
         else:
             candidate = SpeciesArea.next_candidate(item.species_id, item.trip.country_id, item.trip.sea, item.pk, item.undetermined_variant)
             area.defining_sample = candidate['sample'] if candidate['kind'] == 'with_media' else None
-            area.save(update_fields=['defining_sample'])
+            if area.chosen_sample_id == item.pk:
+                area.chosen_sample = None   # released: no longer the manager's chosen main observation
+            area.save(update_fields=['defining_sample', 'chosen_sample'])
             messages.success(request, 'המין שנבחר מופיע בגלריה.' if area.defining_sample_id else 'המין שנבחר אינו מופיע בגלריה.')
     elif action == 'delete_image':
         if is_defining:

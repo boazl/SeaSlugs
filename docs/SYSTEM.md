@@ -251,6 +251,10 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
     afterwards**, because published links must keep working. Example:
     `phyllidia-ocellata-phillipines-indo-pacific-south-china-sea`, keeping the old spelling.
   - `note_he` / `note_en` hold a remark shown on that page.
+  - `chosen_sample` is the main observation a manager picked on the species page ("הפוך לתצפית הראשית",
+    `observation-make-main`). While it is still a published observation of the area with a photo or video,
+    `pick_defining_sample` returns it, so publishes, transfers and `rebuild()` keep it; otherwise the automatic
+    pick applies. It transfers with the `speciesareas` table.
 
 ### 5.4 Content, users and other
 
@@ -290,6 +294,9 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
      sample (`SpeciesArea.pick_defining_sample`).
    - When an observation is deleted, unpublished or moved, the area it leaves gets a new defining sample,
      or none.
+   - A manager's chosen main observation (`SpeciesArea.chosen_sample`) wins over the automatic pick while it is valid.
+   - On the species page an "other observation" card shows its region next to the year when it differs from the
+     main observation's region.
    - Only published, non-deleted defining samples that have a photo or video are shown
      (`gallery_data.taxon_media`).
 3. **Defining samples for taxon rows** (`defining.py`): a row is represented by an observation one level

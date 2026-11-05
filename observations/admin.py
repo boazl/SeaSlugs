@@ -534,7 +534,7 @@ class SpeciesAreaAdmin(admin.ModelAdmin):
     autocomplete_fields = []
     actions = ['rebuild_all']
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        if db_field.name == 'defining_sample' and getattr(self, '_obj', None):
+        if db_field.name in ('defining_sample', 'chosen_sample') and getattr(self, '_obj', None):
             # Only samples that would actually qualify to show the species in the gallery --
             # published, not deleted, matching this row's species+country+sea+variant.
             kwargs['queryset'] = Sample.objects.filter(kind='species', species_id=self._obj.species_id, status='published',
@@ -544,7 +544,7 @@ class SpeciesAreaAdmin(admin.ModelAdmin):
     def get_form(self, request, obj=None, **kwargs):
         self._obj = obj
         return super().get_form(request, obj, **kwargs)
-    @admin.action(description='בנייה מחדש של כל הטבלה מהדגימות המפורסמות הקיימות (מתעלם מהבחירה; מוחק ובונה מחדש את כל הרשומות)')
+    @admin.action(description='בנייה מחדש של כל הטבלה מהדגימות המפורסמות הקיימות (שומר את התצפית הראשית שנבחרה; מוחק ובונה מחדש את כל הרשומות)')
     def rebuild_all(self, request, queryset):
         from .table_transfer import create_backup
         backup = create_backup()
