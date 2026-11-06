@@ -112,7 +112,8 @@ def build_rows(trip, folder, posted=None):
         restore = bool(sample and sample.deleted_at)
         row = {'index': index, 'name': name, 'path': str(path), 'size': path.stat().st_size if path.is_file() else 0,
                'drive': drive, 'sample': str(sample.pk) if sample else NEW, 'url': sample.video_url if sample else '',
-               'checked': not done and not restore, 'done': done, 'deleted_match': restore,
+               # selected by default: only a file that belongs to a live observation and is not attached to it yet
+               'checked': bool(sample) and not done and not restore, 'done': done, 'deleted_match': restore,
                'new': guess_new(name, species), 'errors': []}
         if posted is not None:
             get = lambda key: posted.get(f'{key}_{index}', '')
@@ -221,6 +222,16 @@ def apply(rows, trip, folder, user, copy_to_drive=True):
     return counts
 
 
+def _row_counts(rows):
+    """The selected rows are shown; the others (new, deleted, already attached) sit in a closed list below them."""
+    others = [r for r in rows if not r['checked']]
+    return {'selected_count': len(rows) - len(others), 'other_count': len(others),
+            'other_done': sum(1 for r in others if r['done']), 'other_deleted': sum(1 for r in others if r['deleted_match']),
+            'other_new': sum(1 for r in others if r['sample'] == NEW),
+            'other_rest': sum(1 for r in others if not r['done'] and not r['deleted_match'] and r['sample'] != NEW),
+            'others_open': len(others) == len(rows)}
+
+
 @staff_member_required
 def video_import(request):
     if not request.user.is_superuser: raise PermissionDenied
@@ -261,7 +272,7 @@ def video_import(request):
                 context['error'] = 'לא נשמר דבר: יש לתקן את השורות המסומנות באדום.'
         samples = sorted(by_pk.values(), key=lambda s: (bool(s.deleted_at), (s.taxon_label or s.title or '').lower()))
         context.update({
-            'listed': True, 'rows': rows, 'samples': [(s.pk, sample_label(s)) for s in samples],
+            'listed': True, 'rows': rows, **_row_counts(rows), 'samples': [(s.pk, sample_label(s)) for s in samples],
             'info_json': json.dumps({str(s.pk): sample_info(s) for s in samples}, ensure_ascii=False),
             'species': Species.objects.order_by('scientific_name'),
             'qualifiers': list(IdentificationQualifier.objects.values_list('code', flat=True)),

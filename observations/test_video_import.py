@@ -4,7 +4,8 @@ observation with fields guessed from the file name), its Google Drive copy and a
 every selected row. Saving sets the trip's folder, writes the link, the file name and the Drive id, creates the new
 observations (a manager's save publishes), copies missing files into Drive and refuses a link YouTube reports as
 deleted. Nothing is saved while any selected row is invalid. A file that belongs to a deleted observation of the trip
-(and to no live one) is offered with it, unselected; choosing it restores the observation. Selected rows come first. xattr and YouTube are mocked."""
+(and to no live one) is offered with it, unselected; choosing it restores the observation. Only a file that belongs to a live observation and is not attached to it yet is selected and shown; new,
+deleted and already attached ones sit in a closed list below. xattr and YouTube are mocked."""
 import os
 import tempfile
 from pathlib import Path
@@ -125,15 +126,22 @@ class VideoImportTests(TestCase):
     def test_missing_folder(self):
         self.assertContains(self.client.get(f'/admin/local-videos/import/?trip={self.trip.pk}&folder=/no/such/folder'), 'התיקייה לא נמצאה')
 
-    def test_selected_rows_first(self):
-        Sample.objects.filter(pk=self.existing.pk).update(video_url='https://youtu.be/aaaaaaaaaaa')
-        self.trip.local_video_folder = str(self.folder); self.trip.save()
-        Sample.objects.filter(pk=self.existing.pk).update(local_video_file='Chromodoris annae.mov')
-        with patch('observations.video_import.drive_videos.available', return_value=False), \
-             patch('observations.drive_videos.drive_root', return_value=self.drive / 'none'):
-            rows = self.client.get(self.url()).context['rows']
-        self.assertEqual([r['checked'] for r in rows], [True, True, False])
-        self.assertEqual(rows[-1]['name'], 'Chromodoris annae.mov')
+    def test_only_live_matches_selected_others_in_a_closed_list(self):
+        response = self.client.get(self.url())
+        rows = response.context['rows']
+        self.assertEqual([(r['name'], r['checked']) for r in rows],
+                         [('Chromodoris annae.mov', True), ('Eilat 2026.mp4', False), ('Hypselodoris cf. infucata juv.mov', False)])
+        self.assertEqual((response.context['selected_count'], response.context['other_new']), (1, 2))
+        html = response.content.decode()
+        closed = html[html.index('<details class="vi-others">'):]
+        self.assertIn('Hypselodoris cf. infucata juv.mov', closed); self.assertNotIn('Chromodoris annae.mov', closed)
+        self.assertIn('שאר הקבצים בתיקייה (2): 2 ללא תצפית', html)
+
+    def test_nothing_selected_opens_the_list(self):
+        Sample.objects.filter(pk=self.existing.pk).update(deleted_at=self.existing.created_at)
+        response = self.client.get(self.url())
+        self.assertContains(response, '<details class="vi-others" open>')
+        self.assertContains(response, 'אין קבצים שמתאימים לתצפית קיימת')
 
     def test_deleted_observation_offered_and_restored(self):
         gone = Sample(owner=self.admin, trip=self.trip, species=self.infucata, identification_qualifier='cf.', life_stage='juv.',

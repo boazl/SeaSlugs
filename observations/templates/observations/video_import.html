@@ -18,25 +18,12 @@
 {% if not drive_available %}<p class="notice">תיקיית Google Drive לא נמצאה במחשב הזה — הקבצים לא יועתקו ל-Drive.</p>{% endif %}
 <form method="post" id="video-import-form">{% csrf_token %}<input type="hidden" name="trip" value="{{ trip.pk }}"><input type="hidden" name="folder" value="{{ folder }}">
 <datalist id="vi-species">{% for s in species %}<option value="{{ s.scientific_name }}">{% endfor %}</datalist>
+{% if selected_count %}<table class="local-videos video-import"><thead><tr><th>בחירה</th><th>קובץ במק</th><th>Google Drive</th><th>תצפית</th><th>קישור YouTube (חובה)</th></tr></thead>
+<tbody>{% for row in rows %}{% if row.checked %}{% include "observations/_video_import_row.html" %}{% endif %}{% endfor %}</tbody></table>
+{% else %}<p><strong>אין קבצים שמתאימים לתצפית קיימת ועדיין לא משויכים אליה.</strong></p>{% endif %}
+{% if other_count %}<details class="vi-others"{% if others_open %} open{% endif %}><summary>שאר הקבצים בתיקייה ({{ other_count }}): {% if other_new %}{{ other_new }} ללא תצפית (תצפית חדשה){% endif %}{% if other_deleted %} · {{ other_deleted }} של תצפיות מחוקות{% endif %}{% if other_done %} · {{ other_done }} כבר משויכים{% endif %}{% if other_rest %} · {{ other_rest }} לא נבחרו{% endif %}</summary>
 <table class="local-videos video-import"><thead><tr><th>בחירה</th><th>קובץ במק</th><th>Google Drive</th><th>תצפית</th><th>קישור YouTube (חובה)</th></tr></thead>
-<tbody>{% for row in rows %}<tr data-row="{{ row.index }}"{% if row.errors %} style="outline:2px solid #ff3b3b"{% endif %}>
-<td><input type="checkbox" name="selected" value="{{ row.index }}" class="vi-check"{% if row.checked %} checked{% endif %}>{% if row.done %}<br><small>כבר משויך</small>{% endif %}{% if row.deleted_match %}<br><small style="color:#ff3b3b">תצפית מחוקה</small>{% endif %}<input type="hidden" name="name_{{ row.index }}" value="{{ row.name }}"></td>
-<td dir="ltr"><strong>{{ row.name }}</strong><br><small>{{ row.size|filesizeformat }}</small></td>
-<td dir="ltr"><small>{% if not row.drive.available %}—{% else %}{{ row.drive.path }}<br>{% if row.drive.id %}<a href="https://drive.google.com/file/d/{{ row.drive.id }}/view" target="_blank" rel="noopener">{{ row.drive.id }}</a>{% elif row.drive.exists %}<span dir="rtl">ממתין להעלאה ל-Drive</span>{% else %}<span dir="rtl">יועתק ל-Drive</span>{% endif %}{% endif %}</small></td>
-<td><select name="sample_{{ row.index }}" class="vi-sample"><option value="new"{% if row.sample == 'new' %} selected{% endif %}>— תצפית חדשה —</option>{% for pk, label in samples %}<option value="{{ pk }}"{% if row.sample == pk|stringformat:"s" %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
-{% if row.deleted_match %}<div class="errorlist">הקובץ מתאים לתצפית שנמחקה. השורה לא סומנה: סימון ושמירה ישחזרו את התצפית; כדי ליצור במקומה תצפית חדשה בחרו "תצפית חדשה".</div>{% endif %}<div class="vi-info"></div>
-<div class="vi-new">
-<label>סוג <select name="kind_{{ row.index }}" class="vi-kind">{% for value, label in kinds %}<option value="{{ value }}"{% if row.new.kind == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
-<span class="vi-species-fields"><label>מין <input list="vi-species" name="species_{{ row.index }}" value="{{ row.new.species }}" dir="ltr" autocomplete="off" style="width:16em"></label>
-<label>זהות <select name="qualifier_{{ row.index }}"><option value=""></option>{% for q in qualifiers %}<option{% if row.new.qualifier == q %} selected{% endif %}>{{ q }}</option>{% endfor %}</select></label>
-<label>שלב חיים <select name="life_stage_{{ row.index }}"><option value=""></option>{% for q in life_stages %}<option{% if row.new.life_stage == q %} selected{% endif %}>{{ q }}</option>{% endfor %}</select></label></span>
-<span class="vi-title-field"><label>כותרת <input name="title_{{ row.index }}" value="{{ row.new.title }}" size="30"></label></span><br>
-<label>אתר <select name="site_{{ row.index }}"><option value=""></option>{% for site in sites %}<option value="{{ site.pk }}"{% if row.new.site == site.pk|stringformat:"s" %} selected{% endif %}>{{ site }}</option>{% endfor %}</select></label>
-<label>יום <input name="day_{{ row.index }}" value="{{ row.new.day }}" size="3" inputmode="numeric"></label>
-<label>עומק (מ׳) <input name="depth_{{ row.index }}" value="{{ row.new.depth }}" size="4" inputmode="decimal"></label></div>
-{% for e in row.errors %}<div class="errorlist">{{ e }}</div>{% endfor %}</td>
-<td><input type="url" name="url_{{ row.index }}" value="{{ row.url }}" dir="ltr" size="34" placeholder="https://youtu.be/…" class="vi-url"></td>
-</tr>{% endfor %}</tbody></table>
+<tbody>{% for row in rows %}{% if not row.checked %}{% include "observations/_video_import_row.html" %}{% endif %}{% endfor %}</tbody></table></details>{% endif %}
 {% if drive_available %}<p><label><input type="checkbox" name="copy_to_drive" value="1" checked> העתקת קבצים שעוד אינם ב-Google Drive לתיקייה המשותפת</label></p>{% endif %}
 <p><button>שמירת השורות המסומנות</button></p></form>
 <script id="vi-info-data" type="application/json">{{ info_json|safe }}</script>
