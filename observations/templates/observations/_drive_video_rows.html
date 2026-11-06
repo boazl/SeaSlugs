@@ -1,0 +1,9 @@
+<table class="local-videos"><thead><tr><th>#</th><th>תצפית</th><th>מסע</th><th>קובץ ב-Drive</th><th>מזהה שמור</th><th>מזהה ב-Drive</th></tr></thead>
+<tbody>{% for row in rows %}<tr>
+<td><a href="{% url 'admin:observations_sample_change' row.sample.pk %}">{{ row.sample.pk }}</a></td>
+<td dir="ltr">{{ row.sample.taxon_name|default:row.sample.title }}</td>
+<td>{{ row.sample.trip.title|default:"—" }}</td>
+<td dir="ltr"><small>{{ row.path|default:"—" }}</small></td>
+<td dir="ltr">{% if row.old %}<a href="https://drive.google.com/file/d/{{ row.old }}/view" target="_blank" rel="noopener">{{ row.old }}</a>{% else %}—{% endif %}</td>
+<td dir="ltr">{% if row.action == 'update' %}<a href="https://drive.google.com/file/d/{{ row.new }}/view" target="_blank" rel="noopener">{{ row.new }}</a>{% elif row.action == 'clear' %}<span style="color:#ff3b3b">יימחק</span>{% else %}—{% endif %}</td>
+</tr>{% endfor %}</tbody></table>

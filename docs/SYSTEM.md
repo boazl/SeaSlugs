@@ -145,6 +145,7 @@ observations/
   image_manager.py   /admin/images/: list, compare, transfer, delete images
   folder_import.py   /admin/images/folder/: reviewed bulk import from a folder + Excel
   video_check.py, video_check_views.py  /admin/video-check/: find YouTube videos that were deleted, fix the links
+  drive_videos.py, drive_video_views.py  /admin/drive-videos/: re-read the Google Drive ids of the video copies
   table_transfer.py, transfer_views.py, sample_transfer.py, taxon_transfer.py,
   account_transfer.py  /admin/table-transfer/: JSON export / preview / apply per table
   article_transfer.py, article_files.py, articles.py, article_render.py, article_import.py,
@@ -513,7 +514,7 @@ never serves `MEDIA_ROOT` directly.** Every file goes through a view that checks
     `.venv`, `.git`, `.env`, `.secret_key`; the DB as an online backup) and every local video to the Google Drive
     folder `SeaSlugs.org.il`, videos under `Videos/<path under home>` (mirrored). Only `Videos` is shared
     ("anyone with the link"). `fill_drive_video_ids` (launcher `_Fill Drive video ids.command`) reads each copy's
-    Drive id (xattr `com.google.drivefs.item-id#S`) into `Sample.drive_video_id`, which travels with the samples
+    Drive id (xattr `com.google.drivefs.item-id#S`) into `Sample.drive_video_id` (new ids replace old ones, ids of copies that are gone are emptied; also the page `/admin/drive-videos/`), which travels with the samples
     table. Where the Mac file is unreachable but a Drive id exists (status `drive`), a manager sees Drive's player
     (`/file/d/<id>/preview`) instead of the red mark.
 - **Cleanup of replaced or cleared files**
@@ -550,6 +551,7 @@ never serves `MEDIA_ROOT` directly.** Every file goes through a view that checks
 | `/admin/images/` | Image manager: every media image with the observations using it, sort by file/alpha/taxonomy, kind groups, redundant-image detection, safe delete, rename. **Compare with the other environment** (export a list, upload it on the other side) and **transfer images** (up to 150 photos / 300 MB per upload). A downloaded photo carries every live observation that shows it (owner first, then gallery-image users such as a trip collection); the upload creates/updates all of them and links the others to the owner's file. |
 | `/admin/images/folder/` | Folder import: reviewed bulk import of a folder of images with an Excel sheet. One species selector per image (≤500). Staging in `folder-import-staging/`, auto-cleaned. |
 | `/admin/table-transfer/` | Table transfer (§10.2) |
+| `/admin/drive-videos/` | Google Drive video ids (Mac only): rescans the Drive copies' ids (`drive_videos.py`, the same scan as `fill_drive_video_ids`). A replaced file is a new Drive file, so the stored id showed the old preview and did not play. Sorts each observation into same / update (new id) / clear (copy gone, or no local file) / waiting (copy not uploaded yet: id kept) / missing (no copy); one button backs up and saves update + clear. Then transfer the samples table. |
 | `/admin/video-check/` | YouTube video check: a scan asks YouTube's oEmbed about every live observation's video (200 ok, 404/400 deleted, 401/403 private or embedding blocked, no answer = check failed; parallel, no API key). The problem ids are kept in the session; each observation still using one gets: update the link (re-uploaded video: must exist and be unused; local/Drive copies kept; not logged as a new video), remove the link (only with a photo; clears the local/Drive copy fields) or delete the observation (only without a photo; soft delete). Per environment: transfer the samples table or scan on both sides. |
 | `/admin/local-videos/` | Local (offline) video copies: per-trip Mac folder, each video observation's file (auto-match pre-selected), automatic fill, local playback (§8) |
 | `/admin/article-files/` | Article PDFs and genus identification files: which row uses each, open, delete orphans and unused library articles, article transfer between environments |
@@ -769,6 +771,7 @@ Catalogue of test modules (test count) and what each guards:
 | `test_gallery_order_media_source`, `test_gallery_others_source`, `test_taxon_card_frames`, `test_listing_filter_layout`, `test_species_list_check_migration` | 4 each | gallery card media, "Others" cards, rank frames, listing CSS, catalogue fix |
 | `test_listing_genus_filter`, `test_manager_auto_publish`, `test_sample_changelist_form`, `test_taxon_samples_stay_published`, `test_trip_sea_removal`, `test_library_image_repair`, `test_coryphellina_merge_migration`, `test_worms_suborders_migration` | 3 each | as named |
 | `test_superfamilies_into_orders_migration`, `test_names_and_fossils_migration`, `test_sample_status_filter` | 2 each | as named |
+| `test_drive_video_ids` | 6 | Drive id rescan: same/update/clear/waiting/missing, page and command save, nothing without the Drive folder |
 | `test_video_check` | 12 | YouTube video check: status mapping, scan lists only problems, remove link / delete / update rules |
 | `test_template_translations`, `test_error_logging`, `test_samples_follow_taxonomy_migration`, `test_species_name_migration`, `test_worms_family_cleanup_migration` | 1 each | every `\|t` literal has English; 500s are logged; data migrations |
 

@@ -91,7 +91,7 @@ class DriveVideoDisplayTests(DriveVideoBase):
     def test_fill_ids_from_xattr(self):
         dest = Path(self.tmp.name) / 'drive'; dest.mkdir()
         with patch.dict('os.environ', {'HOME': str(self.home)}), \
-             patch('observations.management.commands.fill_drive_video_ids.drive_id', return_value='1AbC-dEf_123456789'), \
+             patch('observations.drive_videos.drive_id', return_value='1AbC-dEf_123456789'), \
              patch('observations.management.commands.fill_drive_video_ids.create_backup', return_value=Path('b.sqlite3')):
             call_command('copy_to_drive', dest=str(dest), videos_only=True, stdout=io.StringIO())
             call_command('fill_drive_video_ids', dest=str(dest), apply=True, stdout=io.StringIO())

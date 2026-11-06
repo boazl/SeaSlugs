@@ -1,0 +1,15 @@
+{% extends 'observations/base.html' %}{% block site_hero %}{% endblock %}
+{% block content %}<a href="{% url 'admin:index' %}">חזרה לניהול האתר</a> · <a href="{% url 'local-videos' %}">סרטונים מקומיים</a>
+<h1>סרטונים ב-Google Drive</h1>
+<p class="helptext">כשמחליפים קובץ סרטון, העותק ב-Google Drive הוא קובץ חדש עם מזהה חדש, והקובץ הישן עובר לפח של Drive — לכן האתר החי מציג את התמונה הישנה והסרטון לא נפתח. הסריקה קוראת מחדש את המזהים מתיקיית Drive במק: מעדכנת מזהים שהשתנו ומוחקת מזהים של עותקים שכבר אינם קיימים.<br>
+אחרי העדכון יש להעביר את טבלת התצפיות (samples) לאתר החי.</p>
+{% if unavailable %}<p><strong style="color:#ff3b3b">תיקיית Google Drive לא נמצאת במחשב הזה</strong> (<span dir="ltr">{{ root }}</span>). הכלי פועל רק במק, כש-Google Drive פועל.</p>
+{% else %}
+<p>ללא שינוי: {{ same }} · מזהה חדש: {{ groups.update|length }} · עותק שנמחק: {{ groups.clear|length }} · ממתינים להעלאה ל-Drive: {{ groups.waiting|length }} · ללא עותק ב-Drive: {{ groups.missing|length }}</p>
+{% if changes %}<form method="post">{% csrf_token %}<p><button>עדכון {{ changes }} מזהים (עדכון שהשתנו, מחיקת שנמחקו)</button></p></form>{% else %}<p><strong>כל המזהים מעודכנים.</strong></p>{% endif %}
+{% if groups.update %}<h2>מזהה חדש ב-Drive ({{ groups.update|length }})</h2>{% include 'observations/_drive_video_rows.html' with rows=groups.update %}{% endif %}
+{% if groups.clear %}<h2>העותק כבר לא קיים — המזהה יימחק ({{ groups.clear|length }})</h2>{% include 'observations/_drive_video_rows.html' with rows=groups.clear %}{% endif %}
+{% if groups.waiting %}<h2>Drive עדיין לא העלה את הקובץ — המזהה הקיים נשאר, יש לסרוק שוב מאוחר יותר ({{ groups.waiting|length }})</h2>{% include 'observations/_drive_video_rows.html' with rows=groups.waiting %}{% endif %}
+{% if groups.missing %}<h2>אין עותק ב-Drive — יש להריץ את ההעתקה ל-Drive ({{ groups.missing|length }})</h2>{% include 'observations/_drive_video_rows.html' with rows=groups.missing %}{% endif %}
+{% endif %}
+{% endblock %}
