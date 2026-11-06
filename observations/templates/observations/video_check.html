@@ -1,0 +1,22 @@
+{% extends 'observations/base.html' %}{% block site_hero %}{% endblock %}
+{% block content %}<a href="{% url 'admin:index' %}">חזרה לניהול האתר</a>
+<h1>בדיקת סרטוני YouTube</h1>
+<p class="helptext">סריקה של כל קישורי ה-YouTube בתצפיות. סרטון שנמחק מ-YouTube ממשיך להופיע באתר עם כפתור ▶ — כאן אפשר לעדכן את הקישור (אם הסרטון הועלה שוב), למחוק את הקישור (כשיש לתצפית תמונה) או למחוק את התצפית (כשאין לה תמונה).<br>
+מסד הנתונים במק ובאתר החי נפרדים: תיקון שנעשה כאן מגיע לצד השני רק בהעברת טבלת התצפיות, או בסריקה גם שם.</p>
+<form method="post">{% csrf_token %}<input type="hidden" name="action" value="scan"><p><button>{% if stored %}סריקה מחדש{% else %}סריקת כל הסרטונים{% endif %}</button>{% if stored %} <small>סריקה אחרונה: {{ stored.at }} — נבדקו {{ stored.checked }} סרטונים</small>{% endif %}</p></form>
+{% if stored %}{% if rows %}
+<table class="video-check">
+<thead><tr><th>#</th><th>תמונה</th><th>תצפית</th><th>מסע</th><th>סרטון</th><th>מצב</th><th>עדכון הקישור (הסרטון הועלה שוב)</th><th>מחיקה</th></tr></thead>
+<tbody>{% for row in rows %}<tr>
+<td><a href="{% url 'admin:observations_sample_change' row.sample.pk %}">{{ row.sample.pk }}</a></td>
+<td>{% if row.has_image %}<img src="{{ row.sample.image.url }}" alt="" style="width:72px;height:auto;display:block">{% else %}—{% endif %}</td>
+<td dir="ltr">{% if row.species_slug %}<a href="{% url 'species-page' row.species_slug %}" target="_blank" rel="noopener">{{ row.sample.taxon_name|default:row.sample.title }}</a>{% else %}{{ row.sample.taxon_name|default:row.sample.title }}{% endif %} <small>({{ row.sample.get_kind_display }})</small></td>
+<td>{{ row.sample.trip.title|default:"—" }}</td>
+<td dir="ltr"><a href="{{ row.sample.video_url }}" target="_blank" rel="noopener">{{ row.video_id }}</a></td>
+<td{% if row.status == 'not_found' %} style="color:#ff3b3b;font-weight:600"{% endif %}>{{ row.status_label }}</td>
+<td><form method="post">{% csrf_token %}<input type="hidden" name="action" value="update"><input type="hidden" name="sample" value="{{ row.sample.pk }}"><input type="url" name="url" required dir="ltr" size="34" placeholder="https://youtu.be/…"> <button>עדכון</button></form></td>
+<td>{% if row.has_image %}<form method="post" onsubmit="return confirm('למחוק את הקישור לסרטון מתצפית {{ row.sample.pk }}? התצפית תישאר עם התמונה.')">{% csrf_token %}<input type="hidden" name="action" value="remove_link"><input type="hidden" name="sample" value="{{ row.sample.pk }}"><button>מחיקת הקישור</button></form>{% else %}<form method="post" onsubmit="return confirm('לתצפית {{ row.sample.pk }} אין תמונה. למחוק את התצפית כולה? (מנהל יכול לשחזר אותה)')">{% csrf_token %}<input type="hidden" name="action" value="delete"><input type="hidden" name="sample" value="{{ row.sample.pk }}"><button style="color:#ff3b3b">מחיקת התצפית</button></form>{% endif %}</td>
+</tr>{% endfor %}</tbody></table>
+<p class="helptext">"פרטי או חסום להטמעה": הסרטון קיים ב-YouTube אך פרטי, או שההטמעה שלו חסומה (באתר מוצגת התמונה במקומו). אפשר לתקן ב-YouTube Studio. "הבדיקה נכשלה": אין מידע — כדאי לסרוק שוב.</p>
+{% else %}<p><strong>כל הסרטונים נמצאו ב-YouTube.</strong></p>{% endif %}{% endif %}
+{% endblock %}

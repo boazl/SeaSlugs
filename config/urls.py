@@ -9,6 +9,7 @@ from observations.transfer_views import transfer
 from observations.release_views import releases
 from observations.image_manager import manager as image_manager, image_file
 from observations.local_video_views import local_videos
+from observations.video_check_views import video_check
 
 from observations.folder_import import folder_import
 from observations.news import news, news_slideshow
@@ -30,6 +31,7 @@ urlpatterns = [
     path('admin/article-files/delete-chosen-articles/', article_delete, name='article-delete'),
     path('admin/table-transfer/', transfer, name='table-transfer'),
     path('admin/local-videos/', local_videos, name='local-videos'),
+    path('admin/video-check/', video_check, name='video-check'),
     path('admin/db-replace/', db_replace, name='db-replace'),
     path('admin/db-replace/download/', db_replace_download, name='db-replace-download'),
     path('admin/observations/divetrip-locations/', divetrip_locations, name='divetrip-locations'),
