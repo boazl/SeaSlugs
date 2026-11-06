@@ -120,7 +120,8 @@ def plan_row(trip,species_id,owner,variant=''):
 @staff_member_required
 def folder_import(request):
     if not request.user.is_superuser:raise PermissionDenied
-    context={'trips':DiveTrip.objects.all(),'species':Species.objects.order_by('scientific_name'),'local':not settings.PRODUCTION}
+    from .views import trip_picker_context
+    context={**trip_picker_context(request.POST.get('trip') or request.GET.get('trip')),'species':Species.objects.order_by('scientific_name'),'local':not settings.PRODUCTION}
     root=Path(settings.DATA_DIR)/'folder-import-staging'
     if request.method=='POST':
         try:

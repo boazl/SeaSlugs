@@ -34,7 +34,12 @@ SKIP_FILES = {'.env', '.secret_key', '.DS_Store', 'db.sqlite3'}
 def drive_video_path(sample, root=DRIVE_ROOT):
     """Where the observation's local video goes in the Drive copy (None when it has no local video path)."""
     path = local_video_path(sample)
-    if path is None: return None
+    return None if path is None else drive_path_for(path, root)
+
+
+def drive_path_for(path, root=DRIVE_ROOT):
+    """Where a Mac video file goes in the Drive copy: Videos/<path under the home folder>."""
+    path = Path(path).expanduser()
     home = Path('~').expanduser()
     try: relative = path.relative_to(home)
     except ValueError: relative = Path(*path.parts[1:])   # outside the home folder (e.g. /Volumes/…)

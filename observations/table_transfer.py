@@ -285,13 +285,53 @@ def merge_location(old, target):
     old.delete()
 
 
+def backups_dir():
+    return Path(getattr(settings, 'BACKUPS_DIR', None) or Path(settings.DATA_DIR) / 'backups')
+
+
 def create_backup():
     # Backup the SQLite database, never overwrite either database file.
-    root=Path(settings.DATA_DIR)/'backups';root.mkdir(parents=True,exist_ok=True)
+    root=backups_dir();root.mkdir(parents=True,exist_ok=True)
     backup=root/f'table-transfer-{timezone.now():%Y%m%d-%H%M%S}-{uuid.uuid4().hex[:8]}.sqlite3'
     with sqlite3.connect(str(settings.DATABASES['default']['NAME'])) as source, sqlite3.connect(backup) as target:source.backup(target)
     backup.chmod(0o600)
+    prune_backups(root)
     return backup
+
+
+# Automatic backups (create_backup) are pruned after each new one: every one from the last BACKUP_KEEP_DAYS days is
+# kept, and always at least the newest BACKUP_KEEP_LATEST of them. Backups saved by hand under other names
+# (db-before-0086-…, before-article-import-…) are never touched.
+BACKUP_PREFIX = 'table-transfer-'
+BACKUP_KEEP_DAYS = 7
+BACKUP_KEEP_LATEST = 5
+
+
+def automatic_backups(root=None):
+    root = Path(root or backups_dir())
+    if not root.is_dir(): return []
+    files = [p for p in root.glob(BACKUP_PREFIX + '*.sqlite3') if p.is_file() and not p.is_symlink()]
+    return sorted(files, key=lambda p: p.stat().st_mtime, reverse=True)
+
+
+def prune_backups(root=None, now=None):
+    """Delete automatic backups older than BACKUP_KEEP_DAYS, keeping the newest BACKUP_KEEP_LATEST. Returns the deleted."""
+    import time
+    limit = (now or time.time()) - BACKUP_KEEP_DAYS * 86400
+    deleted = []
+    for path in automatic_backups(root)[BACKUP_KEEP_LATEST:]:
+        if path.stat().st_mtime < limit:
+            path.unlink(missing_ok=True); deleted.append(path)
+    return deleted
+
+
+def backups_summary(root=None):
+    """(count, total bytes) of every SQLite backup in the backups folder, automatic ones and hand-made ones."""
+    root = Path(root or backups_dir())
+    files = [p for p in root.glob('*.sqlite3') if p.is_file() and not p.is_symlink()] if root.is_dir() else []
+    auto = automatic_backups(root)
+    return {'count': len(files), 'bytes': sum(p.stat().st_size for p in files), 'automatic': len(auto),
+            'keep_days': BACKUP_KEEP_DAYS, 'keep_latest': BACKUP_KEEP_LATEST}
 
 
 def apply(document, expected, actor=None, backup=None):

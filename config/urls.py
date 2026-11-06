@@ -11,6 +11,7 @@ from observations.image_manager import manager as image_manager, image_file
 from observations.local_video_views import local_videos
 from observations.video_check_views import video_check
 from observations.drive_video_views import drive_videos
+from observations.video_import import video_import
 
 from observations.folder_import import folder_import
 from observations.news import news, news_slideshow
@@ -31,6 +32,7 @@ urlpatterns = [
     path('admin/article-files/transfer-file/', article_transfer_file, name='article-transfer-file'),
     path('admin/article-files/delete-chosen-articles/', article_delete, name='article-delete'),
     path('admin/table-transfer/', transfer, name='table-transfer'),
+    path('admin/local-videos/import/', video_import, name='video-import'),
     path('admin/local-videos/', local_videos, name='local-videos'),
     path('admin/video-check/', video_check, name='video-check'),
     path('admin/drive-videos/', drive_videos, name='drive-videos'),

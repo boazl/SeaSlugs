@@ -4,7 +4,7 @@
 <p>שם הקובץ משמש לזיהוי המין. השנה, החודש, המדינה והאזור נלקחים מהמסע שתבחרו; יום ועומק לא יומצאו. מין שכבר קיים במסע יקבל תמונה והתצפית והסרטון שלו יישמרו. עבור מין חסר תיווצר תצפית חדשה בבעלות המנהל שמבצע את הייבוא. מין שכבר מפורסם באזור במסע אחר ייחסם לבדיקה.</p>
 {% if error %}<p class="errorlist" role="alert">{{error}}</p>{% endif %}
 <form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="action" value="preview">
-<p><label>מסע צלילה<select name="trip" required><option value="">בחרו מסע</option>{% for trip in trips %}<option value="{{trip.pk}}">{{trip}}</option>{% endfor %}</select></label></p>
+{% include 'observations/_trip_picker.html' %}
 {% if local %}<p><label>נתיב תיקייה במק (אפשר במקום בחירת תיקייה)<input type="text" name="folder" style="width:100%" dir="ltr" placeholder="/Users/boazliebes/Romblon Island/Species/Romblon 2026 with Species Names"></label></p>{% endif %}
 <p><label>בחירת תיקייה מהמחשב<input type="file" name="images" webkitdirectory multiple></label></p>
 <p>עד 500 תמונות, עד 10MB לתמונה. JPEG, PNG או WebP. התמונות יוקטנו עד 1920×1080 בלי חיתוך. הכנה זמנית מוגבלת ל־100MB ונמחקת אחרי ייבוא, או בניקוי הכנות שפג תוקפן.</p><button>בדיקת התאמות בלבד</button></form>

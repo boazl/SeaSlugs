@@ -49,6 +49,9 @@ if len(sys.argv) > 1 and sys.argv[1] == "test":
     import tempfile
     MEDIA_ROOT = Path(tempfile.mkdtemp(prefix="seaslugs-test-media-"))
     atexit.register(shutil.rmtree, MEDIA_ROOT, True)
+    # ...and never write or prune backups in the real backups folder (table_transfer.create_backup / prune_backups).
+    BACKUPS_DIR = Path(tempfile.mkdtemp(prefix="seaslugs-test-backups-"))
+    atexit.register(shutil.rmtree, BACKUPS_DIR, True)
 MEDIA_URL = "/media/"
 
 

@@ -1,0 +1,71 @@
+{% extends 'observations/base.html' %}{% block site_hero %}{% endblock %}
+{% block content %}<a href="{% url 'admin:index' %}">חזרה לניהול האתר</a> · <a href="{% url 'local-videos' %}">סרטונים מקומיים</a> · <a href="{% url 'drive-videos' %}">סרטונים ב-Google Drive</a>
+<h1>שיוך סרטונים לתצפיות לפי מסע צלילה</h1>
+<p class="helptext">בוחרים מסע ואת תיקיית הסרטונים שלו במק. לכל קובץ מוצגת התצפית שלו — זו שכבר מחזיקה את הקובץ, או התאמה אוטומטית לפי שם המין, או תצפית חדשה עם שדות שמנוחשים משם הקובץ. הנתיב במק והנתיב ב-Google Drive נקבעים לפי התיקייה שנבחרה; קישור YouTube הוא שדה חובה לכל שורה מסומנת. הקבצים עצמם לא מועלים ולא משתנים — רק מועתקים ל-Google Drive אם עוד אינם שם.</p>
+{% if production %}<p class="notice"><strong>הכלי פועל רק במק</strong> — באתר החי אין גישה לתיקיות הסרטונים.</p>{% endif %}
+{% if error %}<p class="errorlist" role="alert">{{ error }}</p>{% endif %}
+<form method="get" id="video-import-pick">
+{% include 'observations/_trip_picker.html' %}
+<p><label>תיקיית הסרטונים במק <input type="text" name="folder" id="vi-folder" value="{{ folder }}" dir="ltr" size="80" list="vi-folders" placeholder="/Users/boazliebes/…/Video Output"></label>
+<datalist id="vi-folders">{% for f in suggested_folders %}<option value="{{ f }}">{% endfor %}</datalist></p>
+<p><button>הצגת קובצי הסרטונים</button></p></form>
+<script>(function () { var trip = document.getElementById('id_trip'), folder = document.getElementById('vi-folder');
+  trip.addEventListener('change', function () { var o = trip.selectedOptions[0]; if (o && o.dataset.folder) folder.value = o.dataset.folder; }); })();</script>
+{% if listed %}
+<h2>{{ trip.title }} [{{ trip.code }}] — {{ rows|length }} קובצי סרטון</h2>
+{% if not rows %}<p><strong>אין קובצי סרטון (mp4, mov, m4v) בתיקייה הזו.</strong></p>{% endif %}
+{% if folder_changes %}<p class="notice">תיקיית הסרטונים של המסע תעודכן ל-<span dir="ltr">{{ folder }}</span>{% if trip.local_video_folder %} (במקום <span dir="ltr">{{ trip.local_video_folder }}</span>{% if assigned_elsewhere %}; ל-{{ assigned_elsewhere }} תצפיות במסע כבר רשום קובץ בתיקייה הקודמת — ודא שהקבצים שלהן נמצאים גם בתיקייה החדשה{% endif %}){% endif %}.</p>{% endif %}
+{% if not drive_available %}<p class="notice">תיקיית Google Drive לא נמצאה במחשב הזה — הקבצים לא יועתקו ל-Drive.</p>{% endif %}
+<form method="post" id="video-import-form">{% csrf_token %}<input type="hidden" name="trip" value="{{ trip.pk }}"><input type="hidden" name="folder" value="{{ folder }}">
+<datalist id="vi-species">{% for s in species %}<option value="{{ s.scientific_name }}">{% endfor %}</datalist>
+<table class="local-videos video-import"><thead><tr><th>בחירה</th><th>קובץ במק</th><th>Google Drive</th><th>תצפית</th><th>קישור YouTube (חובה)</th></tr></thead>
+<tbody>{% for row in rows %}<tr data-row="{{ row.index }}"{% if row.errors %} style="outline:2px solid #ff3b3b"{% endif %}>
+<td><input type="checkbox" name="selected" value="{{ row.index }}" class="vi-check"{% if row.checked %} checked{% endif %}>{% if row.done %}<br><small>כבר משויך</small>{% endif %}{% if row.deleted_match %}<br><small style="color:#ff3b3b">תצפית מחוקה</small>{% endif %}<input type="hidden" name="name_{{ row.index }}" value="{{ row.name }}"></td>
+<td dir="ltr"><strong>{{ row.name }}</strong><br><small>{{ row.size|filesizeformat }}</small></td>
+<td dir="ltr"><small>{% if not row.drive.available %}—{% else %}{{ row.drive.path }}<br>{% if row.drive.id %}<a href="https://drive.google.com/file/d/{{ row.drive.id }}/view" target="_blank" rel="noopener">{{ row.drive.id }}</a>{% elif row.drive.exists %}<span dir="rtl">ממתין להעלאה ל-Drive</span>{% else %}<span dir="rtl">יועתק ל-Drive</span>{% endif %}{% endif %}</small></td>
+<td><select name="sample_{{ row.index }}" class="vi-sample"><option value="new"{% if row.sample == 'new' %} selected{% endif %}>— תצפית חדשה —</option>{% for pk, label in samples %}<option value="{{ pk }}"{% if row.sample == pk|stringformat:"s" %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+{% if row.deleted_match %}<div class="errorlist">הקובץ מתאים לתצפית שנמחקה. השורה לא סומנה: סימון ושמירה ישחזרו את התצפית; כדי ליצור במקומה תצפית חדשה בחרו "תצפית חדשה".</div>{% endif %}<div class="vi-info"></div>
+<div class="vi-new">
+<label>סוג <select name="kind_{{ row.index }}" class="vi-kind">{% for value, label in kinds %}<option value="{{ value }}"{% if row.new.kind == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+<span class="vi-species-fields"><label>מין <input list="vi-species" name="species_{{ row.index }}" value="{{ row.new.species }}" dir="ltr" autocomplete="off" style="width:16em"></label>
+<label>זהות <select name="qualifier_{{ row.index }}"><option value=""></option>{% for q in qualifiers %}<option{% if row.new.qualifier == q %} selected{% endif %}>{{ q }}</option>{% endfor %}</select></label>
+<label>שלב חיים <select name="life_stage_{{ row.index }}"><option value=""></option>{% for q in life_stages %}<option{% if row.new.life_stage == q %} selected{% endif %}>{{ q }}</option>{% endfor %}</select></label></span>
+<span class="vi-title-field"><label>כותרת <input name="title_{{ row.index }}" value="{{ row.new.title }}" size="30"></label></span><br>
+<label>אתר <select name="site_{{ row.index }}"><option value=""></option>{% for site in sites %}<option value="{{ site.pk }}"{% if row.new.site == site.pk|stringformat:"s" %} selected{% endif %}>{{ site }}</option>{% endfor %}</select></label>
+<label>יום <input name="day_{{ row.index }}" value="{{ row.new.day }}" size="3" inputmode="numeric"></label>
+<label>עומק (מ׳) <input name="depth_{{ row.index }}" value="{{ row.new.depth }}" size="4" inputmode="decimal"></label></div>
+{% for e in row.errors %}<div class="errorlist">{{ e }}</div>{% endfor %}</td>
+<td><input type="url" name="url_{{ row.index }}" value="{{ row.url }}" dir="ltr" size="34" placeholder="https://youtu.be/…" class="vi-url"></td>
+</tr>{% endfor %}</tbody></table>
+{% if drive_available %}<p><label><input type="checkbox" name="copy_to_drive" value="1" checked> העתקת קבצים שעוד אינם ב-Google Drive לתיקייה המשותפת</label></p>{% endif %}
+<p><button>שמירת השורות המסומנות</button></p></form>
+<script id="vi-info-data" type="application/json">{{ info_json|safe }}</script>
+<script>
+(function () {
+  var info = JSON.parse(document.getElementById('vi-info-data').textContent);
+  function esc(t) { var d = document.createElement('div'); d.textContent = t == null ? '' : String(t); return d.innerHTML; }
+  function update(tr) {
+    var pick = tr.querySelector('.vi-sample').value, data = info[pick];
+    var isNew = pick === 'new';
+    tr.querySelector('.vi-new').style.display = isNew ? '' : 'none';
+    var box = tr.querySelector('.vi-info');
+    box.innerHTML = data ? (data.image ? '<img src="' + esc(data.image) + '" alt="" style="width:80px;float:left;margin-inline-start:6px">' : '') +
+      '<div dir="ltr"><strong>' + esc(data.label) + '</strong></div><small>' + esc(data.kind) + ' · ' + esc(data.status) +
+      (data.site ? ' · אתר: ' + esc(data.site) : '') + (data.day ? ' · יום ' + esc(data.day) : '') + (data.depth ? ' · ' + esc(data.depth) + ' מ׳' : '') +
+      (data.deleted ? '<br><strong style="color:#ff3b3b">תצפית מחוקה — שמירה תשחזר אותה</strong>' : '') + '<br>YouTube: <span dir="ltr">' + esc(data.video_url || '—') + '</span><br>קובץ: <span dir="ltr">' + esc(data.file || '—') +
+      '</span> · Drive: <span dir="ltr">' + esc(data.drive || '—') + '</span></small>' : '';
+    var kind = tr.querySelector('.vi-kind').value;
+    tr.querySelector('.vi-species-fields').style.display = kind === 'species' ? '' : 'none';
+    tr.querySelector('.vi-title-field').style.display = kind === 'species' ? 'none' : '';
+    var url = tr.querySelector('.vi-url');
+    url.required = tr.querySelector('.vi-check').checked;
+    if (data && !url.value && data.video_url) url.value = data.video_url;
+  }
+  document.querySelectorAll('.video-import tbody tr').forEach(function (tr) {
+    update(tr);
+    tr.addEventListener('change', function () { update(tr); });
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

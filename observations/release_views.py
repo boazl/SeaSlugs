@@ -6,7 +6,7 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.core.exceptions import PermissionDenied
 from django.http import FileResponse
 from django.shortcuts import render
-from .table_transfer import create_backup, TABLES
+from .table_transfer import create_backup, backups_summary, TABLES
 
 
 @staff_member_required
@@ -29,6 +29,6 @@ def releases(request):
         return response
     # The table order shown here comes straight from TABLES (table_transfer.py), which is
     # itself ordered to match the real transfer dependency chain -- see the comment there.
-    response = render(request, 'observations/releases.html', {'local':not settings.PRODUCTION, 'tables':[(key,str(model._meta.verbose_name_plural)) for key,(model,fields) in TABLES.items()]})
+    response = render(request, 'observations/releases.html', {'local':not settings.PRODUCTION, 'tables':[(key,str(model._meta.verbose_name_plural)) for key,(model,fields) in TABLES.items()],'backups':backups_summary()})
     response['Cache-Control'] = 'private, no-store'
     return response

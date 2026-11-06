@@ -1,0 +1,5 @@
+{# The observation form's dive-trip picker for the admin import tools: country / region / site / year filters above a full-width trip list (views.trip_picker_context, _trip_picker_script.html). #}
+<p><label for="id_trip">מסע צלילה:</label> <select name="trip" id="id_trip" required style="width:100%"><option value="">---------</option>{% for t in picker_trips %}<option value="{{ t.pk }}" data-folder="{{ t.folder }}"{% if picker_selected == t.pk|stringformat:"s" %} selected{% endif %}>{{ t.label }}</option>{% endfor %}</select><span class="helptext">לא מוצא את המסע? אפשר להוסיף מסע חדש ולחזור לכאן.</span></p>
+<p id="trip-add-holder"><a id="trip-add-link" href="{{ trip_add_url }}?next={{ request.path|urlencode }}&amp;select_trip=1">המסע או אתר הצלילה לא ברשימה? הוספת מסע חדש (אפשר להוסיף בו גם אתר חדש)</a></p>
+{% include 'observations/_trip_picker_script.html' %}{{ locations|json_script:'trip-picker-locations' }}
+<script>initTripPicker(document.getElementById('id_trip'),JSON.parse(document.getElementById('trip-picker-locations').textContent));</script>

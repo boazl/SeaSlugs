@@ -161,7 +161,7 @@ class DiveTripTests(TestCase):
         self.assertEqual([r['id'] for r in data['filters']['regions']], [self.region.pk])
         self.assertEqual(data['filters']['years'], [2026, 2025])
         self.assertIn({'id': self.trip.pk, 'region_id': self.region.pk, 'country_id': self.country.pk, 'site_id': None, 'year': 2026}, data['trips'])
-        self.assertContains(response, 'tripFilters')
+        self.assertContains(response, 'initTripPicker(tripEl,locations)')
 
     def test_collection_form_and_transfer(self):
         data={'title':'Collection','kind':'collection','trip':self.trip.pk,'species':'','video_url':'https://youtu.be/abcdefghijk'}

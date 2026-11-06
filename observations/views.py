@@ -986,6 +986,17 @@ def trip_picker_data():
     }
 
 
+def trip_picker_context(selected=None):
+    """The observation form's trip picker for the admin import tools (_trip_picker.html): the trips with the form's
+    labels (title, region · country, month/year) and Mac video folders, the selected one, the filter data and the
+    "add a trip" link."""
+    from .forms import TripChoiceField
+    label = TripChoiceField(queryset=DiveTrip.objects.none()).label_from_instance
+    trips = DiveTrip.objects.exclude(code__in=LIBRARY_TRIP_CODES).select_related('region', 'country')
+    return {'picker_trips': [{'pk': t.pk, 'label': label(t), 'folder': t.local_video_folder} for t in trips],
+            'picker_selected': str(selected or ''), 'locations': trip_picker_data(), 'trip_add_url': reverse('trip-add')}
+
+
 @login_required
 def edit(request,pk=None):
     if pk:
