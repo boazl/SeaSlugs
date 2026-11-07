@@ -34,11 +34,13 @@ class AccountTransferTests(TestCase):
 
     def test_group_permissions_and_missing_dependencies(self):
         doc = export_table('groups')
-        self.assertEqual(plan(doc)[0]['action'], 'same')
-        doc['rows'][0]['permissions'] = []
+        self.assertTrue(all(step['action'] == 'same' for step in plan(doc)))
+        # the Scientist row (migration 0092 also creates the "Macro photographer" group)
+        row = next(r for r in doc['rows'] if r['name'] == 'Scientist')
+        row['permissions'] = []
         self.execute(doc)
         self.assertFalse(self.group.permissions.exists())
-        doc['rows'][0]['permissions'] = ['missing.model.permission']
+        row['permissions'] = ['missing.model.permission']
         with self.assertRaises(ValidationError): plan(doc)
 
     def test_profile_relationships(self):

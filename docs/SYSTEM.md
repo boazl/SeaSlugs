@@ -280,7 +280,13 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
   news posts and the visit counter (§7.4). Per environment; none of them travels between the Mac and the site.
 - **Users:** Django `auth.User` with groups created by `setup_community`:
   - New user, Macro diver, Subscriber, Macro photographer, Artist, Scientist, Administrator.
-  - A guest photographer without an account is an **inactive user** who owns their observations.
+  - **Photographers** (`photographers.py`, `test_guest_photographers.py`): an observation always belongs to a
+    user, its photographer. A **guest photographer** (no account of their own) is an inactive user in the
+    "Macro photographer" group (migration `0092` put the existing inactive users there). A manager sets one up on
+    `/observations/photographers/new/` (no password; username from the English name) and can later make them
+    active. On the observation form a manager chooses the photographer (`photographer_users()`: active users +
+    guests; `?photographer=` preselects, and the add-trip / species / photographer links keep it); the quick trip
+    form's photographer (it names the trip) offers the same users.
 
 ## 6. Core domain rules (the logic most bugs touch)
 
@@ -505,9 +511,14 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
     window instead, with a ✕ to close. After a click inside the YouTube player the keyboard focus returns to the page,
     so the keys keep working: arrows, space, `f`, Esc.
   - **Managers** also see visits (today / 7 / 30 days, a daily chart, top pages), sign-ups, the users table (joined,
-    last login, logins in 30 days, observations), recent logins and, last, the photographers table (everyone with a
-    published observation, guests' inactive accounts included: name, email, phone, published observations;
+    last login, logins in 30 days, observations), visitors by country over 30 days (`test_visitor_countries.py`),
+    recent logins and, last, the photographers table (everyone with a published observation, plus registered
+    members and guest photographers with none yet -- 0; guests marked: name, email, phone, published observations;
     `test_news_photographers.py`).
+  - **Countries:** `DailyVisitor.country` (code only) and `.views`, set by `geo.country_of`: the `CF-IPCountry`
+    header if present, else the DB-IP Country Lite database (CC BY 4.0) at `geoip/country.mmdb`, downloaded on every
+    deploy by `build.sh` → `scripts/fetch_geoip.py` (never fails the build; not in git). On the Mac the visitors are
+    local addresses, so their country is unknown.
 
 ## 8. Storage of media and documents
 

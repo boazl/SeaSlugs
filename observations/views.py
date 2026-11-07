@@ -15,7 +15,7 @@ from django.views.decorators.http import require_POST
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme, urlencode
 from .models import Sample, Profile, Region, Site, DiveTrip, SiteImage, Species, Country, SpeciesArea, SampleKind, KIND_EN_NAMES, TaxonGenus, TaxonFamily, TaxonOrder, full_name_for, LIBRARY_TRIP_CODES
-from .forms import SiteQuickForm, SpeciesQuickForm, SignupForm, SampleForm, ProfileForm, DiveTripForm, TripQuickForm, taxonomy_for_form, species_name_options
+from .forms import SiteQuickForm, SpeciesQuickForm, SignupForm, SampleForm, ProfileForm, DiveTripForm, TripQuickForm, GuestPhotographerForm, taxonomy_for_form, species_name_options
 from .notifications import notify_new_user_registered
 from . import seo_text
 from .gallery_data import TaxonResolver, taxon_media, area_samples, annotate_area_cards
@@ -1036,6 +1036,19 @@ def edit(request,pk=None):
     if manager and not item.species_other:
         # A manager adds the species to the catalog (link below the species field) instead of typing a free-text "other species".
         form.fields['species_other'].widget=forms.HiddenInput()
+    if manager:
+        # The photographer: the user the observation belongs to (photographers.py). A manager may add or move an
+        # observation to any photographer -- a guest photographer (inactive user) too; a new one starts as the manager,
+        # or the photographer in the address (?photographer=, kept when coming back from adding a trip / species /
+        # photographer).
+        from .photographers import photographer_users, photographer_label
+        # not required: a post without it (an older open form, a script) keeps the observation's current photographer
+        field = forms.ModelChoiceField(photographer_users(), label='צלם', empty_label=None, required=False,
+            help_text='התצפית נרשמת על שם הצלם. צלם בלי חשבון באתר מסומן "צלם אורח".')
+        field.label_from_instance = photographer_label
+        form.fields = {'photographer': field, **form.fields}
+        chosen = photographer_users().filter(pk=_int(request.GET.get('photographer'))).first() if not pk else None
+        form.initial['photographer'] = (chosen or item.owner).pk
     if request.user.is_staff: form.enable_add_links()
     if is_manager(request.user): form.enable_taxon_files()
     else:
@@ -1043,6 +1056,7 @@ def edit(request,pk=None):
         for name in ('note_he', 'note_en'): form.fields.pop(name, None)
     if request.method=='POST' and form.is_valid():
         item=form.save(commit=False)
+        if manager and form.cleaned_data.get('photographer'): item.owner=form.cleaned_data['photographer']
         restoring=bool(item.deleted_at and form.cleaned_data.get('restore'))
         if restoring: item.deleted_at=None; item.deleted_by=None       # a manager brings a deleted observation back
         change=form.species_change
@@ -1052,6 +1066,7 @@ def edit(request,pk=None):
             if done is not None: return redirect(done or next_url)
             return render(request,'observations/form.html',{'form':form,'title':'תצפית / Observation','observation_form':True,
                 'trip_new_url':reverse('trip-new'),'trip_add_url':reverse('trip-add'),'species_add_url':reverse('species-new') if manager else '','next':next_url,
+                'photographer_add_url':reverse('photographer-new') if manager else '',
                 'species_options':species_name_options(),'taxonomy':taxonomy_for_form(),'locations':trip_picker_data()})
         def canonical_image_write(source_sample, target_sample=None):
             # Store under the same stable, meaningful name the bulk folder importer and
@@ -1115,6 +1130,7 @@ def edit(request,pk=None):
         return redirect(f'{next_url}#obs-{item.pk}')
     return render(request,'observations/form.html',{'form':form,'title':'תצפית / Observation','observation_form':True,
         'trip_new_url':reverse('trip-new'),'trip_add_url':reverse('trip-add'),'species_add_url':reverse('species-new') if manager else '','next':next_url,
+        'photographer_add_url':reverse('photographer-new') if manager else '',
         'species_options':species_name_options(),
         'taxonomy':taxonomy_for_form(),
         'locations':trip_picker_data()})
@@ -1157,6 +1173,26 @@ def site_new(request):
         messages.success(request, f'אתר הצלילה נוסף: {site.name}.')
         return redirect(next_url)
     return render(request, 'observations/site_add.html', {'form': form, 'popup': popup, 'next': next_url})
+
+
+@login_required
+def photographer_new(request):
+    """A manager sets up a guest photographer -- someone without an account whose photos are added under their name
+    (photographers.py) -- then returns to the observation form with them already chosen."""
+    if not is_manager(request.user):
+        raise Http404
+    next_url = request.POST.get('next') or request.GET.get('next') or reverse('observation-new')
+    if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
+        next_url = reverse('observation-new')
+    form = GuestPhotographerForm(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        user = form.save()
+        messages.success(request, f'הצלם נוסף: {user.get_full_name()}. אפשר להוסיף תצפיות על שמו.')
+        from urllib.parse import urlsplit, urlunsplit, parse_qsl
+        parts = urlsplit(next_url)
+        query = [(k, v) for k, v in parse_qsl(parts.query) if k != 'photographer'] + [('photographer', user.pk)]
+        return redirect(urlunsplit(parts._replace(query=urlencode(query))))
+    return render(request, 'observations/photographer_add.html', {'form': form, 'next': next_url})
 
 
 @login_required
@@ -1328,8 +1364,11 @@ def trip_add(request):
     else:
         region, site, year = _trip_filters(request.GET)
         today = date.today()
+        # the photographer chosen on the observation form (?photographer=) names the trip, else the manager / member
+        from .photographers import photographer_users
+        chosen = photographer_users().filter(pk=_int(request.GET.get('photographer'))).first() if is_manager(request.user) else None
         form = TripQuickForm(user=request.user, initial={'region': region, 'site': site, 'year': year or today.year,
-            'month': today.month, 'photographer': request.user})
+            'month': today.month, 'photographer': chosen or request.user})
     return render(request, 'observations/trip_add.html', {'form': form, 'next': next_url, 'select_trip': select_trip,
         'site_regions': {s.pk: s.region_id for s in Site.objects.all()}})
 

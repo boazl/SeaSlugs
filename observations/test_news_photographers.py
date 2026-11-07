@@ -1,6 +1,7 @@
 """The /news/ page's manager section ends with a table of photographers: everyone with a published observation on the
-site (an observation's photographer is its owner; guest photographers' inactive accounts included), with name,
-email, phone and the number of published observations -- most observations first. Visitors and members never see it."""
+site (an observation's photographer is its owner; guest photographers' inactive accounts included) and the potential
+ones -- registered members who have not published a photo yet (0, marked) -- with name, email, phone and the number
+of published observations, most observations first. Visitors and members never see it."""
 from django.contrib.auth.models import User
 
 from .models import Profile, Sample
@@ -21,6 +22,9 @@ class PhotographersTableTests(Base):
         pending = Sample(owner=self.guest, trip=self.trip, species=self.varicosa, video_url='https://youtu.be/ddddddddddd')
         pending.save()   # not published: not counted
         self.manager = User.objects.create_superuser('boss', password='pw-test-12345')
+        self.newbie = User.objects.create_user('newbie', password='pw-test-12345', first_name='טל', last_name='חדש',
+                                               email='tal@example.com')
+        User.objects.create_user('gone', password='pw-test-12345', email='gone@example.com', is_active=False)
 
     def page(self, lang='he'):
         return self.client.get('/news/', {'lang': lang}).content.decode()
@@ -32,7 +36,8 @@ class PhotographersTableTests(Base):
     def test_manager_sees_the_photographers_with_contact_details_and_counts(self):
         self.client.force_login(self.manager)
         table = self.table(self.page())
-        self.assertIn('צלמים (2)', table)
+        self.assertIn('צלמים (4)', table)          # 2 with observations + 2 registered without (newbie, the manager)
+        self.assertIn('2 עם תצפיות באתר', table)
         self.assertIn('<a href="mailto:dana@example.com">dana@example.com</a>', table)
         self.assertIn('<a href="tel:050-1234567">050-1234567</a>', table)
         self.assertIn('ron@example.com', table)   # a guest photographer (inactive account) is listed too
@@ -54,3 +59,11 @@ class PhotographersTableTests(Base):
         html = self.page()
         self.assertNotIn('id="photographers"', html)
         self.assertNotIn('dana@example.com', html)
+
+    def test_potential_photographers_are_listed_last_with_zero(self):
+        self.client.force_login(self.manager)
+        rows = self.table(self.page()).split('<tr>')[2:]
+        newbie = next(r for r in rows if 'tal@example.com' in r)
+        self.assertIn('<span class="potential">0</span>', newbie)
+        self.assertGreater(rows.index(newbie), 1)
+        self.assertNotIn('gone@example.com', self.table(self.page()))   # an inactive account with no photos is not

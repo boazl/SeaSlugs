@@ -1615,6 +1615,10 @@ class DailyVisitor(models.Model):
     different every day, so visitors are counted per day without being followed."""
     day = models.DateField(db_index=True)
     key = models.CharField(max_length=64)
+    # Where the visitor came from -- the two-letter country code only, '' when unknown (geo.country_of) -- and how
+    # many pages they viewed that day: the /news/ page's visitors by country.
+    country = models.CharField('מדינה', max_length=2, blank=True, default='')
+    views = models.PositiveIntegerField('צפיות', default=0)
     class Meta:
         constraints = [models.UniqueConstraint(fields=['day', 'key'], name='unique_daily_visitor')]
         verbose_name = 'מבקר ביום'; verbose_name_plural = 'מבקרים'

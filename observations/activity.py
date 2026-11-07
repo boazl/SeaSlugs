@@ -17,7 +17,7 @@ Activity log (ActivityEvent)
 
 Visit counter (VisitCounterMiddleware)
   Counts views of public HTML pages per page per day, and visitors per day by a salted, daily-changing hash of IP and
-  browser (no cookie, nothing reversible stored). Not counted: the admin tools, bots, the owner (superusers and
+  browser (no cookie, nothing reversible stored), with the visitor's country (code only -- geo.py) and pages viewed. Not counted: the admin tools, bots, the owner (superusers and
   ACTIVITY_EXCLUDED_USERNAMES) and any browser with the analytics opt-out cookie (/analytics/exclude/).
   Every browser the owner signs in on gets that cookie by itself (VisitCounterMiddleware), so its later visits are
   not counted even signed out -- by this counter or by Google Analytics.
@@ -254,13 +254,18 @@ def record_visit(request):
                 DailyPageView.objects.create(day=day, path=path, views=1)
         except IntegrityError:
             DailyPageView.objects.filter(day=day, path=path).update(views=F('views') + 1)
-    key = hashlib.sha256(f'{settings.SECRET_KEY}|{day}|{client_ip(request)}|{request.META.get("HTTP_USER_AGENT", "")}'
+    ip = client_ip(request)
+    key = hashlib.sha256(f'{settings.SECRET_KEY}|{day}|{ip}|{request.META.get("HTTP_USER_AGENT", "")}'
                          .encode()).hexdigest()
-    try:
-        with transaction.atomic():
-            DailyVisitor.objects.get_or_create(day=day, key=key)
-    except IntegrityError:
-        pass
+    visitor = DailyVisitor.objects.filter(day=day, key=key)
+    if not visitor.update(views=F('views') + 1):
+        # the day's first page of this visitor: its country is looked up once (only the code is kept, not the address)
+        from .geo import country_of
+        try:
+            with transaction.atomic():
+                DailyVisitor.objects.create(day=day, key=key, views=1, country=country_of(request, ip))
+        except IntegrityError:
+            visitor.update(views=F('views') + 1)
 
 
 EXCLUDE_COOKIE = 'exclude_analytics'                 # the same cookie as /analytics/exclude/ (config.views)

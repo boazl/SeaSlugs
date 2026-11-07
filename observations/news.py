@@ -15,6 +15,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .counts import count_text
+from .photographers import PHOTOGRAPHER_GROUP
 from .home_markup import render_markup
 from .i18n import get_lang
 from .models import (ActivityEvent, DailyPageView, DailyVisitor, NewsPost, Sample, Sea, SpeciesArea, full_name_for)
@@ -241,14 +242,28 @@ def manager_data(lang):
                       'logins': logins.get(user.pk, 0), 'observations': observations.get(user.pk, 0),
                       'staff': user.is_staff})
     # Photographers: everyone with a published observation on the site (the photographer of an observation is its
-    # owner -- Sample.photographer_name -- guest photographers' inactive accounts included), most observations first.
+    # owner -- Sample.photographer_name -- guest photographers' inactive accounts included), and the potential ones:
+    # every registered member and guest photographer (photographers.py) who has not published a photo yet (0).
+    # Most observations first.
     published = dict(Sample.objects.filter(status='published', deleted_at__isnull=True).values('owner_id')
                      .annotate(n=Count('id')).values_list('owner_id', 'n'))
+    members = User.objects.filter(is_active=True).exclude(password__startswith='!')
     photographers = sorted(
         ({'name': full_name_for(user, lang) or user.username, 'email': user.email,
-          'phone': getattr(getattr(user, 'profile', None), 'phone', ''), 'observations': published[user.pk]}
-         for user in User.objects.filter(pk__in=published).select_related('profile')),
+          'phone': getattr(getattr(user, 'profile', None), 'phone', ''), 'observations': published.get(user.pk, 0),
+          'guest': not user.is_active}
+         for user in User.objects.filter(Q(pk__in=published) | Q(pk__in=members) | Q(groups__name=PHOTOGRAPHER_GROUP))
+         .distinct().select_related('profile')),
         key=lambda p: (-p['observations'], p['name']))
+    photographers_active = sum(1 for p in photographers if p['observations'])
+    # Visitors by country over the 30 days (DailyVisitor.country, geo.py): a visitor counts once per day, as in the
+    # tiles above; '' = unknown (no country database, a private address, or a day before countries were recorded).
+    countries = [{'code': r['country'], 'visitors': r['visitors'], 'views': r['views'] or 0}
+                 for r in DailyVisitor.objects.filter(day__gte=month_ago).values('country')
+                 .annotate(visitors=Count('id'), views=Sum('views')).order_by('-visitors', 'country')]
+    most = max([c['visitors'] for c in countries] + [1])
+    for c in countries:
+        c['bar'] = round(100 * c['visitors'] / most)
     recent_logins = [{'when': timezone.localtime(e.created_at), 'name': full_name_for(e.user, lang) or e.name}
                      for e in ActivityEvent.objects.filter(kind='login').select_related('user', 'user__profile')[:20] if e.user]
     return {
@@ -256,7 +271,9 @@ def manager_data(lang):
                                                               'right': CHART_W - PAD_X, 'bottom': CHART_H - PAD_Y},
         'visits_today': total(today), 'visits_week': total(today - timedelta(days=6)), 'visits_month': total(month_ago),
         'top_pages': DailyPageView.objects.filter(day__gte=month_ago).values('path').annotate(n=Sum('views')).order_by('-n')[:15],
-        'users': users, 'recent_logins': recent_logins, 'photographers': photographers,
+        'users': users, 'recent_logins': recent_logins, 'photographers': photographers, 'countries': countries,
+        'photographers_active': photographers_active,
+        'country_count': sum(1 for c in countries if c['code']),
         'signups_month': ActivityEvent.objects.filter(kind='signup', created_at__gte=login_since).count(),
     }
 

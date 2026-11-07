@@ -1,0 +1,11 @@
+{% extends 'observations/base.html' %}{% block content %}
+<h1>הוספת צלם אורח</h1>
+<p>צלם אורח הוא צלם שאין לו חשבון באתר: מנהל מוסיף את התצלומים שלו, והם מופיעים באתר עם שמו כצלם. הוא נשמר כמשתמש לא פעיל, בלי סיסמה, ואפשר להפוך אותו בהמשך למשתמש פעיל בניהול המשתמשים. לאחר השמירה תחזרו לטופס התצפית כשהצלם כבר נבחר.</p>
+<form method="post" id="photographer-add-form">{% csrf_token %}<input type="hidden" name="next" value="{{ next }}">
+{{ form.non_field_errors }}
+<div class="filter-row" style="margin-top:0">
+{% for field in form %}<label>{{ field.label }}{{ field.errors }}{{ field }}</label>{% endfor %}
+</div>
+<div class="actions"><button type="submit">הוספת הצלם</button><a href="{{ next }}">ביטול</a></div>
+</form>
+{% endblock %}

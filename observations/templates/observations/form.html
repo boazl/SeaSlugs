@@ -8,6 +8,28 @@
 <form method="post" action="{% url 'observation-action' form.instance.pk %}"><input type="hidden" name="action" value="delete_video">{% csrf_token %}<button type="submit" id="delete-video-btn" data-has-video="{% if form.instance.video_url %}1{% endif %}" {% if not form.instance.video_url %}disabled{% endif %}>מחיקת קישור הסרטון</button></form>
 </div>{% endif %}
 {% if observation_form and species_add_url %}<p id="species-add-holder"><a id="species-add-link" href="{{ species_add_url }}?next={{ request.path|urlencode }}">המין לא ברשימה? הוספת מין חדש לרשימה</a></p>{% endif %}
+{% if observation_form and photographer_add_url %}<p id="photographer-add-holder"><a id="photographer-add-link" href="{{ photographer_add_url }}?next={{ request.path|urlencode }}">הצלם לא ברשימה? הוספת צלם אורח (צלם בלי חשבון באתר)</a></p>
+<script>
+// The photographer chosen on the form travels with the "add" links (a trip is named after its photographer), so coming
+// back from adding a trip, a species or a photographer keeps it.
+document.addEventListener('DOMContentLoaded', function () {
+  const select = document.getElementById('id_photographer');
+  if (!select) return;
+  const links = ['species-add-link', 'trip-add-link', 'photographer-add-link'].map(id => document.getElementById(id)).filter(Boolean);
+  links.forEach(a => { a.dataset.base = a.getAttribute('href'); });
+  function update() {
+    const next = window.location.pathname + '?photographer=' + encodeURIComponent(select.value);
+    links.forEach(a => {
+      const url = new URL(a.dataset.base, window.location.origin);
+      url.searchParams.set('next', next);
+      if (a.id === 'trip-add-link') url.searchParams.set('photographer', select.value);
+      a.setAttribute('href', url.pathname + url.search);
+    });
+  }
+  select.addEventListener('change', update);
+  update();
+});
+</script>{% endif %}
 {% if observation_form and trip_add_url %}<p id="trip-add-holder"><a id="trip-add-link" href="{{ trip_add_url }}?next={{ request.path|urlencode }}&amp;select_trip=1">המסע או אתר הצלילה לא ברשימה? הוספת מסע חדש (אפשר להוסיף בו גם אתר חדש)</a></p>{% endif %}
 {% if observation_form %}{% include 'observations/_trip_picker_script.html' %}{{ locations|json_script:'locations' }}<script>
 const locations=JSON.parse(document.getElementById('locations').textContent);

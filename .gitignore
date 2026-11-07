@@ -28,3 +28,6 @@ folder-import-staging/
 
 # Files moved aside to be deleted by hand (Claude cannot delete without permission) -- never published.
 _to_delete/
+
+# The visitors-by-country database, downloaded by build.sh on every deploy (scripts/fetch_geoip.py).
+geoip/

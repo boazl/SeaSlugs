@@ -10,7 +10,7 @@ from django.core.files.base import ContentFile
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 from django.core.validators import FileExtensionValidator
-from .models import IDENTIFICATION_FILE_EXTENSIONS, Sample, Profile, Species, Country, Region, Site, DiveTrip, TaxonOrder, TaxonFamily, TaxonGenus, IdentificationQualifier, LifeStage, split_undetermined_variant, LIBRARY_TRIP_CODES
+from .models import IDENTIFICATION_FILE_EXTENSIONS, Sample, Profile, Species, Country, Region, Site, DiveTrip, TaxonOrder, TaxonFamily, TaxonGenus, IdentificationQualifier, LifeStage, split_undetermined_variant, LIBRARY_TRIP_CODES, PHONE_VALIDATOR
 
 
 class SignupForm(UserCreationForm):
@@ -736,8 +736,10 @@ class TripQuickForm(forms.ModelForm):
         self.fields['month'].required = True
         self.fields['duration_days'].label = 'מספר ימים (לא חובה)'
         manager = bool(user and user.is_staff and user.has_perm('observations.change_sample'))
-        self.fields['photographer'].queryset = User.objects.filter(is_active=True).order_by('first_name', 'username') if manager else User.objects.filter(pk=getattr(user, 'pk', None))
-        self.fields['photographer'].label_from_instance = lambda u: (u.get_full_name() or u.username)
+        from .photographers import photographer_users, photographer_label
+        # a manager may name any photographer, guest photographers (inactive users) included
+        self.fields['photographer'].queryset = photographer_users() if manager else User.objects.filter(pk=getattr(user, 'pk', None))
+        self.fields['photographer'].label_from_instance = photographer_label
         self.fields['photographer'].required = False
 
     def clean(self):
@@ -779,3 +781,34 @@ class TripQuickForm(forms.ModelForm):
             photographer_letter(self.cleaned_data.get('photographer') or self.user, persist=True)
             trip.save()
         return trip
+
+
+class GuestPhotographerForm(forms.Form):
+    """A manager sets up a guest photographer: someone without an account whose photos a manager adds under their
+    name (observations/photographers.py). Becomes an inactive user, with no password, in the photographer group."""
+    first_name = forms.CharField(max_length=150, label='שם פרטי')
+    last_name = forms.CharField(max_length=150, label='שם משפחה')
+    first_name_en = forms.CharField(max_length=150, required=False, label='שם פרטי באנגלית')
+    last_name_en = forms.CharField(max_length=150, required=False, label='שם משפחה באנגלית')
+    email = forms.EmailField(required=False, label='דואר אלקטרוני')
+    phone = forms.CharField(max_length=30, required=False, label='טלפון', validators=[PHONE_VALIDATOR])
+
+    def clean_email(self):
+        email = self.cleaned_data['email'].strip()
+        if email and User.objects.filter(email__iexact=email).exists():
+            raise forms.ValidationError('כבר קיים משתמש עם כתובת הדואר הזו - אפשר לבחור אותו ברשימת הצלמים.')
+        return email
+
+    def save(self):
+        from django.contrib.auth.models import Group
+        from .photographers import PHOTOGRAPHER_GROUP, guest_username
+        data = self.cleaned_data
+        user = User(username=guest_username(data['first_name_en'], data['last_name_en']), first_name=data['first_name'],
+                    last_name=data['last_name'], email=data['email'], is_active=False)
+        user.set_unusable_password()
+        user.save()
+        user.groups.add(Group.objects.get_or_create(name=PHOTOGRAPHER_GROUP)[0])
+        profile, _ = Profile.objects.get_or_create(user=user)
+        profile.first_name_en, profile.last_name_en, profile.phone = data['first_name_en'], data['last_name_en'], data['phone']
+        profile.save()
+        return user

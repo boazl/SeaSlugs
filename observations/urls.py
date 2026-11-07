@@ -10,6 +10,7 @@ urlpatterns=[
  path('image-search/',views.image_search,name='image-search'),
  path('sites/new/',views.site_new,name='site-new'),
  path('species/new/',views.species_new,name='species-new'),
+ path('photographers/new/',views.photographer_new,name='photographer-new'),
  path('home-text/',views.home_text_edit,name='home-text-edit'),
  path('trips/new/',views.trip_new,name='trip-new'),
  path('trips/manage/',views.trips_manage,name='trips-manage'),
