@@ -281,11 +281,15 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
 - **Users:** Django `auth.User` with groups created by `setup_community`:
   - New user, Macro diver, Subscriber, Macro photographer, Artist, Scientist, Administrator.
   - **Photographers** (`photographers.py`, `test_guest_photographers.py`): an observation always belongs to a
-    user, its photographer. A **guest photographer** (no account of their own) is an inactive user in the
-    "Macro photographer" group (migration `0092` put the existing inactive users there). A manager sets one up on
+    user, its photographer. The photographers are the **"Macro photographer" group** -- not every member (divers
+    only are not). A member joins it with the bilingual "אני צלם/ת" / "I am a photographer" box on the sign-up
+    or profile form (unticking leaves it; locked on with observations -- `test_photographer_checkbox.py`), by a
+    manager (the admin's user page) or with his first observation; migration
+    `0093` added everyone who had observations. A **guest photographer** (no account of their own) is an inactive
+    user in the group (migration `0092` put the existing inactive users there). A manager sets one up on
     `/observations/photographers/new/` (no password; username from the English name) and can later make them
-    active. On the observation form a manager chooses the photographer (`photographer_users()`: active users +
-    guests; `?photographer=` preselects, and the add-trip / species / photographer links keep it); the quick trip
+    active. On the observation form a manager chooses the photographer (`photographer_users()`: the group, plus an
+    edited observation's current owner; `?photographer=` preselects, and the add-trip / species / photographer links keep it); the quick trip
     form's photographer (it names the trip) offers the same users.
 
 ## 6. Core domain rules (the logic most bugs touch)
@@ -379,7 +383,7 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
 | `/observations/new/`, `<pk>/edit/`, `<pk>/remove/`, `<pk>/action/`, `<pk>/photo/` | Observation form and actions. `photo/` is the **only** way images are served in production (access-controlled). |
 | `/observations/trips/` | Public dive trips: trip videos, then a sortable table with expandable species rows; a species picture opens that observation on its species page (`#obs-<pk>`) |
 | `/observations/trips/manage/`, `trips/add/`, `trips/suggest/` | Trip management for members (suggested name/code, see `trip_naming.py`) |
-| `/observations/signup/`, `login/`, `logout/`, `profile/`, `partners/` | Community |
+| `/observations/signup/`, `login/`, `logout/`, `profile/`, `partners/` | Community (sign-up asks the name in Hebrew and in English) |
 | `/observations/home-text/` | Manager editor for home-page sections |
 | `/sitemap.xml`, `/robots.txt`, `/healthz` | SEO and health |
 | `/analytics/exclude/`, `/analytics/include/` | Owner's GA opt-out cookie (not linked anywhere); also stops the site's own visit counter |
@@ -512,8 +516,8 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
     so the keys keep working: arrows, space, `f`, Esc.
   - **Managers** also see visits (today / 7 / 30 days, a daily chart, top pages), sign-ups, the users table (joined,
     last login, logins in 30 days, observations), visitors by country over 30 days (`test_visitor_countries.py`),
-    recent logins and, last, the photographers table (everyone with a published observation, plus registered
-    members and guest photographers with none yet -- 0; guests marked: name, email, phone, published observations;
+    recent logins and, last, the photographers table (the photographer group, and anyone with a published
+    observation; 0 for none yet; guests marked: name, email, phone, published observations;
     `test_news_photographers.py`).
   - **Countries:** `DailyVisitor.country` (code only) and `.views`, set by `geo.country_of`: the `CF-IPCountry`
     header if present, else the DB-IP Country Lite database (CC BY 4.0) at `geoip/country.mmdb`, downloaded on every

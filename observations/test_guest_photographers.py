@@ -2,8 +2,10 @@
 observations for photographers who are not active members of the site.
 
 Rules:
-- A guest photographer is an inactive user in the "Macro photographer" group; migration 0092 puts the existing
-  inactive users (the former photographer table) in it. photographer_users() = every active user + the guests.
+- The photographers are the "Macro photographer" group's users, active or not -- not every member (divers only
+  are not). A guest photographer is an inactive user in the group; migration 0092 puts the existing inactive users
+  (the former photographer table) in it, 0093 everyone who has an observation. Adding an observation puts its
+  owner in the group. An edited observation's current owner is always offered, so opening it never changes it.
 - A manager sets one up on /observations/photographers/new/ (no password, cannot sign in; English names give the
   username) and returns to the observation form with them chosen (?photographer=).
 - On the observation form a manager chooses the photographer (first field; guests marked "צלם אורח"); a new
@@ -37,6 +39,8 @@ class GuestPhotographerTests(TestCase):
         self.guest = User.objects.create_user('oren.kline', first_name='אורן', last_name='קליין', is_active=False)
         self.guest.groups.add(self.group)
         self.blocked = User.objects.create_user('blocked', first_name='חסום', is_active=False)   # inactive, not a photographer
+        self.diver = User.objects.create_user('diver', password='a-valid-password-927', first_name='צולל', last_name='בלבד')
+        self.manager.groups.add(self.group)
         country = Country.objects.create(name='ישראל', name_en='Israel')
         region = Region.objects.create(name='אכזיב', country=country, sea=Sea.objects.create(name='הים התיכון'))
         self.trip = DiveTrip.objects.create(title='Akhziv', code='I26Aug', year=2026, month=8, country=country, region=region)
@@ -53,10 +57,37 @@ class GuestPhotographerTests(TestCase):
         data.update(extra)
         return self.client.post('/observations/new/', data)
 
-    def test_photographer_users_are_members_and_guests(self):
+    def test_photographer_users_are_the_group(self):
         users = set(photographer_users())
-        self.assertTrue({self.manager, self.member, self.guest} <= users)
-        self.assertNotIn(self.blocked, users)
+        self.assertEqual(users, {self.manager, self.guest})
+        self.assertIn(self.diver, photographer_users(also=[self.diver.pk]))
+
+    def test_migration_makes_observation_owners_photographers(self):
+        Sample.objects.create(owner=self.member, trip=self.trip, kind='species', status='published',
+                              species=Species.objects.get(), video_url='https://youtu.be/abcdefghijk')
+        migration = importlib.import_module('observations.migrations.0093_observation_owners_are_photographers')
+        migration.add_owners(django_apps, None)
+        self.assertIn(self.member, photographer_users())
+        self.assertNotIn(self.diver, photographer_users())
+
+    def test_a_divers_only_member_is_not_offered(self):
+        self.client.force_login(self.manager)
+        page = self.client.get('/observations/new/')
+        self.assertNotIn(self.diver, page.context['form'].fields['photographer'].queryset)
+        self.assertNotContains(page, 'צולל בלבד')
+        self.assertNotIn(self.diver, self.client.get('/observations/trips/add/').context['form'].fields['photographer'].queryset)
+
+    def test_a_members_first_observation_makes_him_a_photographer(self):
+        self.client.force_login(self.member)
+        self.post_observation()
+        self.assertIn(self.member, photographer_users())
+
+    def test_an_edited_observation_keeps_an_owner_outside_the_group(self):
+        sample = Sample.objects.create(owner=self.diver, trip=self.trip, kind='species', status='published',
+                                       species=Species.objects.get(), video_url='https://youtu.be/abcdefghijk')
+        self.client.force_login(self.manager)
+        page = self.client.get(f'/observations/{sample.pk}/edit/')
+        self.assertEqual(page.context['form'].initial['photographer'], self.diver.pk)
 
     def test_migration_makes_existing_inactive_users_guests(self):
         self.guest.groups.clear()

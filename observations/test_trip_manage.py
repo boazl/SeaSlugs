@@ -241,6 +241,8 @@ class AddTripTests(Fixture):
         self.assertEqual(second.title, 'בעז ליבס אכזיב 2026 אוגוסט 23')
 
     def test_other_photographers_carry_their_letter_and_name(self):
+        from django.contrib.auth.models import Group
+        self.bart.groups.add(Group.objects.get_or_create(name='Macro photographer')[0])   # a photographer (photographers.py)
         self.client.force_login(self.manager)
         self.post(photographer=self.bart.pk, year=2026, month=8)
         trip = DiveTrip.objects.get()

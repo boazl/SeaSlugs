@@ -241,18 +241,16 @@ def manager_data(lang):
                       'last_login': timezone.localtime(user.last_login) if user.last_login else None,
                       'logins': logins.get(user.pk, 0), 'observations': observations.get(user.pk, 0),
                       'staff': user.is_staff})
-    # Photographers: everyone with a published observation on the site (the photographer of an observation is its
-    # owner -- Sample.photographer_name -- guest photographers' inactive accounts included), and the potential ones:
-    # every registered member and guest photographer (photographers.py) who has not published a photo yet (0).
-    # Most observations first.
+    # Photographers: the photographer group (photographers.py) -- members and guest photographers -- with their
+    # published observations, 0 for those with none yet (plus anyone outside the group who has published ones).
+    # Not every member is a photographer: divers only are not listed. Most observations first.
     published = dict(Sample.objects.filter(status='published', deleted_at__isnull=True).values('owner_id')
                      .annotate(n=Count('id')).values_list('owner_id', 'n'))
-    members = User.objects.filter(is_active=True).exclude(password__startswith='!')
     photographers = sorted(
         ({'name': full_name_for(user, lang) or user.username, 'email': user.email,
           'phone': getattr(getattr(user, 'profile', None), 'phone', ''), 'observations': published.get(user.pk, 0),
           'guest': not user.is_active}
-         for user in User.objects.filter(Q(pk__in=published) | Q(pk__in=members) | Q(groups__name=PHOTOGRAPHER_GROUP))
+         for user in User.objects.filter(Q(pk__in=published) | Q(groups__name=PHOTOGRAPHER_GROUP))
          .distinct().select_related('profile')),
         key=lambda p: (-p['observations'], p['name']))
     photographers_active = sum(1 for p in photographers if p['observations'])

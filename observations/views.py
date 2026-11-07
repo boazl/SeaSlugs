@@ -875,7 +875,10 @@ def signup(request):
     if request.method == 'POST' and form.is_valid():
         user=form.save()
         user.groups.add(Group.objects.get_or_create(name='New user')[0])
-        Profile.objects.create(user=user)
+        Profile.objects.create(user=user, first_name_en=form.cleaned_data['first_name_en'], last_name_en=form.cleaned_data['last_name_en'])
+        if form.cleaned_data.get('is_photographer'):
+            from .forms import set_photographer
+            set_photographer(user, True)
         notify_new_user_registered(user)
         login(request,user)
         return redirect('profile')
@@ -1043,12 +1046,16 @@ def edit(request,pk=None):
         # photographer).
         from .photographers import photographer_users, photographer_label
         # not required: a post without it (an older open form, a script) keeps the observation's current photographer
-        field = forms.ModelChoiceField(photographer_users(), label='צלם', empty_label=None, required=False,
+        choices = photographer_users(also=[item.owner_id] if pk else [])
+        field = forms.ModelChoiceField(choices, label='צלם', empty_label=None, required=False,
             help_text='התצפית נרשמת על שם הצלם. צלם בלי חשבון באתר מסומן "צלם אורח".')
         field.label_from_instance = photographer_label
         form.fields = {'photographer': field, **form.fields}
-        chosen = photographer_users().filter(pk=_int(request.GET.get('photographer'))).first() if not pk else None
-        form.initial['photographer'] = (chosen or item.owner).pk
+        chosen = choices.filter(pk=_int(request.GET.get('photographer'))).first() if not pk else None
+        if not chosen and choices.filter(pk=item.owner_id).exists():
+            chosen = item.owner
+        if chosen:
+            form.initial['photographer'] = chosen.pk
     if request.user.is_staff: form.enable_add_links()
     if is_manager(request.user): form.enable_taxon_files()
     else:
@@ -1117,6 +1124,8 @@ def edit(request,pk=None):
         # publish themselves when complete, the rest wait for a manager's approval.
         approve_now = manager and item.is_complete()
         item.save_reviewed(actor=request.user if approve_now else None, approve=approve_now)
+        from .photographers import mark_photographer
+        mark_photographer(item.owner)        # whoever has an observation is a photographer (photographers.py)
         if old_image_name and old_image_name!=item.image.name:
             from .media_transfer import delete_image_if_unused
             delete_image_if_unused(old_image_name)        # the file this observation used to have, if nothing else uses it

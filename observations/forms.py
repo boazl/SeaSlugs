@@ -13,10 +13,33 @@ from django.core.validators import FileExtensionValidator
 from .models import IDENTIFICATION_FILE_EXTENSIONS, Sample, Profile, Species, Country, Region, Site, DiveTrip, TaxonOrder, TaxonFamily, TaxonGenus, IdentificationQualifier, LifeStage, split_undetermined_variant, LIBRARY_TRIP_CODES, PHONE_VALIDATOR
 
 
+# "I am a photographer": the checkbox on the sign-up and profile forms that puts the user in the photographer group
+# (observations/photographers.py) -- photographers are the ones observations are credited to.
+PHOTOGRAPHER_LABEL = 'אני צלם/ת'
+PHOTOGRAPHER_HELP = 'צלמים מופיעים ברשימת הצלמים של האתר, ותצפיות נרשמות על שמם.'
+NAME_HELP = 'השם מופיע כקרדיט לצלם: בעברית בעמודים בעברית ובאנגלית בעמודים באנגלית.'
+
+
+def set_photographer(user, on):
+    """Puts the user in the photographer group or takes him out of it (the "I am a photographer" box)."""
+    from django.contrib.auth.models import Group
+    from .photographers import PHOTOGRAPHER_GROUP
+    group = Group.objects.get_or_create(name=PHOTOGRAPHER_GROUP)[0]
+    if on: user.groups.add(group)
+    else: user.groups.remove(group)
+
+
 class SignupForm(UserCreationForm):
-    first_name = forms.CharField(label='שם פרטי', max_length=150, required=False)
-    last_name = forms.CharField(label='שם משפחה', max_length=150, required=False)
+    # The name in both languages from the start: the Hebrew one is the user's own first/last name, the English one
+    # goes to the profile (first_name_en/last_name_en) -- each language's pages credit the photographer by its own.
+    first_name = forms.CharField(label='שם פרטי בעברית', max_length=150, required=False)
+    last_name = forms.CharField(label='שם משפחה בעברית', max_length=150, required=False)
+    first_name_en = forms.CharField(label='שם פרטי באנגלית', max_length=150, required=False)
+    last_name_en = forms.CharField(label='שם משפחה באנגלית', max_length=150, required=False, help_text=NAME_HELP)
     email = forms.EmailField(label='דואר אלקטרוני', required=True)
+    is_photographer = forms.BooleanField(label=PHOTOGRAPHER_LABEL, required=False, help_text=PHOTOGRAPHER_HELP)
+    field_order = ['username', 'first_name', 'last_name', 'first_name_en', 'last_name_en', 'email',
+                   'password1', 'password2', 'is_photographer']
     class Meta:
         model = User
         fields = ('username','first_name','last_name','email','password1','password2')
@@ -33,11 +56,20 @@ class ProfileForm(forms.ModelForm):
     # Keep the Hebrew name fields next to their English counterparts rather than at
     # the end of the form -- Django would otherwise place explicitly declared fields
     # (first_name/last_name) after every Meta.fields model field.
-    field_order = ['first_name','last_name','first_name_en','last_name_en','phone','macro_diver','visible_to_members','countries','regions','bio']
+    is_photographer = forms.BooleanField(label=PHOTOGRAPHER_LABEL, required=False, help_text=PHOTOGRAPHER_HELP)
+    field_order = ['first_name','last_name','first_name_en','last_name_en','phone','is_photographer','macro_diver','visible_to_members','countries','regions','bio']
     def __init__(self, *args, lang='he', **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['first_name'].initial = self.instance.user.first_name
         self.fields['last_name'].initial = self.instance.user.last_name
+        from .photographers import PHOTOGRAPHER_GROUP
+        user = self.instance.user
+        self.fields['is_photographer'].initial = user.groups.filter(name=PHOTOGRAPHER_GROUP).exists()
+        if Sample.objects.filter(owner=user, deleted_at__isnull=True).exists():
+            # someone with observations on the site is a photographer: the box stays ticked
+            self.fields['is_photographer'].initial = True
+            self.fields['is_photographer'].disabled = True
+            self.fields['is_photographer'].help_text = 'יש לך תצפיות באתר, ולכן את/ה רשום/ה כצלם/ת.'
         if lang == 'en':
             # Field labels/help_text are translated in the template (form.html runs
             # them through the `t` filter); the countries/regions checkboxes are the
@@ -51,6 +83,7 @@ class ProfileForm(forms.ModelForm):
             profile.user.first_name = self.cleaned_data['first_name']
             profile.user.last_name = self.cleaned_data['last_name']
             profile.user.save(update_fields=['first_name', 'last_name'])
+            set_photographer(profile.user, self.cleaned_data.get('is_photographer'))
         return profile
 
     class Meta:

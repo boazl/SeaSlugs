@@ -1,7 +1,8 @@
 """The /news/ page's manager section ends with a table of photographers: everyone with a published observation on the
-site (an observation's photographer is its owner; guest photographers' inactive accounts included) and the potential
-ones -- registered members who have not published a photo yet (0, marked) -- with name, email, phone and the number
-of published observations, most observations first. Visitors and members never see it."""
+site (an observation's photographer is its owner; guest photographers' inactive accounts included) and the other
+photographers -- the "Macro photographer" group's users who have not published a photo yet (0, marked) -- with name,
+email, phone and the number of published observations, most observations first. Members who are not photographers
+(divers only) are not listed. Visitors and members never see it."""
 from django.contrib.auth.models import User
 
 from .models import Profile, Sample
@@ -24,6 +25,9 @@ class PhotographersTableTests(Base):
         self.manager = User.objects.create_superuser('boss', password='pw-test-12345')
         self.newbie = User.objects.create_user('newbie', password='pw-test-12345', first_name='טל', last_name='חדש',
                                                email='tal@example.com')
+        from django.contrib.auth.models import Group
+        self.newbie.groups.add(Group.objects.get_or_create(name='Macro photographer')[0])
+        User.objects.create_user('diveronly', password='pw-test-12345', email='diver-only@example.com')   # not a photographer
         User.objects.create_user('gone', password='pw-test-12345', email='gone@example.com', is_active=False)
 
     def page(self, lang='he'):
@@ -36,7 +40,8 @@ class PhotographersTableTests(Base):
     def test_manager_sees_the_photographers_with_contact_details_and_counts(self):
         self.client.force_login(self.manager)
         table = self.table(self.page())
-        self.assertIn('צלמים (4)', table)          # 2 with observations + 2 registered without (newbie, the manager)
+        self.assertIn('צלמים (3)', table)          # 2 with observations + the photographer without any yet
+        self.assertNotIn('diver-only@example.com', table)   # a member who is not a photographer
         self.assertIn('2 עם תצפיות באתר', table)
         self.assertIn('<a href="mailto:dana@example.com">dana@example.com</a>', table)
         self.assertIn('<a href="tel:050-1234567">050-1234567</a>', table)
