@@ -197,3 +197,20 @@ body:has(.controls-panel) .collection-selection:empty{margin:0}
 .home-article-thumb{flex:0 0 48px;width:48px;height:48px;border-radius:6px;overflow:hidden;border:1px solid var(--line)}
 .home-article-thumb img{width:48px;height:48px;object-fit:cover;object-position:top;display:block}
 .play.no-local{color:#ff3b3b;border-color:#ff3b3b}.play-both.no-local i{color:var(--ink)}
+/* A manager's "copy a link to this view" button in the gallery's controls (app.js #copyLink). */
+.copy-link{background:none;border:1px solid var(--line);color:var(--accent);border-radius:6px;padding:8px 12px;font-size:14px;white-space:nowrap;flex-shrink:0}.copy-link:hover{border-color:var(--accent)}.copy-link.copied{background:var(--accent);border-color:var(--accent);color:#09222a}
+/* The Mediterranean bounty banner beside the controls panel (app.js fillBountyBanners): in one line with the panel
+   on a computer -- the same top and height, in the column of the opening photo -- and above it on a phone. */
+.controls-row{display:flex;flex-direction:column;gap:12px}
+.bounty-banner{order:-1;display:block;width:auto;max-width:320px;margin:0 auto;padding:10px 12px;border:1px solid #f2c14e;border-radius:10px;background:#f2c14e1a;color:#f7d98a;font-size:13px;line-height:1.5;text-decoration:none}.bounty-banner small{display:block;margin-top:6px;font-size:12px;color:#e9d9ae;opacity:.9}.bounty-banner:hover{background:#f2c14e33;color:#fff3cf}
+@media(min-width:851px){
+  .controls-row{flex-direction:row;align-items:flex-start;gap:32px}
+  .controls-row .controls-panel{flex:1;min-width:0}
+  .controls-row:has(.bounty-banner:not([hidden])) .controls-panel{margin-inline-end:0}
+  .controls-row .bounty-banner{order:0;flex:0 0 200px;max-width:none;margin:0;display:flex;flex-direction:column;justify-content:center}
+  /* the opening photo (200x133, top 12px) ends above the row, so the banner lines up with the panel below it */
+  body:has(.controls-row .bounty-banner:not([hidden])) .intro{min-height:160px}
+}
+/* a wide screen's panel is about the banner's height: the two are made one line (same top and bottom); on a narrower
+   computer the panel's area chips wrap and it grows tall, so the banner keeps its own height at the top */
+@media(min-width:1300px){.controls-row{align-items:stretch}}

@@ -240,6 +240,15 @@ def manager_data(lang):
                       'last_login': timezone.localtime(user.last_login) if user.last_login else None,
                       'logins': logins.get(user.pk, 0), 'observations': observations.get(user.pk, 0),
                       'staff': user.is_staff})
+    # Photographers: everyone with a published observation on the site (the photographer of an observation is its
+    # owner -- Sample.photographer_name -- guest photographers' inactive accounts included), most observations first.
+    published = dict(Sample.objects.filter(status='published', deleted_at__isnull=True).values('owner_id')
+                     .annotate(n=Count('id')).values_list('owner_id', 'n'))
+    photographers = sorted(
+        ({'name': full_name_for(user, lang) or user.username, 'email': user.email,
+          'phone': getattr(getattr(user, 'profile', None), 'phone', ''), 'observations': published[user.pk]}
+         for user in User.objects.filter(pk__in=published).select_related('profile')),
+        key=lambda p: (-p['observations'], p['name']))
     recent_logins = [{'when': timezone.localtime(e.created_at), 'name': full_name_for(e.user, lang) or e.name}
                      for e in ActivityEvent.objects.filter(kind='login').select_related('user', 'user__profile')[:20] if e.user]
     return {
@@ -247,7 +256,7 @@ def manager_data(lang):
                                                               'right': CHART_W - PAD_X, 'bottom': CHART_H - PAD_Y},
         'visits_today': total(today), 'visits_week': total(today - timedelta(days=6)), 'visits_month': total(month_ago),
         'top_pages': DailyPageView.objects.filter(day__gte=month_ago).values('path').annotate(n=Sum('views')).order_by('-n')[:15],
-        'users': users, 'recent_logins': recent_logins,
+        'users': users, 'recent_logins': recent_logins, 'photographers': photographers,
         'signups_month': ActivityEvent.objects.filter(kind='signup', created_at__gte=login_since).count(),
     }
 

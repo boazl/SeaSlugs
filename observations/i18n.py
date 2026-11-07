@@ -10,14 +10,48 @@ LANG_COOKIE = 'seaslugs_lang'
 LANGUAGES = ('he', 'en')
 
 
+# User-agent fragments of search-engine crawlers and link-preview fetchers: they always get the default (Hebrew), so
+# the Hebrew pages stay the indexed ones whatever language such a client announces.
+CRAWLER_HINTS = ('bot', 'crawl', 'spider', 'slurp', 'facebookexternalhit', 'preview', 'whatsapp')
+
+
+def browser_lang(request):
+    """The language of the visitor's browser (the Accept-Language header): Hebrew when its first choice is Hebrew
+    ('he', or the old code 'iw'), English for any other language. No header (crawlers usually send none) and
+    crawlers get Hebrew, the site's default."""
+    agent = request.META.get('HTTP_USER_AGENT', '').lower()
+    if any(hint in agent for hint in CRAWLER_HINTS):
+        return 'he'
+    best, best_q = None, 0.0
+    for part in request.META.get('HTTP_ACCEPT_LANGUAGE', '').split(','):
+        tag, _, params = part.strip().partition(';')
+        tag = tag.strip().lower()
+        if not tag or tag == '*':
+            continue
+        q = 1.0
+        for param in params.split(';'):
+            key, _, value = param.strip().partition('=')
+            if key.strip() == 'q':
+                try:
+                    q = float(value)
+                except ValueError:
+                    q = 0.0
+        if q > best_q:  # the first of equal choices wins
+            best, best_q = tag, q
+    if best is None:
+        return 'he'
+    return 'he' if best.split('-')[0] in ('he', 'iw') else 'en'
+
+
 def get_lang(request):
-    """An explicit ?lang=he/en always wins (and is what the toggle link sends);
-    otherwise fall back to a previously remembered cookie, then Hebrew."""
+    """An explicit ?lang=he/en always wins (and is what the toggle link and every internal link of an English page
+    send); otherwise the language remembered in the cookie (set by any ?lang= visit, so it carries over between
+    pages); otherwise, on a first visit, the browser's language (browser_lang)."""
     param = request.GET.get('lang')
     if param in LANGUAGES:
         return param
     cookie = request.COOKIES.get(LANG_COOKIE)
-    return cookie if cookie in LANGUAGES else 'he'
+    return cookie if cookie in LANGUAGES else browser_lang(request)
 
 
 def lang_toggle_url(request, lang):

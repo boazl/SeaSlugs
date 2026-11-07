@@ -77,5 +77,8 @@
 <div class="table-wrap"><table class="data-table"><thead><tr><th>{{ "שם"|t:lang }}</th><th>{{ "שם משתמש"|t:lang }}</th><th>{{ "הצטרפות"|t:lang }}</th><th>{{ "כניסה אחרונה"|t:lang }}</th><th class="num">{{ "כניסות (30 יום)"|t:lang }}</th><th class="num">{{ "תצפיות"|t:lang }}</th></tr></thead><tbody>
 {% for u in users %}<tr><td>{{ u.name }}{% if u.staff %} <span class="badge site">{{ "מנהל"|t:lang }}</span>{% endif %}</td><td dir="ltr" style="text-align:start">{{ u.username }}</td><td>{{ u.joined|date:"d/m/Y" }}</td><td>{% if u.last_login %}{{ u.last_login|date:"d/m/Y H:i" }}{% else %}—{% endif %}</td><td class="num">{{ u.logins }}</td><td class="num">{{ u.observations }}</td></tr>{% endfor %}</tbody></table></div>
 {% if recent_logins %}<h3>{{ "כניסות אחרונות"|t:lang }}</h3><ul class="news-list">{% for e in recent_logins %}<li><span class="when">{{ e.when|date:"d/m/Y H:i" }}</span><span>{{ e.name }}</span></li>{% endfor %}</ul>{% endif %}
+<h3 id="photographers">{{ "צלמים"|t:lang }} ({{ photographers|length }})</h3>
+<div class="table-wrap"><table class="data-table"><thead><tr><th>{{ "שם"|t:lang }}</th><th>{{ "דואר אלקטרוני"|t:lang }}</th><th>{{ "טלפון"|t:lang }}</th><th class="num">{{ "תצפיות באתר"|t:lang }}</th></tr></thead><tbody>
+{% for p in photographers %}<tr><td>{{ p.name }}</td><td dir="ltr" style="text-align:start">{% if p.email %}<a href="mailto:{{ p.email }}">{{ p.email }}</a>{% else %}—{% endif %}</td><td dir="ltr" style="text-align:start">{% if p.phone %}<a href="tel:{{ p.phone }}">{{ p.phone }}</a>{% else %}—{% endif %}</td><td class="num">{{ p.observations }}</td></tr>{% endfor %}</tbody></table></div>
 </section>{% endif %}
 {% endblock %}

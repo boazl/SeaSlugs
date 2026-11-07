@@ -54,6 +54,9 @@ const state = {
     family: 'all',
     genus: 'all',
     collection: null,
+    // True when the dive-trip collection cards are hidden (sidebar "Dive trip collections" unticked; ?trips=hide),
+    // so a non-taxonomic view shows only the species observations.
+    hideTrips: false,
     sort: 'taxonomic',
     // True once the visitor picks a sort by hand; until then the sort follows the area
     // (the migrant-species view defaults to observation year, every other view to taxonomic).
@@ -439,6 +442,12 @@ function renderSidebar() {
             if (!state.sortChosen || (!multiObsOn() && state.sort === 'count')) { state.sort = defaultSort(); state.sortChosen = false; }
             syncSortControl(); render();
         });
+    // "Dive trip collections": ticked = their cards are shown (the default); unticked hides them (state.hideTrips).
+    const tripCardsShown = new Set(state.hideTrips ? [] : ['shown']);
+    const tripCardCount = collectionsList.filter(c => collectionMatchesArea(c, area)).length;
+    renderCheckboxGroup(document.querySelector('#tripCardOptions'),
+        [['shown', language === 'he' ? 'אוספי מסעות צלילה' : 'Dive trip collections', tripCardCount]],
+        tripCardsShown, () => { state.hideTrips = !tripCardsShown.has('shown'); render(); });
     const siteEntries = [...opts.siteIds]
         .map(id => { const t = siteCount(area, id); return [id, labelFor(id, siteLabelsData), t.compact, t.title]; })
         .sort((a, b) => a[1].localeCompare(b[1], language === 'he' ? 'he' : 'en'));
@@ -1359,6 +1368,171 @@ function focusUpCard() {
     window.requestAnimationFrame(() => (card || document.querySelector('#resultCount')).scrollIntoView({ block: card ? 'center' : 'start' }));
 }
 
+// ---- shareable links to a gallery view ----
+// The address bar always holds the view on screen, so it can be copied and sent: e.g. the Mediterranean species in
+// alphabetical order are "/?area=med&sort=alpha". Opening such a link draws that view (applyGalleryQuery).
+//   area=<code>     a sea's short code (Sea.url_code in catalog.js areas; "sea-<id>" for a sea without one),
+//                   or "multi" (species from multiple areas) / "migrant"; no area = all areas
+//   sort=<sort>     taxonomic | alpha | year | count -- only when chosen by hand (else the view's own default)
+//   level=<rank>    the taxonomic view's rank; in=<rank>:<key> the taxon clicked into, others=<ranks> its "Others"
+//   region= site= photographer= year=   the sidebar's checkboxes (one parameter per ticked box)
+//   obs=multi       species with several observations;  trip=<id> one dive trip;  q=<text> the search box
+//   trips=hide      the dive-trip collection cards hidden (only the species observations)
+// Other parameters (lang, restore, up) are left alone.
+const AREA_PSEUDO_CODES = { 'multi-area': 'multi', migrant: 'migrant' };
+const GALLERY_URL_KEYS = ['area', 'sort', 'level', 'in', 'others', 'region', 'site', 'photographer', 'year', 'obs', 'trip', 'trips', 'q'];
+const GALLERY_URL_SETS = [['region', 'regions'], ['site', 'sites'], ['photographer', 'photographers'], ['year', 'years']];
+const GALLERY_SORTS = ['taxonomic', 'alpha', 'year', 'count'];
+function areaCode(key) {
+    if (AREA_PSEUDO_CODES[key]) return AREA_PSEUDO_CODES[key];
+    const entry = areaLabelsData[key];
+    return (entry && entry.code) || key;
+}
+function areaFromCode(code) {
+    if (!code) return null;
+    const c = code.trim().toLowerCase();
+    for (const [key, pseudo] of Object.entries(AREA_PSEUDO_CODES)) if (pseudo === c) return key;
+    for (const [key, entry] of Object.entries(areaLabelsData)) if (key === c || (entry && entry.code === c)) return key;
+    return null;
+}
+function galleryQuery() {
+    const params = new URLSearchParams();
+    if (state.area !== 'all') params.set('area', areaCode(state.area));
+    if (state.sortChosen) params.set('sort', state.sort);
+    if (state.sort === 'taxonomic') {
+        if (state.drill) {
+            params.set('in', `${state.drill.level}:${state.drill.id}`);
+            if (state.drill.blanks && state.drill.blanks.length) params.set('others', state.drill.blanks.join(','));
+        }
+        if (state.level !== 'order') params.set('level', state.level);
+    }
+    GALLERY_URL_SETS.forEach(([name, key]) => [...state[key]].forEach(v => params.append(name, v)));
+    if (multiObsOn()) params.set('obs', 'multi');
+    if (state.collection) params.set('trip', state.collection);
+    if (state.hideTrips) params.set('trips', 'hide');
+    const q = search.value.trim();
+    if (q) params.set('q', q);
+    return params;
+}
+// The address of the view on screen: the gallery's parameters replaced, every other one (lang...) kept.
+function galleryUrl() {
+    const url = new URL(window.location.href);
+    GALLERY_URL_KEYS.forEach(k => url.searchParams.delete(k));
+    galleryQuery().forEach((value, name) => url.searchParams.append(name, value));
+    return url.pathname + url.search + url.hash;
+}
+// Opens the view a shared link names. Returns false when the address has no gallery parameter. Unknown values
+// (a sea code that isn't in the catalog, a taxon with no species left) are skipped, never an error.
+function applyGalleryQuery(params) {
+    if (!GALLERY_URL_KEYS.some(k => params.has(k))) return false;
+    const area = areaFromCode(params.get('area'));
+    if (area) state.area = area;
+    GALLERY_URL_SETS.forEach(([name, key]) => { state[key] = new Set(params.getAll(name).filter(Boolean)); });
+    state.observations = new Set(params.get('obs') === 'multi' ? ['multi'] : []);
+    const trip = params.get('trip');
+    state.collection = trip && tripLabelsData[trip] ? trip : null;
+    state.hideTrips = params.get('trips') === 'hide';
+    search.value = params.get('q') || '';
+    const sort = params.get('sort');
+    if (GALLERY_SORTS.includes(sort)) { state.sort = sort; state.sortChosen = true; }
+    else { state.sort = defaultSort(); state.sortChosen = false; }
+    syncSortControl();   // a sort the view doesn't offer (year outside "migrant"...) falls back to the default
+    state.drill = null;
+    const level = params.get('level');
+    const into = params.get('in') || '';
+    const cut = into.indexOf(':');
+    if (state.sort === 'taxonomic' && cut > 0) {
+        const drill = { level: into.slice(0, cut), id: into.slice(cut + 1) };
+        const blanks = (params.get('others') || '').split(',').filter(r => LEVELS.includes(r));
+        if (blanks.length) drill.blanks = blanks;
+        const members = LEVELS.includes(drill.level) && drill.level !== 'species' ? drillMembers(drill) : [];
+        if (members.length) {
+            state.drill = drill;
+            setLevel(LEVELS.includes(level) ? level : nextLevel(drill.level, members));
+        } else setLevel(LEVELS.includes(level) ? level : 'order');
+    } else setLevel(LEVELS.includes(level) ? level : 'order');
+    if (search.value.trim()) setLevel('species');   // as when typing: a search shows species
+    return true;
+}
+
+// A manager's button that copies the link of the view on screen, without its language (the button is only on a
+// manager's page).
+const copyLinkButton = document.querySelector('#copyLink');
+function copyLinkLabel(done) {
+    if (language === 'en') return done ? 'Link copied ✓' : 'Copy link to this view';
+    return done ? 'הקישור הועתק ✓' : 'העתקת קישור לתצוגה';
+}
+function copyTextFallback(text) {
+    const area = document.createElement('textarea');
+    area.value = text;
+    area.setAttribute('readonly', '');
+    area.style.position = 'fixed'; area.style.opacity = '0';
+    document.body.append(area);
+    area.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (_) {}
+    area.remove();
+    return ok;
+}
+if (copyLinkButton) {
+    copyLinkButton.addEventListener('click', async () => {
+        // Without "lang": the recipient sees the site in their own language (Hebrew for a Hebrew browser, else
+        // English -- observations/i18n.py browser_lang), not in the language the manager happens to be using.
+        const url = new URL(galleryUrl(), window.location.origin);
+        url.searchParams.delete('lang');
+        const link = url.href;
+        let ok = false;
+        try { await navigator.clipboard.writeText(link); ok = true; } catch (_) { ok = copyTextFallback(link); }
+        copyLinkButton.title = link;
+        if (!ok) return;
+        copyLinkButton.textContent = copyLinkLabel(true);
+        copyLinkButton.classList.add('copied');
+        clearTimeout(copyLinkButton.resetTimer);
+        copyLinkButton.resetTimer = setTimeout(() => {
+            copyLinkButton.textContent = copyLinkLabel(false);
+            copyLinkButton.classList.remove('copied');
+        }, 2000);
+    });
+}
+
+// ---- the Mediterranean bounty banner ----
+// A small banner ([data-bounty] in index.html) offers ₪200 for a photo of a
+// Mediterranean species the site doesn't have yet. Its number is the Mediterranean's species count in the catalog
+// (the same as on the area button), so it follows new observations by itself. It links to the Mediterranean
+// species in alphabetical order without the dive-trip collections (/?area=med&sort=alpha&trips=hide), opened in
+// place on the home page. With no Mediterranean area in the catalog the banner stays hidden. It stands in
+// index.html beside the controls panel (.controls-row: one line with it on a computer, above it on a phone).
+const BOUNTY_AREA_CODE = 'med';
+function bountyText(count) {
+    if (language === 'en') return `₪200 to anyone who adds a photo of a Mediterranean species not among the ${count} observations on the site`;
+    return `תשלום של 200 ש״ח למי שיוסיף תצלום של מין מהים התיכון שאינו מופיע ב-${count} התצפיות באתר`;
+}
+// The second, smaller line: what the photos are for, and that the photographer is credited.
+function bountyNote() {
+    if (language === 'en') return 'The photos are for scientific publication, such as a sea slug identification guide; the photographer will be credited.';
+    return 'התצלומים מיועדים לפרסום מדעי, כגון מגדיר חינניות ים, והצלם יוזכר בפרסומים.';
+}
+function fillBountyBanners() {
+    const key = areaFromCode(BOUNTY_AREA_CODE);
+    const count = key ? areaSpeciesCount(key).species : 0;
+    document.querySelectorAll('[data-bounty]').forEach(link => {
+        link.hidden = !count;
+        if (!count) return;
+        const note = document.createElement('small');
+        note.textContent = bountyNote();
+        link.replaceChildren(bountyText(count), note);
+        link.href = `/?area=${BOUNTY_AREA_CODE}&sort=alpha&trips=hide` + (language === 'en' ? '&lang=en' : '');
+    });
+}
+document.addEventListener('click', event => {
+    const link = event.target.closest('[data-bounty]');
+    if (!link || event.button || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    applyGalleryQuery(new URL(link.href, window.location.origin).searchParams);
+    renderSidebar(); render();
+    document.querySelector('.collection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
 // ---- the browser's back / forward buttons ----
 // Every change of view (area, sort, level, a taxon clicked into, filters) is its own entry in the browser's
 // history, so "back" returns to the previous view of the gallery. The entry keeps the view and the place on the
@@ -1384,11 +1558,11 @@ function recordGalleryHistory() {
     const current = history.state && history.state.gallery;
     if (!current || sameView(current, entry)) {
         // first render, or the search text only: update this entry in place
-        history.replaceState({ ...(history.state || {}), gallery: { ...entry, scrollY: current ? current.scrollY || 0 : 0 } }, '', window.location.href);
+        history.replaceState({ ...(history.state || {}), gallery: { ...entry, scrollY: current ? current.scrollY || 0 : 0 } }, '', galleryUrl());
         return;
     }
     keepScrollInHistory();
-    history.pushState({ gallery: { ...entry, scrollY: 0 } }, '', window.location.href);
+    history.pushState({ gallery: { ...entry, scrollY: 0 } }, '', galleryUrl());
 }
 function applyGalleryEntry(entry) {
     Object.assign(state, entry.state);
@@ -1422,7 +1596,9 @@ function render() {
     const taxonomic = state.sort === 'taxonomic';
     const level = taxonomic ? state.level : 'species';
     levelControl.hidden = !taxonomic;
-    const filteredCollections = taxonomic ? [] : collectionsList.filter(c => collectionMatches(c, q)).sort(collectionCompare);
+    // the taxonomic view has no collection cards, so their checkbox has nothing to do there
+    document.querySelector('#tripCardOptions').hidden = taxonomic;
+    const filteredCollections = taxonomic || state.hideTrips ? [] : collectionsList.filter(c => collectionMatches(c, q)).sort(collectionCompare);
     let filteredSpecies = speciesList.filter(sp => speciesMatches(sp, q));
     if (state.sort === 'alpha') filteredSpecies = [...filteredSpecies].sort(speciesSortCompare);
     if (state.sort === 'year') filteredSpecies = [...filteredSpecies].sort(speciesYearCompare);
@@ -1492,6 +1668,7 @@ function updateFilterToggleCount() {
     // bar above the gallery (see .area-filter-bar), not inside the collapsible drawer this
     // toggle/badge refers to, so counting it here would over-count what's actually hidden.
     let n = state.regions.size + state.sites.size + state.photographers.size + state.years.size + state.observations.size;
+    if (state.hideTrips) n++;
     if (state.order !== 'all') n++;
     if (state.subOrder !== 'all') n++;
     if (state.superfamily !== 'all') n++;
@@ -1662,6 +1839,7 @@ document.querySelector('#reset').addEventListener('click', () => {
     search.value = '';
     state.area = 'all'; state.regions.clear(); state.sites.clear(); state.photographers.clear(); state.years.clear(); state.observations.clear();
     state.order = 'all'; state.subOrder = 'all'; state.superfamily = 'all'; state.family = 'all'; state.genus = 'all'; state.collection = null;
+    state.hideTrips = false;
     state.sort = 'taxonomic'; state.sortChosen = false; syncSortControl();
     state.drill = null; setLevel('order');
     renderSidebar(); render(); search.focus();
@@ -1783,6 +1961,7 @@ function setLanguage(value) {
         else item.element.replaceChildren(...Array.from(item.he.childNodes, node => node.cloneNode(true)));
     });
     applyHomeSections();
+    fillBountyBanners();
     // The main navigation (observations/templates/observations/account_menu.html) carries both languages.
     document.querySelectorAll('.account-menu [data-he][data-en]').forEach(element => {
         element.textContent = en ? element.dataset.en : element.dataset.he;
@@ -1812,6 +1991,7 @@ function setLanguage(value) {
     languageButton.textContent = en ? 'עברית' : 'English';
     languageButton.lang = en ? 'he' : 'en';
     languageButton.setAttribute('aria-label', en ? 'Switch to Hebrew' : 'מעבר לאנגלית');
+    if (copyLinkButton) { copyLinkButton.textContent = copyLinkLabel(false); copyLinkButton.classList.remove('copied'); }
     // The title and description of each language come from the page itself (observations/home_text.py),
     // so what the server rendered and what the button swaps in are the same text.
     document.title = seoText[language].title;
@@ -1827,9 +2007,14 @@ function setLanguage(value) {
 languageButton.addEventListener('click', () => setLanguage(language === 'he' ? 'en' : 'he'));
 let preferredLanguage = 'he';
 try { preferredLanguage = localStorage.getItem('seaslugs-language') || 'he'; } catch (_) {}
+// Which view the gallery opens with: "back to the gallery" (?restore=1, ?up=...), then the view this history entry
+// already had (back / forward / reload), then a shared link's parameters (?area=med&sort=alpha...).
 let restoredScroll = restoreGalleryView();
 if (applyUpParam()) restoredScroll = null;
-else if (restoredScroll === null) restoredScroll = restoreFromHistory();
+else if (restoredScroll === null) {
+    restoredScroll = restoreFromHistory();
+    if (restoredScroll === null) applyGalleryQuery(new URLSearchParams(window.location.search));
+}
 setLanguage(new URLSearchParams(window.location.search).get('lang') || readLanguageCookie() || preferredLanguage);
 if (restoredScroll) window.requestAnimationFrame(() => window.scrollTo(0, restoredScroll));
 focusUpCard();

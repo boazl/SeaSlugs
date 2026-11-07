@@ -43,4 +43,8 @@ class LanguagePreferenceMiddleware:
         lang = request.GET.get('lang')
         if lang in ('he', 'en'):
             response.set_cookie('seaslugs_lang', lang, max_age=60 * 60 * 24 * 365, samesite='Lax')
+        else:
+            # without ?lang= a page's language may come from the cookie or the browser (i18n.get_lang)
+            from django.utils.cache import patch_vary_headers
+            patch_vary_headers(response, ('Cookie', 'Accept-Language'))
         return response

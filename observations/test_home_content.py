@@ -100,6 +100,7 @@ class HomeContentTests(SeoFixture):
     def test_contribute_button_says_add_observation_and_depends_on_login(self):
         self.assertIn('class="btn btn-primary" href="/observations/signup/">הוספת תצפית</a>', self.page('/'))
         self.assertIn('class="btn btn-primary" href="/observations/signup/">Add an observation</a>', self.page('/?lang=en'))
+        self.client.cookies.clear()  # the ?lang=en visit is remembered: / would now go to /?lang=en
         self.client.force_login(self.owner)
         html = self.page('/')
         self.assertIn('class="btn btn-primary" href="/observations/new/">הוספת תצפית</a>', html)
@@ -152,7 +153,7 @@ class AreaFilterTests(SeoFixture):
         other = Species.objects.create(scientific_name='Hypselodoris infucata', genus='Hypselodoris')
         Sample(owner=self.owner, trip=trip, species=other, video_url='https://youtu.be/cdefghijklm').save_reviewed()
         data = self.catalog()
-        self.assertEqual(data['areas'], {f'sea-{red_sea.pk}': {'label': 'ים סוף', 'label_en': 'Red Sea'}})
+        self.assertEqual(data['areas'], {f'sea-{red_sea.pk}': {'label': 'ים סוף', 'label_en': 'Red Sea', 'code': f'sea-{red_sea.pk}'}})
         self.assertEqual({sp['area'] for sp in data['species']}, {f'sea-{red_sea.pk}'})
 
 

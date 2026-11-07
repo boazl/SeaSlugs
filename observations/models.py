@@ -68,8 +68,29 @@ class Country(Named):
     class Meta(Named.Meta): verbose_name = 'מדינה'; verbose_name_plural = 'מדינות'
 
 
+# Codes the gallery itself uses for its pseudo-areas in shareable links (app.js AREA_PSEUDO_CODES) -- a sea can't take them.
+RESERVED_SEA_URL_CODES = {'all', 'multi', 'migrant'}
+
+
 class Sea(Named):
+    # The sea's short code in shareable gallery links (/?area=med; app.js galleryQuery / applyGalleryQuery). Like
+    # SpeciesArea.slug it is permanent once links are out: a sea without a code is linked as "sea-<id>".
+    url_code = models.SlugField('קוד בקישורי הגלריה', max_length=30, blank=True,
+        help_text='קוד קצר באנגלית לקישורים משותפים לגלריה, למשל med ← /?area=med. אין לשנות אחרי ששותפו קישורים.')
     class Meta(Named.Meta): verbose_name = 'ים'; verbose_name_plural = 'ימים'
+    def clean(self):
+        super().clean()
+        code = (self.url_code or '').strip().lower()
+        self.url_code = code
+        if not code:
+            return
+        if code in RESERVED_SEA_URL_CODES or code.startswith('sea-'):
+            raise ValidationError({'url_code': 'הקוד הזה שמור לגלריה עצמה.'})
+        if Sea.objects.filter(url_code=code).exclude(pk=self.pk).exists():
+            raise ValidationError({'url_code': 'הקוד הזה כבר משמש ים אחר.'})
+    @property
+    def gallery_code(self):
+        return self.url_code or f'sea-{self.pk}'
 
 
 class Region(Named):

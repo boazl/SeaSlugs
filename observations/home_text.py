@@ -23,9 +23,9 @@ HOME_TEXT = {
 
 
 def home_lang(request):
-    """The home page's language comes from the URL alone: / is Hebrew, /?lang=en is English. (A remembered
-    cookie must not turn / into English -- one address, one language -- the button and app.js still
-    restore a returning visitor's choice in the browser.)"""
+    """The home page's language comes from the URL alone: / is Hebrew, /?lang=en is English -- one address, one
+    language. A visitor whose remembered or browser language is English is sent from / to /?lang=en first
+    (config.views.gallery_file, i18n.get_lang), so / itself is never served in English."""
     return 'en' if request.GET.get('lang') == 'en' else 'he'
 
 

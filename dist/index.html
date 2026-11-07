@@ -38,6 +38,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
             <div data-home-section="hero" data-lang="{{ lang }}">{{ sections.hero|safe }}</div>
         </section>
         <section class="collection" aria-labelledby="collectionTitle">
+            <div class="controls-row">
             <div class="controls-panel">
             <p class="collection-note" id="collectionNote" role="tooltip" data-home-section="collection_note" data-lang="{{ lang }}">{{ sections.collection_note|safe }}</p>
             <div class="collection-head">
@@ -57,12 +58,14 @@ gtag('config', 'G-CPGTC09P2P');</script>
                         <option value="family">משפחה</option>
                         <option value="genus">סוג</option>
                         <option value="species">מין</option>
-                    </select></label>
+                    </select></label>{% if is_manager %}<button type="button" id="copyLink" class="copy-link" aria-live="polite">העתקת קישור לתצוגה</button>{% endif %}
             </div>
             <div class="area-filter-bar">
                 <h4 id="areaGroupTitle">אזור</h4>
                 <div class="filters" id="areaFilters" role="group" aria-label="סינון לפי אזור"></div>
             </div>
+            </div>
+            <a class="bounty-banner" data-bounty hidden href="/?area=med&amp;sort=alpha&amp;trips=hide{% if lang == 'en' %}&amp;lang=en{% endif %}"></a>
             </div>
             <button type="button" id="filterToggle" class="filter-toggle" aria-haspopup="true" aria-controls="filterSidebar" aria-expanded="false"><span id="filterToggleLabel">סינון</span><span id="filterToggleCount" class="filter-toggle-count" hidden>0</span></button>
             <div class="gallery-layout">
@@ -74,6 +77,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
                     <div class="filter-group">
                         <h4 id="observationGroupTitle">תצפיות</h4>
                         <div class="filter-checks" id="observationOptions"></div>
+                        <div class="filter-checks" id="tripCardOptions"></div>
                     </div>
                     <div class="filter-group">
                         <h4 id="regionGroupTitle">אזור צלילה</h4>

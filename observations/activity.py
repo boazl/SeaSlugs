@@ -19,6 +19,8 @@ Visit counter (VisitCounterMiddleware)
   Counts views of public HTML pages per page per day, and visitors per day by a salted, daily-changing hash of IP and
   browser (no cookie, nothing reversible stored). Not counted: the admin tools, bots, the owner (superusers and
   ACTIVITY_EXCLUDED_USERNAMES) and any browser with the analytics opt-out cookie (/analytics/exclude/).
+  Every browser the owner signs in on gets that cookie by itself (VisitCounterMiddleware), so its later visits are
+  not counted even signed out -- by this counter or by Google Analytics.
 """
 import contextlib
 import hashlib
@@ -261,6 +263,19 @@ def record_visit(request):
         pass
 
 
+EXCLUDE_COOKIE = 'exclude_analytics'                 # the same cookie as /analytics/exclude/ (config.views)
+EXCLUDE_COOKIE_MAX_AGE = 60 * 60 * 24 * 366
+
+
+def mark_owner_browser(request, response):
+    """The owner's browser keeps the opt-out cookie: set on any response while the owner is signed in, so the
+    browser stays uncounted (here and in Google Analytics) after signing out."""
+    if request.COOKIES.get(EXCLUDE_COOKIE) == '1' or not is_excluded_user(getattr(request, 'user', None)):
+        return
+    response.set_cookie(EXCLUDE_COOKIE, '1', max_age=EXCLUDE_COOKIE_MAX_AGE, path='/',
+                        secure=settings.PRODUCTION, httponly=True, samesite='Lax')
+
+
 class VisitCounterMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
@@ -270,6 +285,7 @@ class VisitCounterMiddleware:
         try:
             if should_count(request, response):
                 record_visit(request)
+            mark_owner_browser(request, response)
         except Exception:
             logger.exception('visit counter failed')    # counting must never break a page
         return response

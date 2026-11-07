@@ -74,7 +74,7 @@ class GalleryScriptTests(SimpleTestCase):
         self.assertIn('<option value="order" selected>', html)
         self.assertIn("level: 'order',", js)
         # The taxonomic view hides dive-trip collections and draws one card per taxon above species level.
-        self.assertIn("const filteredCollections = taxonomic ? [] :", js)
+        self.assertIn("const filteredCollections = taxonomic || state.hideTrips ? [] :", js)
         self.assertIn('function renderTaxonLevel(', js)
         # A card click drills one rank down; picking a taxon in the search jumps to its own rank.
         self.assertIn('state.drill = { level, id: String(key) };', js)
@@ -119,8 +119,9 @@ class GalleryScriptTests(SimpleTestCase):
         self.assertIn('yearSortOption.remove()', js)
         self.assertIn("if (state.sort === 'year') { state.sort = defaultSort(); state.sortChosen = false; }", js)
         # area click, observations filter, reset, initial load, restoring the saved view (?restore=1),
-        # "back to the gallery" one rank up (?up=) and a browser Back/Forward step (applyGalleryEntry)
-        self.assertEqual(js.count('syncSortControl();'), 7)
+        # "back to the gallery" one rank up (?up=), a browser Back/Forward step (applyGalleryEntry) and a shared
+        # gallery link (applyGalleryQuery)
+        self.assertEqual(js.count('syncSortControl();'), 8)
         # The years line only appears under the migrant filter.
         self.assertIn("if (state.area === 'migrant' && (sp.first_observed_year || sp.last_observed_year))", js)
         self.assertIn("'נצפה לראשונה בים התיכון'", js)

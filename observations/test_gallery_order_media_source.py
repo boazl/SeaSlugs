@@ -33,4 +33,4 @@ class GalleryViewRestoreSourceTests(SimpleTestCase):
         # saved view the browser's history entry (Back/Forward) is used
         self.assertIn("let restoredScroll = restoreGalleryView();", APP_JS)
         self.assertIn("if (applyUpParam()) restoredScroll = null;", APP_JS)
-        self.assertIn("else if (restoredScroll === null) restoredScroll = restoreFromHistory();", APP_JS)
+        self.assertIn("else if (restoredScroll === null) {\n    restoredScroll = restoreFromHistory();", APP_JS)

@@ -188,7 +188,7 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
 | Model | Fields | Notes |
 |---|---|---|
 | `Country` (21) | `name` (he), `name_en` | |
-| `Sea` (15) | `name`, `name_en` | e.g. "Indo Pacific - South China Sea", "Mediterranean" |
+| `Sea` (15) | `name`, `name_en`, `url_code` | e.g. "Indo Pacific - South China Sea", "Mediterranean". `url_code` is the short code in shareable gallery links (`med`; migration `0090`); permanent once links are out. |
 | `Region` (22) | `name`, `name_en`, `country`, `sea`, `trip_code` | Dive region (Anilao, Romblon, Eilat…). A region belongs to one sea. `trip_code` is the letter(s) used in trip codes. |
 | `Site` (50) | `name`, `name_en`, `region` | Dive site |
 
@@ -407,6 +407,21 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
     gallery view. The view and scroll position live in `history.state`; search typing replaces the entry
     instead of adding one.
   - The view is also kept in `sessionStorage` (`seaslugs-gallery-view`) for `?restore=1`.
+- **Shareable links** (`galleryQuery` / `galleryUrl` / `applyGalleryQuery`, `test_gallery_links.py`)
+  - The address bar always holds the view on screen, e.g. the Mediterranean species alphabetically:
+    `/?area=med&sort=alpha`. Opening such a link draws that view.
+  - Parameters: `area` (a sea's `url_code`, or `sea-<id>` without one; `multi`, `migrant`), `sort` (only when
+    chosen by hand), `level`, `in=<rank>:<key>` + `others=<ranks>` (taxon drilled into), `region`, `site`,
+    `photographer`, `year` (repeated per ticked box), `obs=multi`, `trip`, `trips=hide` (the sidebar's "Dive trip
+    collections" unticked: no collection cards; not offered in the taxonomic view), `q`. `lang` is kept. Unknown values
+    are skipped.
+  - On load: `?restore` / `?up` first, then the history entry's view, then the link's parameters.
+  - A manager's gallery has a "copy a link to this view" button (`#copyLink`; `is_manager` in the page context).
+- **Mediterranean bounty banner** (`test_bounty_banner.py`): beside the controls panel (`index.html` `.controls-row`,
+  `[data-bounty]`; one line with the panel on a computer -- the same height from 1300px -- and above it on a phone),
+  "₪200 for a photo of a Mediterranean species not among the N observations on the site" + a line that the photos
+  are for scientific publication and the photographer is credited. N is the live species count of the area with
+  code `med` (`fillBountyBanners`); hidden without one. It opens `/?area=med&sort=alpha&trips=hide` in place.
 - **"Back to the gallery" on pages:** `/?restore=1&up=<rank>:<key>` (built by `views.gallery_up_url`).
   The gallery opens one rank above the page's taxon, among its siblings:
 
@@ -426,6 +441,14 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
 - Hebrew is the default (`/`, RTL). English is `?lang=en`.
 - `LanguagePreferenceMiddleware` stores an explicit `?lang=` in the `seaslugs_lang` cookie (1 year).
   The `language` context processor exposes `lang`.
+- **Which language a page is in** (`i18n.get_lang`, `test_browser_language.py`): `?lang=` first, then the
+  cookie (so a chosen language stays from page to page), then on a first visit the browser's language
+  (`i18n.browser_lang`, Accept-Language): Hebrew only when the browser's first choice is Hebrew (`he`/`iw`),
+  English otherwise. No header, crawlers and link-preview fetchers get Hebrew. Responses without `?lang=` vary
+  on `Cookie, Accept-Language`.
+  - `/` is only ever served in Hebrew: an English visitor (cookie or browser) gets a 302 to `/?lang=en`, the
+    other parameters kept. `?lang=he` never redirects.
+  - The manager's "copy link" button in the gallery drops `lang`, so a recipient gets their own language.
 - **Server strings:** templates write Hebrew literals through `{{ "…"|t:lang }}`. English values live in
   `TRANSLATIONS` in `templatetags/seaslugs_i18n.py`.
   - **`test_template_translations` fails if a `|t` literal has no English entry**, so add one with every
@@ -452,6 +475,8 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
 - **Visit counter** (`activity.VisitCounterMiddleware`): views of public HTML pages per page per day
   (`DailyPageView`) and visitors per day (`DailyVisitor`, a salted daily hash of IP + browser; no cookie). Skips
   `/admin/`, bots, the owner, and the `exclude_analytics=1` cookie. Counting can never break a page.
+  Every browser the owner signs in on gets that cookie automatically (`activity.mark_owner_browser`,
+  `test_owner_browser_uncounted.py`), so it stays uncounted -- here and in GA -- after signing out.
 - **`/news/`** (public, in the sitemap, linked from the main menu as "חדשות ופעילות"):
   - **Posts** (`NewsPost`, written in the admin of each site, simple markup like the home texts) and **planned dive
     trips** (`NewsPost` kind `trip`, shown until `trip_end`; `DiveTrip` cannot hold a future year).
@@ -480,7 +505,9 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
     window instead, with a ✕ to close. After a click inside the YouTube player the keyboard focus returns to the page,
     so the keys keep working: arrows, space, `f`, Esc.
   - **Managers** also see visits (today / 7 / 30 days, a daily chart, top pages), sign-ups, the users table (joined,
-    last login, logins in 30 days, observations) and recent logins.
+    last login, logins in 30 days, observations), recent logins and, last, the photographers table (everyone with a
+    published observation, guests' inactive accounts included: name, email, phone, published observations;
+    `test_news_photographers.py`).
 
 ## 8. Storage of media and documents
 
@@ -618,6 +645,8 @@ The owner curates data mostly on the Mac and moves it to production. Rules that 
   `Profile.trip_code`, taxon files and the identification preview pages.
 
 ### 10.3 What does not travel through table transfer
+
+- `Sea.url_code` (gallery link codes): set by migration `0090` on each site, else in the admin on each site.
 
 - Article PDFs travel through the article transfer on `/admin/article-files/`.
 - Genus identification files and their preview page numbers are uploaded directly on each site, in the

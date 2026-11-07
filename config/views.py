@@ -18,6 +18,18 @@ def gallery_file(request, filename='index.html'):
         from django.http import HttpResponsePermanentRedirect
         query = request.META.get('QUERY_STRING', '')
         return HttpResponsePermanentRedirect('/' + (f'?{query}' if query else ''))
+    if filename == 'index.html' and request.GET.get('lang') not in ('he', 'en'):
+        # No language in the address: a visitor whose remembered language (cookie) or, on a first visit, browser
+        # language is English goes to the English home page, every other parameter kept (i18n.get_lang).
+        from observations.i18n import get_lang
+        if get_lang(request) == 'en':
+            from django.http import HttpResponseRedirect
+            params = request.GET.copy()
+            params['lang'] = 'en'
+            response = HttpResponseRedirect('/?' + params.urlencode())
+            response['Cache-Control'] = 'private, no-store'
+            response['Vary'] = 'Cookie, Accept-Language'
+            return response
     if filename == 'index.html':
         from django.template import engines
         from django.http import HttpResponse
@@ -42,6 +54,8 @@ def gallery_file(request, filename='index.html'):
         response = HttpResponse(template.render({
             'has_site_image': has_site_image, 'lang': lang, 'home': HOME_TEXT[lang], 'home_text': HOME_TEXT,
             'sections': sections, 'sections_both': sections_both, 'local_videos': local_videos,
+            # A manager gets a button that copies a link to the gallery view on screen (app.js #copyLink).
+            'is_manager': is_manager(request.user),
         }, request))
         response['Cache-Control'] = 'private, no-store'
         return response
@@ -162,7 +176,8 @@ def gallery_file(request, filename='index.html'):
             # One area per SEA (not per country+sea): the Red Sea is one filter button however many
             # countries' coasts it was observed from.
             area_key = f'sea-{area.sea_id}'
-            area_labels[area_key] = {'label': area.sea.name, 'label_en': area.sea.name_en or area.sea.name}
+            # 'code': the sea's short code in shareable gallery links (/?area=med -- Sea.url_code, app.js).
+            area_labels[area_key] = {'label': area.sea.name, 'label_en': area.sea.name_en or area.sea.name, 'code': area.sea.gallery_code}
             samples_qs = Sample.objects.filter(
                 kind='species', species_id=area.species_id, status='published', deleted_at__isnull=True,
                 trip__country_id=area.country_id, trip__region__sea_id=area.sea_id, trip__year__isnull=False,

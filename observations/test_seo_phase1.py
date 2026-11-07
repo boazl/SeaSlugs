@@ -173,11 +173,11 @@ class HomePageLanguageTests(SeoFixture):
         self.assertIn('Israeli research on sea slugs and nudibranchs', self.tag(html, r'<meta name="description" content="(.*?)">'))
         self.assertIn('<meta property="og:locale" content="en_US">', html)
 
-    def test_a_remembered_language_cookie_does_not_change_the_address_into_english(self):
+    def test_a_remembered_english_cookie_moves_to_the_english_address(self):
+        # / itself is never served in English: an English visitor is sent to /?lang=en (test_browser_language)
         self.client.cookies['seaslugs_lang'] = 'en'
-        html = self.page('/')
-        self.assertIn('<html lang="he" dir="rtl">', html)
-        self.assertIn(f'<link rel="canonical" href="{BASE}/">', html)
+        response = self.client.get('/')
+        self.assertEqual((response.status_code, response['Location']), (302, '/?lang=en'))
 
     def test_explicit_hebrew_parameter_keeps_the_root_canonical(self):
         html = self.page('/?lang=he')

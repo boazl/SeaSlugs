@@ -272,6 +272,7 @@ TRANSLATIONS = {
     'כניסות (30 יום)': 'Logins (30 days)',
     'מנהל': 'Manager',
     'כניסות אחרונות': 'Recent logins',
+    'צלמים': 'Photographers',
     'הצגת כל הרשימה': 'Show the whole list',
     'מצגת הסרטונים החדשים': 'New videos slideshow',
     'ניגון מהעותקים במק': 'Play from the copies on the Mac',
