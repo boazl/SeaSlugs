@@ -255,6 +255,7 @@ TRANSLATIONS = {
     'עדכונים': 'updates',
     'התקדמות האתר מאז עלייתו לאוויר': 'Site progress since launch',
     'תצפיות שפורסמו': 'published observations',
+    'סרטונים': 'videos',
     'מאז': 'since',
     'גרף מצטבר של התצפיות והמינים באתר לאורך הזמן': 'Cumulative chart of the observations and species on the site over time',
     'נתוני ניהול (למנהלים בלבד)': 'Management data (managers only)',

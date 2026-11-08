@@ -120,25 +120,27 @@ def progress_chart(lang, sea_id=None):
     """Cumulative public observations and species from the first observation to today, as upward bars: one per day
     (the chart keeps its width; the bars get narrower as days are added) showing the running totals at the end of
     that day, the observations bar behind the species bar, both the day's full width with no gap between bars. The
-    number of species is written (upright, inside the top of its bar) only on the days it changes. With a sea chosen,
-    only that sea's observations and the species first seen there."""
+    number of species is written (upright, inside the top of its bar) only on the days it changes. The running number
+    of videos (published observations with a YouTube link, dated by the observation) is a step line in front of the
+    bars. With a sea chosen, only that sea's observations and the species first seen there."""
     live = Sample.objects.filter(status='published', deleted_at__isnull=True, kind__in=('species', 'collection'))
     if sea_id:
         live = live.filter(trip__region__sea_id=sea_id)
     dates = [timezone.localtime(d).date() for d in live.values_list('created_at', flat=True)]
+    video_dates = [timezone.localtime(d).date() for d in live.exclude(video_url='').values_list('created_at', flat=True)]
     first_seen = [timezone.localtime(d).date() for d in live.filter(kind='species', species__isnull=False)
                   .values('species_id').annotate(first=Min('created_at')).values_list('first', flat=True)]
     if not dates:
         return None
     start, today = min(dates), timezone.localdate()
-    per_obs, per_species = Counter(dates), Counter(first_seen)
+    per_obs, per_species, per_video = Counter(dates), Counter(first_seen), Counter(video_dates)
     buckets = [(start + timedelta(days=i), start + timedelta(days=i + 1)) for i in range((today - start).days + 1)]
-    totals, total_o, total_s, day = [], 0, 0, buckets[0][0]
+    totals, total_o, total_s, total_v, day = [], 0, 0, 0, buckets[0][0]
     for first, nxt in buckets:
         while day < nxt and day <= today:
-            total_o += per_obs[day]; total_s += per_species[day]
+            total_o += per_obs[day]; total_s += per_species[day]; total_v += per_video[day]
             day += timedelta(days=1)
-        totals.append((total_o, total_s))
+        totals.append((total_o, total_s, total_v))
     peak = max(total_o, total_s, 1)
     low = 0
     step = Y_STEP
@@ -150,8 +152,8 @@ def progress_chart(lang, sea_id=None):
     span = (domain_end - domain_start).days
     x_of = lambda d: left + (right - left) * (d - domain_start).days / span
     y_of = lambda v: bottom - (bottom - top) * (v - low) / (high - low)
-    bars, previous_species, last_label_x = [], None, None
-    for (first, nxt), (o, sp) in zip(buckets, totals):
+    bars, previous_species, last_label_x, video_path = [], None, None, []
+    for (first, nxt), (o, sp, v) in zip(buckets, totals):
         x1, x2 = x_of(first), x_of(nxt)
         centre, width = (x1 + x2) / 2, x2 - x1
         bar = lambda value, share: {'x': round(centre - width * share / 2, 2), 'w': round(width * share + .4, 2),
@@ -165,7 +167,11 @@ def progress_chart(lang, sea_id=None):
             label = {'x': round(centre, 1), 'y': round(species_bar['y'] + 4, 1)}
             last_label_x = centre
         previous_species = sp
-        bars.append({'obs': bar(o, 1), 'species': species_bar, 'species_label': label, 'obs_value': o, 'species_value': sp,
+        # the videos' step line: up (or across) to this day's total, then along the day
+        video_y = round(y_of(max(v, low)), 1)
+        video_path.append(f'M{round(x1, 2)} {video_y}' if not video_path else f'V{video_y}')
+        video_path.append(f'H{round(x2, 2)}')
+        bars.append({'obs': bar(o, 1), 'species': species_bar, 'species_label': label, 'obs_value': o, 'species_value': sp, 'video_value': v,
                      'start': max(first, start), 'end': min(nxt - timedelta(days=1), today)})
     y_ticks = [{'y': round(y_of(v), 1), 'label': v} for v in range(low, high + 1, step)]
     # The y axis is labelled with every observation total the bars reach (each new value once). The line sits at the
@@ -202,7 +208,8 @@ def progress_chart(lang, sea_id=None):
     return {'w': P_W, 'h': P_H, 'left': left, 'right': right, 'top': top, 'bottom': bottom,
             'plot_w': right - left, 'plot_h': bottom - top + 2,
             'month_y': bottom + 20, 'year_y': bottom + 44, 'year_line_y': bottom + 28,
-            'bars': bars, 'obs_total': total_o, 'species_total': total_s, 'start': start,
+            'bars': bars, 'obs_total': total_o, 'species_total': total_s, 'video_total': total_v,
+            'video_path': ''.join(video_path), 'start': start,
             'y_ticks': y_ticks, 'value_ticks': value_ticks, 'months': months, 'years': years, 'y_low': low, 'y_step': step}
 
 
