@@ -399,7 +399,8 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
   per-sea buttons. Sidebar filters: region, site, photographer, year, several observations.
   Managers, under the alphabetical sort only: photo / video filters (`media`: video with no photo, photo with no
   video, video with no Google Drive copy -- the page carries the Drive ids as `#drive-videos`).
-- **Collection cards** open the trip page (`/trip/<code>/`); their "View collection" button filters the gallery to the trip.
+- **Collection cards** open the trip page (`/trip/<code>/`); its "This trip in the gallery" button (`/?sort=alpha&trip=<id>`)
+  filters the gallery to the trip.
 - **Sorts:** taxonomic (default), alphabetical, observation year (only under the migrant filter), number
   of observations (only under the multi filter).
 - **Taxonomic drill-down**

@@ -34,3 +34,16 @@ class CollectionCardMarkTests(SimpleTestCase):
     def test_the_collection_card_uses_it(self):
         source = _function_source(APP_JS.read_text(encoding='utf-8'), 'buildCollectionCard')
         self.assertIn('wrap.append(img, ...mediaMarks([c]));', source)
+
+
+class CollectionCardNoViewButtonTests(SimpleTestCase):
+    """A collection card is one link to the trip page, with no separate "view collection" button: the trip page lists
+    the trip's species and links to the gallery filtered to the trip (that button, combined with an active manager's
+    photo / video filter, gave an empty gallery)."""
+
+    def test_no_view_button(self):
+        js = APP_JS.read_text(encoding='utf-8')
+        self.assertNotIn('collection-view', js)
+        self.assertNotIn('openCollectionGallery', js)
+        self.assertIn('article.append(button);', _function_source(js, 'buildCollectionCard'))
+        self.assertNotIn('collection-view', (APP_JS.parent / 'styles.css').read_text(encoding='utf-8'))

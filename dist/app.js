@@ -747,13 +747,6 @@ function openSpeciesDialog(species, button) {
     list.hidden = false;
     openDialog();
 }
-// The collection's gallery only: its species, filtered to that trip, without the media dialog.
-function openCollectionGallery(c) {
-    state.collection = String(c.trip_id);
-    search.value = '';
-    render();
-    document.querySelector('#resultCount').scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
 function playCollection(c, button) {
     opener = button;
     state.collection = String(c.trip_id);
@@ -810,16 +803,10 @@ function buildCollectionCard(c, index) {
     info.append(meta);
     button.append(wrap, info);
     if (!c.trip_code) button.addEventListener('click', () => playCollection(c, button));
-    // "View collection": straight to the collection's gallery, without opening its video / photo first
-    // (a separate button -- a button can't sit inside the card's button; styles.css puts it on the meta line).
-    const view = document.createElement('button');
-    view.type = 'button';
-    view.className = 'collection-view';
-    view.textContent = language === 'he' ? 'צפייה באוסף' : 'View collection';
-    view.setAttribute('aria-label', `${view.textContent}: ${title}`);
-    view.addEventListener('click', () => openCollectionGallery(c));
+    // No separate "view collection" button any more: the trip page lists the trip's species, and its "this trip in
+    // the gallery" button opens the gallery filtered to the trip.
     article.classList.add('collection-card');
-    article.append(button, view);
+    article.append(button);
     return article;
 }
 // Scientific names are shown with the genus and the species epithet in italics and everything
