@@ -1,0 +1,87 @@
+{% load seaslugs_i18n seaslugs_counts seo %}<!doctype html>{% areas_count_text areas lang as species_text %}
+<html lang="{{ lang }}" dir="{% if lang == 'en' %}ltr{% else %}rtl{% endif %}">
+
+<head>
+    <meta charset="utf-8">
+{% if request.COOKIES.exclude_analytics != "1" %}
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-CPGTC09P2P"></script>
+<script>window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-CPGTC09P2P');</script>
+{% endif %}
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ title }} | SeaSlugs</title>
+    <meta name="description" content="{% if description %}{{ description|truncatechars:160 }}{% else %}{{ title }} — {{ place }}{% if date_text %} · {{ date_text }}{% endif %} · {{ species_text }}{% endif %}">
+{% share_meta title place description thumbnail|default:image_url %}
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <link rel="icon" type="image/svg+xml"
+        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23091e28'/%3E%3Cpath d='M7 11c10-9 8 14 18 5M7 18c10-9 8 14 18 5' stroke='%235de0cb' stroke-width='3' fill='none'/%3E%3C/svg%3E">
+    <link rel="stylesheet" href="/styles.css">
+    <style>
+{% include 'observations/_species_page_style.html' %}
+        .trip-title{font-family:inherit !important}
+    </style>
+</head>
+
+<body>
+    <header class="masthead"><a class="brand" href="{{ '/'|with_lang:lang }}" aria-label="SeaSlugs — דף הבית"><span class="brand-name"
+                dir="ltr">SeaSlugs<span class="brand-dot">.</span></span><span class="brand-he">חינניות
+                ים</span></a>{% include 'observations/account_menu.html' %}<a class="language-switch" href="{{ lang_toggle_url }}">{% if lang == 'en' %}עברית{% else %}English{% endif %}</a></header>
+    <main class="species-page">
+        {% for message in messages %}<p class="notice{% if message.extra_tags %} {{ message.extra_tags }}{% endif %}">{{ message|t:lang }}</p>{% endfor %}
+        <nav class="breadcrumb" aria-label="{{ "מיקום באתר"|t:lang }}">
+            <a href="{{ '/'|with_lang:lang }}">{{ "הגלריה"|t:lang }}</a>
+            <span>›</span><a href="{% url 'dive-trips' as trips_url %}{{ trips_url|with_lang:lang }}">{{ "מסעות צלילה"|t:lang }}</a>
+            <span>›</span><span aria-current="page">{{ title }}</span>
+        </nav>
+        <p class="back-row"><a class="back-button" href="{{ '/?restore=1'|with_lang:lang }}">{{ "חזרה לגלריה"|t:lang }}</a><a class="back-button back-button-quiet" href="{{ gallery_trip_url|with_lang:lang }}">{{ "המסע בגלריה"|t:lang }}</a>{% if edit_url %}<a class="edit-button" href="{{ edit_url }}">{{ "עריכת תצפית"|t:lang }}</a>{% endif %}</p>
+        <article class="species-hero" id="obs-{{ main_sample.pk }}">
+            <div class="species-media">
+                {% with s=main_sample %}
+                {% if video_id %}
+                <div class="species-video"><iframe src="https://www.youtube-nocookie.com/embed/{{ video_id }}?enablejsapi=1" data-fallback-image="{{ thumbnail|default:'' }}" data-fallback-alt="{{ title }}" title="{{ title }}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
+                {% elif image_url %}
+                <a class="species-hero-link lightbox-link" href="{% url 'observation-photo' s.pk %}" aria-label="{{ "הגדלת התמונה"|t:lang }}">
+                    <img src="{{ image_url }}" alt="{{ title }}" width="800" height="600">
+                    <span class="play" aria-hidden="true">⤢</span>
+                </a>
+                {% endif %}
+                {% if s.local_video_url %}<div class="local-video-box"><p>{{ "סרטון מקומי (offline)"|t:lang }}</p><video controls playsinline preload="metadata" src="{{ s.local_video_url }}" title="{{ title }}"></video></div>{% elif s.drive_video_url %}<div class="local-video-box"><p>{{ "סרטון מקומי (offline)"|t:lang }} · Google Drive</p><iframe class="drive-video" src="{{ s.drive_video_url }}" title="{{ title }}" allow="autoplay; fullscreen" allowfullscreen loading="lazy"></iframe></div>{% elif s.local_video_missing %}<p class="local-video-missing">{{ "אין גרסה מקומית (offline) לסרטון"|t:lang }}</p>{% endif %}
+                {% with photog=s|photographer_name:lang %}{% if photog %}<p class="species-caption">{{ "צילום:"|t:lang }} {{ photog }}</p>{% endif %}{% endwith %}
+                {% endwith %}
+            </div>
+            <div class="species-summary">
+                <h1 class="trip-title">{{ title }}</h1>
+                <p class="species-area">{{ place }}{% if date_text %} · {{ date_text }}{% endif %}</p>
+                <div class="species-badges"><a class="badge" href="#species">{{ species_text }}</a></div>
+                {% if video_id and main_sample.image %}
+                <button type="button" class="species-thumb" data-full="{% url 'observation-photo' main_sample.pk %}" aria-label="{{ "הגדלת התמונה"|t:lang }}"><img src="{% url 'observation-photo' main_sample.pk %}" alt="{{ title }}" width="160" height="107" loading="lazy"><span aria-hidden="true">⤢</span></button>
+                {% endif %}
+                {% if can_copy_image and main_sample.image %}<button type="button" class="copy-photo-url" data-copy-url="{% url 'observation-photo' main_sample.pk %}" data-done="{{ "הכתובת הועתקה"|t:lang }}" style="margin-top:8px;padding:4px 10px;font-size:13px">{{ "העתקת כתובת התמונה"|t:lang }}</button>{% endif %}
+                {% if trip.link %}<div class="species-links"><a href="{{ trip.link }}" target="_blank" rel="noopener">{{ "קישור נוסף ↗"|t:lang }}</a></div>{% endif %}
+            </div>
+        </article>
+        <section class="species-section">
+            <h2>{{ "תיאור"|t:lang }}</h2>
+            {% if description %}<p class="species-lead">{{ description|linebreaksbr }}</p>{% endif %}
+            <p class="species-share"><span>{{ "קישור לשיתוף:"|t:lang }}</span> <a href="{{ canonical_url }}" id="species-share-link">{{ canonical_url }}</a> <button type="button" id="species-share-copy" data-copy-label="{{ "העתקה"|t:lang }}" data-copied-label="{{ "הועתק!"|t:lang }}">{{ "העתקה"|t:lang }}</button></p>
+        </section>
+        {% include 'observations/_articles_section.html' %}
+        {% if areas %}
+        <section class="species-section" id="species">
+            <h2>{{ "מינים במסע"|t:lang }} <span class="group-count">({{ areas|species_of }})</span></h2>
+            <div class="grid">
+                {% for area in areas %}{% include 'observations/_genus_species_card.html' with anchor=True %}{% endfor %}
+            </div>
+        </section>
+        {% endif %}
+    </main>
+    {% if can_copy_image %}{% include 'observations/_copy_url.html' %}{% endif %}
+{% include 'observations/_species_lightbox.html' with page_title=title %}
+{% include 'observations/_menu_script.html' %}
+<script src="/youtube-fallback.js" defer></script>
+</body>
+
+</html>

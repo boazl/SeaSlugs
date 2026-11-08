@@ -89,3 +89,43 @@ class GalleryMediaFilterLogicTests(GalleryQueryTests):
         self.assertIn("if (media && !(scopedSamples(sp) || sp.samples).some(sm => mediaMatches(sm, media))) return false;", source)
         self.assertIn('if (activeMedia() && !mediaMatches(c, activeMedia())) return false;', source)
         self.assertIn("if (mediaGroup) mediaGroup.hidden = state.sort !== 'alpha';", source)
+
+
+@unittest.skipUnless(shutil.which('node'), 'node is needed to run app.js code')
+class GalleryMediaFilterRestoreTests(TestCase):
+    """The photo / video filter is one of the gallery's saved sets (GALLERY_VIEW_SETS): "back to the gallery"
+    (?restore=1) and the browser's history bring it back as a Set, and a view saved before it existed (the Set
+    stored as {}) restores as no filter instead of breaking the gallery (an empty gallery with no way out)."""
+
+    def restore(self, saved_state):
+        source = APP_JS.read_text(encoding='utf-8')
+        start = source.index('const GALLERY_VIEW_SETS = ')
+        script = '\n'.join([
+            "const store = {};",
+            "const sessionStorage = {getItem: k => store[k] ?? null, setItem: (k, v) => { store[k] = v; }};",
+            "const window = {location: {search: '?restore=1', pathname: '/', hash: ''}, history: {replaceState() {}}, scrollY: 0};",
+            "const search = {value: ''}; const levelSelect = {}; function syncSortControl() {}",
+            "const state = {regions: new Set(), sites: new Set(), photographers: new Set(), years: new Set(),"
+            " observations: new Set(), media: new Set(), sort: 'alpha', level: 'order'};",
+            source[start:source.index('\n', source.index('const savedSet = ', start)) + 1],
+            "const GALLERY_VIEW_KEY = 'k';",
+            _function_source(source, 'saveGalleryView'),
+            _function_source(source, 'restoreGalleryView'),
+            saved_state,
+            "restoreGalleryView();",
+            "console.log(JSON.stringify({isSet: state.media instanceof Set, media: [...state.media], sort: state.sort}));",
+        ])
+        return json.loads(subprocess.run(['node', '-e', script], capture_output=True, text=True, check=True).stdout)
+
+    def test_saved_and_restored(self):
+        result = self.restore("state.media.add('photo'); saveGalleryView(); state.media = new Set();")
+        self.assertEqual(result, {'isSet': True, 'media': ['photo'], 'sort': 'alpha'})
+
+    def test_view_saved_before_the_filter(self):
+        result = self.restore("store.k = JSON.stringify({state: {sort: 'taxonomic', media: {}, regions: []}});")
+        self.assertEqual(result, {'isSet': True, 'media': [], 'sort': 'taxonomic'})
+
+    def test_history_entries_keep_it(self):
+        source = APP_JS.read_text(encoding='utf-8')
+        self.assertIn("'observations', 'media'];", source)
+        self.assertIn('GALLERY_VIEW_SETS.forEach(k => { state[k] = savedSet(entry.state[k]); });', source)

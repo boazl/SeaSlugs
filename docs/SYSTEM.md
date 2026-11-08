@@ -376,6 +376,7 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
 | `/catalog.js` | `window.SEASLUGS = {species, collections, areas, regions, sites, trips, taxa}`, built from the DB per request (`no-store`). |
 | `/species/<slug>/` | Species-in-area page: hero video or photo, facts, all observations of that SpeciesArea, articles, note, share link. |
 | `/genus/<name>/` | Genus page: description, identification text, identification file (preview of a chosen PDF page in a box; the box opens the PDF at that page; he/en file with fallback), species cards, sources. |
+| `/trip/<code>/` | Dive-trip page (`trip_page.py`, keyed by the permanent `DiveTrip.code`): the trip's collection observation -- video, photo, for managers the local / Google Drive copy and an edit button -- the trip's place, date, description and articles, then one card per species observed on the trip (a species is observed at most once per trip, so no count), each linking to that observation on its species page (`#obs-<pk>`). 404 without a published collection observation that the gallery shows. The gallery's collection card and the trips page's video card open it; listed in the sitemap. |
 | `/family/<name>/`, `/order/<pk>/` | Taxon pages (template `taxon_page.html`). An order's base-row page holds the whole order. Old Nudibranchia group pages `/order/14,16,17` → 301. |
 | `/genus/<name>/identification/[<lang>/]`, `…/<lang>/preview.jpg` | Identification file stream and its page preview |
 | `/articles/`, `/articles/<slug>/`, `/articles/<slug>/<lang>.pdf` and `.jpg` | Article library |
@@ -396,6 +397,9 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
   `level`, `drill`, `order`…`genus`, `collection`, `sort`, `sortChosen`.
 - **Area buttons:** all areas, species from multiple areas, Mediterranean exotic (migrants), and
   per-sea buttons. Sidebar filters: region, site, photographer, year, several observations.
+  Managers, under the alphabetical sort only: photo / video filters (`media`: video with no photo, photo with no
+  video, video with no Google Drive copy -- the page carries the Drive ids as `#drive-videos`).
+- **Collection cards** open the trip page (`/trip/<code>/`); their "View collection" button filters the gallery to the trip.
 - **Sorts:** taxonomic (default), alphabetical, observation year (only under the migrant filter), number
   of observations (only under the multi filter).
 - **Taxonomic drill-down**

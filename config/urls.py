@@ -15,6 +15,7 @@ from observations.video_import import video_import
 
 from observations.folder_import import folder_import
 from observations.news import news, news_slideshow
+from observations.trip_page import trip_page
 from observations.views import site_image, species_page, genus_page, genus_identification, genus_identification_preview, order_page, family_page, divetrip_locations
 from observations.articles import article_list, article_page, article_pdf, article_thumb, species_article, genus_article, family_article, order_article
 from observations.db_replace import db_replace, db_replace_download
@@ -53,6 +54,7 @@ urlpatterns = [
     path('species/<slug:slug>/', species_page, name='species-page'),
     path('species/<slug:slug>/article.pdf', species_article, name='species-article'),
     path('genus/<str:name>/', genus_page, name='genus-page'),
+    path('trip/<str:code>/', trip_page, name='trip-page'),
     path('order/<int:pk>/', order_page, name='order-page'),
     path('family/<str:name>/', family_page, name='family-page'),
     path('genus/<str:name>/article.pdf', genus_article, name='genus-article'),

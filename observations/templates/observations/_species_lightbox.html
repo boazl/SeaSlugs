@@ -1,0 +1,73 @@
+{% load seaslugs_i18n %}    <dialog class="lightbox" id="lightbox" aria-label="{{ "הגדלת התמונה"|t:lang }}"><button type="button" class="close" id="lightbox-close" aria-label="{{ "סגירה"|t:lang }}">✕</button><img id="lightbox-img" alt="{{ page_title }}"><div id="lightbox-video" class="lightbox-video" hidden></div></dialog>
+    <script>
+    (function(){
+        var box = document.getElementById('lightbox'), img = document.getElementById('lightbox-img');
+        if (!box || !box.showModal) return;
+        var frame = document.getElementById('lightbox-video');
+        var open = function(src){ frame.hidden = true; frame.replaceChildren(); img.hidden = false; img.src = src; box.showModal(); };
+        // YouTube video id from a watch / youtu.be / shorts / embed / live URL.
+        var youtubeId = function(url){
+            var m = /(?:youtu\.be\/|[?&]v=|\/(?:shorts|embed|live)\/)([\w-]{11})/.exec(url);
+            return m ? m[1] : null;
+        };
+        var openVideo = function(id){
+            img.hidden = true; img.removeAttribute('src');
+            var f = document.createElement('iframe');
+            f.src = 'https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1&rel=0';
+            f.title = '{{ page_title|escapejs }}';
+            f.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+            f.allowFullscreen = true;
+            f.referrerPolicy = 'strict-origin-when-cross-origin';
+            frame.replaceChildren(f); frame.hidden = false; box.showModal();
+            if (window.youtubeFallback) window.youtubeFallback(f, '', f.title);
+        };
+        document.querySelectorAll('.species-thumb').forEach(function(b){
+            b.addEventListener('click', function(){ open(b.dataset.full); });
+        });
+        // Photo and video links open in the same lightbox on the page; a new tab only when
+        // explicitly asked for (Cmd/Ctrl/Shift-click, middle click, or "open in new tab").
+        document.querySelectorAll('.lightbox-link').forEach(function(a){
+            a.addEventListener('click', function(e){
+                if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                if (a.dataset.video) {
+                    var id = youtubeId(a.href);
+                    if (!id) return;          // not a YouTube link: follow it normally
+                    e.preventDefault(); openVideo(id);
+                } else { e.preventDefault(); open(a.href); }
+            });
+        });
+        // A manager's local (Mac) copy of an observation's video plays in the same lightbox.
+        document.querySelectorAll('.local-video-link').forEach(function(a){
+            a.addEventListener('click', function(e){
+                if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                e.preventDefault();
+                img.hidden = true; img.removeAttribute('src');
+                var v;
+                if (a.dataset.driveVideo) {   // the Google Drive copy (live site): Drive's own player
+                    v = document.createElement('iframe'); v.className = 'drive-video'; v.src = a.href;
+                    v.allow = 'autoplay; fullscreen'; v.allowFullscreen = true;
+                } else {
+                    v = document.createElement('video');
+                    v.src = a.href; v.controls = true; v.autoplay = true; v.playsInline = true;
+                }
+                frame.replaceChildren(v); frame.hidden = false; box.showModal();
+            });
+        });
+        document.getElementById('lightbox-close').addEventListener('click', function(){ box.close(); });
+        box.addEventListener('click', function(e){ if (e.target === box || e.target === img) box.close(); });
+        // Stop the video when the lightbox closes (button, backdrop or Esc).
+        box.addEventListener('close', function(){ frame.replaceChildren(); });
+    })();
+    (function(){
+        var btn = document.getElementById('species-share-copy');
+        var link = document.getElementById('species-share-link');
+        if (!btn || !link) return;
+        btn.addEventListener('click', function(){
+            var reset = function(){ btn.textContent = btn.dataset.copyLabel; };
+            var showCopied = function(){ btn.textContent = btn.dataset.copiedLabel; setTimeout(reset, 1500); };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(link.href).then(showCopied, function(){});
+            }
+        });
+    })();
+    </script>

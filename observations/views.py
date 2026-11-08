@@ -44,13 +44,8 @@ def trips(request):
     for trip in rows:
         # A trip's title is typed in Hebrew only; in English it is shown as its place and
         # date ("Eilat · Coral Beach 8/2026") built from the localized site/region names.
-        if lang == 'en':
-            place = (trip.site.name_en or trip.site.name) if trip.site_id else (
-                (trip.region.name_en or trip.region.name) if trip.region_id else trip.region_name)
-            when = f'{trip.month}/{trip.year}' if trip.year and trip.month else (str(trip.year) if trip.year else '')
-            trip.display_title = ' '.join(x for x in (place, when) if x) or trip.title
-        else:
-            trip.display_title = trip.title
+        from .trip_page import trip_title
+        trip.display_title = trip_title(trip, lang)
         trip.display_description = (trip.description_en or '') if lang == 'en' else (trip.description_he or '')
         trip.article_links = article_links(trip.articles.all(), lang)
         # The free-text reserve/site name is usually typed in Hebrew -- left out in English.

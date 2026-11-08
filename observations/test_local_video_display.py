@@ -86,7 +86,7 @@ class LocalVideoGalleryTests(LocalVideoDisplayBase):
         self.assertIn("document.getElementById('local-videos')", js)
         self.assertIn("const NO_LOCAL = ['missing', 'not_found', 'unreachable'];", js)
         self.assertIn('if (hasVideo && samples.some(lacksLocalVideo)) markNoLocal(mark);', js)
-        self.assertIn('if (lacksLocalVideo(c)) markNoLocal(icon);', js)
+        self.assertIn('wrap.append(img, ...mediaMarks([c]));', js)   # a collection card: mediaMarks marks it red too
         self.assertIn('.play.no-local{color:#ff3b3b', (settings.BASE_DIR / 'dist' / 'styles.css').read_text())
 
 

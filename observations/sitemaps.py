@@ -110,10 +110,28 @@ class OrderPageSitemap(Sitemap):
         return reverse('order-page', args=[pk])
 
 
+class TripPageSitemap(Sitemap):
+    """Each dive trip's page (trip_page.trip_page, keyed by DiveTrip.code) -- the trips with a collection
+    observation the gallery shows, the same rule under which the page answers 200."""
+    protocol = 'https'
+    changefreq = 'weekly'
+    priority = 0.5
+
+    def items(self):
+        from .trip_page import trip_collections
+        from .models import DiveTrip
+        return sorted(trip.code for trip in DiveTrip.objects.filter(samples__kind=Sample.Kind.COLLECTION).distinct()
+                      if trip_collections(trip))
+
+    def location(self, code):
+        return reverse('trip-page', args=[code])
+
+
 SITEMAPS = {
     'static': StaticViewSitemap,
     'species': SpeciesPageSitemap,
     'genera': GenusPageSitemap,
     'families': FamilyPageSitemap,
     'orders': OrderPageSitemap,
+    'trips': TripPageSitemap,
 }

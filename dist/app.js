@@ -768,11 +768,14 @@ function playCollection(c, button) {
 function buildCollectionCard(c, index) {
     const article = document.createElement('article');
     article.className = 'card';
-    const button = document.createElement('button');
-    button.type = 'button';
+    // The card opens the trip's own page (/trip/<code>/: its video and photo, and its species below them); without
+    // a trip code (never, in practice) it plays the video here as before.
+    const button = c.trip_code ? document.createElement('a') : document.createElement('button');
+    if (c.trip_code) button.href = `/trip/${encodeURIComponent(c.trip_code)}/` + (language === 'en' ? '?lang=en' : '');
+    else button.type = 'button';
     button.className = 'video-button';
     const title = collectionName(c);
-    button.setAttribute('aria-label', `${language === 'he' ? 'בחירת אוסף' : 'Select collection'}: ${title}`);
+    button.setAttribute('aria-label', `${language === 'he' ? 'דף המסע' : 'Trip page'}: ${title}`);
     const wrap = document.createElement('span');
     wrap.className = 'image-wrap';
     const img = document.createElement('img');
@@ -781,12 +784,8 @@ function buildCollectionCard(c, index) {
     img.width = 640; img.height = 360;
     img.loading = index < 6 ? 'eager' : 'lazy';
     img.decoding = 'async';
-    const icon = document.createElement('span');
-    icon.className = 'play';
-    icon.textContent = c.video_id ? '▶' : '⤢';
-    icon.setAttribute('aria-hidden', 'true');
-    if (lacksLocalVideo(c)) markNoLocal(icon);
-    wrap.append(img, icon);
+    // the same mark as a species card: ▶ for a video, ⤢ for a photo, both in one circle when it has both
+    wrap.append(img, ...mediaMarks([c]));
     const info = document.createElement('span');
     info.className = 'card-info';
     const h3 = document.createElement('h3');
@@ -810,7 +809,7 @@ function buildCollectionCard(c, index) {
     info.append(credit);
     info.append(meta);
     button.append(wrap, info);
-    button.addEventListener('click', () => playCollection(c, button));
+    if (!c.trip_code) button.addEventListener('click', () => playCollection(c, button));
     // "View collection": straight to the collection's gallery, without opening its video / photo first
     // (a separate button -- a button can't sit inside the card's button; styles.css puts it on the meta line).
     const view = document.createElement('button');
@@ -1336,7 +1335,9 @@ levelSelect.addEventListener('change', e => { setLevel(e.target.value); render()
 // filters, search and place on the page. The view lives in this tab's sessionStorage; a plain visit to "/" is
 // always a fresh gallery.
 const GALLERY_VIEW_KEY = 'seaslugs-gallery-view';
-const GALLERY_VIEW_SETS = ['regions', 'sites', 'photographers', 'years', 'observations'];
+const GALLERY_VIEW_SETS = ['regions', 'sites', 'photographers', 'years', 'observations', 'media'];
+// A saved list back into a Set -- anything else (a view saved before a filter existed, e.g. a Set stored as {}) is empty.
+const savedSet = value => new Set(Array.isArray(value) ? value : []);
 function saveGalleryView() {
     try {
         const saved = { ...state };
@@ -1355,7 +1356,7 @@ function restoreGalleryView() {
     try { saved = JSON.parse(sessionStorage.getItem(GALLERY_VIEW_KEY)); } catch (_) {}
     if (!saved || !saved.state) return null;
     Object.assign(state, saved.state);
-    GALLERY_VIEW_SETS.forEach(k => { state[k] = new Set(saved.state[k] || []); });
+    GALLERY_VIEW_SETS.forEach(k => { state[k] = savedSet(saved.state[k]); });
     search.value = saved.search || '';
     syncSortControl();
     levelSelect.value = state.level;
@@ -1367,7 +1368,7 @@ window.addEventListener('pagehide', () => { saveGalleryView(); keepScrollInHisto
 // A species / genus / family / order page links back to "/?up=<rank>:<key>" (e.g. up=genus:12): the gallery
 // opens in the taxonomic view one rank above that page's taxon -- among its siblings, e.g. the genera of its
 // family -- keeping the visitor's area and filters unless they would hide that taxon.
-const FRESH_VIEW = { ...state, regions: null, sites: null, photographers: null, years: null, observations: null };
+const FRESH_VIEW = { ...state, regions: null, sites: null, photographers: null, years: null, observations: null, media: null };
 let upFocus = null;      // the card to bring into view once the gallery is drawn
 function applyUpParam() {
     const params = new URLSearchParams(window.location.search);
@@ -1605,7 +1606,7 @@ function recordGalleryHistory() {
 }
 function applyGalleryEntry(entry) {
     Object.assign(state, entry.state);
-    GALLERY_VIEW_SETS.forEach(k => { state[k] = new Set(entry.state[k] || []); });
+    GALLERY_VIEW_SETS.forEach(k => { state[k] = savedSet(entry.state[k]); });
     search.value = entry.search || '';
     syncSortControl();
     levelSelect.value = state.level;
