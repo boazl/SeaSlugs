@@ -9,7 +9,7 @@ already-working, already-tested code path while the new per-entity pages are bei
 entity type at a time. Once all entity types have pages, that inline copy should be replaced
 with calls into this module too.
 """
-from .models import Sample, TaxonGenus, TaxonFamily, TaxonOrder, youtube_id
+from .models import Sample, SpeciesArea, TaxonGenus, TaxonFamily, TaxonOrder, youtube_id
 
 
 def area_samples(area):
@@ -20,6 +20,65 @@ def area_samples(area):
         kind=Sample.Kind.SPECIES, species_id=area.species_id, status='published', deleted_at__isnull=True,
         trip__country_id=area.country_id, trip__region__sea_id=area.sea_id, trip__year__isnull=False,
         species_other='', site_other='', undetermined_variant=area.undetermined_variant)
+
+
+UNMARKED_SP_EPITHETS = ('', 'sp', 'sp.', 'spp', 'spp.')
+
+
+def is_unmarked_sp(area):
+    """A bare "Genus sp." with no number or letter (neither in the catalog name, e.g. "sp. 7" / "sp. A", nor as the
+    area's undetermined_variant): an unidentified animal, never treated as the same species as another area's."""
+    return not area.undetermined_variant and (area.species.species or '').strip() in UNMARKED_SP_EPITHETS
+
+
+def same_species_areas(area):
+    """The other SpeciesArea rows of the same species: the same catalog species and the same undetermined-variant
+    letter; none for an unmarked "sp." (is_unmarked_sp). Mirrored by sameSpeciesKey in app.js."""
+    if is_unmarked_sp(area):
+        return SpeciesArea.objects.none()
+    return SpeciesArea.objects.filter(species_id=area.species_id, undetermined_variant=area.undetermined_variant).exclude(pk=area.pk)
+
+
+def same_species_totals():
+    """{(species_id, undetermined_variant): [areas, observations]} over the live gallery cards -- the same numbers
+    app.js counts from catalog.js (speciesAreaTotals): a card counts when its defining sample is showable and it
+    has published observations of its own; an unmarked "sp." is left out (is_unmarked_sp). One query each."""
+    from django.db.models import Count
+    counts = {(r['species_id'], r['trip__country_id'], r['trip__region__sea_id'], r['undetermined_variant']): r['n']
+              for r in Sample.objects.filter(
+                  kind=Sample.Kind.SPECIES, species__isnull=False, status='published', deleted_at__isnull=True,
+                  trip__year__isnull=False, species_other='', site_other='')
+              .values('species_id', 'trip__country_id', 'trip__region__sea_id', 'undetermined_variant')
+              .annotate(n=Count('pk'))}
+    totals = {}
+    for area in SpeciesArea.objects.select_related('species', 'defining_sample'):
+        if is_unmarked_sp(area) or not any(taxon_media(area.defining_sample)[1:]):
+            continue
+        n = counts.get((area.species_id, area.country_id, area.sea_id, area.undetermined_variant), 0)
+        if n:
+            t = totals.setdefault((area.species_id, area.undetermined_variant), [0, 0])
+            t[0] += 1
+            t[1] += n
+    return totals
+
+
+def other_areas_tip(areas, observations, lang):
+    """The yellow count's tooltip -- mirrors otherAreasTip in app.js."""
+    if lang == 'en':
+        return f'This species was observed in {areas} areas, {observations} observations in total'
+    return f'המין נצפה ב-{areas} אזורים, {observations} תצפיות בסך הכול'
+
+
+def annotate_same_species(areas, lang, totals=None):
+    """Sets, on each species card (SpeciesArea), other_areas (the number of areas of the same species, 0 when it is
+    in this area only) and other_areas_tip -- the card's count then turns yellow (_count_badge.html), as in the
+    gallery."""
+    totals = same_species_totals() if totals is None else totals
+    for area in areas:
+        t = None if is_unmarked_sp(area) else totals.get((area.species_id, area.undetermined_variant))
+        area.other_areas = t[0] if t and t[0] > 1 else 0
+        area.other_areas_tip = other_areas_tip(t[0], t[1], lang) if area.other_areas else ''
+    return areas
 
 
 def area_is_live(area):

@@ -209,6 +209,9 @@ def gallery_file(request, filename='index.html'):
                 'title': f'{area.species.scientific_name} {area.undetermined_variant}'.strip(),
                 'name_he': area.species.name_he, 'name_en': area.species.name_en,
                 'epithet': area.species.species,
+                # the area's undetermined_variant letter: with the species it decides which cards are one species
+                # (app.js sameSpeciesKey, gallery_data.same_species_areas)
+                'variant': area.undetermined_variant,
                 'author': (area.species.author or '').strip(),
                 # Species.is_migrant, straight through -- drives the "migrant species" area
                 # filter button in app.js (a species-level flag, not species+area-specific,

@@ -64,6 +64,7 @@ TRANSLATIONS = {
     'הגדלת התמונה': 'Enlarge photo',
     'סגירה': 'Close',
     'תצפיות נוספות': 'More observations',
+    'המין באזורים נוספים': 'This species in other areas',
     'קהילה ותצפיות': 'Community & observations',
     'SeaSlugs — גלריה': 'SeaSlugs — Gallery',
     'ניהול האתר': 'Site admin',

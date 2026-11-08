@@ -18,7 +18,7 @@ from .models import Sample, Profile, Region, Site, DiveTrip, SiteImage, Species,
 from .forms import SiteQuickForm, SpeciesQuickForm, SignupForm, SampleForm, ProfileForm, DiveTripForm, TripQuickForm, GuestPhotographerForm, taxonomy_for_form, species_name_options
 from .notifications import notify_new_user_registered
 from . import seo_text
-from .gallery_data import TaxonResolver, taxon_media, area_samples, annotate_area_cards
+from .gallery_data import TaxonResolver, taxon_media, area_samples, annotate_area_cards, annotate_same_species
 from .i18n import get_lang
 from .templatetags.seaslugs_i18n import loc
 from .species_redirects import historical_species_redirect
@@ -186,6 +186,21 @@ def species_page(request, slug):
         from .local_videos import annotate
         annotate(samples)
     other_samples = [s for s in samples if s is not main_sample]
+    # The same species observed in other areas (gallery_data.same_species_areas -- the gallery's "species from
+    # multiple areas" rule; never for an unmarked "sp."): a card per live area at the foot of the page.
+    from .gallery_data import same_species_areas
+    other_areas = []
+    for other in same_species_areas(area).select_related(
+            'species', 'country', 'sea', 'defining_sample').order_by('sea__name', 'country__name', 'undetermined_variant', 'pk'):
+        if not any(taxon_media(other.defining_sample)[1:]):
+            continue
+        annotate_area_cards(other)   # observation count + photo / video marks, as on the gallery card
+        if other.observation_count:
+            other_areas.append(other)
+    annotate_same_species(other_areas, lang)
+    if other_areas and is_manager(request.user):
+        from .local_videos import annotate_areas
+        annotate_areas(other_areas)
     def pick(he, en):
         # The current language's text, falling back to the other language when it's blank.
         return (en or he) if lang == 'en' else (he or en)
@@ -235,7 +250,7 @@ def species_page(request, slug):
         'can_copy_image': is_manager(request.user),
         'meta_title': meta_title, 'meta_description': meta_description, 'place_label': place,
         'area': area, 'species': species, 'species_label': species_label, 'samples': samples,
-        'main_sample': main_sample, 'other_samples': other_samples,
+        'main_sample': main_sample, 'other_samples': other_samples, 'other_areas': other_areas,
         'info': info, 'size_short': size_short, 'depth_short': depth_short, 'sources': sources,
         'image_url': image_url, 'video_id': video_id, 'thumbnail': thumbnail,
         'taxon_order': order_obj, 'taxon_family': family_obj, 'taxon_genus': genus_obj,
@@ -312,6 +327,7 @@ def genus_page(request, name):
     from .defining import display_sample
     thumbnail, image_url, video_id = taxon_hero_media(display_sample(genus), areas)
     lang = get_lang(request)
+    annotate_same_species(areas, lang)   # yellow count on a species also observed in other areas
     focus = genus_page_focus(request, areas)
 
     def taxon_label(obj):
@@ -475,6 +491,7 @@ def _taxon_page(request, rank, obj, areas, children, parent, parent_url, trail=(
     pick = lambda he, en: (en or he) if lang == 'en' else (he or en)
     from .defining import display_sample
     thumbnail, image_url, video_id = taxon_hero_media(display_sample(obj), areas)
+    annotate_same_species(areas, lang)   # yellow count on a species also observed in other areas
     if is_manager(request.user):
         from .local_videos import annotate_areas
         annotate_areas(areas)   # the manager's red ▶ on a card whose video has no local copy

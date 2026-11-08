@@ -145,8 +145,8 @@ gtag('config', 'G-CPGTC09P2P');</script>
         </section>
         {% endif %}
         <section class="species-section" id="species">
-{# A genus card clicked in a filtered gallery view (a trip, region, photographer...) brings that filter here
-   (views.genus_page_focus): its species first, the genus's other species after them as small cards. #}
+{% comment %}A genus card clicked in a filtered gallery view (a trip, region, photographer...) brings that filter here
+   (views.genus_page_focus): its species first, the genus's other species after them as small cards.{% endcomment %}
             <h2>{{ "מינים בסוג זה"|t:lang }}{% if filtered %} — {% if filter_trip %}{{ "במסע"|t:lang }} {{ filter_trip.title }}{% else %}{{ "לפי הסינון בגלריה"|t:lang }}{% endif %}{% endif %} <span class="group-count">({{ areas|species_of }})</span></h2>
             {% if filtered %}<p class="filter-note"><a href="{{ request.path|with_lang:lang }}#species">{{ "הצגת כל המינים בסוג"|t:lang }}</a></p>{% endif %}
             <div class="grid">

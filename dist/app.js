@@ -38,11 +38,29 @@ const siteLabelsData = catalog.sites || {};
 const tripLabelsData = catalog.trips || {};
 const taxaData = catalog.taxa || { orders: {}, families: {}, genera: {} };
 
-// How many area-rows (SpeciesArea rows -- one catalog species entry per area a species
-// was observed in) each species_id has, computed once up front -- backs the "species from
-// multiple areas" pseudo-area button in the area filter (see matchesAreaFilter below).
-const speciesAreaCountById = new Map();
-for (const sp of speciesList) speciesAreaCountById.set(sp.species_id, (speciesAreaCountById.get(sp.species_id) || 0) + 1);
+// Which cards are one species seen in several areas: the same catalog species and the same undetermined-variant
+// letter. A bare "Genus sp." with no number or letter is an unidentified animal and never matches another card
+// (null key). Mirrors gallery_data.same_species_areas. Per key: the number of areas (cards) and of observations --
+// backs the "species from multiple areas" button (matchesAreaFilter) and the yellow count on the cards.
+const UNMARKED_SP_EPITHETS = ['', 'sp', 'sp.', 'spp', 'spp.'];
+function sameSpeciesKey(sp) {
+    if (!sp.variant && UNMARKED_SP_EPITHETS.includes((sp.epithet || '').trim())) return null;
+    return `${sp.species_id}|${sp.variant || ''}`;
+}
+const speciesAreaTotals = new Map();
+for (const sp of speciesList) {
+    const key = sameSpeciesKey(sp);
+    if (key === null) continue;
+    const t = speciesAreaTotals.get(key) || { areas: 0, observations: 0 };
+    t.areas += 1;
+    t.observations += sp.samples.length;
+    speciesAreaTotals.set(key, t);
+}
+// The species' totals over all its areas when it has cards from more than one area, else null.
+function otherAreasTotals(sp) {
+    const t = speciesAreaTotals.get(sameSpeciesKey(sp));
+    return t && t.areas > 1 ? t : null;
+}
 
 let language = 'he';
 
@@ -170,9 +188,13 @@ function updateCollectionStatus() {
 // area -- more than one SpeciesArea row) and 'migrant' (Species.is_migrant). Every place
 // that used to compare sp.area === area goes through this instead, so those two behave
 // exactly like picking a real area everywhere else in the sidebar/grid.
+// The same species also has a card from another area -- the card's count turns yellow.
+function alsoInOtherAreas(sp) {
+    return !!otherAreasTotals(sp);
+}
 function matchesAreaFilter(sp, area) {
     if (area === 'all') return true;
-    if (area === 'multi-area') return speciesAreaCountById.get(sp.species_id) > 1;
+    if (area === 'multi-area') return alsoInOtherAreas(sp);
     if (area === 'migrant') return !!sp.is_migrant;
     return sp.area === area;
 }
@@ -840,6 +862,12 @@ function setLatinName(el, text) {
     flush();
 }
 
+function otherAreasTip(t) {
+    return language === 'he'
+        ? `המין נצפה ב-${t.areas} אזורים, ${t.observations} תצפיות בסך הכול`
+        : `This species was observed in ${t.areas} areas, ${t.observations} observations in total`;
+}
+
 function buildSpeciesCard(sp, index) {
     const article = document.createElement('article');
     article.className = 'card';
@@ -867,11 +895,18 @@ function buildSpeciesCard(sp, index) {
     img.decoding = 'async';
     wrap.append(img, ...mediaMarks(pickSamples || sp.samples));
     const displayCount = pickSamples ? pickSamples.length : sp.samples.length;
-    if (displayCount > 1) {
+    // The card's observation count, in every sort: shown above 1, and also at 1 when the same species has cards
+    // from other areas -- then the number is yellow and its tooltip gives the species' areas and total observations.
+    const otherAreas = otherAreasTotals(sp);
+    if (displayCount > 1 || otherAreas) {
         const badge = document.createElement('span');
         badge.className = 'count-badge';
         badge.textContent = displayCount;
         badge.setAttribute('aria-hidden', 'true');
+        if (otherAreas) {
+            badge.classList.add('other-areas');
+            badge.title = otherAreasTip(otherAreas);
+        }
         wrap.append(badge);
     }
     const info = document.createElement('span');

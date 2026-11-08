@@ -164,6 +164,15 @@ gtag('config', 'G-CPGTC09P2P');</script>
             </div>
         </section>
         {% endif %}
+
+        {% if other_areas %}
+        <section class="species-section species-other-areas" id="other-areas">
+            <h2>{{ "המין באזורים נוספים"|t:lang }} ({{ other_areas|length }})</h2>
+            <div class="grid">
+                {% for area in other_areas %}{% include 'observations/_genus_species_card.html' %}{% endfor %}
+            </div>
+        </section>
+        {% endif %}
     </main>
     {% if can_copy_image %}{% include 'observations/_copy_url.html' %}{% endif %}
 {% include 'observations/_species_lightbox.html' with page_title=species_label %}

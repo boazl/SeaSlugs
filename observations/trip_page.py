@@ -40,7 +40,7 @@ def trip_species_areas(trip):
     """The gallery cards (SpeciesArea) of the species observed on the trip, alphabetically. A species is observed at
     most once per trip (Sample.clean: a trip is one sampling -- more dives in the same place are a new trip), so each
     card carries that one observation (card_sample: the card's photo, and the anchor of its link on the species
-    page) and shows no observation count."""
+    page) and shows no observation count, except the yellow "1" of a species also observed in other areas."""
     samples = list(Sample.objects.filter(
         trip=trip, kind=Sample.Kind.SPECIES, species__isnull=False, status='published', deleted_at__isnull=True,
         species_other='', site_other='').order_by('created_at', 'pk'))
@@ -77,6 +77,8 @@ def trip_page(request, code):
         from .local_videos import annotate
         annotate([main])
     areas = trip_species_areas(trip)
+    from .gallery_data import annotate_same_species
+    annotate_same_species(areas, lang)   # a species also observed in other areas: a yellow count (1) with its totals
     if manager and areas:
         from .local_videos import annotate_areas
         annotate_areas(areas)
