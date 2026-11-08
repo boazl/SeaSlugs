@@ -47,13 +47,16 @@ def gallery_file(request, filename='index.html'):
         template = engines['django'].from_string((settings.BASE_DIR / 'dist' / filename).read_text())
         # A manager's gallery marks videos with no local (Mac) copy in red (observations/local_videos.py, app.js).
         from observations.views import is_manager
-        local_videos = None
+        local_videos = drive_videos = None
         if is_manager(request.user):
-            from observations.local_videos import gallery_statuses
+            from observations.local_videos import gallery_statuses, gallery_drive_ids
             local_videos = gallery_statuses()
+            # and filters (alphabetical sort only) by photo / video / Google Drive copy (app.js mediaMatches)
+            drive_videos = gallery_drive_ids()
         response = HttpResponse(template.render({
             'has_site_image': has_site_image, 'lang': lang, 'home': HOME_TEXT[lang], 'home_text': HOME_TEXT,
             'sections': sections, 'sections_both': sections_both, 'local_videos': local_videos,
+            'drive_videos': drive_videos,
             # A manager gets a button that copies a link to the gallery view on screen (app.js #copyLink).
             'is_manager': is_manager(request.user),
         }, request))

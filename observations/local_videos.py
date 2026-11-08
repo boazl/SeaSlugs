@@ -222,6 +222,14 @@ def gallery_statuses():
     return {str(pk): status for pk, status in statuses(samples).items()}
 
 
+def gallery_drive_ids():
+    """The gallery's manager data: the ids of the live observations whose YouTube video also has a copy in the shared
+    Google Drive folder (drive_video_id) -- backs the manager's "video with no Google Drive copy" filter (app.js)."""
+    from .models import Sample
+    return sorted(Sample.objects.filter(deleted_at__isnull=True).exclude(video_url='').exclude(drive_video_id='')
+                  .values_list('pk', flat=True))
+
+
 def annotate(samples):
     """Set .local_video_url (a playable local copy) and .local_video_missing (a video without one) on each sample."""
     found = statuses(samples)

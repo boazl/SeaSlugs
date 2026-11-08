@@ -15,6 +15,22 @@ function markNoLocal(mark) {
     mark.classList.add('no-local');
     mark.title = language === 'en' ? 'No local (offline) copy of the video' : 'אין גרסה מקומית (offline) לסרטון';
 }
+// A manager's page also carries the ids of the observations whose video has a copy in Google Drive
+// (local_videos.gallery_drive_ids); it backs the manager's photo / video filters below. null on visitors' pages.
+const driveVideoIds = (() => {
+    const node = document.getElementById('drive-videos');
+    try { return node ? new Set(JSON.parse(node.textContent).map(String)) : null; } catch (e) { return null; }
+})();
+// The manager's photo / video filters (alphabetical sort only; one at a time): 'video' = a video with no photo,
+// 'photo' = a photo with no video, 'nodrive' = a video with no copy in Google Drive. An item is a catalog sample or
+// a dive-trip collection (both carry sample_id, video_id and image_url).
+const MEDIA_FILTERS = ['video', 'photo', 'nodrive'];
+function mediaMatches(item, kind) {
+    if (kind === 'video') return !!item.video_id && !item.image_url;
+    if (kind === 'photo') return !!item.image_url && !item.video_id;
+    if (kind === 'nodrive') return !!item.video_id && !(driveVideoIds && driveVideoIds.has(String(item.sample_id)));
+    return true;
+}
 const collectionsList = catalog.collections || [];
 const areaLabelsData = catalog.areas || {};
 const regionLabelsData = catalog.regions || {};
@@ -57,12 +73,15 @@ const state = {
     // True when the dive-trip collection cards are hidden (sidebar "Dive trip collections" unticked; ?trips=hide),
     // so a non-taxonomic view shows only the species observations.
     hideTrips: false,
+    // The manager's photo / video filter (MEDIA_FILTERS; at most one value), in effect under the alphabetical sort only.
+    media: new Set(),
     sort: 'taxonomic',
     // True once the visitor picks a sort by hand; until then the sort follows the area
     // (the migrant-species view defaults to observation year, every other view to taxonomic).
     sortChosen: false,
 };
 const multiObsOn = () => state.observations.has('multi');
+const activeMedia = () => (driveVideoIds && state.sort === 'alpha' && [...state.media][0]) || null;
 // The sort a view falls back to until the visitor picks one by hand: by number of
 // observations under the several-observations filter, by year under the migrant
 // filter, taxonomic otherwise.
@@ -448,6 +467,21 @@ function renderSidebar() {
     renderCheckboxGroup(document.querySelector('#tripCardOptions'),
         [['shown', language === 'he' ? 'אוספי מסעות צלילה' : 'Dive trip collections', tripCardCount]],
         tripCardsShown, () => { state.hideTrips = !tripCardsShown.has('shown'); render(); });
+    const mediaBox = document.querySelector('#mediaOptions');
+    if (mediaBox && driveVideoIds) {
+        const he = language === 'he';
+        const labels = { video: he ? 'סרטון בלבד (ללא תמונה)' : 'Video only (no photo)',
+                         photo: he ? 'תמונה בלבד (ללא סרטון)' : 'Photo only (no video)',
+                         nodrive: he ? 'סרטון ללא עותק ב-Google Drive' : 'Video with no Google Drive copy' };
+        // the count: the cards (species and dive-trip collections) the filter would leave in this area
+        const mediaCount = kind => speciesList.filter(sp => matchesAreaFilter(sp, area) && sp.samples.some(sm => mediaMatches(sm, kind))).length
+            + collectionsList.filter(c => collectionMatchesArea(c, area) && mediaMatches(c, kind)).length;
+        renderCheckboxGroup(mediaBox, MEDIA_FILTERS.map(kind => [kind, labels[kind], mediaCount(kind)]), state.media, () => {
+            // one at a time: the box just ticked (the Set's newest value) replaces the previous one
+            if (state.media.size > 1) state.media = new Set([[...state.media].pop()]);
+            renderSidebar(); render();
+        });
+    }
     const siteEntries = [...opts.siteIds]
         .map(id => { const t = siteCount(area, id); return [id, labelFor(id, siteLabelsData), t.compact, t.title]; })
         .sort((a, b) => a[1].localeCompare(b[1], language === 'he' ? 'he' : 'en'));
@@ -550,6 +584,8 @@ function speciesMatches(sp, q) {
     if (state.genus !== 'all' && sp.genus !== state.genus) return false;
     if ((state.regions.size || state.sites.size || state.photographers.size || state.years.size) && !sp.samples.some(sampleMatchesFilters)) return false;
     if (multiObsOn() && observationCount(sp) < 2) return false;
+    const media = activeMedia();
+    if (media && !(scopedSamples(sp) || sp.samples).some(sm => mediaMatches(sm, media))) return false;
     if (q && !(searchByName ? speciesNameMatches(sp, q) : speciesSearchText(sp).includes(q))) return false;
     return true;
 }
@@ -573,6 +609,7 @@ function observationCount(sp) {
 function collectionMatches(c, q) {
     if (state.collection) return false;
     if (multiObsOn()) return false;
+    if (activeMedia() && !mediaMatches(c, activeMedia())) return false;
     if (!collectionMatchesArea(c, state.area)) return false;
     if (state.regions.size && !state.regions.has(c.region)) return false;
     if (state.sites.size) return false;
@@ -1380,7 +1417,7 @@ function focusUpCard() {
 //   trips=hide      the dive-trip collection cards hidden (only the species observations)
 // Other parameters (lang, restore, up) are left alone.
 const AREA_PSEUDO_CODES = { 'multi-area': 'multi', migrant: 'migrant' };
-const GALLERY_URL_KEYS = ['area', 'sort', 'level', 'in', 'others', 'region', 'site', 'photographer', 'year', 'obs', 'trip', 'trips', 'q'];
+const GALLERY_URL_KEYS = ['area', 'sort', 'level', 'in', 'others', 'region', 'site', 'photographer', 'year', 'obs', 'trip', 'trips', 'media', 'q'];
 const GALLERY_URL_SETS = [['region', 'regions'], ['site', 'sites'], ['photographer', 'photographers'], ['year', 'years']];
 const GALLERY_SORTS = ['taxonomic', 'alpha', 'year', 'count'];
 function areaCode(key) {
@@ -1410,6 +1447,7 @@ function galleryQuery() {
     if (multiObsOn()) params.set('obs', 'multi');
     if (state.collection) params.set('trip', state.collection);
     if (state.hideTrips) params.set('trips', 'hide');
+    if (activeMedia()) params.set('media', activeMedia());
     const q = search.value.trim();
     if (q) params.set('q', q);
     return params;
@@ -1432,6 +1470,7 @@ function applyGalleryQuery(params) {
     const trip = params.get('trip');
     state.collection = trip && tripLabelsData[trip] ? trip : null;
     state.hideTrips = params.get('trips') === 'hide';
+    state.media = new Set(MEDIA_FILTERS.includes(params.get('media')) ? [params.get('media')] : []);
     search.value = params.get('q') || '';
     const sort = params.get('sort');
     if (GALLERY_SORTS.includes(sort)) { state.sort = sort; state.sortChosen = true; }
@@ -1598,6 +1637,9 @@ function render() {
     levelControl.hidden = !taxonomic;
     // the taxonomic view has no collection cards, so their checkbox has nothing to do there
     document.querySelector('#tripCardOptions').hidden = taxonomic;
+    // the manager's photo / video filter belongs to the alphabetical sort
+    const mediaGroup = document.querySelector('#mediaGroup');
+    if (mediaGroup) mediaGroup.hidden = state.sort !== 'alpha';
     const filteredCollections = taxonomic || state.hideTrips ? [] : collectionsList.filter(c => collectionMatches(c, q)).sort(collectionCompare);
     let filteredSpecies = speciesList.filter(sp => speciesMatches(sp, q));
     if (state.sort === 'alpha') filteredSpecies = [...filteredSpecies].sort(speciesSortCompare);
@@ -1669,6 +1711,7 @@ function updateFilterToggleCount() {
     // toggle/badge refers to, so counting it here would over-count what's actually hidden.
     let n = state.regions.size + state.sites.size + state.photographers.size + state.years.size + state.observations.size;
     if (state.hideTrips) n++;
+    if (activeMedia()) n++;
     if (state.order !== 'all') n++;
     if (state.subOrder !== 'all') n++;
     if (state.superfamily !== 'all') n++;
@@ -1839,7 +1882,7 @@ document.querySelector('#reset').addEventListener('click', () => {
     search.value = '';
     state.area = 'all'; state.regions.clear(); state.sites.clear(); state.photographers.clear(); state.years.clear(); state.observations.clear();
     state.order = 'all'; state.subOrder = 'all'; state.superfamily = 'all'; state.family = 'all'; state.genus = 'all'; state.collection = null;
-    state.hideTrips = false;
+    state.hideTrips = false; state.media.clear();
     state.sort = 'taxonomic'; state.sortChosen = false; syncSortControl();
     state.drill = null; setLevel('order');
     renderSidebar(); render(); search.focus();
@@ -1887,6 +1930,7 @@ const translations = [
     ['#areaGroupTitle', 'Area'],
     ['#regionGroupTitle', 'Dive region'],
     ['#observationGroupTitle', 'Observations'],
+    ['#mediaGroupTitle', 'Photo and video (manager)'],
     ['#siteGroupTitle', 'Dive site'],
     ['#tripGroupTitle', 'Dive trip'],
     ['#photographerGroupTitle', 'Photographer'],
@@ -1896,7 +1940,7 @@ const translations = [
     ['#superfamilyGroupTitle', 'Superfamily'],
     ['#familyGroupTitle', 'Family'],
     ['#genusGroupTitle', 'Genus'],
-].map(([selector, en]) => {
+].filter(([selector]) => document.querySelector(selector)).map(([selector, en]) => {
     const element = document.querySelector(selector);
     return { element, he: element.cloneNode(true), en };
 });

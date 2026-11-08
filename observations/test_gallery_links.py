@@ -126,7 +126,8 @@ class GalleryQueryTests(SimpleTestCase):
             "const nextLevel = () => 'family';",
             "const search = {value: ''};",
             'const state = {area: "all", regions: new Set(), sites: new Set(), photographers: new Set(), years: new Set(),'
-            ' observations: new Set(), level: "order", drill: null, collection: null, hideTrips: false, sort: "taxonomic", sortChosen: false};',
+            ' observations: new Set(), level: "order", drill: null, collection: null, hideTrips: false, media: new Set(), sort: "taxonomic", sortChosen: false};',
+            'const driveVideoIds = new Set();   // a manager\'s page',
             'const multiObsOn = () => state.observations.has("multi");',
             'function setLevel(level) { state.level = LEVELS.includes(level) ? level : "order"; }',
             'function defaultSort() { return multiObsOn() ? "count" : state.area === "migrant" ? "year" : "taxonomic"; }',
@@ -136,6 +137,8 @@ class GalleryQueryTests(SimpleTestCase):
             _const_line(source, 'GALLERY_URL_KEYS'),
             _const_line(source, 'GALLERY_URL_SETS'),
             _const_line(source, 'GALLERY_SORTS'),
+            _const_line(source, 'MEDIA_FILTERS'),
+            _const_line(source, 'activeMedia'),
             _function_source(source, 'areaCode'),
             _function_source(source, 'areaFromCode'),
             _function_source(source, 'galleryQuery'),
