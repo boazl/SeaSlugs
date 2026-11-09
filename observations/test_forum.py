@@ -73,16 +73,27 @@ class ForumPageTests(ForumSetup):
         self.assertIn('על המין', html)
         self.assertNotIn('על המסע', html)
 
-    def test_grouped_by_observation_latest_first(self):
-        first = self.message(text='ראשונה')
+    def test_landing_lists_discussed_observations_newest_first(self):
+        self.message(text='ראשונה')
         self.message(sample=self.collection, text='על המסע')
-        self.message(text='אחרונה')
+        last = self.message(text='אחרונה')
         html = self.page()
-        self.assertLess(html.index('מסע אילת</a>'), html.index('על המסע'))
-        self.assertLess(html.index('ראשונה'), html.index('אחרונה'))
-        # the species observation's discussion is the most recently active: shown first
-        self.assertLess(html.index('ראשונה'), html.index('על המסע'))
-        self.assertIn(f'id="m-{first.pk}"', html)
+        listing = html.split('class="discussion-list"')[1].split('</ol>')[0]
+        rows = listing.split('<li>')[1:]
+        self.assertEqual(len(rows), 2)
+        # the species observation's discussion is the most recently active: first, with its count and latest message
+        self.assertIn(f'href="/forum/?obs={self.sample.pk}"', rows[0])
+        self.assertIn('אחרונה', rows[0])
+        self.assertNotIn('ראשונה', rows[0])
+        self.assertIn('>2</span>', rows[0])
+        self.assertIn(f'href="/forum/?obs={self.collection.pk}"', rows[1])
+        self.assertIn('על המסע', rows[1])
+        self.assertNotIn(f'id="m-{last.pk}"', html)          # the messages themselves open with the discussion
+
+    def test_observation_without_discussion_not_listed(self):
+        self.message()
+        listing = self.page().split('class="discussion-list"')[1].split('</ol>')[0]
+        self.assertNotIn(f'?obs={self.collection.pk}"', listing)
 
     def test_one_discussion(self):
         self.message(text='ראשונה')

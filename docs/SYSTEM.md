@@ -551,8 +551,9 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
   with a discussion first (with their message count), then the others, alphabetically. With `?obs=<pk>`: the
   observation (photo, name, place, date, discussion manager, a link to its page -- the species/taxon page, the
   dive-trip page of a collection, the planning section for a planned trip), its whole discussion oldest first, and the
-  writing box (`#write`). Without one: the matching observations' discussions grouped by observation, the most
-  recently active first, 20 a page. In the main menu as "פורום" and in the sitemap.
+  writing box (`#write`). Without one (the landing page): the matching observations that have a discussion, one
+  row each -- photo, name, place, date, discussion manager, the latest message's time, writer and opening words, the
+  message count -- the most recently active first, 30 a page; a row opens its discussion. In the main menu as "פורום" and in the sitemap.
 - **A closed dive-trip planning** (its date has passed): gone from the forum for everyone but its owner and the site
   managers, and nobody can write in it ("הדיון נסגר").
 - **Discussion manager** = the observation's owner (photographer).

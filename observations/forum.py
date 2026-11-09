@@ -8,8 +8,10 @@ site's observations.
   region, the year and, by kind, the taxon (TAXON_FACETS: genus and species for species observations, the genus /
   family / order of a taxon observation). Each list offers the values found among the observations that match the
   other filters. With an observation chosen (`?obs=<pk>`) the page shows that observation, its whole discussion (oldest
-  first) and the writing box (`#write`); without one it shows the discussions of the matching observations grouped by
-  observation, the most recently active first (GROUPS_PER_PAGE a page).
+  first) and the writing box (`#write`); without one -- the page a visitor lands on -- it lists the matching
+  observations that have a discussion, one row each (photo, name, place and date, number of messages, the latest
+  message's time, writer and opening words), the most recently active first (DISCUSSIONS_PER_PAGE a page); clicking
+  a row opens its discussion.
 - **Dive-trip planning** (planned_trips.py): its discussion is open until the trip's last day; then it is closed --
   gone from the forum (its owner and the site managers still reach it by its address) and nobody can write in it.
 - **The discussion's manager** is the observation's owner (its photographer).
@@ -42,7 +44,8 @@ from .i18n import get_lang
 from .models import ForumMessage, Sample, full_name_for
 from .templatetags.seaslugs_i18n import loc, with_lang
 
-GROUPS_PER_PAGE = 20
+DISCUSSIONS_PER_PAGE = 30
+SNIPPET_CHARS = 140
 MAX_TEXT = 5000
 # The kind filter: key -> (observation kinds, Hebrew label). A new kind of observation (e.g. planned dive trips) is
 # added here.
@@ -310,17 +313,25 @@ def forum(request):
         if filters['active']:
             rows = rows.filter(observation_id__in=[s.pk for s in filters['matched']])
         latest = list(rows.values('observation').annotate(last=Max('created_at'), n=Count('id')).order_by('-last'))
-        page = Paginator(latest, GROUPS_PER_PAGE).get_page(request.GET.get('page'))
+        page = Paginator(latest, DISCUSSIONS_PER_PAGE).get_page(request.GET.get('page'))
         ids = [row['observation'] for row in page.object_list]
         samples = Sample.objects.select_related(*OBSERVATION_RELATED).in_bulk(ids)
         page_urls = observation_page_urls(list(samples.values()), lang)
-        grouped = {pk: [] for pk in ids}
-        for m in _annotate(list(rows.filter(observation_id__in=ids).order_by('created_at', 'pk')), user, lang):
-            grouped[m.observation_id].append(m)
+        last = {}   # the latest message this visitor can read, per observation
+        for m in rows.filter(observation_id__in=ids).order_by('-created_at', '-pk'):
+            last.setdefault(m.observation_id, m)
+        discussions = []
+        for row in page.object_list:
+            s = _annotate_observation(samples[row['observation']], lang, page_urls, row['n'])
+            m = last[row['observation']]
+            s.last_message = m
+            s.last_time = timezone.localtime(m.created_at)
+            s.last_author = _display_name(m.user, lang)
+            text = ' '.join(m.text.split())
+            s.last_snippet = m.subject or (text[:SNIPPET_CHARS] + '…' if len(text) > SNIPPET_CHARS else text)
+            discussions.append(s)
         context.update({
-            'page': page, 'total_discussions': page.paginator.count,
-            'groups': [(_annotate_observation(samples[row['observation']], lang, page_urls, row['n']),
-                        grouped[row['observation']]) for row in page.object_list],
+            'page': page, 'total_discussions': page.paginator.count, 'discussions': discussions,
             'page_query': f'{query}&' if query else '',
         })
     return render(request, 'observations/forum.html', context)
