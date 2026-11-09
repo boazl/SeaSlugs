@@ -59,7 +59,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
                         <option value="family">משפחה</option>
                         <option value="genus">סוג</option>
                         <option value="species">מין</option>
-                    </select></label>{% if is_manager %}<button type="button" id="copyLink" class="copy-link" aria-live="polite">העתקת קישור לתצוגה</button>{% endif %}
+                    </select></label>{% if is_manager %}<button type="button" id="copyLink" class="copy-link" aria-live="polite">העתקת קישור לתצוגה</button>{% endif %}<a class="forum-link" data-forum-link data-he="הוספת תגובה" data-en="Add a comment" href="{% url 'forum-new' %}{% if lang == 'en' %}?lang=en{% endif %}">{% if lang == 'en' %}Add a comment{% else %}הוספת תגובה{% endif %}</a>
             </div>
             <div class="area-filter-bar">
                 <h4 id="areaGroupTitle">אזור</h4>

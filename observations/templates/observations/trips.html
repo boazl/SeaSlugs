@@ -5,9 +5,14 @@
 .trip-arrow{display:block;font-size:14px;line-height:1;transition:transform .15s}html[dir=rtl] .trip-arrow{transform:scaleX(-1)}html .trip-row.open .trip-arrow{transform:rotate(90deg)}
 .trip-detail>td{padding:4px 12px 22px;background:#0b222d}.trip-detail p{margin:6px 0}.trip-detail h3{font-size:16px;margin:14px 0 0}.trip-name a{color:inherit;text-decoration:none}.card-species{margin:10px 0 0;font-size:15px}
 @media (prefers-reduced-motion:reduce){.trip-arrow{transition:none}}
+.plannings{margin:0 0 34px}.planning-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}.planning h3{margin:0 0 6px;font-size:19px}.planning-meta{display:flex;flex-wrap:wrap;gap:4px 14px;color:#b8ccd0;font-size:15px;margin:0}.planning-links{display:flex;flex-wrap:wrap;gap:6px 16px;margin:10px 0 0}.plan-new{display:inline-block;margin-inline-start:10px;padding:6px 14px;text-decoration:none}.planning-empty{color:#b8ccd0}
 </style>
 <h1>{{ "מסעות צלילה"|t:lang }}</h1>
 <p>{{ "סרטוני אוסף ממסעות צלילה, לצד הדגימות המשויכות לכל מסע."|t:lang }}</p>
+<section class="plannings" id="planning" aria-labelledby="planning-title"><h2 id="planning-title">{{ "תכנון מסעות צלילה"|t:lang }}</h2>
+<p>{{ "מסעות צלילה מתוכננים: מצטרפים, שואלים ומתאמים בפורום. אחרי המסע הוא הופך למסע צלילה רגיל עם הסרטונים והתמונות."|t:lang }} <a class="button plan-new" href="{{ plan_new_url|with_lang:lang }}">{{ "תכנון מסע חדש"|t:lang }}</a></p>
+{% if plannings %}<div class="planning-list">{% for s in plannings %}<article class="planning" id="planned-{{ s.pk }}"><h3>{{ s.display_title }}</h3><p class="planning-meta">{% if s.date_text %}<span>{{ s.date_text }}</span>{% endif %}{% if s.display_place %}<span>{{ s.display_place }}</span>{% endif %}<span>{{ "מארגן/ת:"|t:lang }} {{ s.organizer }}</span></p>{% if s.note %}<p>{{ s.note|linebreaksbr }}</p>{% endif %}<p class="planning-links"><a href="{{ s.forum_url }}">{{ "לדיון בפורום"|t:lang }}{% if s.forum_count %} ({{ s.forum_count }}){% endif %}</a><a href="{{ s.forum_new_url }}">{{ "הוספת תגובה"|t:lang }}</a>{% if s.edit_url %}<a href="{{ s.edit_url }}">{{ "עריכה"|t:lang }}</a>{% endif %}</p></article>{% endfor %}</div>{% else %}<p class="planning-empty">{{ "אין כרגע מסעות מתוכננים."|t:lang }}</p>{% endif %}
+</section>
 {% include 'observations/_trip_filters.html' %}
 {% if trips_with_video %}
 <h2>{{ "סרטוני המסעות"|t:lang }}</h2>

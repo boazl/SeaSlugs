@@ -744,3 +744,24 @@ class ActivityEventAdmin(admin.ModelAdmin):
     list_select_related = ('user', 'country', 'sea')
     def has_add_permission(self, request): return False
     def has_change_permission(self, request, obj=None): return False
+
+
+# --- the observations forum (/forum/, forum.py) ----------------------------------------------------------------------
+from .models import ForumMessage  # noqa: E402
+
+
+@admin.register(ForumMessage)
+class ForumMessageAdmin(admin.ModelAdmin):
+    """The forum's messages. Messages are written in the forum and never edited (the table transfer relies on that), so
+    only the deletion mark can be changed here: setting deleted_at hides a message, as the forum's own delete button
+    does. The admin's delete removes the row for good (in this environment only)."""
+    list_display = ('created_at', 'user', 'observation', 'subject', 'manager_only', 'deleted_at')
+    list_filter = ('manager_only', ('deleted_at', admin.EmptyFieldListFilter))
+    search_fields = ('subject', 'text', 'user__username', 'user__first_name', 'user__last_name')
+    date_hierarchy = 'created_at'
+    list_select_related = ('user', 'observation', 'observation__species')
+    raw_id_fields = ('deleted_by',)
+    readonly_fields = ('transfer_id', 'observation', 'user', 'created_at', 'manager_only', 'subject', 'text')
+    def has_add_permission(self, request): return False
+    def view_on_site(self, obj):
+        return reverse('forum') + f'?obs={obj.observation_id}#m-{obj.pk}'

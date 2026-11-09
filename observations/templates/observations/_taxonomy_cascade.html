@@ -28,7 +28,7 @@ html[data-theme="light"] body.change-form #id_full_name{color:#0b5fa5;-webkit-te
   const familyKnown=name=>tax.families.some(f=>f[0]===name);
   const fillList=(id,values)=>{const dl=document.getElementById(id);dl.replaceChildren(...values.map(v=>{const o=document.createElement('option');o.value=v;return o;}));};
   const uniq=a=>[...new Set(a)].sort();
-  const LEVEL={collection:0,order:1,family:2,genus:3,species:4};
+  const LEVEL={collection:0,planned:0,order:1,family:2,genus:3,species:4};
   function kind(){return kindEl.value||'species';}
   function toggle(el,on){if(!el)return;el.disabled=!on;const p=el.closest('p, .form-row');if(p)p.style.opacity=on?'':'0.45';}
   function applyKind(){
@@ -38,6 +38,10 @@ html[data-theme="light"] body.change-form #id_full_name{color:#0b5fa5;-webkit-te
     // An order/family/genus observation has no dive trip (nor the dive site and day that hang on it).
     const onDive=!(level>=1&&level<=3);
     ['trip','site','site_other','day'].forEach(n=>toggle($(n),onDive));
+    // A dive-trip planning has no media (and no observation day or depth): it becomes a regular dive trip later.
+    // Hidden rather than disabled, so the image picker's own enable/disable rules stay untouched.
+    const planned=kind()==='planned';
+    ['video_url','image','existing_image','day','depth'].forEach(n=>{const el=$(n),p=el&&el.closest('p, .form-row');if(p)p.style.display=planned?'none':'';});
   }
   function refreshLists(){
     const order=orderEl.value.trim(),family=familyEl.value.trim(),genus=genusEl.value.trim();
@@ -84,7 +88,7 @@ html[data-theme="light"] body.change-form #id_full_name{color:#0b5fa5;-webkit-te
     if(!fullEl)return;
     const k=kind(),life=lifeEl&&!lifeEl.disabled?lifeEl.value:'';
     let parts=[];
-    if(k==='collection')parts=[];
+    if(k==='collection'||k==='planned')parts=[];
     else if(k==='order')parts=[orderEl.value.trim(),life];
     else if(k==='family')parts=[familyEl.value.trim(),life];
     else if(k==='genus')parts=[genusEl.value.trim(),life];

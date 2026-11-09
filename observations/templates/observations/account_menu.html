@@ -5,6 +5,7 @@
 <a class="nav-item" href="{% url 'dive-trips' as menu_url %}{{ menu_url|with_lang:lang }}">{% nav_icon 'trips' %}{% nav_label 'מסעות צלילה' lang %}</a>
 <a class="nav-item" href="{% url 'article-list' as menu_url %}{{ menu_url|with_lang:lang }}">{% nav_icon 'articles' %}{% nav_label 'מאמרים' lang %}</a>
 <a class="nav-item" href="{% url 'news' as menu_url %}{{ menu_url|with_lang:lang }}">{% nav_icon 'news' %}{% nav_label 'חדשות ופעילות' lang %}</a>
+<a class="nav-item" href="{% url 'forum' as menu_url %}{{ menu_url|with_lang:lang }}">{% nav_icon 'forum' %}{% nav_label 'פורום' lang %}</a>
 {% if user.is_authenticated %}
     <a class="nav-item community-link" href="{% url 'observations' as menu_url %}{{ menu_url|with_lang:lang }}">{% nav_icon 'observations' %}{% nav_label 'תצפיות' lang %}</a>
     <a class="nav-item" href="{% url 'profile' as menu_url %}{{ menu_url|with_lang:lang }}">{% nav_icon 'profile' %}{% nav_label 'הפרופיל שלי' lang %}</a>

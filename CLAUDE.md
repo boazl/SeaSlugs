@@ -12,6 +12,9 @@ The full system reference is **`docs/SYSTEM.md`**. Read it before planning a fea
   - a member community (observations, dive trips, partners)
   - a news & activity page (`/news/`): activity log, manager posts, planned trips, progress chart; visits,
     sign-ups and logins for managers (`activity.py`, `news.py`)
+  - an observations forum (`/forum/`, `forum.py`): a discussion per observation (no general discussion), each
+    message for everyone or for the discussion manager (the observation's owner) only; the conversations move between
+    the Mac and the live site with the table transfer (table `forum`, `forum_transfer.py`)
   - admin tools for moving data between the Mac and production
 - **Hosting:** Render (`seaslugs.onrender.com`), domain **https://seaslugs.org.il/**.
 - **Owner:** Boaz Liebes. In Hebrew, address him in the masculine form.
@@ -81,3 +84,5 @@ node -e "new Function(require('fs').readFileSync('dist/app.js','utf8'))"   # app
 - **Publication:** a complete species observation publishes itself, and a manager's save publishes.
   Otherwise it stays pending. Publishing creates or updates the SpeciesArea and its defining sample.
 - **Changing an observation's species** happens in place: same row, same `transfer_id`.
+- **Dive-trip planning** (kind `planned`, `planned_trips.py`): a future trip, no media, shown only in the forum and the
+  dive trips page's planning section; closed after its date; becomes a collection when media is added.

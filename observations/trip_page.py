@@ -83,6 +83,9 @@ def trip_page(request, code):
         from .local_videos import annotate_areas
         annotate_areas(areas)
     title = main.gallery_title(lang) or trip_title(trip, lang)
+    # The observations forum (forum.py): "add a comment" for the trip's collection observation, and its comments.
+    from .forum import forum_counts, forum_url, new_comment_url
+    forum_count = forum_counts(request.user, [main]).get(main.pk, 0)
     # the region's name already starts with its country ("Philippines - Anilao"); the country alone without one
     place = ' · '.join(x for x in (
         loc(trip.region, lang) if trip.region_id else (loc(trip.country, lang) if trip.country_id else trip.country_name),
@@ -98,6 +101,7 @@ def trip_page(request, code):
         'canonical_url': request.build_absolute_uri(request.path),
         'edit_url': sample_edit_url(request, [main]),
         'can_copy_image': manager,
+        'forum_new_url': new_comment_url(main, lang), 'forum_url': forum_url(main, lang), 'forum_count': forum_count,
     })
 
 

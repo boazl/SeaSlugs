@@ -66,7 +66,7 @@ class MainObservationTests(TestCase):
     def test_choice_survives_publish_and_rebuild(self):
         self.client.force_login(self.manager)
         self.client.post(reverse('observation-make-main', args=[self.second.pk]))
-        trip3 = DiveTrip.objects.create(title='Anilao 2', year=2027, country=self.country, region=self.region)
+        trip3 = DiveTrip.objects.create(title='Anilao 2', year=2024, country=self.country, region=self.region)
         self._sample(trip3, '33333333333')              # another publish in the area
         self.first.title = 'edited'; self.first.save_reviewed(self.manager, approve=True)
         self.area.refresh_from_db()

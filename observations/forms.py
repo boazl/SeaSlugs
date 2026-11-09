@@ -57,7 +57,7 @@ class ProfileForm(forms.ModelForm):
     # the end of the form -- Django would otherwise place explicitly declared fields
     # (first_name/last_name) after every Meta.fields model field.
     is_photographer = forms.BooleanField(label=PHOTOGRAPHER_LABEL, required=False, help_text=PHOTOGRAPHER_HELP)
-    field_order = ['first_name','last_name','first_name_en','last_name_en','phone','is_photographer','macro_diver','visible_to_members','countries','regions','bio']
+    field_order = ['first_name','last_name','first_name_en','last_name_en','phone','is_photographer','forum_email','macro_diver','visible_to_members','countries','regions','bio']
     def __init__(self, *args, lang='he', **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['first_name'].initial = self.instance.user.first_name
@@ -88,7 +88,7 @@ class ProfileForm(forms.ModelForm):
 
     class Meta:
         model = Profile
-        fields = ['first_name_en','last_name_en','phone','macro_diver','visible_to_members','countries','regions','bio']
+        fields = ['first_name_en','last_name_en','phone','forum_email','macro_diver','visible_to_members','countries','regions','bio']
         widgets = {'countries':forms.CheckboxSelectMultiple, 'regions':forms.CheckboxSelectMultiple}
 
 
@@ -539,6 +539,14 @@ class SampleForm(forms.ModelForm):
             data['site_other'] = ''
         self.species_change = self._check_species_change(data)
         self.clean_taxon_files(data)
+        # A dive-trip planning is written only for a trip that has not ended yet; one whose date has passed is closed
+        # (planned_trips.py) and can only be turned into a regular dive trip (kind "collection" with media).
+        trip = data.get('trip')
+        if data.get('kind') == Sample.Kind.PLANNED and trip and trip.year and trip.month:
+            from datetime import date
+            if trip.end_date() < date.today():
+                self.add_error('trip', 'תאריך המסע כבר עבר, ולכן התכנון נסגר. אפשר להפוך אותו למסע צלילה רגיל: '
+                                       'בחרו את הסוג "אוסף מינים / מסע צלילה" והוסיפו סרטון או תמונה.')
         return data
     def _check_species_change(self, data):
         """None unless an existing species observation is being given another catalogued species (or sp. letter). Then

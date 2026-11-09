@@ -2033,6 +2033,13 @@ function setLanguage(value) {
     document.querySelectorAll('.account-menu [data-he][data-en]').forEach(element => {
         element.textContent = en ? element.dataset.en : element.dataset.he;
     });
+    // The observations forum's "add a comment" button (index.html, [data-forum-link]): its label and its link's language.
+    document.querySelectorAll('[data-forum-link]').forEach(link => {
+        link.textContent = en ? link.dataset.en : link.dataset.he;
+        const url = new URL(link.getAttribute('href'), window.location.origin);
+        if (en) url.searchParams.set('lang', 'en'); else url.searchParams.delete('lang');
+        link.setAttribute('href', url.pathname + url.search + url.hash);
+    });
     document.querySelectorAll('.account-menu [data-aria-he][data-aria-en]').forEach(element => {
         element.setAttribute('aria-label', en ? element.dataset.ariaEn : element.dataset.ariaHe);
     });

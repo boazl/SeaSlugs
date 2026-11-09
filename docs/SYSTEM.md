@@ -223,7 +223,8 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
 
 ### 5.3 Observations and the gallery
 
-- **`DiveTrip`** (table `dive_trips`, 49)
+- **`DiveTrip`** (table `dive_trips`, 49) -- may lie in the future (a planned trip, §7.6); `start_date()` / `end_date()`
+  give its known dates (start day + duration, else the end of its month / year)
   - `code` is the stable natural key, e.g. `V`, `I26Aug`. `kind` is dive or thematic.
   - `title`, `year`, `month`, `start_day`, `duration_days`.
   - `country`, `region`, `site`, plus source text columns.
@@ -232,7 +233,8 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
   - Taxon "library trips" `Genera`, `Families` and `Orders` hold genus/family/order observations
     (`TAXON_LIBRARY_TRIPS`).
 - **`Sample`** (table `samples`, 486): **an observation**.
-  - `kind`: `species` | `collection` (a dive-trip summary video) | `genus` | `family` | `order`.
+  - `kind`: `species` | `collection` (a dive-trip summary video) | `genus` | `family` | `order` | `planned` (a dive
+    trip being planned: no media, future trip; §7.6).
   - `trip`: required except for taxon kinds. `owner`: the creator, who is the photographer.
   - Taxonomy by kind, as text: `order`, `family`, `genus`. `species` is an FK (species kind only).
     `sync_taxonomy()` fills the higher levels from the taxonomy tables.
@@ -278,6 +280,9 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
 - **`SiteImage`**: (`key`) → home intro photo.
 - **`ActivityEvent`**, **`NewsPost`**, **`DailyPageView`**, **`DailyVisitor`**: the activity log, the manager's
   news posts and the visit counter (§7.4). Per environment; none of them travels between the Mac and the site.
+- **`ForumMessage`** (migration `0094`): a message in the observations forum (§7.5): `observation` FK→Sample (required),
+  `created_at`, `user`, `manager_only`, `subject` (optional), `text`, soft delete `deleted_at`/`deleted_by`, and
+  `transfer_id` (UUID, the transfer key). Travels with the table transfer (table `forum`, §10.2).
 - **Users:** Django `auth.User` with groups created by `setup_community`:
   - New user, Macro diver, Subscriber, Macro photographer, Artist, Scientist, Administrator.
   - **Photographers** (`photographers.py`, `test_guest_photographers.py`): an observation always belongs to a
@@ -361,7 +366,10 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
    - Each page shows exactly one language.
    - The choice persists across pages.
    - Every page has the same header.
-10. **Hebrew terms**
+10. **Dive-trip planning** (`planned_trips.py`, §7.6): a `planned` observation has a title, a trip with a year and a
+    month, no media; it publishes itself; never in the gallery. Species and collection observations cannot be added to
+    a trip that has not started (`Sample.clean`).
+11. **Hebrew terms**
     - "חינניות ים" (singular "חיננית ים") = sea slugs, the umbrella term. "חשופיות" = nudibranchs only.
       Never use "חשופיות ים" as the umbrella term.
     - Adding: "הוספת תצפית" / "הוסיפו תצפית" ("Add an observation"), never "תרמו".
@@ -388,7 +396,9 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
 | `/observations/home-text/` | Manager editor for home-page sections |
 | `/sitemap.xml`, `/robots.txt`, `/healthz` | SEO and health |
 | `/analytics/exclude/`, `/analytics/include/` | Owner's GA opt-out cookie (not linked anywhere); also stops the site's own visit counter |
+| `/observations/trips/#planning` | The dive trips page's "תכנון מסעות צלילה" section (§7.6) |
 | `/news/` | News & activity (§7.4): public activity feed, posts, planned trips, progress chart; management data for staff |
+| `/forum/` (`?kind=…`, `?obs=<pk>`), `/forum/new/`, `/forum/<pk>/delete/` | Observations forum (§7.5) |
 
 ### 7.2 The gallery (`dist/app.js`)
 
@@ -529,6 +539,57 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
     deploy by `build.sh` → `scripts/fetch_geoip.py` (never fails the build; not in git). On the Mac the visitors are
     local addresses, so their country is unknown.
 
+### 7.5 Observations forum (`forum.py`, `forum.html`, `_forum_observation.html`, `_forum_message.html`, `test_forum.py`)
+
+- **What:** members write criticism, remarks, plans and discussion about observations. **Every discussion belongs to one
+  observation** (a Sample of any kind); there is no general discussion.
+- **The page `/forum/`:** filters (`forum.observation_filters`) that narrow the observation picker and the discussions:
+  kind (`?kind=species|collection|planned|genus|family|order`, `KIND_FILTERS`), photographer, country, region, year and,
+  by kind (`TAXON_FACETS`), genus + species (species observations) or the genus / family / order of a taxon
+  observation. Each list offers the values among the observations matching the other filters; a change resubmits and
+  clears the chosen observation (a kind change also the taxon filters). The picker lists the matching observations
+  with a discussion first (with their message count), then the others, alphabetically. With `?obs=<pk>`: the
+  observation (photo, name, place, date, discussion manager, a link to its page -- the species/taxon page, the
+  dive-trip page of a collection, the planning section for a planned trip), its whole discussion oldest first, and the
+  writing box (`#write`). Without one: the matching observations' discussions grouped by observation, the most
+  recently active first, 20 a page. In the main menu as "פורום" and in the sitemap.
+- **A closed dive-trip planning** (its date has passed): gone from the forum for everyone but its owner and the site
+  managers, and nobody can write in it ("הדיון נסגר").
+- **Discussion manager** = the observation's owner (photographer).
+- **Reading:** a message "for everyone" is public (no account needed). A "manager only" message is seen by its writer, the
+  discussion manager and the site managers (`views.is_manager`). A discussion of a pending or deleted observation is
+  seen only by its owner and the site managers (404 for others).
+- **Writing** needs an account. "הוספת תגובה" / "Add a comment" buttons: the species page (the main observation in the
+  top button row, each other observation on its card, with "תגובות (N)" = the messages this visitor can read), the
+  dive-trip page (its collection observation) and the home page's gallery head. They go to `/forum/new/?obs=<pk>`
+  (from the home page without `obs`: to the picker, `#choose`); a visitor who is not signed in goes to the login page
+  (`?next=` back there), which then offers sign-up (only when there is a `next`), and sign-up honours a safe `next`.
+- **Deleting** (button on the message): its writer, the discussion manager or a site manager; marks `deleted_at`.
+  Messages are never edited; the admin (`ForumMessageAdmin`) shows them read-only except the deletion mark.
+- **Email** (`notifications.notify_forum_message`, migration `0095`): a message written in the forum emails the
+  observation's owner and the discussion's other writers who ticked "שליחת מייל כשמגיעה תגובה חדשה בפורום" on their
+  profile (`Profile.forum_email`, off by default, per environment -- not in the profiles transfer); never the writer; a
+  manager-only message goes to the owner alone. Transferred messages send nothing. Failures are only logged.
+- **Transfer:** table `forum` in `/admin/table-transfer/` (`forum_transfer.py`), in both directions; additive, deletion
+  wins, nothing removed; skips a message whose observation or writer is missing at the destination (TABLE-TRANSFER.md).
+
+### 7.6 Dive-trip planning (`planned_trips.py`, `test_planned_trips.py`, migration `0096`)
+
+- **Kind `planned`** ("תכנון מסע צלילות"): an observation of a dive trip that has not happened yet. Its DiveTrip holds
+  the future date (year and month required; start day and duration optional); the observation has a title (and may have
+  notes and a site) and **no media**. Any member adds one with the observation form (kind "תכנון מסע צלילות";
+  `/observations/new/?kind=planned` preselects it; the form hides the media, day and depth fields); it publishes itself.
+- **Shown** only in the forum (its owner manages the discussion) and in the "תכנון מסעות צלילה" section at the top of
+  the dive trips page (`views.planning_rows`): title, dates, place, organizer, notes, links to the discussion, "add a
+  comment" and, for its owner / managers, edit; a "תכנון מסע חדש" button. Never in the gallery, the species / taxon /
+  trip pages, the sitemap or the news log (they select their kinds explicitly).
+- **Closing:** after the trip's last day (`Sample.planning_open` False) the planning leaves the section and the forum,
+  and its discussion is closed. The form refuses to save a planning whose trip has ended (`SampleForm.clean`); the
+  model does not (the table transfer must still carry a closed one).
+- **Becoming a dive trip:** its owner or a manager edits it, chooses "אוסף מינים / מסע צלילה" and adds a video or photo:
+  the same row (same `transfer_id`, same discussion) becomes a regular collection (a member's waits for approval).
+- **Transfer:** travels with the samples table (natural key: trip + title, like a collection; no media needed).
+
 ## 8. Storage of media and documents
 
 All uploads live under `MEDIA_ROOT` (`media/` locally, `/var/data/media/` in production). **Production
@@ -655,12 +716,15 @@ The owner curates data mostly on the Mac and moves it to production. Rules that 
    - Optional "permanent delete" removes deleted observations that are missing from the file.
 7. SpeciesArea (needs Samples; the slug of an existing row is never overwritten).
 8. Taxonomy tables again, to apply defining samples now that the samples exist.
+9. Forum (`forum`): the conversations, in both directions (needs Users and Samples).
 
 ### 10.2 Table transfer details
 
 - Export a single table as JSON. Import up to 20 MB and 10,000 rows. The preview shows additions and
   before/after values.
 - The format is checked strictly: "fields do not match" means the two environments run different code.
+- **Forum messages** (table `forum`, last): matched by `transfer_id`, observation by Sample `transfer_id`, users by
+  username; only new messages and deletions travel (see §7.5).
 - Some fields are **not** transferred and are set per environment by migration or admin: `Region.trip_code`,
   `Profile.trip_code`, taxon files and the identification preview pages.
 
@@ -785,6 +849,8 @@ Catalogue of test modules (test count) and what each guards:
 | `test_genus_page_filter` | 8 | The gallery's filter carried to the genus page: filtered species first with their matching observations, the others as small cards, stale parameters ignored |
 | `test_media_transfer` | 57 | One observation per species per trip; image storage, canonical names, replacing photos, environment image comparison and transfer |
 | `test_trip_species_links` | 2 | Trip page species pictures open the observation on its species page |
+| `test_planned_trips` | 13 | Dive-trip planning: no media, title + year/month, self-publishing, no media observation on a future trip, trip dates, form (?kind=planned, past trip refused, conversion to a collection keeps the discussion), trips page section, not in the gallery, forum open/closed |
+| `test_forum` | 39 | Observations forum: per-observation discussions only, kind / photographer / place / year / taxon filters and picker, grouped view, who reads public / manager-only messages, writing needs an account, login → sign-up → back, delete rights, species/trip/home buttons, sitemap/robots, the `forum` table transfer |
 | `test_news_activity` | 31 | Activity log events, visit counter exclusions, /news/ page, posts, backfill |
 | `test_articles` | 73 | Article library, sections on pages, PDFs, previews, site-written articles, home articles |
 | `test_home_content` | 47 | SEO phase 3: server-rendered home content in both languages, editable home texts |

@@ -15,6 +15,7 @@ from observations.video_import import video_import
 
 from observations.folder_import import folder_import
 from observations.news import news, news_slideshow
+from observations.forum import forum, forum_new, forum_delete
 from observations.trip_page import trip_page
 from observations.views import site_image, species_page, genus_page, genus_identification, genus_identification_preview, order_page, family_page, divetrip_locations
 from observations.articles import article_list, article_page, article_pdf, article_thumb, species_article, genus_article, family_article, order_article
@@ -47,6 +48,9 @@ urlpatterns = [
     path('site-image/<slug:key>.jpg', site_image, name='site-image'),
     path('news/', news, name='news'),
     path('news/slideshow/', news_slideshow, name='news-slideshow'),
+    path('forum/', forum, name='forum'),
+    path('forum/new/', forum_new, name='forum-new'),
+    path('forum/<int:pk>/delete/', forum_delete, name='forum-delete'),
     path('articles/', article_list, name='article-list'),
     path('articles/<slug:slug>/', article_page, name='article-page'),
     path('articles/<slug:slug>/<str:lang>.pdf', article_pdf, name='article-pdf'),

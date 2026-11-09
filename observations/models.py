@@ -2,7 +2,7 @@ import calendar
 import hashlib
 import re
 import uuid
-from datetime import date
+from datetime import date, timedelta
 from urllib.parse import urlparse, parse_qs
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -612,6 +612,10 @@ class Profile(models.Model):
     regions = models.ManyToManyField(Region, blank=True, verbose_name='אזורי צלילה')
     countries = models.ManyToManyField(Country, blank=True, verbose_name='מדינות צלילה')
     bio = models.TextField('על עצמי', blank=True, max_length=1500)
+    # The observations forum (forum.py, notifications.notify_forum_message): an email when a new comment arrives in a
+    # discussion of one of my observations or one I wrote in. Off until the member ticks it on the profile page.
+    forum_email = models.BooleanField('שליחת מייל כשמגיעה תגובה חדשה בפורום', default=False,
+        help_text='על התצפיות שלך ובדיונים שכתבת בהם.')
     trip_code = models.CharField('אות הצלם בסימון מסעות', max_length=4, blank=True,
         help_text='האות שמופיעה בתחילת סימון מסע של הצלם. ריק = בלי אות (בעל האתר).')
     class Meta: verbose_name = 'פרופיל'; verbose_name_plural = 'פרופילים'
@@ -705,10 +709,25 @@ class DiveTrip(models.Model):
     def sea_id(self):
         return self.region.sea_id if self.region_id else None
 
+    def start_date(self):
+        """The trip's first day as far as it is known (the 1st of its month / of January), None without a year."""
+        if not self.year: return None
+        try: return date(self.year, self.month or 1, self.start_day or 1)
+        except ValueError: return None
+
+    def end_date(self):
+        """The trip's last day as far as it is known: start day + duration, else the end of its month / year."""
+        if not self.year: return None
+        if self.month and self.start_day:
+            start = self.start_date()
+            return start + timedelta(days=(self.duration_days or 1) - 1) if start else None
+        if self.month: return date(self.year, self.month, calendar.monthrange(self.year, self.month)[1])
+        return date(self.year, 12, 31)
+
     def clean(self):
+        # A trip may lie in the future: it is then being planned (Sample.Kind.PLANNED). Observations with media
+        # cannot be added to it before it starts (Sample.clean).
         super().clean()
-        if self.year and self.year > date.today().year:
-            raise ValidationError({'year': 'השנה אינה יכולה להיות בעתיד.'})
         if self.start_day:
             if not self.year or not self.month: raise ValidationError({'start_day':'יום התחלה מחייב שנה וחודש.'})
             try: date(self.year, self.month, self.start_day)
@@ -785,6 +804,7 @@ KIND_EN_NAMES = {
     'genus': 'Genus',
     'family': 'Family',
     'order': 'Order',
+    'planned': 'Dive trip planning',
 }
 
 
@@ -796,6 +816,9 @@ class Sample(models.Model):
         GENUS = 'genus', 'סוג'
         FAMILY = 'family', 'משפחה'
         ORDER = 'order', 'סדרה'
+        # A dive trip being planned (planned_trips.py): a trip with a future date, no media, shown only in the forum
+        # and on the dive trips page; it closes when its date has passed and can be turned into a COLLECTION.
+        PLANNED = 'planned', 'תכנון מסע צלילות'
     kind = models.CharField('סוג הסרטון', max_length=20, choices=Kind.choices, default=Kind.SPECIES)
     # Required for every kind except an order/family/genus observation (see clean()): those describe a
     # taxon, not a dive, and may have no trip.
@@ -899,7 +922,7 @@ class Sample(models.Model):
         kind: the title of a collection, the order / family / genus of a taxon-level sample, the
         species (or the not-yet-catalogued 'other' species) of a species sample. This is also
         the identifying part of the image's file name."""
-        if self.kind == self.Kind.COLLECTION: return self.title
+        if self.kind in (self.Kind.COLLECTION, self.Kind.PLANNED): return self.title
         if self.kind == self.Kind.ORDER: return self.order
         if self.kind == self.Kind.FAMILY: return self.family
         if self.kind == self.Kind.GENUS: return self.genus
@@ -914,7 +937,7 @@ class Sample(models.Model):
             else:
                 name = sp.scientific_name
             return name, (sp.author or '').strip(), self.life_stage
-        return self.taxon_name, '', self.life_stage if self.kind != self.Kind.COLLECTION else ''
+        return self.taxon_name, '', self.life_stage if self.kind not in (self.Kind.COLLECTION, self.Kind.PLANNED) else ''
     def _taxon_text(self, with_author):
         name, author, stage = self.taxon_parts()
         return ' '.join(p for p in (name, author if with_author else '', stage) if p)
@@ -995,8 +1018,9 @@ class Sample(models.Model):
         K = self.Kind
         for field in ('order', 'family', 'genus', 'species_other'):
             setattr(self, field, ' '.join((getattr(self, field) or '').split()))
-        if self.kind == K.COLLECTION:
+        if self.kind in (K.COLLECTION, K.PLANNED):
             self.order = self.family = self.genus = ''
+            self.species = None; self.species_other = ''
             self.identification_qualifier = self.life_stage = ''
             return errors
         if self.kind != K.SPECIES:
@@ -1062,8 +1086,13 @@ class Sample(models.Model):
         original = Sample.objects.filter(pk=self.pk).values('image', 'video_url').first() if self.pk else None
         # An order/family/genus observation may have no media of its own: its page and gallery card
         # then borrow the picture of one of the observations a level below.
-        if not self.video_url and not self.image and self.kind not in (self.Kind.ORDER, self.Kind.FAMILY, self.Kind.GENUS):
+        if self.kind == self.Kind.PLANNED:
+            errors.update(self.planned_errors())
+        elif not self.video_url and not self.image and self.kind not in (self.Kind.ORDER, self.Kind.FAMILY, self.Kind.GENUS):
             errors['video_url'] = 'יש לספק קישור YouTube או להעלות תמונה, או את שניהם.'
+        if self.kind in (self.Kind.SPECIES, self.Kind.COLLECTION) and self.trip_id and self.trip.start_date() and self.trip.start_date() > date.today():
+            errors['trip'] = ('המסע עדיין לא התקיים, ולכן אי אפשר להוסיף לו תצפית עם מדיה. '
+                              'לתכנון מסע בחרו את הסוג "תכנון מסע צלילות".')
         if self.kind == self.Kind.COLLECTION:
             if self.species_id or self.species_other: errors['species'] = 'סרטון אוסף אינו משויך למין יחיד. נקה את בחירת המין.'
             if not self.title.strip(): errors['title'] = 'יש להזין כותרת לסרטון האוסף.'
@@ -1197,6 +1226,25 @@ class Sample(models.Model):
             from .defining import rows_affected_by, repair
             for row in rows_affected_by(self):
                 if not isinstance(row, SpeciesArea): repair(row)
+    def planned_errors(self):
+        """What a dive-trip planning observation (Kind.PLANNED) needs: a title, a trip with a year and a month, and no
+        media -- a trip that took place, with a photo or a video, is a COLLECTION."""
+        errors = {}
+        if self.video_url or self.image or self.gallery_source_id:
+            errors['video_url'] = ('לתכנון מסע אין מדיה. אחרי המסע אפשר להפוך אותו למסע צלילה רגיל: '
+                                   'בחרו את הסוג "אוסף מינים / מסע צלילה" והוסיפו סרטון או תמונה.')
+        if not (self.title or '').strip(): errors['title'] = 'יש להזין כותרת לתכנון המסע.'
+        if self.trip_id and not (self.trip.year and self.trip.month):
+            errors['trip'] = 'למסע מתוכנן יש להגדיר שנה וחודש.'
+        # That the trip has not ended yet is checked when a member saves the planning (SampleForm.clean), not here:
+        # a planning that closed must still travel through the table transfer.
+        return errors
+    @property
+    def planning_open(self):
+        """A dive-trip planning observation whose trip has not ended yet (planned_trips.py). False for every other kind."""
+        if self.kind != self.Kind.PLANNED or not self.trip_id: return False
+        end = self.trip.end_date()
+        return bool(end and end >= date.today())
     def is_complete(self):
         """Everything publishing needs: a trip with a year (not needed by an order / family / genus
         observation), a catalogued species for a species observation, and no "other" free-text values."""
@@ -1222,7 +1270,8 @@ class Sample(models.Model):
             complete = self.is_complete()
             if approve and not complete:
                 raise ValidationError('לפני אישור יש להשלים את שנת המסע ולהחליף ערכי ״אחר״ בערכים מטבלאות העזר.')
-            self.status = 'published' if complete and (approve or self.kind == self.Kind.SPECIES) else 'pending'
+            # A species observation and a dive-trip planning (no media to check) publish themselves when complete.
+            self.status = 'published' if complete and (approve or self.kind in (self.Kind.SPECIES, self.Kind.PLANNED)) else 'pending'
             self.approved_by = actor if approve else None
             self.approved_at = timezone.now() if approve else None
             self.save()
@@ -1625,3 +1674,34 @@ class DailyVisitor(models.Model):
 
 
 from . import activity  # noqa: E402,F401  (connects the activity-log signals)
+
+
+class ForumMessage(models.Model):
+    """One message in the observations forum (/forum/, forum.py): criticism, remarks, planning and discussion about one
+    observation -- a species observation, a dive-trip collection, and so on. Every message belongs to an observation.
+
+    The discussion's manager is the observation's owner (its photographer). A message is either for everyone -- then
+    anyone, signed in or not, can read it -- or for the discussion's manager only: then only its writer, the discussion's
+    manager and the site managers see it. Writing needs an account.
+    Messages travel between the Mac and the live site with the table transfer (forum_transfer.py), matched by
+    `transfer_id`; the observation by its own transfer_id and the writer by username."""
+    observation = models.ForeignKey('Sample', on_delete=models.CASCADE, related_name='forum_messages', verbose_name='תצפית')
+    created_at = models.DateTimeField('תאריך ושעה', default=timezone.now, db_index=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='forum_messages', verbose_name='משתמש')
+    manager_only = models.BooleanField('רק למנהל הדיון', default=False,
+                                       help_text='ההודעה גלויה רק לכותב, לבעל התצפית (מנהל הדיון) ולמנהלי האתר.')
+    subject = models.CharField('נושא', max_length=200, blank=True)
+    text = models.TextField('טקסט')
+    deleted_at = models.DateTimeField('נמחקה', null=True, blank=True)
+    deleted_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+',
+                                   verbose_name='נמחקה על ידי')
+    # The same in both environments: the table transfer's key (forum_transfer.py).
+    transfer_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    class Meta:
+        ordering = ['-created_at', '-pk']
+        verbose_name = 'הודעה בפורום'; verbose_name_plural = 'פורום תצפיות'
+    def __str__(self): return f'{self.subject or self.text[:50]} · {self.created_at:%Y-%m-%d %H:%M}'
+    @property
+    def discussion_manager(self):
+        """The observation's owner."""
+        return self.observation.owner

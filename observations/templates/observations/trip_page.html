@@ -36,7 +36,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
             <span>›</span><a href="{% url 'dive-trips' as trips_url %}{{ trips_url|with_lang:lang }}">{{ "מסעות צלילה"|t:lang }}</a>
             <span>›</span><span aria-current="page">{{ title }}</span>
         </nav>
-        <p class="back-row"><a class="back-button" href="{{ '/?restore=1'|with_lang:lang }}">{{ "חזרה לגלריה"|t:lang }}</a><a class="back-button back-button-quiet" href="{{ gallery_trip_url|with_lang:lang }}">{{ "המסע בגלריה"|t:lang }}</a>{% if edit_url %}<a class="edit-button" href="{{ edit_url }}">{{ "עריכת תצפית"|t:lang }}</a>{% endif %}</p>
+        <p class="back-row"><a class="back-button" href="{{ '/?restore=1'|with_lang:lang }}">{{ "חזרה לגלריה"|t:lang }}</a><a class="back-button back-button-quiet" href="{{ gallery_trip_url|with_lang:lang }}">{{ "המסע בגלריה"|t:lang }}</a>{% if edit_url %}<a class="edit-button" href="{{ edit_url }}">{{ "עריכת תצפית"|t:lang }}</a>{% endif %}<a class="edit-button forum-button" href="{{ forum_new_url }}">{{ "הוספת תגובה"|t:lang }}</a>{% if forum_count %}<a class="back-button back-button-quiet forum-count" href="{{ forum_url }}">{{ "תגובות"|t:lang }} ({{ forum_count }})</a>{% endif %}</p>
         <article class="species-hero" id="obs-{{ main_sample.pk }}">
             <div class="species-media">
                 {% with s=main_sample %}

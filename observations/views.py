@@ -67,7 +67,32 @@ def trips(request):
         for x in trip.species_samples:
             x.page_url = page_urls.get(x.pk, '')
     return render(request, 'observations/trips.html', {'trips':rows, **filters,
-        'trips_with_video': [t for t in rows if t.video_cards]})
+        'trips_with_video': [t for t in rows if t.video_cards], 'plannings': planning_rows(request, lang),
+        'plan_new_url': (reverse('observation-new') + '?kind=planned') if request.user.is_authenticated
+                        else reverse('login') + '?' + urlencode({'next': reverse('observation-new') + '?kind=planned'})})
+
+
+def planning_rows(request, lang):
+    """The dive trips page's "תכנון מסעות צלילה" section: the open plannings (planned_trips.py), the soonest first, each
+    with its place, dates, organizer, comments and links to its discussion in the forum."""
+    from .planned_trips import open_plannings, date_range_text
+    from .forum import forum_counts, forum_url, new_comment_url
+    rows = open_plannings()
+    counts = forum_counts(request.user, rows)
+    for s in rows:
+        trip = s.trip
+        s.display_title = s.gallery_title(lang) or trip.title
+        s.display_place = ' · '.join(x for x in (
+            loc(trip.region, lang) if trip.region_id else (loc(trip.country, lang) if trip.country_id else trip.region_name),
+            loc(s.site, lang) if s.site_id else (loc(trip.site, lang) if trip.site_id else '')) if x)
+        s.date_text = date_range_text(trip)
+        s.organizer = full_name_for(s.owner, lang) or s.owner.username
+        s.forum_count = counts.get(s.pk, 0)
+        s.forum_url = forum_url(s, lang)
+        s.forum_new_url = new_comment_url(s, lang)
+        s.edit_url = sample_edit_url(request, [s])
+        s.note = (s.note_en or s.note_he) if lang == 'en' else (s.note_he or s.note_en)
+    return rows
 
 
 def sample_edit_url(request, samples):
@@ -186,6 +211,14 @@ def species_page(request, slug):
         from .local_videos import annotate
         annotate(samples)
     other_samples = [s for s in samples if s is not main_sample]
+    # The observations forum (forum.py): an "add a comment" button per observation and, when there are any, a link to
+    # the comments this visitor can read.
+    from .forum import forum_counts, forum_url, new_comment_url
+    comment_counts = forum_counts(request.user, samples)
+    for s in samples:
+        s.forum_count = comment_counts.get(s.pk, 0)
+        s.forum_new_url = new_comment_url(s, lang)
+        s.forum_url = forum_url(str(s.pk), lang)
     # The same species observed in other areas (gallery_data.same_species_areas -- the gallery's "species from
     # multiple areas" rule; never for an unmarked "sp."): a card per live area at the foot of the page.
     from .gallery_data import same_species_areas
@@ -893,6 +926,10 @@ def signup(request):
             set_photographer(user, True)
         notify_new_user_registered(user)
         login(request,user)
+        # Back to where the sign-up started (e.g. the forum's writing box -- forum.forum_new), else the profile.
+        next_url = request.POST.get('next') or request.GET.get('next')
+        if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
+            return redirect(next_url)
         return redirect('profile')
     return render(request,'observations/form.html',{'form':form,'title':'הרשמה / Sign up'})
 
@@ -1034,6 +1071,9 @@ def edit(request,pk=None):
     if not pk and request.method!='POST' and is_manager(request.user) and kind_param in ('order','family','genus'):
         initial['kind']=kind_param
         initial[kind_param]=request.GET.get('name','')[:150]
+    # "Plan a dive trip" (the dive trips page's planning section): any member starts a dive-trip planning observation.
+    if not pk and request.method!='POST' and kind_param==Sample.Kind.PLANNED:
+        initial['kind']=Sample.Kind.PLANNED
     # Where to return to after saving -- normally the observations list URL the user
     # followed the "עריכה" link from, filters/sort/page and all, carried through the
     # POST as a hidden field (see form.html) since it isn't otherwise part of this URL.

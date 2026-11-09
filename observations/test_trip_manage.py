@@ -260,11 +260,16 @@ class AddTripTests(Fixture):
         self.client.force_login(self.boaz)
         self.assertEqual(self.post(site=self.canyon.pk, region=self.eilat.pk).status_code, 200)   # site of another region
         self.assertEqual(self.post(day=31, month=2, year=2025).status_code, 200)                  # no such date
-        self.assertEqual(self.post(year=NOW.year + 1).status_code, 200)                           # future
         self.assertEqual(self.post(month=13).status_code, 200)
         DiveTrip.objects.create(title='t', code='TAKEN')
         self.assertEqual(self.post(code='TAKEN').status_code, 200)                                # typed code already used
         self.assertEqual(DiveTrip.objects.count(), 1)
+
+    def test_a_future_trip_is_accepted(self):
+        # A trip may lie in the future: it is being planned (Sample.Kind.PLANNED, planned_trips.py).
+        self.client.force_login(self.boaz)
+        self.assertEqual(self.post(year=NOW.year + 1, month=5).status_code, 302)
+        self.assertEqual(DiveTrip.objects.get().year, NOW.year + 1)
 
     def test_next_is_followed_but_only_on_this_site(self):
         self.client.force_login(self.boaz)

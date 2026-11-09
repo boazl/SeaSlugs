@@ -144,7 +144,7 @@ class TaxonomyTablesTests(TestCase):
     def test_apply_populates_sample_kind_reference_table(self):
         call_command('build_taxonomy_tables', '--apply')
         codes = set(SampleKind.objects.values_list('code', flat=True))
-        self.assertEqual(codes, {'species', 'collection', 'genus', 'family', 'order'})
+        self.assertEqual(codes, {'species', 'collection', 'genus', 'family', 'order', 'planned'})
         genus_kind = SampleKind.objects.get(code='genus')
         self.assertEqual(genus_kind.name, 'סוג')
         self.assertEqual(genus_kind.name_en, 'Genus')

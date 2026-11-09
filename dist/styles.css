@@ -212,3 +212,5 @@ body:has(.controls-panel) .collection-selection:empty{margin:0}
 /* a wide screen's panel is about the banner's height: the two are made one line (same top and bottom); on a narrower
    computer the panel's area chips wrap and it grows tall, so the banner keeps its own height at the top */
 @media(min-width:1300px){.controls-row{align-items:stretch}}
+/* the observations forum's "add a comment" button in the gallery head (forum.py) */
+.forum-link{border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:8px 12px;font-size:14px;white-space:nowrap;flex-shrink:0;text-decoration:none}.forum-link:hover{background:var(--panel)}

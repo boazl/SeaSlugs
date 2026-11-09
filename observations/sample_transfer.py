@@ -86,6 +86,7 @@ def _natural_key(kind, trip, species, variant, title, taxon):
     if not trip: return None
     if kind == 'species': return ('species', trip, species, (variant or '').strip()) if species else None
     if kind == 'collection': return ('collection', trip, title.strip()) if (title or '').strip() else None
+    if kind == 'planned': return ('planned', trip, title.strip()) if (title or '').strip() else None
     if kind in ('order', 'family', 'genus'): return (kind, trip, taxon.strip()) if (taxon or '').strip() else None
     return None
 
@@ -320,8 +321,9 @@ def sample_plan(document, fields, restore_deleted=True):
                     if not default_storage.exists(values['image']):
                         warnings.append(f'קובץ התמונה {values["image"]} חסר ביעד — שם התמונה הועתק; יש להעביר את הקובץ דרך ניהול התמונות.')
                 # An order / family / genus observation may legitimately have no media of its own (its
-                # page then borrows a species photo), so only the other kinds need one to be transferred.
-                if not values['video_url'] and not values['image'] and not pending_gallery and values['kind'] not in ('order', 'family', 'genus'):
+                # page then borrows a species photo) and a dive-trip planning never has any, so only the other kinds
+                # need one to be transferred.
+                if not values['video_url'] and not values['image'] and not pending_gallery and values['kind'] not in ('order', 'family', 'genus', 'planned'):
                     result.append({'object':None,'label':values['title'] or incoming.get('species') or identity,
                                    'action':'skipped','changes':[],
                                    'reason':'התצפית לא הועברה: חסרה תמונה ביעד ואין סרטון. העבירו את התמונה דרך ניהול התמונות ואז ייבאו שוב.'})
