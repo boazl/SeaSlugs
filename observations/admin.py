@@ -813,16 +813,17 @@ from .models import ForumMessage  # noqa: E402
 
 @admin.register(ForumMessage)
 class ForumMessageAdmin(admin.ModelAdmin):
-    """The forum's messages. Messages are written in the forum and never edited (the table transfer relies on that), so
-    only the deletion mark can be changed here: setting deleted_at hides a message, as the forum's own delete button
-    does. The admin's delete removes the row for good (in this environment only)."""
+    """The forum's messages. Messages are written in the forum and their text is never edited (the table transfer relies
+    on that). A manager may change only the writer (e.g. a message posted on someone's behalf) and the deletion mark:
+    setting deleted_at hides a message, as the forum's own delete button does. Both are changed on each site separately
+    -- the transfer does not rewrite an existing message. The admin's delete removes the row for good (here only)."""
     list_display = ('created_at', 'user', 'observation', 'subject', 'manager_only', 'deleted_at')
     list_filter = ('manager_only', ('deleted_at', admin.EmptyFieldListFilter))
     search_fields = ('subject', 'text', 'user__username', 'user__first_name', 'user__last_name')
     date_hierarchy = 'created_at'
     list_select_related = ('user', 'observation', 'observation__species')
     raw_id_fields = ('deleted_by',)
-    readonly_fields = ('transfer_id', 'observation', 'user', 'created_at', 'manager_only', 'subject', 'text')
+    readonly_fields = ('transfer_id', 'observation', 'created_at', 'manager_only', 'subject', 'text')
     def has_add_permission(self, request): return False
     def view_on_site(self, obj):
         return reverse('forum') + f'?obs={obj.observation_id}#m-{obj.pk}'

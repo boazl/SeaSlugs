@@ -593,7 +593,9 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
   (from the home page without `obs`: to the picker, `#choose`); a visitor who is not signed in goes to the login page
   (`?next=` back there), which then offers sign-up (only when there is a `next`), and sign-up honours a safe `next`.
 - **Deleting** (button on the message): its writer, the discussion manager or a site manager; marks `deleted_at`.
-  Messages are never edited; the admin (`ForumMessageAdmin`) shows them read-only except the deletion mark.
+  Messages' text is never edited; in the admin (`ForumMessageAdmin`) a manager may change only the writer (a
+  message posted on someone's behalf) and the deletion mark -- on each site separately (the transfer does not rewrite
+  an existing message).
 - **Email** (`notifications.notify_forum_message`, migration `0095`): a message written in the forum emails the
   observation's owner and the discussion's other writers who ticked "שליחת מייל כשמגיעה תגובה חדשה בפורום" on their
   profile (`Profile.forum_email`, off by default, per environment -- not in the profiles transfer); never the writer; a

@@ -431,3 +431,21 @@ class ForumEmailTests(ForumSetup):
         for item in plan(doc):
             item['object'].save()
         self.assertEqual(mail.outbox, [])
+
+
+class ForumAdminWriterTests(ForumSetup):
+    """A manager may change a message's writer in the admin (a message posted on someone's behalf); its text stays
+    read-only."""
+
+    def test_change_writer(self):
+        message = self.message(user=self.member, text='פתיחה')
+        boss = User.objects.create_superuser('boss', 'b@example.org', 'a-valid-password-927')
+        self.client.force_login(boss)
+        url = f'/admin/observations/forummessage/{message.pk}/change/'
+        page = self.client.get(url).content.decode()
+        self.assertIn('name="user"', page)
+        self.assertNotIn('name="text"', page)
+        response = self.client.post(url, {'user': self.owner.pk, 'deleted_at_0': '', 'deleted_at_1': '', 'deleted_by': ''})
+        self.assertEqual(response.status_code, 302, response.content.decode()[:1500] if response.status_code != 302 else '')
+        message.refresh_from_db()
+        self.assertEqual((message.user, message.text), (self.owner, 'פתיחה'))
