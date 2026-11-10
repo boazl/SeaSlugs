@@ -218,6 +218,12 @@ class ForumWritingTests(ForumSetup):
         self.assertIsNotNone(message.created_at)
         self.assertEqual(response['Location'], f'/forum/?obs={self.sample.pk}#m-{message.pk}')
 
+    def test_manager_only_choice_names_the_manager(self):
+        self.client.force_login(self.member)
+        html = self.client.get(f'/forum/?obs={self.sample.pk}').content.decode()
+        self.assertIn('רק ל<span class="manager-name">דני צלם</span>', html)
+        self.assertIn('Only to <span class="manager-name">', self.client.get(f'/forum/?obs={self.sample.pk}&lang=en').content.decode())
+
     def test_empty_text_is_refused(self):
         response = self.post({'obs': self.sample.pk, 'audience': 'all', 'text': '   '}, user=self.member)
         self.assertEqual(response.status_code, 200)

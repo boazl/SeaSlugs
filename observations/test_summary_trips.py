@@ -200,6 +200,9 @@ class SeriesPlanningTests(TestCase):
         select = html.split('name="obs"')[1].split('</select>')[0]
         for sample in (self.series, part1, part2):
             self.assertIn(f'value="{sample.pk}"', select)
+        # "only to <the discussion manager's name>" (the series' owner; changes with the chosen trip)
+        self.assertIn('רק ל<span class="manager-name">member</span>', html)
+        self.assertIn('data-manager="member"', select)
         response = self.client.post('/forum/', {'obs': part2.pk, 'audience': 'all', 'text': 'מצטרף במרץ', 'next': '/forum/trip/SE/'})
         message = ForumMessage.objects.get(text='מצטרף במרץ')
         self.assertEqual((message.observation_id, response['Location']), (part2.pk, f'/forum/trip/SE/#m-{message.pk}'))

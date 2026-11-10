@@ -17,7 +17,7 @@
 <section class="forum-write" id="write"><h2>{{ "הוספת תגובה לתצפית"|t:lang }}</h2>
 {% if not can_write %}<p class="badge">{{ "הדיון נסגר: תאריך המסע המתוכנן עבר."|t:lang }}</p>{% elif user.is_authenticated %}<form method="post" action="{{ sample.discussion_url }}">{% csrf_token %}<input type="hidden" name="obs" value="{{ sample.pk }}">
 {% if form.errors %}<p class="errorlist">{{ "ההודעה לא נשמרה: יש לכתוב את תוכן ההודעה (עד 5000 תווים)."|t:lang }}</p>{% endif %}
-<fieldset><legend>{{ "למי ההודעה?"|t:lang }}</legend><label><input type="radio" name="audience" value="all"{% if form.audience.value != 'manager' %} checked{% endif %}> {{ "לכולם"|t:lang }}</label><label><input type="radio" name="audience" value="manager"{% if form.audience.value == 'manager' %} checked{% endif %}> {{ "רק למנהל הדיון (בעל התצפית)"|t:lang }}</label></fieldset>
+<fieldset><legend>{{ "למי ההודעה?"|t:lang }}</legend><label><input type="radio" name="audience" value="all"{% if form.audience.value != 'manager' %} checked{% endif %}> {{ "לכולם"|t:lang }}</label><label><input type="radio" name="audience" value="manager"{% if form.audience.value == 'manager' %} checked{% endif %}> {% if lang == 'en' %}Only to <span class="manager-name">{{ sample.manager_name }}</span>{% else %}רק ל<span class="manager-name">{{ sample.manager_name }}</span>{% endif %}</label></fieldset>
 <p><label for="forum-subject">{{ "נושא (לא חובה)"|t:lang }}</label><input type="text" id="forum-subject" name="subject" maxlength="200" value="{{ form.subject.value|default:'' }}"></p>
 <p><label for="forum-text">{{ "ההודעה"|t:lang }}</label><textarea id="forum-text" name="text" maxlength="5000" required>{{ form.text.value|default:'' }}</textarea></p>
 <button type="submit">{{ "שליחה"|t:lang }}</button></form>

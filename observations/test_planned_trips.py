@@ -193,3 +193,17 @@ class PlanningPagesTests(PlannedSetup):
         response = self.client.get('/planning/F1/')
         self.assertEqual((response.status_code, response['Location']), (301, '/trip/F1/'))
         self.assertEqual(self.client.get('/planning/NOPE/').status_code, 404)
+
+
+class PlannedListingTests(PlannedSetup):
+    """A dive-trip planning has no photographer: its card in the observations listing shows no "צילום:" line, and the
+    place line skips the empty site (no "· ·")."""
+
+    def test_listing_card(self):
+        sample = self.planning()
+        self.client.force_login(self.member)
+        html = self.client.get('/observations/?mine=1').content.decode()
+        card = html.split('מסע לאילת')[1].split('</article>')[0]
+        self.assertNotIn('צילום:', card)
+        self.assertNotIn('· ·', card)
+        self.assertIn('ישראל · אילת · ', card)
