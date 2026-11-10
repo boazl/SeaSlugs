@@ -651,9 +651,9 @@ class ArticleFilesLinkTests(TestCase):
         self.client.force_login(boss)
         html = self.client.get('/observations/trips/').content.decode()
         self.assertIn('href="/admin/article-files/"', html)
-        self.assertIn('ניהול קבצי מאמרים', html)
-        self.assertIn('Article files', self.client.get('/observations/trips/?lang=en').content.decode())
-        self.assertIn('מחיקת קבצים ומאמרים מיותרים', self.client.get('/admin/').content.decode())
+        self.assertIn('ניהול והעברת מאמרים', html)
+        self.assertIn('Articles: manage and transfer', self.client.get('/observations/trips/?lang=en').content.decode())
+        self.assertIn('מאמרים — העברה בין המק לאתר', self.client.get('/admin/').content.decode())
         self.client.force_login(staff)
         self.assertNotIn('href="/admin/article-files/"', self.client.get('/observations/trips/').content.decode())
 

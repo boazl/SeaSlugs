@@ -70,6 +70,7 @@ TRANSLATIONS = {
     'ניהול האתר': 'Site admin',
     'ניהול והעברת תמונות': 'Image management',
     'ניהול קבצי מאמרים': 'Article files',
+    'ניהול והעברת מאמרים': 'Articles: manage and transfer',
     'ניהול משתמשים': 'Users',
     'ניהול גרסאות וגיבויים': 'Releases & backups',
     'העברת טבלאות': 'Table transfer',
