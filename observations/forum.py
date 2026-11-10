@@ -320,10 +320,6 @@ def forum(request):
             x.discussion_url = forum_url(x, lang)
             x.message_count = child_counts.get(x.pk, 0)
         context.update({'series_parent': parent, 'series_children': children})
-        # a dive trip's or a planning's own discussion page, to send to people (forum_trip)
-        if share_link(sample, user) and trip_observation(sample.trip) == sample:
-            context['share_url'] = request.build_absolute_uri(share_link(sample, user))
-            context['copy_links'] = True
         # a dive trip's or a planning's articles (e.g. a series' schedule)
         if sample.kind in (Sample.Kind.COLLECTION, Sample.Kind.PLANNED) and sample.trip_id:
             from .articles import article_links
@@ -352,7 +348,6 @@ def forum(request):
             m = s.thread[-1]
             s.last_time = timezone.localtime(m.created_at)
             s.last_author = _display_name(m.user, lang)
-            s.share_url = share_link(s, user)
             # a dive trip's discussion opens on the trip's own page, without the filters and picker (forum_trip)
             if s.kind in (Sample.Kind.PLANNED, Sample.Kind.COLLECTION) and s.trip_id and trip_observation(s.trip) == s:
                 s.discussion_url = trip_forum_url(s.trip, lang)
@@ -364,7 +359,6 @@ def forum(request):
             discussions.append(head)
         context.update({
             'page': page, 'total_discussions': len(latest), 'discussions': discussions,
-            'copy_links': any(x.share_url for d in discussions for x in [d, *d.children]),
             'page_query': f'{query}&' if query else '',
         })
     return render(request, 'observations/forum.html', context)
@@ -415,19 +409,6 @@ def trip_forum_url(trip, lang='he'):
     return with_lang(reverse('forum-trip', args=[trip.code]), lang)
 
 
-def share_link(sample, user):
-    """The "copy the discussion link" button's address (the trip's own discussion page, without ?lang) -- only on a
-    summary trip's discussion (its planning or collection observation) and only for its discussion manager (the
-    observation's owner) and the site managers; '' otherwise."""
-    if sample.kind not in (Sample.Kind.PLANNED, Sample.Kind.COLLECTION) or not sample.trip_id:
-        return ''
-    if not (is_site_manager(user) or (user.is_authenticated and sample.owner_id == user.pk)):
-        return ''
-    if not sample.trip.sub_trips.exists():
-        return ''
-    return trip_forum_url(sample.trip)
-
-
 def forum_trip(request, code):
     """/forum/trip/<trip code>/: one dive trip's discussion on a page of its own, to send to people -- without the
     forum's filters and picker. A summary trip's page holds the series: its discussion, then each of its trips'
@@ -461,7 +442,6 @@ def forum_trip(request, code):
             s.last_time = timezone.localtime(s.thread[-1].created_at)
             s.last_author = _display_name(s.thread[-1].user, lang)
         s.label = observation_label(s, lang)
-        s.share_url = share_link(s, user)
         return s
     head = entry(members[0])
     head.children = sorted((entry(s) for s in members[1:]), key=lambda s: (s.trip.start_date() or date.max, s.pk))
@@ -470,8 +450,6 @@ def forum_trip(request, code):
     from .articles import article_links
     return render(request, 'observations/forum_trip.html', {
         'head': head, 'trip': trip, 'writable': writable, 'here': here, 'form': ForumMessageForm(),
-        'share_url': request.build_absolute_uri(share_link(head, user)) if share_link(head, user) else '',
-        'copy_links': any(x.share_url for x in [head, *head.children]),
         'article_links': article_links(trip.articles.all(), lang),
         'summary_url': trip_forum_url(trip.summary_trip, lang) if trip.summary_trip_id and trip_observation(trip.summary_trip) else '',
         'login_url': login_url(here + '#write', lang), 'signup_url': signup_url(here + '#write', lang),

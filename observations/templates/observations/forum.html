@@ -10,7 +10,6 @@
 <script>document.querySelectorAll('#choose select').forEach(function(select){select.addEventListener('change',function(){var form=select.form;(select.dataset.resets||'').split(' ').forEach(function(name){var other=name&&form.elements[name];if(other)other.value='';});form.submit();});});</script>
 {% if sample %}
 {% include 'observations/_forum_observation.html' with s=sample full=True %}
-{% if share_url %}<p class="forum-series"><button type="button" class="copy-link-button" data-copy-url="{{ share_url }}" data-done="{{ 'הקישור הועתק'|t:lang }}">{{ "העתקת קישור לדיון"|t:lang }}</button> <a href="{{ share_url }}" dir="ltr">{{ share_url }}</a></p>{% endif %}
 {% if trip_articles %}<div class="forum-series">{% include 'observations/_article_links.html' with links=trip_articles %}</div>{% endif %}
 {% if series_parent %}<p class="forum-series">{{ "חלק מסדרת המסעות:"|t:lang }} <a href="{{ series_parent.discussion_url }}">{{ series_parent.label }}</a></p>{% endif %}
 {% if series_children %}<div class="forum-series"><b>{{ "הדיונים במסעות הסדרה:"|t:lang }}</b><ul>{% for x in series_children %}<li><a href="{{ x.discussion_url }}">{{ x.label }}</a>{% if x.message_count %} ({{ x.message_count }}){% endif %}</li>{% endfor %}</ul></div>{% endif %}
@@ -30,4 +29,4 @@
 {% else %}<p>{{ "אין עדיין דיונים."|t:lang }}</p>{% endif %}
 {% if page.has_other_pages %}<nav class="pager">{% if page.has_previous %}<a href="?{{ page_query }}page={{ page.previous_page_number }}{% if lang == 'en' %}&amp;lang=en{% endif %}">{{ "דיונים חדשים יותר"|t:lang }}</a>{% endif %}{% if page.has_next %}<a href="?{{ page_query }}page={{ page.next_page_number }}{% if lang == 'en' %}&amp;lang=en{% endif %}">{{ "דיונים קודמים"|t:lang }}</a>{% endif %}</nav>{% endif %}
 {% endif %}
-{% if copy_links %}{% include 'observations/_copy_url.html' %}{% endif %}{% endblock %}
+{% endblock %}

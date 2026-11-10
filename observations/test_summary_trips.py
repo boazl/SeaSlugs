@@ -195,10 +195,8 @@ class SeriesPlanningTests(TestCase):
         self.assertLess(children.index(f'id="discussion-{part1.pk}"'), children.index(f'id="discussion-{part2.pk}"'))
         self.assertIn('ינואר', children)
         self.assertIn('/forum/trip/E1/', children)
-        self.assertNotIn('http://testserver/forum/trip/SE/', html)              # a visitor gets no share line
         self.client.force_login(self.member)
         html = self.client.get('/forum/trip/SE/?lang=he').content.decode()
-        self.assertIn('http://testserver/forum/trip/SE/', html)
         select = html.split('name="obs"')[1].split('</select>')[0]
         for sample in (self.series, part1, part2):
             self.assertIn(f'value="{sample.pk}"', select)
@@ -206,26 +204,12 @@ class SeriesPlanningTests(TestCase):
         message = ForumMessage.objects.get(text='מצטרף במרץ')
         self.assertEqual((message.observation_id, response['Location']), (part2.pk, f'/forum/trip/SE/#m-{message.pk}'))
         self.assertEqual(self.client.get('/forum/trip/NOPE/').status_code, 404)
-        # the copy-link button: only on the summary trip, only for its discussion manager (the owner) and the site managers
-        self.assertIn('data-copy-url="/forum/trip/SE/"', html)                  # self.member owns the series
-        self.assertNotIn('data-copy-url="/forum/trip/E1/"', html)               # not on a trip of the series
+        # no copy-link buttons: a trip's row opens its own page, whose address is the link to send
         ForumMessage.objects.create(observation=self.series, user=self.member, text='סדרה')
         landing = self.client.get('/forum/?lang=he').content.decode()
-        self.assertIn('data-copy-url="/forum/trip/SE/"', landing)
-        self.assertIn('class="discussion-row" href="/forum/trip/SE/"', landing)    # a trip's row opens its own page
-        self.assertIn('data-copy-url="/forum/trip/SE/"', self.client.get('/observations/trips/?lang=en').content.decode())
-        self.assertIn('data-copy-url="/forum/trip/SE/"', self.client.get('/planning/SE/?lang=he').content.decode())
-        other = User.objects.create_user('other', password='a-valid-password-927')
-        self.client.force_login(other)
+        self.assertIn('class="discussion-row" href="/forum/trip/SE/"', landing)
         for url in ('/forum/trip/SE/', '/forum/?lang=he', '/observations/trips/', '/planning/SE/', f'/forum/?obs={self.series.pk}'):
             self.assertNotIn('data-copy-url', self.client.get(url).content.decode(), url)
-        self.client.logout()
-        self.assertNotIn('data-copy-url', self.client.get('/forum/trip/SE/').content.decode())
-        self.client.force_login(self.manager)
-        self.assertIn('data-copy-url="/forum/trip/SE/"', self.client.get('/forum/trip/SE/').content.decode())
-        self.client.force_login(self.member)
-        # the forum's discussion page offers the link to the series' owner
-        self.assertIn('http://testserver/forum/trip/SE/', self.client.get(f'/forum/?obs={self.series.pk}').content.decode())
 
     def test_planning_section_and_forum(self):
         html = self.client.get('/observations/trips/').content.decode()
@@ -289,3 +273,72 @@ class PlanPhilippines2027CommandTests(TestCase):
         self.assertEqual(len(table_rows(article.blocks.get(kind='table').text_he)), 22)
         with self.assertRaises(CommandError):
             self.run_command('--apply')
+
+
+class ArticleLinkThumbTests(TestCase):
+    """An article without a picture (a site-written article with no figure, e.g. a schedule) is listed without an
+    empty thumbnail box."""
+
+    def test_no_empty_thumbnail(self):
+        from .articles import article_links
+        from .models import Article, ArticleBlock
+        from django.template.loader import render_to_string
+        article = Article.objects.create(slug='schedule', title_he='לוח זמנים', published_on=date.today())
+        ArticleBlock.objects.create(article=article, kind='table', text_he='א | ב\n1 | 2')
+        html = render_to_string('observations/_article_links.html', {'links': article_links([article], 'he'), 'lang': 'he'})
+        self.assertIn('לוח זמנים', html)
+        self.assertNotIn('class="article-thumb"', html)
+
+
+class ArticleSiteEditTests(TestCase):
+    """A dive trip's organizer (the owner of its planning / collection observation) edits the trip's site-written
+    article -- e.g. the schedule -- on the site at /articles/<slug>/edit/, not in the admin: titles and sections in both
+    languages, adding and deleting sections; figures stay. Others cannot; staff keep the admin's edit link."""
+
+    def setUp(self):
+        from .models import Article, ArticleBlock
+        self.ofer = User.objects.create_user('ofer', password='a-valid-password-927')
+        self.other = User.objects.create_user('other', password='a-valid-password-927')
+        country = Country.objects.create(name='ישראל', name_en='Israel')
+        region = Region.objects.create(name='אילת', name_en='Eilat', country=country, sea=Sea.objects.create(name='ים סוף'))
+        self.trip = DiveTrip.objects.create(title='סדרה', code='SR', year=TODAY.year + 1, month=4, country=country, region=region)
+        Sample(kind='planned', trip=self.trip, owner=self.ofer, title='סדרה').save_reviewed()
+        self.article = Article.objects.create(slug='schedule', title_he='לוח זמנים', published_on=TODAY)
+        self.block = ArticleBlock.objects.create(article=self.article, position=10, kind='table', text_he='יום | אתר\n1 | דהב')
+        self.trip.articles.add(self.article)
+
+    def data(self, **extra):
+        data = {'title_he': 'לוח זמנים מעודכן', 'title_en': 'Schedule', 'subtitle_he': '', 'subtitle_en': '',
+                'blocks-TOTAL_FORMS': '2', 'blocks-INITIAL_FORMS': '1', 'blocks-MIN_NUM_FORMS': '0', 'blocks-MAX_NUM_FORMS': '1000',
+                'blocks-0-id': str(self.block.pk), 'blocks-0-position': '10', 'blocks-0-kind': 'table',
+                'blocks-0-title_he': '', 'blocks-0-title_en': '', 'blocks-0-text_he': 'יום\tאתר\n1\tאילת', 'blocks-0-text_en': '',
+                'blocks-1-position': '20', 'blocks-1-kind': 'paragraph', 'blocks-1-title_he': '', 'blocks-1-title_en': '',
+                'blocks-1-text_he': 'הערה חדשה', 'blocks-1-text_en': ''}
+        data.update(extra)
+        return data
+
+    def test_organizer_edits_on_the_site(self):
+        self.client.force_login(self.ofer)
+        page = self.client.get('/articles/schedule/').content.decode()
+        self.assertIn('href="/articles/schedule/edit/"', page)
+        self.assertNotIn('/admin/', page.split('<main>')[1])
+        response = self.client.post('/articles/schedule/edit/', self.data())
+        self.assertEqual(response.status_code, 302, response.content.decode()[:2000] if response.status_code != 302 else '')
+        self.article.refresh_from_db()
+        self.assertEqual(self.article.title_he, 'לוח זמנים מעודכן')
+        self.assertEqual(list(self.article.blocks.order_by('position').values_list('kind', 'text_he')),
+                         [('table', 'יום\tאתר\n1\tאילת'), ('paragraph', 'הערה חדשה')])
+
+    def test_delete_a_section_but_not_all(self):
+        self.client.force_login(self.ofer)
+        response = self.client.post('/articles/schedule/edit/', self.data(**{'blocks-0-DELETE': 'on', 'blocks-1-text_he': ''}))
+        self.assertEqual(response.status_code, 200)              # an article needs a section
+        self.assertTrue(self.article.blocks.exists())
+        self.client.post('/articles/schedule/edit/', self.data(**{'blocks-0-DELETE': 'on'}))
+        self.assertEqual(list(self.article.blocks.values_list('kind', flat=True)), ['paragraph'])
+
+    def test_others_cannot(self):
+        self.assertEqual(self.client.get('/articles/schedule/edit/').status_code, 302)        # to the login page
+        self.client.force_login(self.other)
+        self.assertEqual(self.client.get('/articles/schedule/edit/').status_code, 404)
+        self.assertNotIn('/articles/schedule/edit/', self.client.get('/articles/schedule/').content.decode())

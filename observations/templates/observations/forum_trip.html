@@ -1,5 +1,4 @@
 {% extends 'observations/base.html' %}{% load seaslugs_i18n seo %}{% block title %}SeaSlugs · {{ head.label }}{% endblock %}{% block share_meta %}{% share_meta head.label "פורום תצפיות"|t:lang head.note_he %}{% endblock %}{% block content %}{% include 'observations/_forum_style.html' %}
-{% if share_url %}<p class="forum-series"><button type="button" class="copy-link-button" data-copy-url="{{ share_url }}" data-done="{{ 'הקישור הועתק'|t:lang }}">{{ "העתקת קישור לדיון"|t:lang }}</button> <a href="{{ share_url }}" dir="ltr">{{ share_url }}</a></p>{% endif %}
 {% if head.page_url %}<p class="forum-series"><a href="{{ head.page_url }}">{% if head.kind == 'planned' %}{{ "לדף תכנון המסע"|t:lang }}{% else %}{{ "לדף המסע"|t:lang }}{% endif %}</a></p>{% endif %}
 {% if summary_url %}<p class="forum-series">{{ "חלק מסדרת המסעות:"|t:lang }} <a href="{{ summary_url }}">{{ trip.summary_trip.title }}</a></p>{% endif %}
 {% if article_links %}<div class="forum-series">{% include 'observations/_article_links.html' with links=article_links %}</div>{% endif %}
@@ -15,4 +14,4 @@
 {% else %}<p>{{ "כדי לכתוב בפורום יש"|t:lang }} <a href="{{ login_url }}">{{ "להיכנס"|t:lang }}</a> {{ "או"|t:lang }} <a href="{{ signup_url }}">{{ "להירשם לאתר"|t:lang }}</a>.</p>{% endif %}
 </section>
 
-{% if copy_links %}{% include 'observations/_copy_url.html' %}{% endif %}{% endblock %}
+{% endblock %}

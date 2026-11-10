@@ -281,6 +281,10 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
     entries. A table block is one row per line with cells separated by `|`, or a table copied from Excel and pasted as
     is (tab-separated; quoted cells may hold line breaks; `article_render.table_rows`). Excel files themselves are not
     uploaded.
+  - **Edited on the site** (`article_edit.py`, `/articles/<slug>/edit/`) by the organizer of a dive trip that picks the
+    article (the owner of the trip's planning / collection observation) and the managers: titles, subtitles and the
+    sections (add, delete, kind, order, he/en text); figures stay (admin). The article page's "עריכת מאמר" leads there
+    for the organizer and to the admin for staff. An article without a picture is listed without a thumbnail box.
   - Picked from the library by species, taxa and dive trips through their `articles` M2M.
 - **`Profile`**: `user` 1:1. `must_change_password` (migration `0098`): a temporary password a manager set -- the
   member is sent to `/observations/password/` (`views.password_change`, `PasswordChangeRequiredMiddleware`) from every
@@ -575,11 +579,8 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
 - **A trip's own discussion page** `/forum/trip/<trip code>/` (`forum.forum_trip`), to send to people: no filters,
   picker or headings. The trip's discussion (its planning, else its collection observation) and, for a summary trip,
   its trips' discussions by date, indented, all open with +/-; one writing box (a choice of trip in a series) that
-  returns here (`next`). A "העתקת קישור לדיון" button (`forum.share_link`, `_copy_url.html`; the address without `?lang`,
-  so a recipient gets their own language) appears only on a summary trip's discussion and only for its discussion
-  manager (the owner) and the site managers -- on its row in the forum and on this page, the forum's discussion of it,
-  its planning card and its planning page (with the full address beside it on the discussion pages); "לדיון בפורום"
-  in the planning section and page leads here. The forum page itself has no headings (the page title stays).
+  returns here (`next`). The address in the browser is the link to send (no copy button); "לדיון בפורום" in the planning section and
+  page leads here. The forum page itself has no headings (the page title stays).
 - **A closed dive-trip planning** (its date has passed): gone from the forum for everyone but its owner and the site
   managers, and nobody can write in it ("הדיון נסגר").
 - **Discussion manager** = the observation's owner (photographer).

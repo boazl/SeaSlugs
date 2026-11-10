@@ -196,6 +196,8 @@ OWN_OBSERVATION_HEADINGS = {'תצפיות באתר', 'התצפיות באתר', 
 def article_page(request, slug):
     """An article written on the site, in the page's language (a PDF-only article: its PDF)."""
     from .article_render import inline, plain, reference_list, render_blocks
+    from .article_edit import can_edit_on_site
+    from .templatetags.seaslugs_i18n import with_lang
     from .seo_text import multi_sea_country_ids
     lang = get_lang(request)
     article = get_object_or_404(Article.objects.prefetch_related('blocks', 'references'), slug=slug)
@@ -231,4 +233,6 @@ def article_page(request, slug):
         'share_image': reverse('observation-photo', args=[figure.pk]) if figure else '',
         'pdf_url': article.pdf_url(lang), 'pdf_other_language': bool(article.pdf_lang(lang) and article.pdf_lang(lang) != lang),
         'can_edit_article': request.user.is_staff and request.user.has_perm('observations.change_article'),
+        # a dive trip's organizer edits the trip's article on the site (article_edit.py), not in the admin
+        'site_edit_url': with_lang(reverse('article-edit', args=[article.slug]), lang) if can_edit_on_site(request.user, article) else '',
     })

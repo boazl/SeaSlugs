@@ -128,8 +128,7 @@ def planning_list(request):
     lang = get_lang(request)
     rows = planning_rows(request, lang)
     return render(request, 'observations/planning_list.html', {
-        'plannings': rows, 'plan_new_url': plan_new_url(request), 'planning_page': True,
-        'copy_links': any(s.share_url for s in rows)})
+        'plannings': rows, 'plan_new_url': plan_new_url(request), 'planning_page': True})
 
 
 def planning_page(request, code):
@@ -140,7 +139,7 @@ def planning_page(request, code):
     from django.http import Http404, HttpResponsePermanentRedirect
     from django.shortcuts import get_object_or_404, render
     from .articles import article_links
-    from .forum import _annotate, can_write, forum_url, is_site_manager, new_comment_url, share_link, trip_forum_url, visible_messages
+    from .forum import _annotate, can_write, forum_url, is_site_manager, new_comment_url, trip_forum_url, visible_messages
     from .i18n import get_lang
     from .models import DiveTrip, full_name_for
     from .templatetags.seaslugs_i18n import loc
@@ -177,7 +176,7 @@ def planning_page(request, code):
         'parent': describe(parent) if parent else None, 'children': children,
         'messages_list': messages_list, 'can_write': can_write(sample), 'closed': not sample.planning_open,
         'forum_url': forum_url(sample, lang), 'forum_new_url': new_comment_url(sample, lang),
-        'trip_forum_url': trip_forum_url(trip, lang), 'share_url': share_link(sample, user), 'copy_links': bool(share_link(sample, user)),
+        'trip_forum_url': trip_forum_url(trip, lang),
         'edit_url': sample_edit_url(request, [sample]),
         'meta_description': ' · '.join(x for x in (sample.date_text, sample.display_place, note) if x)[:300],
     })

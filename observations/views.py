@@ -78,7 +78,6 @@ def trips(request):
     plannings = planning_rows(request, lang)
     return render(request, 'observations/trips.html', {'trips':rows, **filters,
         'trips_with_video': [t for t in rows if t.video_cards], 'plannings': plannings,
-        'copy_links': any(s.share_url for s in plannings),
         'plan_new_url': plan_new_url(request), 'planning_list_url': with_lang(reverse('planning-list'), lang)})
 
 
@@ -87,7 +86,7 @@ def planning_rows(request, lang):
     with its place, dates, organizer, comments and links to its discussion in the forum; a series planning (a summary
     trip) carries the plannings of its trips (sub_rows)."""
     from .planned_trips import open_plannings, sub_plannings, date_range_text, planning_page_url
-    from .forum import forum_counts, new_comment_url, share_link, trip_forum_url
+    from .forum import forum_counts, new_comment_url, trip_forum_url
     rows = open_plannings()
     for s in rows:
         s.sub_rows = sub_plannings(s)
@@ -103,7 +102,6 @@ def planning_rows(request, lang):
         s.organizer = full_name_for(s.owner, lang) or s.owner.username
         s.forum_count = counts.get(s.pk, 0)
         s.forum_url = trip_forum_url(trip, lang)        # the trip's own discussion page, without the forum's picker
-        s.share_url = share_link(s, request.user)       # the copy-link button: a summary trip, for its manager
         s.forum_new_url = new_comment_url(s, lang)
         s.page_url = planning_page_url(trip, lang)
         s.edit_url = sample_edit_url(request, [s])

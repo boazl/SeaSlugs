@@ -1,0 +1,20 @@
+{% extends 'observations/base.html' %}{% load seaslugs_i18n %}{% block title %}SeaSlugs · {{ "עריכת מאמר"|t:lang }}{% endblock %}{% block content %}<style>
+.article-edit-form textarea,.article-edit-form input[type=text]{width:100%}.article-edit-form .pair{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px 20px}.article-edit-form .pair p{margin:8px 0}
+.edit-block{border:1px solid #36515a;border-radius:10px;padding:14px 16px;margin:0 0 18px}.edit-block legend{padding:0 6px;font-weight:600}.edit-block .row{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:end}.edit-block .row input[type=number]{width:90px}.edit-block .row label{display:flex;flex-direction:column;gap:4px}.edit-block .row label.delete{flex-direction:row;align-items:center;gap:6px}
+</style>
+<h1>{{ "עריכת מאמר"|t:lang }}</h1>
+<p><a href="{{ back_url }}">{{ "חזרה למאמר"|t:lang }}</a></p>
+<form method="post" class="article-edit-form">{% csrf_token %}
+{{ form.non_field_errors }}
+<div class="pair"><p><label for="{{ form.title_he.id_for_label }}">{{ "כותרת (עברית)"|t:lang }}</label>{{ form.title_he }}</p><p><label for="{{ form.title_en.id_for_label }}">{{ "כותרת (אנגלית)"|t:lang }}</label>{{ form.title_en }}</p>
+<p><label for="{{ form.subtitle_he.id_for_label }}">{{ "כותרת משנה (עברית)"|t:lang }}</label>{{ form.subtitle_he }}</p><p><label for="{{ form.subtitle_en.id_for_label }}">{{ "כותרת משנה (אנגלית)"|t:lang }}</label>{{ form.subtitle_en }}</p></div>
+<h2>{{ "קטעי המאמר"|t:lang }}</h2>
+<p class="helptext">{{ "טבלה: שורה לכל שורה, תאים מופרדים ב־|, השורה הראשונה כותרת — או טבלה שהועתקה מ־Excel והודבקה כמו שהיא. רשימה: שורה לכל פריט. **מודגש**, *נטוי*, [טקסט](קישור). הקטעים מוצגים לפי המספר בשדה הסדר."|t:lang }}</p>
+{% if figures %}<p class="helptext">{{ "איורים (תמונות של תצפיות) נשארים כמו שהם; מנהל האתר עורך אותם."|t:lang }}</p>{% endif %}
+{{ blocks.management_form }}{{ blocks.non_form_errors }}
+{% for f in blocks %}<fieldset class="edit-block"><legend>{% if f.instance.pk %}{{ "קטע"|t:lang }} {{ f.instance.position }}{% else %}{{ "קטע חדש"|t:lang }}{% endif %}</legend>{{ f.id }}{% for e in f.non_field_errors %}<p class="errorlist">{{ e }}</p>{% endfor %}
+<div class="row"><label>{{ "סדר"|t:lang }}{{ f.position }}</label><label>{{ "סוג הקטע"|t:lang }}{{ f.kind }}</label>{% if f.instance.pk %}<label class="delete">{{ f.DELETE }} {{ "מחיקת הקטע"|t:lang }}</label>{% endif %}</div>
+<div class="pair"><p><label>{{ "כותרת (עברית)"|t:lang }}</label>{{ f.title_he }}</p><p><label>{{ "כותרת (אנגלית)"|t:lang }}</label>{{ f.title_en }}</p>
+<p><label>{{ "טקסט (עברית)"|t:lang }}</label>{{ f.text_he }}</p><p><label>{{ "טקסט (אנגלית)"|t:lang }}</label>{{ f.text_en }}</p></div></fieldset>{% endfor %}
+<button type="submit">{{ "שמירה"|t:lang }}</button></form>
+{% endblock %}
