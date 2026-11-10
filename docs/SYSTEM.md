@@ -300,8 +300,14 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
 - **`ForumMessage`** (migration `0094`): a message in the observations forum (§7.5): `observation` FK→Sample (required),
   `created_at`, `user`, `manager_only`, `subject` (optional), `text`, soft delete `deleted_at`/`deleted_by`, and
   `transfer_id` (UUID, the transfer key). Travels with the table transfer (table `forum`, §10.2).
-- **Users:** Django `auth.User` with groups created by `setup_community`:
-  - New user, Macro diver, Subscriber, Macro photographer, Artist, Scientist, Administrator.
+- **Users:** Django `auth.User` with groups created by `setup_community` (migration `0099` deleted the unused New user,
+  Subscriber and Artist):
+  - **Macro diver** -- the partners list (`views.partners`, `test_partners.py`) shows members who ticked "interested in
+    finding macro diving partners" (`Profile.macro_diver`) and "show my profile to members" **and** are in this group.
+    Tick and group follow each other both ways (`models._sync_macro_diver`, an `m2m_changed` signal; the profile form
+    adds / removes the group): a manager removes someone from the list by removing them from the group.
+  - **Macro photographer** -- the photographers (below). **Scientist** / **Administrator** -- admin permissions (species /
+    all observation tables except delete) for staff members.
   - **Photographers** (`photographers.py`, `test_guest_photographers.py`): an observation always belongs to a
     user, its photographer. The photographers are the **"Macro photographer" group** -- not every member (divers
     only are not). A member joins it with the bilingual "אני צלם/ת" / "I am a photographer" box on the sign-up

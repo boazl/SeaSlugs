@@ -933,7 +933,6 @@ def signup(request):
     form = SignupForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
         user=form.save()
-        user.groups.add(Group.objects.get_or_create(name='New user')[0])
         Profile.objects.create(user=user, first_name_en=form.cleaned_data['first_name_en'], last_name_en=form.cleaned_data['last_name_en'])
         if form.cleaned_data.get('is_photographer'):
             from .forms import set_photographer
@@ -977,7 +976,9 @@ def profile(request):
     form=ProfileForm(request.POST or None,instance=item,lang=lang)
     if request.method=='POST' and form.is_valid():
         item=form.save()
-        group=Group.objects.get_or_create(name='Macro diver')[0]
+        # the tick and the "Macro diver" group follow each other (models._sync_macro_diver)
+        from .models import MACRO_DIVER_GROUP
+        group=Group.objects.get_or_create(name=MACRO_DIVER_GROUP)[0]
         if item.macro_diver: request.user.groups.add(group)
         else: request.user.groups.remove(group)
         messages.success(request,'הפרופיל נשמר.')
@@ -987,11 +988,22 @@ def profile(request):
 
 @login_required
 def partners(request):
-    rows=Profile.objects.filter(macro_diver=True,visible_to_members=True).prefetch_related('regions','countries')
-    if request.GET.get('region'): rows=rows.filter(regions__id=request.GET['region'])
-    if request.GET.get('country'): rows=rows.filter(countries__id=request.GET['country'])
-    from .models import Country
-    return render(request,'observations/partners.html',{'profiles':rows.distinct(),'regions':Region.objects.all(),'countries':Country.objects.all()})
+    """Macro diving partners: members who chose to be listed, in the page's language (names, countries, regions)."""
+    lang=get_lang(request)
+    from .models import MACRO_DIVER_GROUP
+    # listed: ticked "interested" and "show my profile", and in the "Macro diver" group (a manager removes someone there)
+    rows=Profile.objects.filter(macro_diver=True,visible_to_members=True,user__is_active=True,user__groups__name=MACRO_DIVER_GROUP
+                                ).select_related('user').prefetch_related('regions','countries')
+    if _int(request.GET.get('region')): rows=rows.filter(regions__id=_int(request.GET['region']))
+    if _int(request.GET.get('country')): rows=rows.filter(countries__id=_int(request.GET['country']))
+    profiles=list(rows.distinct())
+    for p in profiles:
+        p.display_name=full_name_for(p.user,lang) or p.user.username
+        p.country_names=[loc(x,lang) for x in p.countries.all()]
+        p.region_names=[loc(x,lang) for x in p.regions.all()]
+    order=(lambda x:(x.name_en or x.name).lower()) if lang=='en' else (lambda x:x.name)
+    return render(request,'observations/partners.html',{'profiles':profiles,
+        'regions':sorted(Region.objects.all(),key=order),'countries':sorted(Country.objects.all(),key=order)})
 
 
 @login_required

@@ -4,7 +4,7 @@ from observations.models import Country, Sea, Region
 class Command(BaseCommand):
     help='Create initial role groups and geographic reference data, without assigning users.'
     def handle(self,*args,**options):
-        for name in ['New user','Subscriber','Macro diver','Macro photographer','Artist','Scientist','Administrator']:
+        for name in ['Macro diver','Macro photographer','Scientist','Administrator']:
             group,_=Group.objects.get_or_create(name=name)
             if name=='Scientist': group.permissions.add(*Permission.objects.filter(content_type__app_label='observations',codename__in=['view_species','add_species','change_species']))
             if name=='Administrator': group.permissions.add(*Permission.objects.filter(content_type__app_label='observations').exclude(codename__startswith='delete_'))

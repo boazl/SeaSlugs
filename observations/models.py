@@ -1740,3 +1740,45 @@ class ForumMessage(models.Model):
     def discussion_manager(self):
         """The observation's owner."""
         return self.observation.owner
+
+
+# --- the macro diving partners list (views.partners) and the "Macro diver" group ---------------------------------------
+# A member is listed when they ticked "interested in finding macro diving partners" (Profile.macro_diver) and "show my
+# profile to members", and belong to the "Macro diver" group. The tick and the group follow each other both ways: the
+# profile form adds / removes the group, and a manager who removes someone from the group in the admin (or adds them)
+# unticks (ticks) their profile -- so removing a member from the group takes them off the list.
+MACRO_DIVER_GROUP = 'Macro diver'
+
+
+def _sync_macro_diver(sender, instance, action, reverse, model, pk_set, **kwargs):
+    from django.contrib.auth.models import Group
+    if action not in ('post_add', 'post_remove', 'pre_clear'):
+        return
+    if not reverse:          # user.groups.add/remove/clear(...): instance is the user, pk_set group ids
+        group = Group.objects.filter(name=MACRO_DIVER_GROUP).first()
+        if group is None:
+            return
+        if action == 'pre_clear':
+            if instance.groups.filter(pk=group.pk).exists():
+                Profile.objects.filter(user=instance).update(macro_diver=False)
+            return
+        if group.pk not in (pk_set or ()):
+            return
+        users = [instance.pk]
+    else:                    # group.user_set.add/remove/clear(...): instance is the group, pk_set user ids
+        if instance.name != MACRO_DIVER_GROUP:
+            return
+        users = list(instance.user_set.values_list('pk', flat=True)) if action == 'pre_clear' else list(pk_set or ())
+    on = action == 'post_add'
+    for user_id in users:
+        profile, _ = Profile.objects.get_or_create(user_id=user_id)
+        if profile.macro_diver != on:
+            Profile.objects.filter(pk=profile.pk).update(macro_diver=on)
+
+
+def _connect_macro_diver_sync():
+    from django.contrib.auth.models import User
+    models.signals.m2m_changed.connect(_sync_macro_diver, sender=User.groups.through, dispatch_uid='sync_macro_diver')
+
+
+_connect_macro_diver_sync()
