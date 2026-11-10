@@ -215,7 +215,7 @@ class SeriesPlanningTests(TestCase):
             self.assertNotIn('data-copy-url', self.client.get(url).content.decode(), url)
 
     def test_planning_section_and_forum(self):
-        html = self.client.get('/observations/trips/').content.decode()
+        html = self.client.get('/observations/trips/?view=planning').content.decode()
         section = html.split('id="planning"')[1].split('</section>')[0]
         card = section.split(f'id="planned-{self.series.pk}"')[1]
         part = Sample.objects.get(trip=self.part1)

@@ -6,10 +6,13 @@
 .trip-detail>td{padding:4px 12px 22px;background:#0b222d}.trip-detail p{margin:6px 0}.trip-detail h3{font-size:16px;margin:14px 0 0}.trip-name a{color:inherit;text-decoration:none}.card-species{margin:10px 0 0;font-size:15px}
 @media (prefers-reduced-motion:reduce){.trip-arrow{transition:none}}
 
+
+.trip-states{display:inline-flex;flex-wrap:wrap;margin:0 0 20px;border:1px solid #36515a;border-radius:999px;overflow:hidden}.trip-states a{padding:7px 16px;text-decoration:none;font-size:15px;border-inline-start:1px solid #36515a}.trip-states a:first-child{border-inline-start:0}.trip-states a[aria-current=page]{background:#61dfcc;color:#08232a}.trip-states span{opacity:.75}
 </style>
 <h1>{{ "מסעות צלילה"|t:lang }}</h1>
+<nav class="trip-states" aria-label="{{ 'מצב המסעות'|t:lang }}"><a href="{{ held_url }}"{% if not planning_view %} aria-current="page"{% endif %}>{{ "מסעות שהתקיימו"|t:lang }}</a><a href="{{ planning_url }}"{% if planning_view %} aria-current="page"{% endif %}>{{ "תכנון מסעות צלילה"|t:lang }} <span>({{ plannings|length }})</span></a></nav>
+{% if planning_view %}{% include 'observations/_planning_section.html' with planning_page=True %}{% else %}
 <p>{{ "סרטוני אוסף ממסעות צלילה, לצד הדגימות המשויכות לכל מסע."|t:lang }}</p>
-{% include 'observations/_planning_section.html' %}
 {% include 'observations/_trip_filters.html' %}
 {% if trips_with_video %}
 <h2>{{ "סרטוני המסעות"|t:lang }}</h2>
@@ -101,4 +104,5 @@
 })();
 </script>
 {% else %}<p>{{ "עדיין אין מסעות עם תמונות או סרטונים מפורסמים."|t:lang }}</p>{% endif %}
+{% endif %}
 {% endblock %}

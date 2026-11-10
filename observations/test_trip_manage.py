@@ -298,3 +298,56 @@ class AddTripTests(Fixture):
         r = self.client.post('/observations/trips/new/?next=/observations/new/', {'title': 'Old way', 'country': str(self.israel.pk), 'region': str(self.akhziv.pk), 'year': '2026', 'next': '/observations/new/'})
         self.assertEqual(r.status_code, 302)
         self.assertTrue(DiveTrip.objects.filter(title='Old way').exists())
+
+
+class TripStateSwitchTests(Fixture):
+    """The trips management page separates the trips that took place (the default) from the trips being planned (not
+    started yet: DiveTrip.start_date after today), with a switch between the two, its counts, and the state kept by the
+    filters and the sort links. A dive-trip planning is not counted as an observation of its trip."""
+
+    def setUp(self):
+        super().setUp()
+        from .models import Sample
+        self.past = DiveTrip.objects.create(title='עבר', code='PAST', year=NOW.year - 1, month=3, country=self.israel, region=self.eilat)
+        self.future = DiveTrip.objects.create(title='עתיד', code='FUT', year=NOW.year + 1, month=3, country=self.israel, region=self.eilat)
+        Sample(kind='planned', trip=self.future, owner=self.boaz, title='תכנון').save_reviewed()
+        self.client.force_login(self.manager)
+
+    def codes(self, query=''):
+        html = self.client.get('/observations/trips/manage/' + query).content.decode()
+        return html, {code for code in ('PAST', 'FUT') if f'>{code}<' in html}
+
+    def test_switch(self):
+        html, codes = self.codes()
+        self.assertEqual(codes, {'PAST'})
+        self.assertIn('aria-current="page">מסעות שהתקיימו <span>(1)</span>', html)
+        self.assertIn('מסעות בתכנון <span>(1)</span>', html)
+        self.assertEqual(self.codes('?state=planned')[1], {'FUT'})
+        self.assertEqual(self.codes('?state=all')[1], {'PAST'})                 # no 'both' view
+        self.assertEqual(self.codes('?state=nonsense')[1], {'PAST'})
+
+    def test_state_kept_and_planning_not_counted(self):
+        html, _ = self.codes('?state=planned')
+        self.assertIn('name="state" value="planned"', html)
+        self.assertIn('state=planned', html.split('class="trips-table"')[1].split('</thead>')[0])
+        row = html.split('>FUT<')[1].split('</tr>')[0]
+        self.assertIn('<td>0</td>', row)
+
+    def test_series_grouped(self):
+        """A series is one entry: its trips follow its summary trip, by date, indented."""
+        late = DiveTrip.objects.create(title='שני', code='S2', year=NOW.year - 1, month=5, country=self.israel, region=self.eilat)
+        early = DiveTrip.objects.create(title='ראשון', code='S1', year=NOW.year - 1, month=4, country=self.israel, region=self.eilat)
+        for t in (late, early):
+            t.summary_trip = self.past; t.save()
+        html, _ = self.codes('?sort=-code')
+        self.assertLess(html.index('>PAST<'), html.index('>S1<'))
+        self.assertLess(html.index('>S1<'), html.index('>S2<'))
+        self.assertEqual(html.count('class="in-series"'), 2)
+        self.assertIn('<strong>1</strong>', html)                              # the series counts once
+        self.assertIn('מסעות שהתקיימו <span>(1)</span>', html)
+
+    def test_no_add_observation_on_planned(self):
+        html, _ = self.codes('?state=planned')
+        self.assertNotIn(f'?trip={self.future.pk}"', html)
+        html, _ = self.codes()
+        self.assertIn(f'?trip={self.past.pk}"', html)

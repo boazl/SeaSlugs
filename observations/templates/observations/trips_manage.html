@@ -1,19 +1,20 @@
-{% extends 'observations/base.html' %}{% block content %}
+{% extends 'observations/base.html' %}{% load seaslugs_i18n %}{% block content %}
 <h1>ניהול מסעות צלילה</h1>
 <p>בחרו מדינה, אזור, אתר ושנה כדי לסנן מסעות. לחיצה על כותרת עמודה ממיינת; לחיצה נוספת הופכת את הסדר.</p>
+<nav class="trip-states" aria-label="{{ 'מצב המסעות'|t:lang }}">{% for s in trip_states %}<a href="{{ s.url }}"{% if s.active %} aria-current="page"{% endif %}>{{ s.label|t:lang }} <span>({{ s.count }})</span></a>{% endfor %}</nav>
 {% include 'observations/_trip_filters.html' %}
-<p><strong>{{ trips|length }}</strong> מסעות{% if region %} · {{ region.name }}{% endif %}{% if site %} · {{ site.name }}{% endif %}{% if year %} · {{ year }}{% endif %}</p>
+<p><strong>{{ trip_count }}</strong> מסעות{% if region %} · {{ region.name }}{% endif %}{% if site %} · {{ site.name }}{% endif %}{% if year %} · {{ year }}{% endif %}</p>
 <table class="trips-table">
 <thead><tr>{% for header in sort_headers %}<th scope="col" aria-sort="{{ header.aria }}"><a href="{{ header.url }}">{{ header.label }}{{ header.arrow }}</a></th>{% endfor %}<th scope="col">פעולות</th></tr></thead>
 <tbody>
-{% for trip in trips %}<tr>
+{% for trip in trips %}<tr{% if trip.in_series %} class="in-series"{% endif %}>
 <td><bdi dir="ltr"><code>{{ trip.code }}</code></bdi></td>
-<td>{{ trip.title }}</td>
+<td class="trip-title">{% if trip.in_series %}<span class="series-mark" aria-hidden="true">↳</span> {% endif %}{{ trip.title }}</td>
 <td>{% if trip.region %}{{ trip.region.name }}{% else %}{{ trip.region_name }}{% endif %}{% if trip.site %} · {{ trip.site.name }}{% endif %}</td>
 <td><bdi dir="ltr">{% if trip.start_day %}{{ trip.start_day }}/{% endif %}{% if trip.month %}{{ trip.month }}/{% endif %}{{ trip.year|default_if_none:"" }}</bdi></td>
 <td>{{ trip.sample_count }}</td>
-<td><a href="{% url 'observation-new' %}?trip={{ trip.pk }}">הוספת תצפית</a>{% if manager %} · <a href="{% url 'admin:observations_divetrip_change' trip.pk %}">עריכה</a>{% endif %}</td>
+<td>{% if trip_state != 'planned' %}<a href="{% url 'observation-new' %}?trip={{ trip.pk }}">הוספת תצפית</a>{% endif %}{% if manager %}{% if trip_state != 'planned' %} · {% endif %}<a href="{% url 'admin:observations_divetrip_change' trip.pk %}">עריכה</a>{% endif %}</td>
 </tr>{% empty %}<tr><td colspan="6">אין מסעות לפי המסננים האלה.</td></tr>{% endfor %}
 </tbody></table>
-<style>.trips-table{width:100%;border-collapse:collapse}.trips-table th,.trips-table td{padding:8px 10px;border-bottom:1px solid #36515a;text-align:start;vertical-align:top}.filter-actions .button{text-decoration:none;margin-inline-start:auto}</style>
+<style>.in-series td{background:#0b222d}.in-series .trip-title{padding-inline-start:30px}.series-mark{color:#64dfce}.trip-states{display:inline-flex;flex-wrap:wrap;gap:0;margin:0 0 18px;border:1px solid #36515a;border-radius:999px;overflow:hidden}.trip-states a{padding:7px 16px;text-decoration:none;font-size:15px;border-inline-start:1px solid #36515a}.trip-states a:first-child{border-inline-start:0}.trip-states a[aria-current=page]{background:#61dfcc;color:#08232a}.trip-states span{opacity:.75}.trips-table{width:100%;border-collapse:collapse}.trips-table th,.trips-table td{padding:8px 10px;border-bottom:1px solid #36515a;text-align:start;vertical-align:top}.filter-actions .button{text-decoration:none;margin-inline-start:auto}</style>
 {% endblock %}

@@ -1,6 +1,6 @@
 {% load seaslugs_i18n %}
 <form method="get" class="filter-row trip-filters" id="trip-filter">
-<input type="hidden" name="lang" value="{{ lang }}"><input type="hidden" name="sort" value="{{ sort }}">
+<input type="hidden" name="lang" value="{{ lang }}"><input type="hidden" name="sort" value="{{ sort }}">{% if trip_state %}<input type="hidden" name="state" value="{{ trip_state }}">{% endif %}
 <label>{{ "מדינה"|t:lang }}<select name="country" id="f-country"><option value="">{{ "כל המדינות"|t:lang }}</option>{% for c in countries %}<option value="{{ c.pk }}"{% if country.pk == c.pk %} selected{% endif %}>{{ c|loc:lang }}</option>{% endfor %}</select></label>
 <label>{{ "אזור"|t:lang }}<select name="region" id="f-region"><option value="">{{ "כל האזורים"|t:lang }}</option>{% for r in regions %}<option value="{{ r.pk }}" data-country="{{ r.country_id }}"{% if region.pk == r.pk %} selected{% endif %}>{{ r|loc:lang }}</option>{% endfor %}</select></label>
 <label>{{ "אתר"|t:lang }}<select name="site" id="f-site"><option value="">{{ "כל האתרים"|t:lang }}</option>{% for s in sites %}<option value="{{ s.pk }}" data-region="{{ s.region_id }}" data-country="{{ s.region.country_id }}"{% if site.pk == s.pk %} selected{% endif %}>{{ s|loc:lang }}</option>{% endfor %}</select></label>

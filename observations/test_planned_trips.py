@@ -120,14 +120,24 @@ class PlannedPagesTests(PlannedSetup):
 
     def test_trips_page_section(self):
         sample = self.planning()
-        html = self.client.get('/observations/trips/').content.decode()
+        html = self.client.get('/observations/trips/?view=planning').content.decode()
         section = html.split('id="planning"')[1].split('</section>')[0]
         self.assertIn('מסע לאילת', section)
         self.assertIn('href="/forum/trip/F1/"', section)
         self.assertIn(f'href="/forum/new/?obs={sample.pk}"', section)
         self.close(sample)
-        html = self.client.get('/observations/trips/').content.decode()
+        html = self.client.get('/observations/trips/?view=planning').content.decode()
         self.assertNotIn('מסע לאילת', html.split('id="planning"')[1].split('</section>')[0])
+
+    def test_trips_page_switch(self):
+        """The dive-trips page shows either the trips that took place (the default) or the trip planning, with a switch."""
+        self.planning()
+        held = self.client.get('/observations/trips/').content.decode()
+        self.assertNotIn('id="planning"', held)
+        self.assertIn('href="/observations/trips/?view=planning"', held)
+        planning = self.client.get('/observations/trips/?view=planning').content.decode()
+        self.assertIn('id="planning"', planning)
+        self.assertNotIn('class="trips-table"', planning)
 
     def test_not_in_the_gallery(self):
         self.planning()
@@ -169,7 +179,7 @@ class PlanningPagesTests(PlannedSetup):
         self.assertIn('Discussion', self.client.get('/planning/F1/?lang=en').content.decode())
         listing = self.client.get('/planning/?lang=he').content.decode()
         self.assertIn('href="/planning/F1/"', listing)
-        self.assertIn('href="/planning/F1/"', self.client.get('/observations/trips/?lang=he').content.decode())
+        self.assertIn('href="/planning/F1/"', self.client.get('/observations/trips/?view=planning&lang=he').content.decode())
         self.assertIn('href="/planning/F1/"', self.client.get(f'/forum/?obs={sample.pk}&lang=he').content.decode())
         sitemap = self.client.get('/sitemap.xml').content.decode()
         self.assertIn('/planning/F1/</loc>', sitemap)

@@ -78,7 +78,10 @@ def trips(request):
     plannings = planning_rows(request, lang)
     return render(request, 'observations/trips.html', {'trips':rows, **filters,
         'trips_with_video': [t for t in rows if t.video_cards], 'plannings': plannings,
-        'plan_new_url': plan_new_url(request), 'planning_list_url': with_lang(reverse('planning-list'), lang)})
+        'plan_new_url': plan_new_url(request), 'planning_list_url': with_lang(reverse('planning-list'), lang),
+        # the state switch: the trips that took place (default) or the trips being planned (?view=planning)
+        'planning_view': request.GET.get('view') == 'planning',
+        'held_url': with_lang(reverse('dive-trips'), lang), 'planning_url': with_lang(reverse('dive-trips') + '?view=planning', lang)})
 
 
 def planning_rows(request, lang):
@@ -1415,6 +1418,7 @@ def _trip_list_context(request, available, management=False):
     query = {k: v for k, v in (('country', country.pk if country and request.GET.get('country') else ''),
         ('region', region.pk if region else ''), ('site', site.pk if site else ''), ('year', year or '')) if v}
     if request.GET.get('lang') in ('en', 'he'): query['lang'] = request.GET['lang']
+    if management and request.GET.get('state') in TRIP_STATES: query['state'] = request.GET['state']
     headers = []
     for field, label in [('code', 'סימון'), ('title', 'שם המסע'), ('place', 'מקום'), ('date', 'תאריך'), ('count', 'תצפיות')]:
         if field not in sorts: continue
@@ -1441,16 +1445,67 @@ def _trip_list_context(request, available, management=False):
         'add_url': reverse('trip-add') + ('?' + urlencode(query) if query else '')}
 
 
+TRIP_STATES = {'held': 'מסעות שהתקיימו', 'planned': 'מסעות בתכנון'}
+
+
+def group_series(trips):
+    """A series of trips (DiveTrip.summary_trip) as one entry: each trip whose summary trip is in the list follows it,
+    by date, marked `in_series` (shown indented); the others keep their order."""
+    listed = {t.pk for t in trips}
+    children = {}
+    for t in trips:
+        if t.summary_trip_id in listed:
+            children.setdefault(t.summary_trip_id, []).append(t)
+    out = []
+    for t in trips:
+        if t.summary_trip_id in listed:
+            continue
+        out.append(t)
+        for child in sorted(children.get(t.pk, []), key=lambda c: (c.year or 0, c.month or 0, c.start_day or 0, c.title)):
+            child.in_series = True
+            out.append(child)
+    return out
+
+
+def series_count(trips):
+    """How many entries the list shows: a series (its summary trip and the trips under it) counts once."""
+    pairs = [(t.pk, t.summary_trip_id) if hasattr(t, 'pk') else t for t in trips]
+    pks = {pk for pk, _ in pairs}
+    return sum(1 for _, summary in pairs if summary not in pks)
+
+
+def future_trips_q(today=None):
+    """Trips that have not started yet (being planned): their known start date (DiveTrip.start_date) is after today."""
+    from datetime import date
+    today = today or date.today()
+    return (Q(year__gt=today.year) | Q(year=today.year, month__gt=today.month)
+            | Q(year=today.year, month=today.month, start_day__gt=today.day))
+
+
 @login_required
 def trips_manage(request):
     """Every dive trip with filters (region/site, year) and an add button that carries the filters
     into the add form, which suggests the trip's name and code from them."""
     from django.db.models import Count
+    # observations of the trip -- a dive-trip planning is not one (it has no media; planned_trips.py)
     rows = DiveTrip.objects.exclude(code__in=LIBRARY_TRIP_CODES).select_related('country', 'region', 'site').annotate(
-        sample_count=Count('samples', filter=Q(samples__deleted_at__isnull=True), distinct=True))
+        sample_count=Count('samples', filter=Q(samples__deleted_at__isnull=True) & ~Q(samples__kind=Sample.Kind.PLANNED), distinct=True))
+    # the state switch: trips that took place (the default) / trips being planned (not started yet) / all
+    state = request.GET.get('state') if request.GET.get('state') in TRIP_STATES else 'held'
+    future = future_trips_q()
+    # a series counts as one trip
+    counts = {'held': series_count(rows.exclude(future).values_list('pk', 'summary_trip_id')),
+              'planned': series_count(rows.filter(future).values_list('pk', 'summary_trip_id'))}
+    rows = rows.exclude(future) if state == 'held' else rows.filter(future)
     rows, filters = _trip_list_context(request, rows, management=True)
+    rows = group_series(list(rows))
+    lang = get_lang(request)
+    base = {k: v for k, v in request.GET.items() if k in ('country', 'region', 'site', 'year', 'sort', 'lang') and v}
+    states = [{'key': key, 'label': label, 'count': counts[key], 'active': key == state,
+               'url': '?' + urlencode({**base, 'state': key})} for key, label in TRIP_STATES.items()]
     return render(request, 'observations/trips_manage.html', {
-        'trips': rows, **filters, 'manager': is_manager(request.user), 'trip_management': True})
+        'trips': rows, **filters, 'manager': is_manager(request.user), 'trip_management': True,
+        'trip_state': state, 'trip_states': states, 'trip_count': series_count(rows)})
 
 
 @login_required

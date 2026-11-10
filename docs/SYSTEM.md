@@ -415,8 +415,8 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
 | `/articles/`, `/articles/<slug>/`, `/articles/<slug>/<lang>.pdf` and `.jpg` | Article library |
 | `/observations/` | Members' listing (filters, sort). Owners also see their pending observations; managers see everything. |
 | `/observations/new/`, `<pk>/edit/`, `<pk>/remove/`, `<pk>/action/`, `<pk>/photo/` | Observation form and actions. `photo/` is the **only** way images are served in production (access-controlled). |
-| `/observations/trips/` | Public dive trips: trip videos, then a sortable table with expandable species rows; a species picture opens that observation on its species page (`#obs-<pk>`) |
-| `/observations/trips/manage/`, `trips/add/`, `trips/suggest/` | Trip management for members (suggested name/code, see `trip_naming.py`) |
+| `/observations/trips/` | Public dive trips, a switch between the trips that took place (default) and trip planning (`?view=planning`, `_planning_section.html` only): trip videos, then a sortable table with expandable species rows; a species picture opens that observation on its species page (`#obs-<pk>`) |
+| `/observations/trips/manage/`, `trips/add/`, `trips/suggest/` | Trip management for members (suggested name/code, see `trip_naming.py`); a state switch (`?state=held` default / `planned` = not started yet, `views.future_trips_q`; never both) with counts, kept by the filters and sort links; a series is one entry (`views.group_series`): the trips whose `summary_trip` is listed follow it by date, indented (`in-series`, ↳), and counts once (`views.series_count`, in the state counts and the total); no "add observation" link on planned trips; the observations column does not count a dive-trip planning |
 | `/observations/signup/`, `login/`, `logout/`, `profile/`, `partners/` | Community (sign-up asks the name in Hebrew and in English) |
 | `/observations/home-text/` | Manager editor for home-page sections |
 | `/sitemap.xml`, `/robots.txt`, `/healthz` | SEO and health |
