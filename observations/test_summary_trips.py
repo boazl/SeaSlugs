@@ -210,7 +210,9 @@ class SeriesPlanningTests(TestCase):
         self.assertIn('data-copy-url="/forum/trip/SE/"', html)                  # self.member owns the series
         self.assertNotIn('data-copy-url="/forum/trip/E1/"', html)               # not on a trip of the series
         ForumMessage.objects.create(observation=self.series, user=self.member, text='סדרה')
-        self.assertIn('data-copy-url="/forum/trip/SE/"', self.client.get('/forum/?lang=he').content.decode())
+        landing = self.client.get('/forum/?lang=he').content.decode()
+        self.assertIn('data-copy-url="/forum/trip/SE/"', landing)
+        self.assertIn('class="discussion-row" href="/forum/trip/SE/"', landing)    # a trip's row opens its own page
         self.assertIn('data-copy-url="/forum/trip/SE/"', self.client.get('/observations/trips/?lang=en').content.decode())
         self.assertIn('data-copy-url="/forum/trip/SE/"', self.client.get('/planning/SE/?lang=he').content.decode())
         other = User.objects.create_user('other', password='a-valid-password-927')

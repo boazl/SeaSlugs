@@ -85,7 +85,7 @@ class ForumPageTests(ForumSetup):
         self.assertIn(f'href="/forum/?obs={self.sample.pk}"', rows[0])
         self.assertIn('>2</span>', rows[0])
         self.assertLess(rows[0].index(f'id="m-{first.pk}"'), rows[0].index(f'id="m-{last.pk}"'))
-        self.assertIn(f'href="/forum/?obs={self.collection.pk}"', rows[1])
+        self.assertIn('href="/forum/trip/e1/"', rows[1])      # a dive trip's discussion opens on the trip's own page
         self.assertIn('על המסע', rows[1])
         self.assertIn('aria-expanded="true"', rows[0])            # open by default, with a +/- button
         self.assertIn('class="discussion-toggle"', rows[0])

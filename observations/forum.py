@@ -353,6 +353,9 @@ def forum(request):
             s.last_time = timezone.localtime(m.created_at)
             s.last_author = _display_name(m.user, lang)
             s.share_url = share_link(s, user)
+            # a dive trip's discussion opens on the trip's own page, without the filters and picker (forum_trip)
+            if s.kind in (Sample.Kind.PLANNED, Sample.Kind.COLLECTION) and s.trip_id and trip_observation(s.trip) == s:
+                s.discussion_url = trip_forum_url(s.trip, lang)
             return s
         discussions = []
         for group in page.object_list:

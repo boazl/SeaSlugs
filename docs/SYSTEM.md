@@ -570,7 +570,8 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
   recently active first, 30 groups a page (`forum.discussion_groups`). Each is a row (photo, name, place, date,
   discussion manager, the latest message's time and writer, the message count; it opens the discussion) with its
   messages open beneath and a +/- button that folds them (open by default). A series of dive trips is one group: the
-  summary trip's discussion, then its trips' discussions by date, indented; its +/- folds the whole series. In the main menu as "פורום" and in the sitemap.
+  summary trip's discussion, then its trips' discussions by date, indented; its +/- folds the whole series.
+  A dive trip's row (its planning or collection observation) opens the trip's own page `/forum/trip/<code>/`. In the main menu as "פורום" and in the sitemap.
 - **A trip's own discussion page** `/forum/trip/<trip code>/` (`forum.forum_trip`), to send to people: no filters,
   picker or headings. The trip's discussion (its planning, else its collection observation) and, for a summary trip,
   its trips' discussions by date, indented, all open with +/-; one writing box (a choice of trip in a series) that
