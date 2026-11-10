@@ -999,6 +999,7 @@ def partners(request):
     profiles=list(rows.distinct())
     for p in profiles:
         p.display_name=full_name_for(p.user,lang) or p.user.username
+        p.display_bio=(p.bio_en or p.bio) if lang=='en' else (p.bio or p.bio_en)
         p.country_names=[loc(x,lang) for x in p.countries.all()]
         p.region_names=[loc(x,lang) for x in p.regions.all()]
     order=(lambda x:(x.name_en or x.name).lower()) if lang=='en' else (lambda x:x.name)

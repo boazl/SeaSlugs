@@ -611,7 +611,8 @@ class Profile(models.Model):
     visible_to_members = models.BooleanField('הצגת הפרופיל למשתמשים רשומים', default=False)
     regions = models.ManyToManyField(Region, blank=True, verbose_name='אזורי צלילה')
     countries = models.ManyToManyField(Country, blank=True, verbose_name='מדינות צלילה')
-    bio = models.TextField('על עצמי', blank=True, max_length=1500)
+    bio = models.TextField('על עצמי (עברית)', blank=True, max_length=1500)
+    bio_en = models.TextField('על עצמי (אנגלית)', blank=True, max_length=1500)
     # The observations forum (forum.py, notifications.notify_forum_message): an email when a new comment arrives in a
     # discussion of one of my observations or one I wrote in. Off until the member ticks it on the profile page.
     forum_email = models.BooleanField('שליחת מייל כשמגיעה תגובה חדשה בפורום', default=False,

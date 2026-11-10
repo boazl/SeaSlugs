@@ -29,7 +29,7 @@ class ProfileInline(admin.StackedInline):
     model = Profile
     can_delete = False
     verbose_name_plural = 'פרופיל'
-    fields = ['must_change_password','first_name_en','last_name_en','phone','macro_diver','visible_to_members','countries','regions','bio','trip_code']
+    fields = ['must_change_password','first_name_en','last_name_en','phone','macro_diver','visible_to_members','countries','regions','bio','bio_en','trip_code']
     filter_horizontal = ['countries','regions']
 
 

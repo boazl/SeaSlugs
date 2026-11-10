@@ -57,7 +57,7 @@ class ProfileForm(forms.ModelForm):
     # the end of the form -- Django would otherwise place explicitly declared fields
     # (first_name/last_name) after every Meta.fields model field.
     is_photographer = forms.BooleanField(label=PHOTOGRAPHER_LABEL, required=False, help_text=PHOTOGRAPHER_HELP)
-    field_order = ['first_name','last_name','first_name_en','last_name_en','phone','is_photographer','forum_email','macro_diver','visible_to_members','countries','regions','bio']
+    field_order = ['first_name','last_name','first_name_en','last_name_en','phone','is_photographer','forum_email','macro_diver','visible_to_members','countries','regions','bio','bio_en']
     def __init__(self, *args, lang='he', **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['first_name'].initial = self.instance.user.first_name
@@ -88,8 +88,8 @@ class ProfileForm(forms.ModelForm):
 
     class Meta:
         model = Profile
-        fields = ['first_name_en','last_name_en','phone','forum_email','macro_diver','visible_to_members','countries','regions','bio']
-        widgets = {'countries':forms.CheckboxSelectMultiple, 'regions':forms.CheckboxSelectMultiple}
+        fields = ['first_name_en','last_name_en','phone','forum_email','macro_diver','visible_to_members','countries','regions','bio','bio_en']
+        widgets = {'countries':forms.CheckboxSelectMultiple, 'regions':forms.CheckboxSelectMultiple, 'bio_en':forms.Textarea(attrs={'dir':'ltr'})}
 
 
 class TripChoiceField(forms.ModelChoiceField):

@@ -9,7 +9,7 @@ User = get_user_model()
 ACCOUNT_TABLES = {
     'groups': (Group, ['name', 'permissions']),
     'users': (User, ['username','first_name','last_name','email','is_active','is_staff','is_superuser','groups','user_permissions']),
-    'profiles': (Profile, ['user','first_name_en','last_name_en','phone','macro_diver','visible_to_members','bio','countries','regions']),
+    'profiles': (Profile, ['user','first_name_en','last_name_en','phone','macro_diver','visible_to_members','bio','bio_en','countries','regions']),
 }
 
 def permission_key(obj):
@@ -52,7 +52,9 @@ def account_plan(document):
     model, fields = ACCOUNT_TABLES[document['table']]
     result = []; seen = set()
     for incoming in document['rows']:
-        if not isinstance(incoming, dict) or set(incoming) != set(fields): raise ValidationError('שדות החשבון אינם תואמים לגרסת הכלי.')
+        # a profile row from a file exported before the English "about me" existed: the destination keeps its own
+        older_profile = model is Profile and isinstance(incoming, dict) and set(incoming) == set(fields) - {'bio_en'}
+        if not isinstance(incoming, dict) or (set(incoming) != set(fields) and not older_profile): raise ValidationError('שדות החשבון אינם תואמים לגרסת הכלי.')
         values = {}; many = {}
         for field, value in incoming.items():
             if field in ('permissions','user_permissions','groups','countries','regions'):
@@ -80,6 +82,6 @@ def account_plan(document):
         for field in many:
             if field == 'regions': after[field] = sorted(after[field], key=lambda x:(x['country__name'], x['name']))
             else: after[field] = sorted(after[field])
-        changes = [{'field':str(model._meta.get_field(f).verbose_name),'before':before.get(f,''),'after':after[f]} for f in fields if before.get(f) != after[f]]
+        changes = [{'field':str(model._meta.get_field(f).verbose_name),'before':before.get(f,''),'after':after[f]} for f in fields if f in after and before.get(f) != after[f]]
         result.append({'object':candidate,'many':many,'label':identity,'action':'new' if obj is None else 'update' if changes else 'same','changes':changes})
     return result

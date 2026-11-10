@@ -113,3 +113,34 @@ class MacroDiverGroupTests(TestCase):
         self.client.post('/observations/signup/', {'username': 'newdiver', 'email': 'n@example.com',
                                                    'password1': 'Very-long-pw-9876', 'password2': 'Very-long-pw-9876'})
         self.assertFalse(User.objects.get(username='newdiver').groups.exists())
+
+
+class BioBothLanguagesTests(TestCase):
+    """"About me" in Hebrew and in English: both on the profile form; the partners page shows the page's language,
+    falling back to the other one; the profiles transfer carries both (an older file without the English one keeps the
+    destination's)."""
+
+    def setUp(self):
+        from django.contrib.auth.models import Group
+        self.user = User.objects.create_user('diver', password='a-valid-password-927', first_name='דנה')
+        self.profile = Profile.objects.create(user=self.user, macro_diver=True, visible_to_members=True,
+                                              bio='חובבת חינניות ים', bio_en='Sea slug enthusiast')
+        self.user.groups.add(Group.objects.get_or_create(name='Macro diver')[0])
+        self.client.force_login(self.user)
+
+    def test_profile_form_and_partners(self):
+        form = self.client.get('/observations/profile/?lang=en').content.decode()
+        self.assertIn('name="bio_en"', form)
+        self.assertIn('About me (English)', form)
+        self.assertIn('Sea slug enthusiast', self.client.get('/observations/partners/?lang=en').content.decode())
+        self.assertIn('חובבת חינניות ים', self.client.get('/observations/partners/?lang=he').content.decode())
+        Profile.objects.filter(pk=self.profile.pk).update(bio_en='')
+        self.assertIn('חובבת חינניות ים', self.client.get('/observations/partners/?lang=en').content.decode())
+
+    def test_transfer(self):
+        import json
+        from .table_transfer import export_table, plan
+        doc = json.loads(json.dumps(export_table('profiles')))
+        self.assertEqual(doc['rows'][0]['bio_en'], 'Sea slug enthusiast')
+        del doc['rows'][0]['bio_en']
+        self.assertEqual([i['action'] for i in plan(doc)], ['same'])

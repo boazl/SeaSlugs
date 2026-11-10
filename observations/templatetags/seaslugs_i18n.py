@@ -338,6 +338,8 @@ TRANSLATIONS = {
     'הוספת תגובה': 'Add a comment',
     'תגובות': 'Comments',
     'אין לך עדיין משתמש?': 'No account yet?',
+    'על עצמי (עברית)': 'About me (Hebrew)',
+    'על עצמי (אנגלית)': 'About me (English)',
     'שותפים לצלילת מאקרו': 'Macro diving partners',
     'מוצגים רק משתמשים שבחרו להצטרף לרשימה. כתובות דוא״ל אינן מוצגות.': 'Only members who chose to join the list are shown. Email addresses are not shown.',
     'אין פרופילים להצגה בבחירה זו.': 'No profiles to show for this choice.',

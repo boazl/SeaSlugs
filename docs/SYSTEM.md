@@ -292,7 +292,9 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
   this mark never travel). Every member can change their password from the profile page.
   - English name, `phone`.
   - `macro_diver` and `visible_to_members` control the partners directory.
-  - `bio`, `trip_code` (the photographer letter), and M2M `regions` and `countries`.
+  - `bio` and `bio_en` ("about me" in Hebrew / English, migration `0100`; the partners page shows the page's
+    language, else the other; both travel with the profiles table -- an older file without `bio_en` keeps the
+    destination's), `trip_code` (the photographer letter), and M2M `regions` and `countries`.
 - **`HomeText`**: (`key`, `lang`) → editable home-page section text.
 - **`SiteImage`**: (`key`) → home intro photo.
 - **`ActivityEvent`**, **`NewsPost`**, **`DailyPageView`**, **`DailyVisitor`**: the activity log, the manager's
