@@ -303,6 +303,11 @@ def gallery_file(request, filename='index.html'):
         # recomputing the same rule a third time here.
         for trip_id, trip in trip_objects.items():
             trip_out[str(trip_id)]['species_count'] = trip.display_species_count
+        # A summary trip (DiveTrip.summary_trip) holds the species of the trips it sums up: the gallery's trip filter
+        # (app.js tripFamily) matches their observations too.
+        from observations.models import DiveTrip
+        for summary_id, sub_id in DiveTrip.objects.filter(summary_trip_id__in=[int(k) for k in trip_out]).values_list('summary_trip_id', 'pk'):
+            trip_out[str(summary_id)].setdefault('sub_trips', []).append(str(sub_id))
 
         # order name -> pk of the TaxonOrder row whose page holds the whole order (observations.views.order_base_rows):
         # the gallery's order cards link there.

@@ -616,6 +616,10 @@ class Profile(models.Model):
     # discussion of one of my observations or one I wrote in. Off until the member ticks it on the profile page.
     forum_email = models.BooleanField('שליחת מייל כשמגיעה תגובה חדשה בפורום', default=False,
         help_text='על התצפיות שלך ובדיונים שכתבת בהם.')
+    # A temporary password a manager gave: the member must choose their own at the next login
+    # (middleware.PasswordChangeRequiredMiddleware). Set per environment (passwords never travel).
+    must_change_password = models.BooleanField('יש להחליף סיסמה בכניסה הבאה', default=False,
+        help_text='סיסמה זמנית שמנהל קבע: בכניסה הבאה המשתמש יתבקש לבחור סיסמה משלו לפני שימשיך באתר.')
     trip_code = models.CharField('אות הצלם בסימון מסעות', max_length=4, blank=True,
         help_text='האות שמופיעה בתחילת סימון מסע של הצלם. ריק = בלי אות (בעל האתר).')
     class Meta: verbose_name = 'פרופיל'; verbose_name_plural = 'פרופילים'
@@ -675,6 +679,12 @@ class DiveTrip(models.Model):
     articles = models.ManyToManyField('Article', blank=True, related_name='trips', verbose_name='מאמרים',
         help_text='בחירה מתוך טבלת המאמרים (מאמר מועלה פעם אחת בניהול ← מאמרים).')
     # The Mac folder holding this trip's videos as uploaded to YouTube (see local_videos.py).
+    # A series of small trips (or samplings) documented separately and summed up at the end -- often with one video of
+    # the species from all of them -- points at its summary trip. One level only: a summary trip has no summary trip of
+    # its own, and a trip that has one cannot be a summary. The summary trip's species are its own observations plus
+    # those of all its trips (trip_family).
+    summary_trip = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='sub_trips',
+        verbose_name='מסע מסכם', help_text='המסע שמסכם סדרת מסעות שזה אחד מהם. אפשר לבחור רק מסע שאין לו מסע מסכם בעצמו.')
     local_video_folder = models.CharField('תיקיית הסרטונים במק', max_length=500, blank=True, validators=[validate_local_video_folder],
         help_text='נתיב מלא לתיקייה במק שבה שמורים הסרטונים של המסע כפי שהועלו ל-YouTube, למשל /Users/boazliebes/Movies/Anilao 2025. '
                   'משמש לצפייה בסרטונים ללא אינטרנט.')
@@ -687,14 +697,24 @@ class DiveTrip(models.Model):
 
     def __str__(self): return f'{self.title} [{self.code}]'
 
+    def trip_family(self):
+        """This trip and the trips it sums up (summary_trip) -- whose observations count as its own."""
+        return [self, *self.sub_trips.all()] if self.pk else [self]
+
+    def series_end_date(self):
+        """The last day of this trip or of any trip it sums up."""
+        ends = [t.end_date() for t in self.trip_family()]
+        ends = [e for e in ends if e]
+        return max(ends) if ends else None
+
     @property
     def display_species_count(self):
         """Number of distinct species actually visible on the public site when this trip's
         collection is opened (published, non-deleted, real samples only). Always computed
         live from the gallery data -- the self-reported species_count field above is kept
         only as a reference value from the source spreadsheet and is never shown on the site."""
-        return self.samples.filter(
-            kind='species', status='published', deleted_at__isnull=True, species__isnull=False,
+        return Sample.objects.filter(
+            trip__in=self.trip_family(), kind='species', status='published', deleted_at__isnull=True, species__isnull=False,
             species_other='', site_other='',
         ).order_by().values('species_id').distinct().count()
 
@@ -728,6 +748,13 @@ class DiveTrip(models.Model):
         # A trip may lie in the future: it is then being planned (Sample.Kind.PLANNED). Observations with media
         # cannot be added to it before it starts (Sample.clean).
         super().clean()
+        if self.summary_trip_id:
+            if self.pk and self.summary_trip_id == self.pk:
+                raise ValidationError({'summary_trip': 'מסע אינו יכול לסכם את עצמו.'})
+            if self.summary_trip.summary_trip_id:
+                raise ValidationError({'summary_trip': 'המסע שנבחר שייך בעצמו למסע מסכם. יש לבחור מסע שאין לו מסע מסכם.'})
+            if self.pk and self.sub_trips.exists():
+                raise ValidationError({'summary_trip': 'המסע הזה הוא מסע מסכם של מסעות אחרים, ולכן אין לו מסע מסכם משלו.'})
         if self.start_day:
             if not self.year or not self.month: raise ValidationError({'start_day':'יום התחלה מחייב שנה וחודש.'})
             try: date(self.year, self.month, self.start_day)
@@ -1236,14 +1263,18 @@ class Sample(models.Model):
         if not (self.title or '').strip(): errors['title'] = 'יש להזין כותרת לתכנון המסע.'
         if self.trip_id and not (self.trip.year and self.trip.month):
             errors['trip'] = 'למסע מתוכנן יש להגדיר שנה וחודש.'
+        # one planning per trip: its page is /planning/<trip code>/
+        if self.trip_id and Sample.objects.filter(kind=self.Kind.PLANNED, trip_id=self.trip_id, deleted_at__isnull=True).exclude(pk=self.pk).exists():
+            errors['trip'] = 'למסע הזה כבר יש תכנון. אפשר להוסיף תגובות בדיון שלו בפורום.'
         # That the trip has not ended yet is checked when a member saves the planning (SampleForm.clean), not here:
         # a planning that closed must still travel through the table transfer.
         return errors
     @property
     def planning_open(self):
-        """A dive-trip planning observation whose trip has not ended yet (planned_trips.py). False for every other kind."""
+        """A dive-trip planning observation whose trip has not ended yet (planned_trips.py) -- for a summary trip, until
+        the last of its trips ends. False for every other kind."""
         if self.kind != self.Kind.PLANNED or not self.trip_id: return False
-        end = self.trip.end_date()
+        end = self.trip.series_end_date()
         return bool(end and end >= date.today())
     def is_complete(self):
         """Everything publishing needs: a trip with a year (not needed by an order / family / genus
@@ -1286,6 +1317,10 @@ class Sample(models.Model):
                     defaults={'defining_sample': SpeciesArea.pick_defining_sample(
                         self.species_id, self.trip.country_id, self.trip.sea_id, self.undetermined_variant)},
                 )
+            if self.kind == self.Kind.PLANNED and self.status == self.Status.PUBLISHED and self.trip.sub_trips.exists():
+                # planning a series of trips opens a planning (a discussion) for each of its trips (planned_trips.py)
+                from .planned_trips import sync_sub_plannings
+                sync_sub_plannings(self.trip)
             if previous_identity and (previous_identity != self.gallery_identity() or self.status != self.Status.PUBLISHED):
                 # the area it left (or stopped being published in) hands its card to another observation, or to none
                 SpeciesArea.objects.filter(
@@ -1542,7 +1577,7 @@ class ArticleBlock(models.Model):
     title_he = models.CharField('כותרת (עברית)', max_length=300, blank=True, help_text='לתיבת הערה.')
     title_en = models.CharField('כותרת (אנגלית)', max_length=300, blank=True)
     text_he = models.TextField('טקסט (עברית)', blank=True,
-        help_text='**מודגש**, *נטוי*, [טקסט](קישור). טבלה: שורה לכל שורה, תאים מופרדים ב־|, השורה הראשונה כותרת. רשימה: שורה לכל פריט. באיור: הכיתוב.')
+        help_text='**מודגש**, *נטוי*, [טקסט](קישור). טבלה: שורה לכל שורה, תאים מופרדים ב־|, השורה הראשונה כותרת — או טבלה שהועתקה מ־Excel והודבקה כמו שהיא. רשימה: שורה לכל פריט. באיור: הכיתוב.')
     text_en = models.TextField('טקסט (אנגלית)', blank=True)
     sample = models.ForeignKey('Sample', null=True, blank=True, on_delete=models.SET_NULL, related_name='+', verbose_name='תצפית (לאיור)',
         help_text='באיור: התצפית שתמונתה מוצגת.')

@@ -9,9 +9,10 @@ site's observations.
   family / order of a taxon observation). Each list offers the values found among the observations that match the
   other filters. With an observation chosen (`?obs=<pk>`) the page shows that observation, its whole discussion (oldest
   first) and the writing box (`#write`); without one -- the page a visitor lands on -- it lists the matching
-  observations that have a discussion, one row each (photo, name, place and date, number of messages, the latest
-  message's time, writer and opening words), the most recently active first (DISCUSSIONS_PER_PAGE a page); clicking
-  a row opens its discussion.
+  observations that have a discussion, the most recently active first (DISCUSSIONS_PER_PAGE groups a page): each a row
+  (photo, name, place and date, number of messages, the latest message's time and writer; it opens the discussion)
+  with its messages open beneath it and a +/- button that folds them. A series of dive trips is one group: the
+  summary trip's discussion, then its trips' discussions by date, indented under it; its +/- folds the whole series.
 - **Dive-trip planning** (planned_trips.py): its discussion is open until the trip's last day; then it is closed --
   gone from the forum (its owner and the site managers still reach it by its address) and nobody can write in it.
 - **The discussion's manager** is the observation's owner (its photographer).
@@ -28,6 +29,8 @@ site's observations.
   the owner alone. Messages arriving through the transfer send nothing.
 - Messages travel between the Mac and the live site with the table transfer (forum_transfer.py).
 """
+from datetime import date
+
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -45,7 +48,6 @@ from .models import ForumMessage, Sample, full_name_for
 from .templatetags.seaslugs_i18n import loc, with_lang
 
 DISCUSSIONS_PER_PAGE = 30
-SNIPPET_CHARS = 140
 MAX_TEXT = 5000
 # The kind filter: key -> (observation kinds, Hebrew label). A new kind of observation (e.g. planned dive trips) is
 # added here.
@@ -139,7 +141,7 @@ def observation_label(sample, lang):
 
 def observation_page_urls(samples, lang):
     """pk -> the public page that shows each observation: the species/taxon page, the dive-trip page of a collection, the
-    dive trips page's planning section for a dive-trip planning."""
+    planning's own page (/planning/<trip code>/) for a dive-trip planning."""
     from .views import gallery_urls
     from .trip_page import trip_collections, trip_page_url
     out = gallery_urls(samples, lang)
@@ -147,7 +149,8 @@ def observation_page_urls(samples, lang):
         if s.kind == Sample.Kind.COLLECTION and is_live(s) and s.trip_id and s in trip_collections(s.trip):
             out[s.pk] = trip_page_url(s.trip, lang)
         elif s.kind == Sample.Kind.PLANNED and is_live(s):
-            out[s.pk] = with_lang(reverse('dive-trips'), lang) + f'#planned-{s.pk}'
+            from .planned_trips import planning_page_url
+            out[s.pk] = planning_page_url(s.trip, lang)
     return out
 
 
@@ -287,6 +290,9 @@ def forum(request):
                 subject=form.cleaned_data['subject'].strip(), text=form.cleaned_data['text'])
             messages.success(request, 'התגובה נשמרה.')
             target = forum_url(sample, lang, f'#m-{message.pk}')
+            back = request.POST.get('next') or ''      # e.g. a trip's own discussion page (forum_trip)
+            if back and url_has_allowed_host_and_scheme(back, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
+                target = back.split('#')[0] + f'#m-{message.pk}'
             from .notifications import notify_forum_message
             notify_forum_message(message, request.build_absolute_uri(forum_url(sample, anchor=f'#m-{message.pk}')))
             return redirect(target)
@@ -304,6 +310,24 @@ def forum(request):
     rows = visible_messages(user).select_related('user', 'user__profile', 'observation__owner')
     if sample:
         _annotate_observation(sample, lang, observation_page_urls([sample], lang))
+        # a series of planned trips (planned_trips.py): the series' discussion and its trips' discussions link each other
+        from .planned_trips import series_planning, sub_plannings
+        parent = series_planning(sample)
+        children = sub_plannings(sample)
+        child_counts = forum_counts(user, children)
+        for x in ([parent] if parent else []) + children:
+            x.label = observation_label(x, lang)
+            x.discussion_url = forum_url(x, lang)
+            x.message_count = child_counts.get(x.pk, 0)
+        context.update({'series_parent': parent, 'series_children': children})
+        # a dive trip's or a planning's own discussion page, to send to people (forum_trip)
+        if share_link(sample, user) and trip_observation(sample.trip) == sample:
+            context['share_url'] = request.build_absolute_uri(share_link(sample, user))
+            context['copy_links'] = True
+        # a dive trip's or a planning's articles (e.g. a series' schedule)
+        if sample.kind in (Sample.Kind.COLLECTION, Sample.Kind.PLANNED) and sample.trip_id:
+            from .articles import article_links
+            context['trip_articles'] = article_links(sample.trip.articles.all(), lang)
         context.update({
             'messages_list': _annotate(list(rows.filter(observation=sample).order_by('created_at', 'pk')), user, lang),
             'login_url': login_url(forum_url(sample, lang, '#write'), lang),
@@ -312,29 +336,143 @@ def forum(request):
     else:
         if filters['active']:
             rows = rows.filter(observation_id__in=[s.pk for s in filters['matched']])
-        latest = list(rows.values('observation').annotate(last=Max('created_at'), n=Count('id')).order_by('-last'))
-        page = Paginator(latest, DISCUSSIONS_PER_PAGE).get_page(request.GET.get('page'))
-        ids = [row['observation'] for row in page.object_list]
-        samples = Sample.objects.select_related(*OBSERVATION_RELATED).in_bulk(ids)
-        page_urls = observation_page_urls(list(samples.values()), lang)
-        last = {}   # the latest message this visitor can read, per observation
-        for m in rows.filter(observation_id__in=ids).order_by('-created_at', '-pk'):
-            last.setdefault(m.observation_id, m)
-        discussions = []
-        for row in page.object_list:
+        latest = list(rows.values('observation').annotate(last=Max('created_at'), n=Count('id')))
+        samples = Sample.objects.select_related(*OBSERVATION_RELATED, 'trip__summary_trip').in_bulk([r['observation'] for r in latest])
+        groups = discussion_groups(latest, samples)
+        page = Paginator(groups, DISCUSSIONS_PER_PAGE).get_page(request.GET.get('page'))
+        shown = [row for group in page.object_list for row in group]
+        ids = [row['observation'] for row in shown]
+        page_urls = observation_page_urls([samples[i] for i in ids], lang)
+        messages_by = {i: [] for i in ids}       # each discussion's messages this visitor can read, oldest first
+        for m in _annotate(list(rows.filter(observation_id__in=ids).order_by('created_at', 'pk')), user, lang):
+            messages_by[m.observation_id].append(m)
+        def entry(row):
             s = _annotate_observation(samples[row['observation']], lang, page_urls, row['n'])
-            m = last[row['observation']]
-            s.last_message = m
+            s.thread = messages_by[s.pk]
+            m = s.thread[-1]
             s.last_time = timezone.localtime(m.created_at)
             s.last_author = _display_name(m.user, lang)
-            text = ' '.join(m.text.split())
-            s.last_snippet = m.subject or (text[:SNIPPET_CHARS] + '…' if len(text) > SNIPPET_CHARS else text)
-            discussions.append(s)
+            s.share_url = share_link(s, user)
+            return s
+        discussions = []
+        for group in page.object_list:
+            head = entry(group[0])
+            head.children = [entry(row) for row in group[1:]]
+            discussions.append(head)
         context.update({
-            'page': page, 'total_discussions': page.paginator.count, 'discussions': discussions,
+            'page': page, 'total_discussions': len(latest), 'discussions': discussions,
+            'copy_links': any(x.share_url for d in discussions for x in [d, *d.children]),
             'page_query': f'{query}&' if query else '',
         })
     return render(request, 'observations/forum.html', context)
+
+
+def discussion_groups(latest, samples):
+    """The landing list's order: groups of discussions, the most recently active group first. A group is one
+    discussion -- or a series of dive trips (DiveTrip.summary_trip): the summary trip's discussion followed by those of
+    its trips, by date, shown indented under it. A trip whose summary trip has no discussion here stands alone."""
+    by_pk = {row['observation']: row for row in latest}
+    by_trip = {}
+    for row in latest:
+        sample = samples[row['observation']]
+        if sample.trip_id:
+            by_trip.setdefault((sample.trip_id, sample.kind), row)
+    children = {}
+    for row in latest:
+        sample = samples[row['observation']]
+        parent = by_trip.get((sample.trip.summary_trip_id, sample.kind)) if sample.trip_id and sample.trip.summary_trip_id else None
+        if parent is not None and parent is not row:
+            children.setdefault(parent['observation'], []).append(row)
+    nested = {row['observation'] for rows in children.values() for row in rows}
+    def start(row):
+        trip = samples[row['observation']].trip
+        return (trip.start_date() or date.max, row['observation'])
+    groups = []
+    for row in latest:
+        if row['observation'] in nested:
+            continue
+        group = [row] + sorted(children.get(row['observation'], []), key=start)
+        groups.append(group)
+    groups.sort(key=lambda g: max(r['last'] for r in g), reverse=True)
+    return groups
+
+
+def trip_observation(trip):
+    """The observation that holds a dive trip's discussion: its planning, else its collection observation."""
+    from .planned_trips import planning_trip_planning
+    from .trip_page import trip_collections
+    planning = planning_trip_planning(trip)
+    if planning is not None:
+        return planning
+    collections = trip_collections(trip)
+    return collections[0] if collections else None
+
+
+def trip_forum_url(trip, lang='he'):
+    return with_lang(reverse('forum-trip', args=[trip.code]), lang)
+
+
+def share_link(sample, user):
+    """The "copy the discussion link" button's address (the trip's own discussion page, without ?lang) -- only on a
+    summary trip's discussion (its planning or collection observation) and only for its discussion manager (the
+    observation's owner) and the site managers; '' otherwise."""
+    if sample.kind not in (Sample.Kind.PLANNED, Sample.Kind.COLLECTION) or not sample.trip_id:
+        return ''
+    if not (is_site_manager(user) or (user.is_authenticated and sample.owner_id == user.pk)):
+        return ''
+    if not sample.trip.sub_trips.exists():
+        return ''
+    return trip_forum_url(sample.trip)
+
+
+def forum_trip(request, code):
+    """/forum/trip/<trip code>/: one dive trip's discussion on a page of its own, to send to people -- without the
+    forum's filters and picker. A summary trip's page holds the series: its discussion, then each of its trips'
+    discussions by date, indented, every one with its messages open (+/- folds them) -- and one writing box with a
+    choice of the trip the message is about. The discussion is the trip's planning (planned_trips.py), else its
+    collection observation; the usual reading rules apply (forum.visible_messages)."""
+    from .models import DiveTrip
+    lang = get_lang(request)
+    user = request.user
+    trip = get_object_or_404(DiveTrip.objects.select_related('summary_trip'), code=code)
+    head = trip_observation(trip)
+    if head is None or not (is_live(head) or is_site_manager(user) or (user.is_authenticated and head.owner_id == user.pk)):
+        raise Http404
+    members = [head]
+    for sub in trip.sub_trips.all():
+        sample = trip_observation(sub)
+        if sample is not None and is_live(sample):
+            members.append(sample)
+    samples = Sample.objects.select_related(*OBSERVATION_RELATED).in_bulk([s.pk for s in members])
+    members = [samples[s.pk] for s in members]
+    page_urls = observation_page_urls(members, lang)
+    rows = visible_messages(user).select_related('user', 'user__profile', 'observation__owner')
+    threads = {s.pk: [] for s in members}
+    for m in _annotate(list(rows.filter(observation_id__in=threads).order_by('created_at', 'pk')), user, lang):
+        threads[m.observation_id].append(m)
+    def entry(s):
+        _annotate_observation(s, lang, page_urls, len(threads[s.pk]))
+        s.discussion_url = trip_forum_url(s.trip, lang)
+        s.thread = threads[s.pk]
+        if s.thread:
+            s.last_time = timezone.localtime(s.thread[-1].created_at)
+            s.last_author = _display_name(s.thread[-1].user, lang)
+        s.label = observation_label(s, lang)
+        s.share_url = share_link(s, user)
+        return s
+    head = entry(members[0])
+    head.children = sorted((entry(s) for s in members[1:]), key=lambda s: (s.trip.start_date() or date.max, s.pk))
+    writable = [s for s in [head, *head.children] if can_write(s)]
+    here = trip_forum_url(trip, lang)
+    from .articles import article_links
+    return render(request, 'observations/forum_trip.html', {
+        'head': head, 'trip': trip, 'writable': writable, 'here': here, 'form': ForumMessageForm(),
+        'share_url': request.build_absolute_uri(share_link(head, user)) if share_link(head, user) else '',
+        'copy_links': any(x.share_url for x in [head, *head.children]),
+        'article_links': article_links(trip.articles.all(), lang),
+        'summary_url': trip_forum_url(trip.summary_trip, lang) if trip.summary_trip_id and trip_observation(trip.summary_trip) else '',
+        'login_url': login_url(here + '#write', lang), 'signup_url': signup_url(here + '#write', lang),
+    })
 
 
 def login_url(next_url, lang):

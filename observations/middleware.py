@@ -48,3 +48,24 @@ class LanguagePreferenceMiddleware:
             from django.utils.cache import patch_vary_headers
             patch_vary_headers(response, ('Cookie', 'Accept-Language'))
         return response
+
+
+class PasswordChangeRequiredMiddleware:
+    """A member whose password a manager set as temporary (Profile.must_change_password) is sent to the password
+    change page on every request until they choose their own; logging out, the language switch's own page and static
+    files still pass. Changing the password (views.password_change) clears the mark."""
+    EXEMPT = ('/observations/password/', '/observations/logout/', '/static/', '/healthz', '/site-header.css')
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        user = getattr(request, 'user', None)
+        if user is not None and user.is_authenticated and not request.path.startswith(self.EXEMPT):
+            profile = getattr(user, 'profile', None)
+            if profile is not None and profile.must_change_password:
+                from django.shortcuts import redirect
+                from django.urls import reverse
+                from django.utils.http import urlencode
+                return redirect(reverse('password-change') + '?' + urlencode({'next': request.get_full_path()}))
+        return self.get_response(request)

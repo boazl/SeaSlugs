@@ -1,0 +1,18 @@
+{% extends 'observations/base.html' %}{% load seaslugs_i18n seo %}{% block title %}SeaSlugs · {{ head.label }}{% endblock %}{% block share_meta %}{% share_meta head.label "פורום תצפיות"|t:lang head.note_he %}{% endblock %}{% block content %}{% include 'observations/_forum_style.html' %}
+{% if share_url %}<p class="forum-series"><button type="button" class="copy-link-button" data-copy-url="{{ share_url }}" data-done="{{ 'הקישור הועתק'|t:lang }}">{{ "העתקת קישור לדיון"|t:lang }}</button> <a href="{{ share_url }}" dir="ltr">{{ share_url }}</a></p>{% endif %}
+{% if head.page_url %}<p class="forum-series"><a href="{{ head.page_url }}">{% if head.kind == 'planned' %}{{ "לדף תכנון המסע"|t:lang }}{% else %}{{ "לדף המסע"|t:lang }}{% endif %}</a></p>{% endif %}
+{% if summary_url %}<p class="forum-series">{{ "חלק מסדרת המסעות:"|t:lang }} <a href="{{ summary_url }}">{{ trip.summary_trip.title }}</a></p>{% endif %}
+{% if article_links %}<div class="forum-series">{% include 'observations/_article_links.html' with links=article_links %}</div>{% endif %}
+<ol class="discussion-list">{% include 'observations/_forum_discussion.html' with s=head %}</ol>
+<script>document.querySelectorAll('.discussion-toggle').forEach(function(button){button.hidden=false;button.addEventListener('click',function(){var open=button.getAttribute('aria-expanded')!=='true';button.setAttribute('aria-expanded',String(open));button.textContent=open?'−':'+';document.getElementById(button.getAttribute('aria-controls')).hidden=!open;});});</script>
+<section class="forum-write" id="write"><h2>{{ "הוספת תגובה"|t:lang }}</h2>
+{% if not writable %}<p class="badge">{{ "הדיון נסגר: תאריך המסע המתוכנן עבר."|t:lang }}</p>{% elif user.is_authenticated %}<form method="post" action="{% url 'forum' as forum_path %}{{ forum_path|with_lang:lang }}">{% csrf_token %}<input type="hidden" name="next" value="{{ here }}">
+{% if writable|length > 1 %}<p><label for="forum-obs">{{ "על איזה מסע?"|t:lang }}</label><select id="forum-obs" name="obs">{% for x in writable %}<option value="{{ x.pk }}">{{ x.label }}</option>{% endfor %}</select></p>{% else %}<input type="hidden" name="obs" value="{{ writable.0.pk }}">{% endif %}
+<fieldset><legend>{{ "למי ההודעה?"|t:lang }}</legend><label><input type="radio" name="audience" value="all" checked> {{ "לכולם"|t:lang }}</label><label><input type="radio" name="audience" value="manager"> {{ "רק למנהל הדיון (בעל התצפית)"|t:lang }}</label></fieldset>
+<p><label for="forum-subject">{{ "נושא (לא חובה)"|t:lang }}</label><input type="text" id="forum-subject" name="subject" maxlength="200"></p>
+<p><label for="forum-text">{{ "ההודעה"|t:lang }}</label><textarea id="forum-text" name="text" maxlength="5000" required></textarea></p>
+<button type="submit">{{ "שליחה"|t:lang }}</button></form>
+{% else %}<p>{{ "כדי לכתוב בפורום יש"|t:lang }} <a href="{{ login_url }}">{{ "להיכנס"|t:lang }}</a> {{ "או"|t:lang }} <a href="{{ signup_url }}">{{ "להירשם לאתר"|t:lang }}</a>.</p>{% endif %}
+</section>
+
+{% if copy_links %}{% include 'observations/_copy_url.html' %}{% endif %}{% endblock %}

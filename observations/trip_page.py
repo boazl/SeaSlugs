@@ -37,21 +37,23 @@ def trip_title(trip, lang):
 
 
 def trip_species_areas(trip):
-    """The gallery cards (SpeciesArea) of the species observed on the trip, alphabetically. A species is observed at
-    most once per trip (Sample.clean: a trip is one sampling -- more dives in the same place are a new trip), so each
-    card carries that one observation (card_sample: the card's photo, and the anchor of its link on the species
-    page) and shows no observation count, except the yellow "1" of a species also observed in other areas."""
+    """The gallery cards (SpeciesArea) of the species observed on the trip -- for a summary trip also on the trips it
+    sums up (DiveTrip.trip_family) --, alphabetically. A species is observed at most once per trip (Sample.clean: a trip
+    is one sampling -- more dives in the same place are a new trip), so each card carries one observation (card_sample:
+    the earliest; the card's photo and the anchor of its link on the species page) and shows no observation count,
+    except the yellow "1" of a species also observed in other areas. Each observation's card is looked up in its own
+    trip's country and sea (the trips of a series may lie in different places)."""
     samples = list(Sample.objects.filter(
-        trip=trip, kind=Sample.Kind.SPECIES, species__isnull=False, status='published', deleted_at__isnull=True,
-        species_other='', site_other='').order_by('created_at', 'pk'))
-    if not samples or not (trip.country_id and trip.region_id and trip.region.sea_id and trip.year):
+        trip__in=trip.trip_family(), kind=Sample.Kind.SPECIES, species__isnull=False, status='published', deleted_at__isnull=True,
+        species_other='', site_other='').select_related('trip', 'trip__region').order_by('created_at', 'pk'))
+    samples = [s for s in samples if s.trip.country_id and s.trip.region_id and s.trip.region.sea_id and s.trip.year]
+    if not samples:
         return []
-    areas = {(a.species_id, a.undetermined_variant): a for a in SpeciesArea.objects.filter(
-        species_id__in={s.species_id for s in samples}, country_id=trip.country_id, sea_id=trip.region.sea_id)
-        .select_related('species', 'country', 'sea', 'defining_sample')}
+    areas = {(a.species_id, a.undetermined_variant, a.country_id, a.sea_id): a for a in SpeciesArea.objects.filter(
+        species_id__in={s.species_id for s in samples}).select_related('species', 'country', 'sea', 'defining_sample')}
     shown = {}
     for sample in samples:
-        area = areas.get((sample.species_id, sample.undetermined_variant))
+        area = areas.get((sample.species_id, sample.undetermined_variant, sample.trip.country_id, sample.trip.region.sea_id))
         if not area or not area.slug or area.pk in shown or not area_is_live(area):
             continue
         area.card_sample = sample
@@ -92,6 +94,14 @@ def trip_page(request, code):
         loc(trip.site, lang) if trip.site_id else '') if x)
     date_text = (f'{trip.month}/{trip.year}' if trip.month else str(trip.year)) if trip.year else ''
     description = (trip.description_en or trip.description_he) if lang == 'en' else (trip.description_he or trip.description_en)
+    # A series of trips: the trips this one sums up (their species are on this page), or the trip that sums it up.
+    def series_entry(t):
+        t.display_title = trip_title(t, lang) if lang == 'en' else t.title
+        t.date_text = (f'{t.month}/{t.year}' if t.month else str(t.year)) if t.year else ''
+        t.page_url = trip_page_url(t, lang) if trip_collections(t) else ''
+        return t
+    series_trips = [series_entry(t) for t in trip.sub_trips.select_related('region', 'country', 'site').order_by('year', 'month', 'start_day', 'title')]
+    summary_trip = series_entry(trip.summary_trip) if trip.summary_trip_id else None
     return render(request, 'observations/trip_page.html', {
         'trip': trip, 'main_sample': main, 'title': title,
         'place': place, 'date_text': date_text, 'description': description,
@@ -101,6 +111,7 @@ def trip_page(request, code):
         'canonical_url': request.build_absolute_uri(request.path),
         'edit_url': sample_edit_url(request, [main]),
         'can_copy_image': manager,
+        'series_trips': series_trips, 'summary_trip': summary_trip,
         'forum_new_url': new_comment_url(main, lang), 'forum_url': forum_url(main, lang), 'forum_count': forum_count,
     })
 

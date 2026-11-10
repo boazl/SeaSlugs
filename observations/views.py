@@ -30,13 +30,16 @@ def is_manager(user): return user.is_authenticated and user.is_staff and user.ha
 
 
 def trips(request):
+    from .planned_trips import plan_new_url
+    from .templatetags.seaslugs_i18n import with_lang
     from django.db.models import Prefetch
     published = Sample.objects.filter(status='published', deleted_at__isnull=True, trip__isnull=False,
         trip__country__isnull=False, trip__region__isnull=False, trip__year__isnull=False,
         species_other='', site_other='').filter(Q(kind='collection', species__isnull=True) | Q(kind='species',species__isnull=False)
         ).filter(Q(image__gt='') | Q(video_url__gt='')   # the public list shows only trips that have media (photo or video)
         ).select_related('species','trip','owner','owner__profile')
-    available = DiveTrip.objects.filter(samples__in=published).exclude(code__in=LIBRARY_TRIP_CODES).distinct()
+    # a summary trip is listed with the trips it sums up (DiveTrip.summary_trip): their species are its species too
+    available = DiveTrip.objects.filter(Q(samples__in=published) | Q(sub_trips__samples__in=published)).exclude(code__in=LIBRARY_TRIP_CODES).distinct()
     rows, filters = _trip_list_context(request, available)
     rows = list(rows.select_related('country', 'region', 'site')
                 .prefetch_related(Prefetch('samples',queryset=published,to_attr='public_samples')))
@@ -60,26 +63,37 @@ def trips(request):
         trip.date_text = (f'{trip.month}/{trip.year}' if trip.month else str(trip.year)) if trip.year else ''
         trip.video_cards = [x for x in trip.public_samples if x.kind == 'collection']
         trip.species_samples = [x for x in trip.public_samples if x.kind == 'species']
+        if trip.sub_trips.exists():
+            # a summary trip: also the species observed on the trips it sums up (each species once, the earliest)
+            seen = {(x.species_id, x.undetermined_variant) for x in trip.species_samples}
+            for x in published.filter(trip__summary_trip=trip, kind='species').order_by('trip__year', 'trip__month', 'created_at', 'pk'):
+                if (x.species_id, x.undetermined_variant) not in seen:
+                    seen.add((x.species_id, x.undetermined_variant)); trip.species_samples.append(x)
         trip.species_total = trip.display_species_count
     # A species picture opens that observation on its species page (not the bare photo or the YouTube video).
     page_urls = gallery_urls([x for trip in rows for x in trip.species_samples], lang)
     for trip in rows:
         for x in trip.species_samples:
             x.page_url = page_urls.get(x.pk, '')
+    plannings = planning_rows(request, lang)
     return render(request, 'observations/trips.html', {'trips':rows, **filters,
-        'trips_with_video': [t for t in rows if t.video_cards], 'plannings': planning_rows(request, lang),
-        'plan_new_url': (reverse('observation-new') + '?kind=planned') if request.user.is_authenticated
-                        else reverse('login') + '?' + urlencode({'next': reverse('observation-new') + '?kind=planned'})})
+        'trips_with_video': [t for t in rows if t.video_cards], 'plannings': plannings,
+        'copy_links': any(s.share_url for s in plannings),
+        'plan_new_url': plan_new_url(request), 'planning_list_url': with_lang(reverse('planning-list'), lang)})
 
 
 def planning_rows(request, lang):
     """The dive trips page's "תכנון מסעות צלילה" section: the open plannings (planned_trips.py), the soonest first, each
-    with its place, dates, organizer, comments and links to its discussion in the forum."""
-    from .planned_trips import open_plannings, date_range_text
-    from .forum import forum_counts, forum_url, new_comment_url
+    with its place, dates, organizer, comments and links to its discussion in the forum; a series planning (a summary
+    trip) carries the plannings of its trips (sub_rows)."""
+    from .planned_trips import open_plannings, sub_plannings, date_range_text, planning_page_url
+    from .forum import forum_counts, new_comment_url, share_link, trip_forum_url
     rows = open_plannings()
-    counts = forum_counts(request.user, rows)
     for s in rows:
+        s.sub_rows = sub_plannings(s)
+    every = rows + [x for s in rows for x in s.sub_rows]
+    counts = forum_counts(request.user, every)
+    for s in every:
         trip = s.trip
         s.display_title = s.gallery_title(lang) or trip.title
         s.display_place = ' · '.join(x for x in (
@@ -88,12 +102,14 @@ def planning_rows(request, lang):
         s.date_text = date_range_text(trip)
         s.organizer = full_name_for(s.owner, lang) or s.owner.username
         s.forum_count = counts.get(s.pk, 0)
-        s.forum_url = forum_url(s, lang)
+        s.forum_url = trip_forum_url(trip, lang)        # the trip's own discussion page, without the forum's picker
+        s.share_url = share_link(s, request.user)       # the copy-link button: a summary trip, for its manager
         s.forum_new_url = new_comment_url(s, lang)
+        s.page_url = planning_page_url(trip, lang)
         s.edit_url = sample_edit_url(request, [s])
         s.note = (s.note_en or s.note_he) if lang == 'en' else (s.note_he or s.note_en)
+        s.article_links = article_links(trip.articles.all(), lang)      # e.g. the series' schedule
     return rows
-
 
 def sample_edit_url(request, samples):
     """Edit link for the first of these observations the visitor may edit (a manager: any;
@@ -935,6 +951,28 @@ def signup(request):
 
 
 @login_required
+def password_change(request):
+    """The member chooses a new password (the old one first). Required after a manager set a temporary one
+    (Profile.must_change_password, PasswordChangeRequiredMiddleware); the mark is cleared on success."""
+    from django.contrib.auth import update_session_auth_hash
+    from django.contrib.auth.forms import PasswordChangeForm
+    lang = get_lang(request)
+    item, _ = Profile.objects.get_or_create(user=request.user)
+    next_url = request.POST.get('next') or request.GET.get('next') or reverse('profile')
+    if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()) \
+            or next_url.startswith(reverse('password-change')):
+        next_url = reverse('profile')
+    form = PasswordChangeForm(request.user, request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        user = form.save()
+        update_session_auth_hash(request, user)
+        Profile.objects.filter(pk=item.pk).update(must_change_password=False)
+        messages.success(request, 'הסיסמה הוחלפה.')
+        return redirect(next_url)
+    return render(request, 'observations/password_change.html', {'form': form, 'next': next_url, 'required': item.must_change_password})
+
+
+@login_required
 def profile(request):
     lang = get_lang(request)
     item,_=Profile.objects.get_or_create(user=request.user)
@@ -946,7 +984,7 @@ def profile(request):
         else: request.user.groups.remove(group)
         messages.success(request,'הפרופיל נשמר.')
         return redirect('profile')
-    return render(request,'observations/form.html',{'form':form,'title':'הפרופיל שלי / My profile'})
+    return render(request,'observations/form.html',{'form':form,'title':'הפרופיל שלי / My profile','password_change_url':reverse('password-change')})
 
 
 @login_required

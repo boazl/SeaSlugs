@@ -36,6 +36,11 @@ const areaLabelsData = catalog.areas || {};
 const regionLabelsData = catalog.regions || {};
 const siteLabelsData = catalog.sites || {};
 const tripLabelsData = catalog.trips || {};
+// A summary trip (catalog trips[id].sub_trips) counts the observations of the trips it sums up as its own.
+function tripFamily(id) {
+    const entry = tripLabelsData[id];
+    return new Set([String(id), ...((entry && entry.sub_trips) || [])]);
+}
 const taxaData = catalog.taxa || { orders: {}, families: {}, genera: {} };
 
 // Which cards are one species seen in several areas: the same catalog species and the same undetermined-variant
@@ -266,7 +271,8 @@ function siteCount(area, id) {
     return tally(speciesList.filter(sp => matchesAreaFilter(sp, area) && sp.samples.some(sm => sm.site === id && (!state.regions.size || state.regions.has(sm.region)))));
 }
 function tripCount(area, id) {
-    return tally(speciesList.filter(sp => matchesAreaFilter(sp, area) && sp.samples.some(sm => String(sm.trip_id) === id)));
+    const family = tripFamily(id);
+    return tally(speciesList.filter(sp => matchesAreaFilter(sp, area) && sp.samples.some(sm => family.has(String(sm.trip_id)))));
 }
 function photographerSpeciesCount(area, name) {
     return tally(speciesList.filter(sp => matchesAreaFilter(sp, area) && sp.samples.some(sm => sm.photographer === name)));
@@ -575,7 +581,8 @@ function scopedSamples(sp) {
     if (!(state.collection || state.regions.size || state.sites.size || state.photographers.size || state.years.size)) return null;
     let pool = sp.samples;
     if (state.collection) {
-        const byTrip = pool.filter(sm => String(sm.trip_id) === state.collection);
+        const family = tripFamily(state.collection);
+        const byTrip = pool.filter(sm => family.has(String(sm.trip_id)));
         if (byTrip.length) pool = byTrip;
     }
     if (state.regions.size || state.sites.size || state.photographers.size || state.years.size) {
@@ -596,7 +603,10 @@ function speciesSearchText(sp) {
     return normalize(parts.filter(Boolean).join(' '));
 }
 function speciesMatches(sp, q) {
-    if (state.collection && !sp.samples.some(sm => String(sm.trip_id) === state.collection)) return false;
+    if (state.collection) {
+        const family = tripFamily(state.collection);
+        if (!sp.samples.some(sm => family.has(String(sm.trip_id)))) return false;
+    }
     if (state.drill && !inDrill(sp, state.drill)) return false;
     if (!matchesAreaFilter(sp, state.area)) return false;
     if (state.order !== 'all' && sp.order !== state.order) return false;

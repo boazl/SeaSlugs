@@ -74,21 +74,21 @@ class ForumPageTests(ForumSetup):
         self.assertNotIn('על המסע', html)
 
     def test_landing_lists_discussed_observations_newest_first(self):
-        self.message(text='ראשונה')
+        first = self.message(text='ראשונה')
         self.message(sample=self.collection, text='על המסע')
         last = self.message(text='אחרונה')
         html = self.page()
-        listing = html.split('class="discussion-list"')[1].split('</ol>')[0]
-        rows = listing.split('<li>')[1:]
+        listing = html.split('class="discussion-list"')[1].split('<script>')[0]
+        rows = listing.split('<li class="discussion"')[1:]
         self.assertEqual(len(rows), 2)
-        # the species observation's discussion is the most recently active: first, with its count and latest message
+        # the species observation's discussion is the most recently active: first, with its count and its messages open
         self.assertIn(f'href="/forum/?obs={self.sample.pk}"', rows[0])
-        self.assertIn('אחרונה', rows[0])
-        self.assertNotIn('ראשונה', rows[0])
         self.assertIn('>2</span>', rows[0])
+        self.assertLess(rows[0].index(f'id="m-{first.pk}"'), rows[0].index(f'id="m-{last.pk}"'))
         self.assertIn(f'href="/forum/?obs={self.collection.pk}"', rows[1])
         self.assertIn('על המסע', rows[1])
-        self.assertNotIn(f'id="m-{last.pk}"', html)          # the messages themselves open with the discussion
+        self.assertIn('aria-expanded="true"', rows[0])            # open by default, with a +/- button
+        self.assertIn('class="discussion-toggle"', rows[0])
 
     def test_observation_without_discussion_not_listed(self):
         self.message()
@@ -108,7 +108,7 @@ class ForumPageTests(ForumSetup):
 
     def test_english(self):
         html = self.page(f'?obs={self.sample.pk}&lang=en')
-        self.assertIn('Observations forum', html)
+        self.assertIn('Observations forum', html.split('<main>')[0])   # the page title (no heading on the page)
         self.assertIn('Discussion manager:', html)
         self.assertIn('Kind of observations', html)
         self.assertNotIn('פורום תצפיות', html.split('<main>')[1])

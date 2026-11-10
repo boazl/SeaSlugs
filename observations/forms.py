@@ -544,7 +544,7 @@ class SampleForm(forms.ModelForm):
         trip = data.get('trip')
         if data.get('kind') == Sample.Kind.PLANNED and trip and trip.year and trip.month:
             from datetime import date
-            if trip.end_date() < date.today():
+            if trip.series_end_date() < date.today():
                 self.add_error('trip', 'תאריך המסע כבר עבר, ולכן התכנון נסגר. אפשר להפוך אותו למסע צלילה רגיל: '
                                        'בחרו את הסוג "אוסף מינים / מסע צלילה" והוסיפו סרטון או תמונה.')
         return data

@@ -34,7 +34,7 @@ TABLES = {'groups': ACCOUNT_TABLES['groups'], 'users': ACCOUNT_TABLES['users'],
                                 'native_range_he','native_range_en','depth_min','depth_max','introduction_route_he','introduction_route_en',
                                 'med_status_he','med_status_en','first_record_place_he','first_record_place_en',
                                 'last_record_place_he','last_record_place_en','sources']),
-          'trips': (DiveTrip, ['code','title','source_sort','year','month','start_day','duration_days','country','region','site','country_name','region_name','reserve','sea_name','species_count','source_metadata','kind','description_he','description_en','link','local_video_folder']),
+          'trips': (DiveTrip, ['code','title','source_sort','year','month','start_day','duration_days','country','region','site','country_name','region_name','reserve','sea_name','species_count','source_metadata','kind','description_he','description_en','link','local_video_folder','summary_trip']),
           'qualifiers': (IdentificationQualifier,['code','name','name_en']), 'lifestages': (LifeStage,['code','name','name_en']),
           'samples': (Sample, ['title','title_en','kind','trip','owner','order','family','genus','species','identification_qualifier','life_stage','site','species_other','undetermined_variant','site_other','day','depth','video_url','status','source_id','gallery_order','source_metadata','transfer_id','image','gallery_source','note_he','note_en','local_video_file','drive_video_id']),
           'speciesareas': (SpeciesArea, ['species','country','sea','undetermined_variant','defining_sample','note_he','note_en','chosen_sample']),
@@ -46,6 +46,9 @@ NOTE_FIELDS = ('note_he', 'note_en')
 AREA_CHOICE_FIELDS = ('chosen_sample',)
 # The trip's Mac video folder (local_videos.py), added later: a trip row without it keeps the target's value.
 TRIP_LOCAL_FIELDS = ('local_video_folder',)
+# The trip's summary trip (DiveTrip.summary_trip, by its code), added later still: a trip row without it keeps the
+# target's value. A summary trip that is new in the same file is linked after all the rows are saved.
+TRIP_LATER_FIELDS = TRIP_LOCAL_FIELDS + ('summary_trip',)
 
 
 def reference(obj):
@@ -71,6 +74,9 @@ def row(obj, fields):
             # Species' OWN 'species' field (the epithet, a plain string) shares a name with
             # SpeciesArea's 'species' FK -- only treat it as a reference on SpeciesArea itself.
             result[f] = reference(getattr(obj,f))
+        elif isinstance(obj, DiveTrip) and f == 'summary_trip':
+            # the summary trip by its code ('_pending_summary': one that arrives in the same file, linked after saving)
+            result[f] = getattr(obj, '_pending_summary', None) or (obj.summary_trip.code if obj.summary_trip_id else None)
         elif f == 'defining_sample':
             # Taxon rows (orders/families/genera): the sample's fixed transfer id, '' for none.
             sample = obj.defining_sample
@@ -153,10 +159,12 @@ def plan(document):
         # A species-area row from a file exported before the page notes existed has no note fields: the target keeps its own.
         older_area_row = (model is SpeciesArea and isinstance(incoming,dict) and set(incoming) < set(fields)
                           and set(fields)-set(incoming) <= set(NOTE_FIELDS)|set(AREA_CHOICE_FIELDS))
-        # A trip row from a file exported before the Mac video folder existed: the target keeps its own folder.
-        older_trip_row = model is DiveTrip and isinstance(incoming,dict) and set(incoming)==set(fields)-set(TRIP_LOCAL_FIELDS)
+        # A trip row from a file exported before the Mac video folder / the summary trip existed: the target keeps its own.
+        older_trip_row = (model is DiveTrip and isinstance(incoming,dict) and set(incoming) < set(fields)
+                          and set(fields)-set(incoming) <= set(TRIP_LATER_FIELDS))
         if not isinstance(incoming,dict) or (set(incoming)!=set(fields) and not older_area_row and not older_trip_row): raise ValidationError(f'שדות לא תואמים בשורה {number}; יש לעדכן את הקוד בשתי הסביבות.')
         values={}
+        pending_summary = None
         for f,v in incoming.items():
             if f in ('country','sea','region','site'): values[f]=related(f,v,required=not (model is DiveTrip))
             elif model is SpeciesArea and f == 'chosen_sample':
@@ -171,6 +179,14 @@ def plan(document):
             elif model is DiveTrip and f in ('year','month','start_day','duration_days','species_count'):
                 if v is not None and type(v) is not int: raise ValidationError('נדרש מספר שלם: '+f)
                 values[f] = v
+            elif model is DiveTrip and f == 'summary_trip':
+                if v is not None and not isinstance(v,str): raise ValidationError('מפתח מסע מסכם לא תקין.')
+                values[f] = None
+                if v:
+                    target = unique(DiveTrip, code=v)
+                    if target is not None and target.code != incoming.get('code'): values[f] = target
+                    elif any(isinstance(r, dict) and r.get('code') == v for r in document['rows']): pending_summary = v
+                    else: raise ValidationError(f'המסע המסכם {v} חסר ביעד ואינו בקובץ.')
             elif model is DiveTrip and f == 'source_metadata':
                 if not isinstance(v,dict): raise ValidationError('מידע מקור לא תקין.')
                 values[f] = v
@@ -233,8 +249,10 @@ def plan(document):
         if model is Region and obj:
             candidate.trip_code = obj.trip_code
         if model is DiveTrip and obj:
-            for field in TRIP_LOCAL_FIELDS:
+            for field in TRIP_LATER_FIELDS:
                 if field not in values: setattr(candidate, field, getattr(obj, field))
+        if pending_summary:
+            candidate._pending_summary = pending_summary
         if model is Species and obj:
             for field in TABLES['species'][1]:
                 if field not in values: setattr(candidate,field,getattr(obj,field))
@@ -369,6 +387,13 @@ def apply(document, expected, actor=None, backup=None):
                     DiveTrip.objects.filter(site=site).update(region=site.region, country=site.region.country)
                 for field, values in item.get('many', {}).items():
                     getattr(item['object'],field).set(values)
+        for item in items:
+            # a summary trip that was new in this same file: linked now that it is saved
+            pending = getattr(item.get('object'), '_pending_summary', None) if item['action'] in ('new', 'update', 'same') else None
+            if pending:
+                trip = DiveTrip.objects.get(pk=item['object'].pk)
+                trip.summary_trip = DiveTrip.objects.get(code=pending)
+                trip.full_clean(); trip.save()
         for item in items:
             if item['action'] == 'merge':
                 merge_location(item['object'], item['target'])

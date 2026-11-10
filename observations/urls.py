@@ -26,5 +26,6 @@ urlpatterns=[
  path('login/',auth.LoginView.as_view(template_name='observations/login.html'),name='login'),
  path('logout/',auth.LogoutView.as_view(),name='logout'),
  path('profile/',views.profile,name='profile'),
+ path('password/',views.password_change,name='password-change'),
  path('partners/',views.partners,name='partners'),
 ]

@@ -86,6 +86,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'observations.middleware.PasswordChangeRequiredMiddleware',
     'observations.middleware.MaintenanceModeMiddleware',
     'observations.middleware.LanguagePreferenceMiddleware',
     'observations.activity.VisitCounterMiddleware',

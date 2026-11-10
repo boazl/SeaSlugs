@@ -123,7 +123,7 @@ class PlannedPagesTests(PlannedSetup):
         html = self.client.get('/observations/trips/').content.decode()
         section = html.split('id="planning"')[1].split('</section>')[0]
         self.assertIn('מסע לאילת', section)
-        self.assertIn(f'href="/forum/?obs={sample.pk}"', section)
+        self.assertIn('href="/forum/trip/F1/"', section)
         self.assertIn(f'href="/forum/new/?obs={sample.pk}"', section)
         self.close(sample)
         html = self.client.get('/observations/trips/').content.decode()
@@ -140,7 +140,7 @@ class PlannedPagesTests(PlannedSetup):
         self.client.logout()
         html = self.client.get('/forum/?kind=planned').content.decode()
         self.assertIn('מי מצטרף?', html)
-        self.assertIn(f'href="/observations/trips/#planned-{sample.pk}"', self.client.get(f'/forum/?obs={sample.pk}').content.decode())
+        self.assertIn('href="/planning/F1/"', self.client.get(f'/forum/?obs={sample.pk}').content.decode())
         self.close(sample)
         self.assertNotIn('מי מצטרף?', self.client.get('/forum/').content.decode())
         self.assertEqual(self.client.get(f'/forum/?obs={sample.pk}').status_code, 404)
@@ -150,3 +150,46 @@ class PlannedPagesTests(PlannedSetup):
         self.assertIn('הדיון נסגר', html)
         self.client.post('/forum/', {'obs': sample.pk, 'audience': 'all', 'text': 'עוד הודעה'})
         self.assertEqual(ForumMessage.objects.count(), 1)
+
+
+class PlanningPagesTests(PlannedSetup):
+    """Each planning has its own address, /planning/<trip code>/ (the trip's permanent code), and /planning/ lists the
+    open ones; the planning section, the forum and the sitemap link there. A trip has one planning. A closed planning
+    is shown to its owner and the managers only; once it became a dive trip with a page, its address leads there (301)."""
+
+    def test_page_and_list(self):
+        sample = self.planning(note_he='מחפשים צוללים')
+        from .models import ForumMessage
+        ForumMessage.objects.create(observation=sample, user=self.manager, text='אני בפנים')
+        html = self.client.get('/planning/F1/').content.decode()
+        self.assertIn('<h1>מסע לאילת</h1>', html)
+        self.assertIn('מחפשים צוללים', html)
+        self.assertIn('אני בפנים', html)
+        self.assertIn(f'href="/forum/new/?obs={sample.pk}"', html)
+        self.assertIn('Discussion', self.client.get('/planning/F1/?lang=en').content.decode())
+        listing = self.client.get('/planning/?lang=he').content.decode()
+        self.assertIn('href="/planning/F1/"', listing)
+        self.assertIn('href="/planning/F1/"', self.client.get('/observations/trips/?lang=he').content.decode())
+        self.assertIn('href="/planning/F1/"', self.client.get(f'/forum/?obs={sample.pk}&lang=he').content.decode())
+        sitemap = self.client.get('/sitemap.xml').content.decode()
+        self.assertIn('/planning/F1/</loc>', sitemap)
+        self.assertIn('/planning/</loc>', sitemap)
+
+    def test_one_planning_per_trip(self):
+        self.planning()
+        with self.assertRaises(ValidationError):
+            self.planning(owner=self.manager)
+
+    def test_closed_and_converted(self):
+        sample = self.planning()
+        self.close(sample)
+        self.assertEqual(self.client.get('/planning/F1/').status_code, 404)
+        self.client.force_login(self.member)
+        self.assertContains(self.client.get('/planning/F1/'), 'התכנון נסגר')
+        self.client.logout()
+        sample.kind = Sample.Kind.COLLECTION
+        sample.video_url = 'https://youtu.be/12345678901'
+        sample.save_reviewed(actor=self.manager, approve=True)
+        response = self.client.get('/planning/F1/')
+        self.assertEqual((response.status_code, response['Location']), (301, '/trip/F1/'))
+        self.assertEqual(self.client.get('/planning/NOPE/').status_code, 404)

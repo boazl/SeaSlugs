@@ -1,0 +1,18 @@
+{% extends 'observations/base.html' %}{% load seaslugs_i18n seo %}{% block title %}SeaSlugs · {{ sample.display_title }}{% endblock %}{% block share_meta %}{% share_meta sample.display_title "תכנון מסע צלילות"|t:lang meta_description %}{% endblock %}{% block content %}<style>
+.planning-head .meta{display:flex;flex-wrap:wrap;gap:4px 16px;color:#b8ccd0;margin:0 0 10px}.planning-actions{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;margin:18px 0 28px}.planning-actions .button{text-decoration:none}
+.planning-series{margin:0 0 26px}.planning-series ul{margin:6px 0 0}.planning-closed{border-inline-start:4px solid #ffcf5c;padding:10px 14px;background:#ffcf5c14}
+.forum-list{list-style:none;margin:0;padding:0}.forum-msg{padding:14px 16px;border:1px solid #22404a;border-radius:10px;margin:0 0 12px}.forum-msg.private{border-color:#ffcf5c66;background:#ffcf5c0d}.forum-msg h3{margin:0 0 4px;font-size:18px}.forum-msg .meta{color:#b8ccd0;font-size:14px;display:flex;flex-wrap:wrap;gap:4px 12px}.forum-msg .text{margin:8px 0 0;overflow-wrap:anywhere}.forum-msg form{margin:8px 0 0}.forum-msg form button{padding:3px 10px;font-size:13px;background:transparent;color:#ffb4af;border:1px solid #ffb4af66}.badge{display:inline-block;padding:1px 9px;border-radius:999px;font-size:12px;background:#ffcf5c26;color:#ffe4a1;border:1px solid #ffcf5c66}
+.copy-link-button{padding:4px 12px;font-size:14px;background:transparent;color:#64dfce;border:1px solid #64dfce;border-radius:7px;cursor:pointer}
+</style>
+<p><a href="{% url 'planning-list' as list_url %}{{ list_url|with_lang:lang }}">{{ "תכנון מסעות צלילה"|t:lang }}</a></p>
+<section class="planning-head"><h1>{{ sample.display_title }}</h1>
+<p class="meta">{% if sample.date_text %}<span>{{ sample.date_text }}</span>{% endif %}{% if sample.display_place %}<span>{{ sample.display_place }}</span>{% endif %}<span>{{ "מארגן/ת:"|t:lang }} {{ organizer }}</span></p>
+{% if closed %}<p class="planning-closed">{{ "תאריך המסע עבר והתכנון נסגר. אפשר להפוך אותו למסע צלילה רגיל: בעריכה בוחרים את הסוג אוסף מינים / מסע צלילה ומוסיפים סרטון או תמונה."|t:lang }}</p>{% endif %}
+{% if note %}<p>{{ note|linebreaksbr }}</p>{% endif %}</section>
+{% if parent %}<p class="planning-series">{{ "חלק מסדרת המסעות:"|t:lang }} <a href="{{ parent.page_url }}">{{ parent.display_title }}</a>{% if parent.date_text %} · {{ parent.date_text }}{% endif %}</p>{% endif %}
+{% if children %}<div class="planning-series"><h2>{{ "המסעות בסדרה"|t:lang }}</h2><ul>{% for x in children %}<li><a href="{{ x.page_url }}">{{ x.display_title }}</a>{% if x.date_text %} · {{ x.date_text }}{% endif %}{% if x.display_place %} · {{ x.display_place }}{% endif %}</li>{% endfor %}</ul></div>{% endif %}
+{% if article_links %}<h2>{{ "מאמרים"|t:lang }}</h2>{% include 'observations/_article_links.html' with links=article_links %}{% endif %}
+<p class="planning-actions">{% if can_write %}<a class="button" href="{{ forum_new_url }}">{{ "הוספת תגובה"|t:lang }}</a>{% endif %}<a href="{{ trip_forum_url }}">{{ "לדיון בפורום"|t:lang }}</a>{% if share_url %}<button type="button" class="copy-link-button" data-copy-url="{{ share_url }}" data-done="{{ 'הקישור הועתק'|t:lang }}">{{ "העתקת קישור לדיון"|t:lang }}</button>{% endif %}{% if edit_url %}<a href="{{ edit_url }}">{{ "עריכה"|t:lang }}</a>{% endif %}</p>
+<h2>{{ "הדיון"|t:lang }} ({{ messages_list|length }})</h2>
+{% if messages_list %}<ol class="forum-list">{% for m in messages_list %}{% include 'observations/_forum_message.html' %}{% endfor %}</ol>{% else %}<p>{{ "אין עדיין הודעות על התצפית הזו."|t:lang }}</p>{% endif %}
+{% if copy_links %}{% include 'observations/_copy_url.html' %}{% endif %}{% endblock %}

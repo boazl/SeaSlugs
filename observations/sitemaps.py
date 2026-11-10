@@ -17,7 +17,7 @@ class StaticViewSitemap(Sitemap):
     priority = 0.8
 
     def items(self):
-        return ['gallery', 'news', 'forum']
+        return ['gallery', 'news', 'forum', 'planning-list']
 
     def location(self, item):
         return reverse(item)
@@ -127,7 +127,23 @@ class TripPageSitemap(Sitemap):
         return reverse('trip-page', args=[code])
 
 
+class PlanningPageSitemap(Sitemap):
+    """Each open dive-trip planning's page (planned_trips.planning_page, keyed by its trip's code) -- the rule under
+    which the page answers 200 to everyone."""
+    protocol = 'https'
+    changefreq = 'daily'
+    priority = 0.5
+
+    def items(self):
+        from .planned_trips import planned_samples
+        return sorted({s.trip.code for s in planned_samples() if s.planning_open})
+
+    def location(self, code):
+        return reverse('planning-page', args=[code])
+
+
 SITEMAPS = {
+    'planning': PlanningPageSitemap,
     'static': StaticViewSitemap,
     'species': SpeciesPageSitemap,
     'genera': GenusPageSitemap,

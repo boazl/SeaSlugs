@@ -29,7 +29,7 @@ class ProfileInline(admin.StackedInline):
     model = Profile
     can_delete = False
     verbose_name_plural = 'פרופיל'
-    fields = ['first_name_en','last_name_en','phone','macro_diver','visible_to_members','countries','regions','bio','trip_code']
+    fields = ['must_change_password','first_name_en','last_name_en','phone','macro_diver','visible_to_members','countries','regions','bio','trip_code']
     filter_horizontal = ['countries','regions']
 
 
@@ -439,19 +439,80 @@ class TaxonGenusAdmin(DefiningSampleChoicesMixin, TaxonSitePageMixin, admin.Mode
         messages.success(request, output.getvalue().strip())
 
 
+class SummaryTripSelect(forms.Select):
+    """The trips that may sum up a trip, each option carrying its country, region and year for the filters of
+    summary_trip_picker.js."""
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex, attrs)
+        trip = getattr(value, 'instance', None)
+        if trip is not None:
+            country = trip.country or (trip.region.country if trip.region_id else None)
+            if country: option['attrs'].update({'data-country': country.pk, 'data-country-label': str(country)})
+            if trip.region_id: option['attrs'].update({'data-region': trip.region_id, 'data-region-label': str(trip.region)})
+            if trip.year: option['attrs']['data-year'] = trip.year
+        return option
+
+
+class SummaryTripChoiceField(forms.ModelChoiceField):
+    def label_from_instance(self, trip):
+        when = f'{trip.month}/{trip.year}' if trip.month and trip.year else (str(trip.year) if trip.year else '')
+        place = str(trip.region) if trip.region_id else trip.region_name
+        details = ' · '.join(x for x in (place, when) if x)
+        return f'{trip.title} ({details}) [{trip.code}]' if details else f'{trip.title} [{trip.code}]'
+
+
+class DiveTripAdminForm(forms.ModelForm):
+    """The summary trip is chosen among the trips that have no summary trip of their own (DiveTrip.summary_trip: one
+    level only); a trip that sums up others cannot have one."""
+    class Meta:
+        model = DiveTrip
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from .models import LIBRARY_TRIP_CODES
+        choices = (DiveTrip.objects.filter(summary_trip__isnull=True).exclude(code__in=LIBRARY_TRIP_CODES)
+                   .select_related('country', 'region', 'region__country').order_by('-year', '-month', 'title'))
+        if self.instance.pk:
+            choices = choices.exclude(pk=self.instance.pk)
+        field = self.fields['summary_trip']
+        self.fields['summary_trip'] = SummaryTripChoiceField(
+            choices, required=False, label=field.label, help_text=field.help_text, widget=SummaryTripSelect)
+        if self.instance.pk and self.instance.sub_trips.exists():
+            self.fields['summary_trip'].disabled = True
+            self.fields['summary_trip'].help_text = 'זהו מסע מסכם של מסעות אחרים, ולכן אין לו מסע מסכם משלו.'
+
+
 @admin.register(DiveTrip)
 class DiveTripAdmin(admin.ModelAdmin):
-    list_display = ['code','title','kind','year','month','country','region','site','species_count','local_video_folder']
-    list_filter = ['kind','year','country','region','site']
+    form = DiveTripAdminForm
+    list_display = ['code','title','kind','year','month','country','region','site','summary_trip','species_count','local_video_folder']
+    list_filter = ['kind','year','country','region','site',('summary_trip', admin.EmptyFieldListFilter)]
     search_fields = ['code','title','region_name','reserve','site__name']
-    readonly_fields = ['source_metadata']
+    readonly_fields = ['source_metadata', 'summed_up_trips']
     autocomplete_fields = ['articles']
+
+    @admin.display(description='המסעות שהמסע הזה מסכם')
+    def summed_up_trips(self, obj):
+        trips = list(obj.sub_trips.order_by('year', 'month', 'start_day', 'title')) if obj and obj.pk else []
+        if not trips:
+            return '—'
+        return mark_safe('<br>'.join(format_html('<a href="{}">{}</a>', reverse('admin:observations_divetrip_change', args=[t.pk]),
+                                                 f'{t.title} [{t.code}]') for t in trips))
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        # a trip joined a summary trip that is being planned: its own planning discussion opens (planned_trips.py)
+        if obj.summary_trip_id:
+            from .planned_trips import sync_sub_plannings
+            sync_sub_plannings(obj.summary_trip)
 
     # Narrows the "region" options to the selected country and the "site" options to the
     # selected region, fetched from views.divetrip_locations. See divetrip_admin.js. (A trip's
-    # sea is its region's sea -- there is no sea field on the trip.)
+    # sea is its region's sea -- there is no sea field on the trip.) summary_trip_picker.js filters the summary trip
+    # list by country, region and year.
     class Media:
-        js = ['observations/js/divetrip_admin.js']
+        js = ['observations/js/divetrip_admin.js', 'observations/js/summary_trip_picker.js']
 
 
 class ArticleBlockFormSet(forms.BaseInlineFormSet):

@@ -84,5 +84,7 @@ node -e "new Function(require('fs').readFileSync('dist/app.js','utf8'))"   # app
 - **Publication:** a complete species observation publishes itself, and a manager's save publishes.
   Otherwise it stays pending. Publishing creates or updates the SpeciesArea and its defining sample.
 - **Changing an observation's species** happens in place: same row, same `transfer_id`.
+- **Summary trips** (`DiveTrip.summary_trip`, one level): the summary trip's species include those of the trips it
+  sums up; a planning on it opens one for each of its trips.
 - **Dive-trip planning** (kind `planned`, `planned_trips.py`): a future trip, no media, shown only in the forum and the
   dive trips page's planning section; closed after its date; becomes a collection when media is added.

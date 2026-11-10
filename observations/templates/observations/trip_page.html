@@ -66,6 +66,8 @@ gtag('config', 'G-CPGTC09P2P');</script>
         <section class="species-section">
             <h2>{{ "תיאור"|t:lang }}</h2>
             {% if description %}<p class="species-lead">{{ description|linebreaksbr }}</p>{% endif %}
+            {% if series_trips %}<div class="trip-series"><h3>{{ "המסע מסכם את המסעות"|t:lang }}</h3><ul>{% for t in series_trips %}<li>{% if t.page_url %}<a href="{{ t.page_url }}">{{ t.display_title }}</a>{% else %}{{ t.display_title }}{% endif %}{% if t.date_text %} · {{ t.date_text }}{% endif %}</li>{% endfor %}</ul></div>{% endif %}
+            {% if summary_trip %}<p class="trip-series">{{ "חלק מסדרת המסעות:"|t:lang }} {% if summary_trip.page_url %}<a href="{{ summary_trip.page_url }}">{{ summary_trip.display_title }}</a>{% else %}{{ summary_trip.display_title }}{% endif %}</p>{% endif %}
             <p class="species-share"><span>{{ "קישור לשיתוף:"|t:lang }}</span> <a href="{{ canonical_url }}" id="species-share-link">{{ canonical_url }}</a> <button type="button" id="species-share-copy" data-copy-label="{{ "העתקה"|t:lang }}" data-copied-label="{{ "הועתק!"|t:lang }}">{{ "העתקה"|t:lang }}</button></p>
         </section>
         {% include 'observations/_articles_section.html' %}

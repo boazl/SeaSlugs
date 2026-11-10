@@ -1,0 +1,5 @@
+{% extends 'observations/base.html' %}{% load seaslugs_i18n seo %}{% block title %}SeaSlugs · {{ "תכנון מסעות צלילה"|t:lang }}{% endblock %}{% block share_meta %}{% share_meta "תכנון מסעות צלילה"|t:lang "SeaSlugs" "מסעות צלילה מתוכננים: מצטרפים, שואלים ומתאמים בפורום. אחרי המסע הוא הופך למסע צלילה רגיל עם הסרטונים והתמונות."|t:lang %}{% endblock %}{% block content %}
+<h1 id="planning-title">{{ "תכנון מסעות צלילה"|t:lang }}</h1>
+{% include 'observations/_planning_section.html' %}
+<p><a href="{% url 'dive-trips' as trips_url %}{{ trips_url|with_lang:lang }}">{{ "למסעות הצלילה"|t:lang }}</a></p>
+{% endblock %}

@@ -59,12 +59,30 @@ def paragraphs(text, binomials, lang='he', lead=''):
                    for i, part in enumerate(parts))
 
 
+def table_rows(text):
+    """A table block's rows of cells. Cells are separated by | -- or, for a table copied from Excel (or any
+    spreadsheet) and pasted as is, by tabs: then a cell may also hold a line break or a quote, as Excel writes it.
+    Rows are padded to the widest one; empty rows are dropped."""
+    text = str(text or '').replace('\r\n', '\n')
+    if '\t' in text:
+        import csv, io
+        rows = [[cell.strip() for cell in row] for row in csv.reader(io.StringIO(text), delimiter='\t')]
+        rows = [row for row in rows if any(row)]
+        while rows and all(not row[-1] for row in rows if row):
+            rows = [row[:-1] for row in rows]
+    else:
+        rows = [[cell.strip() for cell in line.strip().strip('|').split('|')] for line in text.splitlines() if line.strip()]
+    width = max((len(row) for row in rows), default=0)
+    return [row + [''] * (width - len(row)) for row in rows]
+
+
 def table(text, binomials, lang='he'):
-    rows = [[cell.strip() for cell in line.strip().strip('|').split('|')] for line in str(text or '').splitlines() if line.strip()]
+    rows = table_rows(text)
     if not rows:
         return ''
     head = ''.join('<th>' + inline(c, binomials, lang=lang) + '</th>' for c in rows[0])
-    body = ''.join('<tr>' + ''.join('<td>' + inline(c, binomials, lang=lang) + '</td>' for c in row) + '</tr>' for row in rows[1:])
+    body = ''.join('<tr>' + ''.join('<td>' + '<br>'.join(inline(part, binomials, lang=lang) for part in c.split('\n')) + '</td>' for c in row) + '</tr>'
+                   for row in rows[1:])
     return f'<div class="table-wrap"><table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></div>'
 
 

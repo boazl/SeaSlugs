@@ -225,6 +225,14 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
 
 - **`DiveTrip`** (table `dive_trips`, 49) -- may lie in the future (a planned trip, §7.6); `start_date()` / `end_date()`
   give its known dates (start day + duration, else the end of its month / year)
+  - `summary_trip` (FK self, migration `0097`): a series of small trips / samplings documented separately is summed up
+    by one trip (often with one video of all the species). One level: the summary trip has no summary trip, and a trip
+    that sums up others has none. `trip_family()` = the trip + the trips it sums up; `series_end_date()` the last day of
+    any of them. The summary trip's species are its own observations plus theirs: its trip page (with "המסע מסכם את
+    המסעות" / "חלק מסדרת המסעות"), `display_species_count`, the public trips table and the gallery's trip filter
+    (`/catalog.js` trips[id].sub_trips, app.js `tripFamily`). Chosen in the admin's trip form among the trips without a
+    summary trip, with country / region / year filters (`DiveTripAdminForm`, `summary_trip_picker.js`); the form lists
+    the trips a summary trip sums up.
   - `code` is the stable natural key, e.g. `V`, `I26Aug`. `kind` is dive or thematic.
   - `title`, `year`, `month`, `start_day`, `duration_days`.
   - `country`, `region`, `site`, plus source text columns.
@@ -270,9 +278,14 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
   - `published_on`, `show_on_home`.
   - It is either a PDF article or an article **written on the site**, made of `ArticleBlock` sections
     (heading, subheading, paragraph, figure → Sample, table, list, notice) plus `ArticleReference`
-    entries.
+    entries. A table block is one row per line with cells separated by `|`, or a table copied from Excel and pasted as
+    is (tab-separated; quoted cells may hold line breaks; `article_render.table_rows`). Excel files themselves are not
+    uploaded.
   - Picked from the library by species, taxa and dive trips through their `articles` M2M.
-- **`Profile`**: `user` 1:1.
+- **`Profile`**: `user` 1:1. `must_change_password` (migration `0098`): a temporary password a manager set -- the
+  member is sent to `/observations/password/` (`views.password_change`, `PasswordChangeRequiredMiddleware`) from every
+  page until they choose their own (logout passes); ticked on the user's admin page; per environment (passwords and
+  this mark never travel). Every member can change their password from the profile page.
   - English name, `phone`.
   - `macro_diver` and `visible_to_members` control the partners directory.
   - `bio`, `trip_code` (the photographer letter), and M2M `regions` and `countries`.
@@ -397,6 +410,8 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
 | `/sitemap.xml`, `/robots.txt`, `/healthz` | SEO and health |
 | `/analytics/exclude/`, `/analytics/include/` | Owner's GA opt-out cookie (not linked anywhere); also stops the site's own visit counter |
 | `/observations/trips/#planning` | The dive trips page's "תכנון מסעות צלילה" section (§7.6) |
+| `/planning/`, `/planning/<trip code>/` | The open plannings; one planning's page (§7.6) |
+| `/forum/trip/<trip code>/` | One dive trip's discussion to send to people, without the forum's picker; a summary trip's page holds its series (§7.5) |
 | `/news/` | News & activity (§7.4): public activity feed, posts, planned trips, progress chart; management data for staff |
 | `/forum/` (`?kind=…`, `?obs=<pk>`), `/forum/new/`, `/forum/<pk>/delete/` | Observations forum (§7.5) |
 
@@ -551,9 +566,19 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
   with a discussion first (with their message count), then the others, alphabetically. With `?obs=<pk>`: the
   observation (photo, name, place, date, discussion manager, a link to its page -- the species/taxon page, the
   dive-trip page of a collection, the planning section for a planned trip), its whole discussion oldest first, and the
-  writing box (`#write`). Without one (the landing page): the matching observations that have a discussion, one
-  row each -- photo, name, place, date, discussion manager, the latest message's time, writer and opening words, the
-  message count -- the most recently active first, 30 a page; a row opens its discussion. In the main menu as "פורום" and in the sitemap.
+  writing box (`#write`). Without one (the landing page): the matching observations that have a discussion, the most
+  recently active first, 30 groups a page (`forum.discussion_groups`). Each is a row (photo, name, place, date,
+  discussion manager, the latest message's time and writer, the message count; it opens the discussion) with its
+  messages open beneath and a +/- button that folds them (open by default). A series of dive trips is one group: the
+  summary trip's discussion, then its trips' discussions by date, indented; its +/- folds the whole series. In the main menu as "פורום" and in the sitemap.
+- **A trip's own discussion page** `/forum/trip/<trip code>/` (`forum.forum_trip`), to send to people: no filters,
+  picker or headings. The trip's discussion (its planning, else its collection observation) and, for a summary trip,
+  its trips' discussions by date, indented, all open with +/-; one writing box (a choice of trip in a series) that
+  returns here (`next`). A "העתקת קישור לדיון" button (`forum.share_link`, `_copy_url.html`; the address without `?lang`,
+  so a recipient gets their own language) appears only on a summary trip's discussion and only for its discussion
+  manager (the owner) and the site managers -- on its row in the forum and on this page, the forum's discussion of it,
+  its planning card and its planning page (with the full address beside it on the discussion pages); "לדיון בפורום"
+  in the planning section and page leads here. The forum page itself has no headings (the page title stays).
 - **A closed dive-trip planning** (its date has passed): gone from the forum for everyone but its owner and the site
   managers, and nobody can write in it ("הדיון נסגר").
 - **Discussion manager** = the observation's owner (photographer).
@@ -590,6 +615,17 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
 - **Becoming a dive trip:** its owner or a manager edits it, chooses "אוסף מינים / מסע צלילה" and adds a video or photo:
   the same row (same `transfer_id`, same discussion) becomes a regular collection (a member's waits for approval).
 - **Transfer:** travels with the samples table (natural key: trip + title, like a collection; no media needed).
+- **Addresses:** `/planning/` (the open plannings, the same section as on the dive trips page) and
+  `/planning/<trip code>/` (keyed by the trip's permanent code): dates, place, organizer, notes, the trip's articles,
+  the series links, the discussion with "add a comment". One planning per trip (`Sample.clean`). A closed planning's
+  page answers its owner and the managers only (404 for others); once the planning became a dive trip with a page, the
+  address answers 301 → `/trip/<code>/`. In the sitemap (the list and each open planning); the planning section, the
+  forum and the series links point there.
+- **A series** (DiveTrip.summary_trip): a planning on the summary trip opens a planning (discussion) for each trip of the
+  series that has not ended (`sync_sub_plannings`: when the series planning is saved, and when a trip joins the summary
+  trip in the admin); same owner, the trip's title. The series stays open until its last trip ends; the planning
+  section shows the trips' plannings inside the series card (full width) with the trip's articles (e.g. a schedule);
+  the forum links the series and its trips' discussions and shows the trip's articles.
 
 ## 8. Storage of media and documents
 
@@ -689,6 +725,8 @@ never serves `MEDIA_ROOT` directly.** Every file goes through a view that checks
   - `import_gallery_samples`, `import_dive_trips`, `import_missing_no_video_samples`.
   - `fill_philippines_trip_gaps`, `redistribute_philippines_samples`, `reconcile_defining_samples`.
   - `import_genus_texts` (CSV), `import_article_html` (two HTML files → site-written article).
+  - `plan_philippines_2027`: the planned Visayas series of Feb–Mar 2027 (sea, regions, liveaboard sites, summary trip +
+    3 trips, plannings, opening forum messages, schedule article). Run on the Mac on 2026-11-10; refuses to run twice.
   - All of them default to a dry run, need `--apply`, and back up first.
 
 ## 10. Moving data between the Mac and the site
@@ -726,6 +764,8 @@ The owner curates data mostly on the Mac and moves it to production. Rules that 
 - The format is checked strictly: "fields do not match" means the two environments run different code.
 - **Forum messages** (table `forum`, last): matched by `transfer_id`, observation by Sample `transfer_id`, users by
   username; only new messages and deletions travel (see §7.5).
+- **Trips** carry `summary_trip` by code; a summary trip that is new in the same file is linked after all rows are
+  saved; a file from before the field keeps the destination's value.
 - Some fields are **not** transferred and are set per environment by migration or admin: `Region.trip_code`,
   `Profile.trip_code`, taxon files and the identification preview pages.
 
@@ -850,7 +890,8 @@ Catalogue of test modules (test count) and what each guards:
 | `test_genus_page_filter` | 8 | The gallery's filter carried to the genus page: filtered species first with their matching observations, the others as small cards, stale parameters ignored |
 | `test_media_transfer` | 57 | One observation per species per trip; image storage, canonical names, replacing photos, environment image comparison and transfer |
 | `test_trip_species_links` | 2 | Trip page species pictures open the observation on its species page |
-| `test_planned_trips` | 13 | Dive-trip planning: no media, title + year/month, self-publishing, no media observation on a future trip, trip dates, form (?kind=planned, past trip refused, conversion to a collection keeps the discussion), trips page section, not in the gallery, forum open/closed |
+| `test_summary_trips` | 14 | Summary trips: one-level rules, admin choices and filters, species of the series (trip page, count, trips table, gallery filter), trips transfer, series planning (sub-plannings, joining later, open until the last trip, planning section and forum), Excel-pasted tables, the plan_philippines_2027 command |
+| `test_planned_trips` | 16 | Dive-trip planning: no media, title + year/month, self-publishing, no media observation on a future trip, trip dates, form (?kind=planned, past trip refused, conversion to a collection keeps the discussion), trips page section, not in the gallery, forum open/closed |
 | `test_forum` | 39 | Observations forum: per-observation discussions only, kind / photographer / place / year / taxon filters and picker, grouped view, who reads public / manager-only messages, writing needs an account, login → sign-up → back, delete rights, species/trip/home buttons, sitemap/robots, the `forum` table transfer |
 | `test_news_activity` | 31 | Activity log events, visit counter exclusions, /news/ page, posts, backfill |
 | `test_articles` | 73 | Article library, sections on pages, PDFs, previews, site-written articles, home articles |
