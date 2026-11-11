@@ -279,8 +279,8 @@ class PlanPhilippines2027CommandTests(TestCase):
 
 
 class ArticleLinkThumbTests(TestCase):
-    """An article without a picture (a site-written article with no figure, e.g. a schedule) is listed without an
-    empty thumbnail box."""
+    """An article without a picture (a site-written article with no figure, e.g. a schedule) is listed with a table
+    icon in its thumbnail box (test_article_table_icon), never with an empty image."""
 
     def test_no_empty_thumbnail(self):
         from .articles import article_links
@@ -290,7 +290,8 @@ class ArticleLinkThumbTests(TestCase):
         ArticleBlock.objects.create(article=article, kind='table', text_he='א | ב\n1 | 2')
         html = render_to_string('observations/_article_links.html', {'links': article_links([article], 'he'), 'lang': 'he'})
         self.assertIn('לוח זמנים', html)
-        self.assertNotIn('class="article-thumb"', html)
+        self.assertIn('class="article-icon"', html)
+        self.assertNotIn('<img', html)
 
 
 class ArticleSiteEditTests(TestCase):

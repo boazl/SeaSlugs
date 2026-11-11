@@ -1704,6 +1704,8 @@ class DailyVisitor(models.Model):
     # many pages they viewed that day: the /news/ page's visitors by country.
     country = models.CharField('מדינה', max_length=2, blank=True, default='')
     views = models.PositiveIntegerField('צפיות', default=0)
+    # The time of the visitor's latest page that day (the /news/ page's last visit per country); empty on older rows.
+    last_seen = models.DateTimeField('כניסה אחרונה', null=True, blank=True)
     class Meta:
         constraints = [models.UniqueConstraint(fields=['day', 'key'], name='unique_daily_visitor')]
         verbose_name = 'מבקר ביום'; verbose_name_plural = 'מבקרים'

@@ -536,7 +536,12 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
     from two lists, which offer only years and months with activity. "All months" = the whole chosen year. A sea
     (area) filter applies to the feed and the chart.
   - **Tiles** (a tile whose value is 0 is hidden): new observations (records, see §6.7), new videos, new species
-    (species new to the site), new species in an area (new cards), identification changes, updated observations.
+    (species new to the site), new species in an area (new cards), identification changes, updated observations,
+    new forum comments (a link to the list below).
+  - **Forum comments** (`news.forum_activity`, `test_news_activity.ForumActivityTests`): the forum messages written in
+    the period that the visitor may read (`forum.visible_messages`: not deleted; manager-only ones only for those who
+    may see them), sea-filtered; a table per observation -- name (link to its discussion), count, last comment's date
+    and time -- newest discussion first.
   - **Feed:** new species = species new to the site, each once, with a small photo, date and name only; new videos as
     cards that open the observation (its species page); new observations as small picture cards; identification
     changes (old ← new); updated observations. Only lines whose observation / card is still public.
@@ -557,7 +562,8 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
     window instead, with a ✕ to close. After a click inside the YouTube player the keyboard focus returns to the page,
     so the keys keep working: arrows, space, `f`, Esc.
   - **Managers** also see visits (today / 7 / 30 days, a daily chart, top pages), sign-ups, the users table (joined,
-    last login, logins in 30 days, observations), visitors by country over 30 days (`test_visitor_countries.py`),
+    last login, logins in 30 days, observations), visitors by country over 30 days with each country's last visit (`DailyVisitor.last_seen`, migration `0101`;
+    older rows show the day only) (`test_visitor_countries.py`),
     recent logins and, last, the photographers table (the photographer group, and anyone with a published
     observation; 0 for none yet; guests marked: name, email, phone, published observations;
     `test_news_photographers.py`).
@@ -906,6 +912,7 @@ Catalogue of test modules (test count) and what each guards:
 | `test_planned_trips` | 16 | Dive-trip planning: no media, title + year/month, self-publishing, no media observation on a future trip, trip dates, form (?kind=planned, past trip refused, conversion to a collection keeps the discussion), trips page section, not in the gallery, forum open/closed |
 | `test_forum` | 39 | Observations forum: per-observation discussions only, kind / photographer / place / year / taxon filters and picker, grouped view, who reads public / manager-only messages, writing needs an account, login → sign-up → back, delete rights, species/trip/home buttons, sitemap/robots, the `forum` table transfer |
 | `test_news_activity` | 31 | Activity log events, visit counter exclusions, /news/ page, posts, backfill |
+| `test_article_table_icon` | 2 | An article without a picture shows a table icon (library and article links), never an empty image |
 | `test_articles` | 73 | Article library, sections on pages, PDFs, previews, site-written articles, home articles |
 | `test_home_content` | 47 | SEO phase 3: server-rendered home content in both languages, editable home texts |
 | `test_gallery` | 37 | `/observations/` filters, manager-only owner filter, sort, dropdown options |

@@ -432,3 +432,69 @@ class SlideshowTests(Base):
         ActivityEvent = E
         ActivityEvent.objects.filter(kind='video_added').delete()
         self.assertIn('No new videos in this period.', self.client.get('/news/slideshow/?lang=en').content.decode())
+
+class CountryLastVisitTests(Base):
+    """Visitors by country show each country's last visit: the latest page's date and time (DailyVisitor.last_seen),
+    or only the day for rows from before the time was kept."""
+
+    def test_last_visit_per_country(self):
+        from unittest.mock import patch
+        with patch('observations.geo.country_of', return_value='IL'):
+            self.client.get('/news/', HTTP_USER_AGENT=UA)
+            self.client.get('/news/', HTTP_USER_AGENT=UA)
+        visitor = DailyVisitor.objects.get()
+        self.assertIsNotNone(visitor.last_seen)
+        DailyVisitor.objects.create(day=timezone.localdate() - timedelta(days=3), key='old', country='FR', views=1)
+        boss = User.objects.create_superuser('boss', password='pw-test-12345')
+        self.client.force_login(boss)
+        response = self.client.get('/news/')
+        rows = {c['code']: c for c in response.context['countries']}
+        self.assertEqual(rows['IL']['last_seen'], timezone.localtime(visitor.last_seen))
+        self.assertIsNone(rows['FR']['last_seen'])
+        html = response.content.decode()
+        self.assertIn(timezone.localtime(visitor.last_seen).strftime('%d/%m/%Y %H:%M'), html)
+        self.assertIn((timezone.localdate() - timedelta(days=3)).strftime('%d/%m/%Y'), html)
+        self.assertIn('ביקור אחרון', html)
+
+
+class ForumActivityTests(Base):
+    """The news page counts the forum comments written in the period that the visitor may read (not deleted; a
+    manager-only one only for those who may see it), with a tile and, per observation, how many and the last one's
+    date and time -- newest discussion first, filtered by sea like the rest of the page."""
+
+    def setUp(self):
+        super().setUp()
+        from .models import ForumMessage
+        self.first = self.observe()
+        self.second = self.observe(species=self.varicosa, trip=self.trip_ph, video='nnnnnnnnnnn')
+        writer = User.objects.create_user('writer', password='pw-test-12345')
+        now = timezone.now()
+        mk = lambda sample, minutes, **kw: ForumMessage.objects.create(
+            observation=sample, user=writer, text='הערה', created_at=now - timedelta(minutes=minutes), **kw)
+        mk(self.first, 50); mk(self.first, 10); mk(self.second, 30)
+        mk(self.second, 5, manager_only=True)
+        mk(self.first, 1, deleted_at=now)
+        mk(self.first, 60 * 24 * 20)                       # three weeks ago: not this week
+
+    def test_counts_and_discussions(self):
+        response = self.client.get('/news/')
+        self.assertEqual(response.context['forum_count'], 3)
+        rows = response.context['forum_discussions']
+        self.assertEqual([r['count'] for r in rows], [2, 1])                     # the newest discussion first
+        self.assertIn('Phyllidia ocellata', str(rows[0]['name']))
+        html = response.content.decode()
+        self.assertIn('href="#forum"><b>3</b><span>הערות חדשות בפורום</span>', html)
+        self.assertIn(rows[0]['last'].strftime('%d/%m/%Y %H:%M'), html)
+        self.assertIn(f'?obs={self.first.pk}', html)                             # the observation's discussion
+
+    def test_manager_only_comment_for_managers(self):
+        boss = User.objects.create_superuser('boss', password='pw-test-12345')
+        self.client.force_login(boss)
+        response = self.client.get('/news/')
+        self.assertEqual(response.context['forum_count'], 4)
+        self.assertEqual(response.context['forum_discussions'][0]['count'], 2)   # the second: now its last is newest
+
+    def test_sea_filter_and_period(self):
+        self.assertEqual(self.client.get(f'/news/?sea={self.scs.pk}').context['forum_count'], 1)
+        year = timezone.localdate().year
+        self.assertEqual(self.client.get(f'/news/?year={year}').context['forum_count'], 4)

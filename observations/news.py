@@ -9,7 +9,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 
 from django.contrib.auth import get_user_model
-from django.db.models import Count, Min, Q, Sum
+from django.db.models import Count, Max, Min, Q, Sum
 from django.shortcuts import render
 from django.urls import reverse
 from django.utils import timezone
@@ -263,9 +263,12 @@ def manager_data(lang):
     photographers_active = sum(1 for p in photographers if p['observations'])
     # Visitors by country over the 30 days (DailyVisitor.country, geo.py): a visitor counts once per day, as in the
     # tiles above; '' = unknown (no country database, a private address, or a day before countries were recorded).
-    countries = [{'code': r['country'], 'visitors': r['visitors'], 'views': r['views'] or 0}
+    # The last visit is the latest page's time (DailyVisitor.last_seen); rows from before it was kept give their day only.
+    countries = [{'code': r['country'], 'visitors': r['visitors'], 'views': r['views'] or 0,
+                  'last_seen': timezone.localtime(r['last_seen']) if r['last_seen'] else None, 'last_day': r['last_day']}
                  for r in DailyVisitor.objects.filter(day__gte=month_ago).values('country')
-                 .annotate(visitors=Count('id'), views=Sum('views')).order_by('-visitors', 'country')]
+                 .annotate(visitors=Count('id'), views=Sum('views'), last_seen=Max('last_seen'), last_day=Max('day'))
+                 .order_by('-visitors', 'country')]
     most = max([c['visitors'] for c in countries] + [1])
     for c in countries:
         c['bar'] = round(100 * c['visitors'] / most)
@@ -381,6 +384,33 @@ def news_slideshow(request):
     })
 
 
+def forum_activity(user, since, until=None, sea_id=None, lang='he'):
+    """The forum messages (forum.py) this user may read that were written in the period: how many, and per observation
+    how many and when the last one was -- the news page's "new forum comments", newest discussion first."""
+    from .forum import forum_url, visible_messages
+    from .names import name_html
+    rows = visible_messages(user).filter(created_at__gte=since)
+    if until:
+        rows = rows.filter(created_at__lt=until)
+    if sea_id:
+        rows = rows.filter(observation__trip__region__sea_id=sea_id)
+    per = list(rows.values('observation').annotate(n=Count('id'), last=Max('created_at')).order_by('-last'))
+    samples = Sample.objects.select_related('species', 'trip', 'trip__region').in_bulk([r['observation'] for r in per])
+    discussions = []
+    for r in per:
+        sample = samples.get(r['observation'])
+        if sample is None:
+            continue
+        taxon = sample.kind not in (Sample.Kind.COLLECTION, Sample.Kind.PLANNED)
+        name = sample.taxon_label if taxon else (sample.gallery_title(lang) or str(sample.trip or ''))
+        place = ' · '.join(x for x in (
+            loc(sample.trip.region, lang) if sample.trip_id and sample.trip.region_id else '',
+            str(sample.trip.year) if sample.trip_id and sample.trip.year else '') if x)
+        discussions.append({'name': name_html(name) if taxon else name, 'place': place, 'count': r['n'],
+                            'last': timezone.localtime(r['last']), 'url': forum_url(sample, lang)})
+    return {'count': sum(r['n'] for r in per), 'discussions': discussions}
+
+
 def news(request):
     lang = get_lang(request)
     try:
@@ -407,8 +437,10 @@ def news(request):
     for line in sections['species_new']:
         if line['new_to_site'] and line['species_id'] not in seen:
             seen.add(line['species_id']); species_list.append(line)
+    forum = forum_activity(request.user, period['since'], period['until'], sea_id, lang)
     context = {
         'period': period, 'sea_id': sea_id, 'seas': seas,
+        'forum_count': forum['count'], 'forum_discussions': forum['discussions'],
         'month_options': [(m, MONTH_NAMES[lang][m - 1]) for m in period['months']], 'year_options': activity_years(),
         # new to the site = a species (species table) shown for the first time anywhere; new to an area = every new card
         'new_species_site': len(species_list),

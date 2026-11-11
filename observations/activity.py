@@ -257,15 +257,16 @@ def record_visit(request):
     ip = client_ip(request)
     key = hashlib.sha256(f'{settings.SECRET_KEY}|{day}|{ip}|{request.META.get("HTTP_USER_AGENT", "")}'
                          .encode()).hexdigest()
+    now = timezone.now()
     visitor = DailyVisitor.objects.filter(day=day, key=key)
-    if not visitor.update(views=F('views') + 1):
+    if not visitor.update(views=F('views') + 1, last_seen=now):
         # the day's first page of this visitor: its country is looked up once (only the code is kept, not the address)
         from .geo import country_of
         try:
             with transaction.atomic():
-                DailyVisitor.objects.create(day=day, key=key, views=1, country=country_of(request, ip))
+                DailyVisitor.objects.create(day=day, key=key, views=1, country=country_of(request, ip), last_seen=now)
         except IntegrityError:
-            visitor.update(views=F('views') + 1)
+            visitor.update(views=F('views') + 1, last_seen=now)
 
 
 EXCLUDE_COOKIE = 'exclude_analytics'                 # the same cookie as /analytics/exclude/ (config.views)
