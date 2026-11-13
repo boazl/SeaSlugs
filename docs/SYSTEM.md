@@ -145,6 +145,9 @@ observations/
   image_manager.py   /admin/images/: list, compare, transfer, delete images
   folder_import.py   /admin/images/folder/: reviewed bulk import from a folder + Excel
   video_check.py, video_check_views.py  /admin/video-check/: find YouTube videos that were deleted, fix the links
+  ratings.py         ratings and views of an observation's photo / video (§7.2a)
+  photo_credit.py    photographer tracking: the credit and frame under a card's picture (mirrors app.js photoCredit)
+  missing_descriptions.py  /admin/missing-descriptions/: gallery species with no description yet
   views.trip_picker_context + _trip_picker.html / _trip_picker_script.html  the observation form's trip picker (country / region / site / year filters, initTripPicker), shared with the folder and video import tools
   video_import.py    /admin/local-videos/import/: attach a trip's video files to observations (Mac file, Drive copy, YouTube)
   drive_videos.py, drive_video_views.py  /admin/drive-videos/: re-read the Google Drive ids of the video copies
@@ -434,6 +437,19 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
   `level`, `drill`, `order`…`genus`, `collection`, `sort`, `sortChosen`.
 - **Area buttons:** all areas, species from multiple areas, Mediterranean exotic (migrants), and
   per-sea buttons. Sidebar filters: region, site, photographer, year, several observations.
+- **Photographer filter:** each photographer's name heads three boxes with counts -- **מינים** (his species
+  observations), **אוספים** (his dive-trip collections) and **אקסקלוסיבי** (species no other photographer has observed,
+  over all areas; an unmarked "Genus sp." card counts on its own). Each box is `<name>::<kind>` in
+  `state.photographers` and in the link (`photographer=<name>::species|collections|exclusive`); a bare name (older
+  links and saved views) means species + collections (`normalizePhotographerKeys`). Ticking only the species hides his
+  collections and the other way round.
+- **Photographer tracking** (`photo_credit.py` ⇄ `photoCredit` in app.js; catalog.js carries each observation's
+  `owner`, each species' `defining_sample_id` and the signed-in `viewer` = id + his species keys): under a card's
+  picture an anonymous visitor always sees "צילום: <name>"; a signed-in member sees it only for someone else's
+  picture, which then gets a thin frame (`viewer-has` white = he has a live observation of that species + variant
+  letter, published or pending; `viewer-new` green = he has none; colours in styles.css); his own pictures get
+  neither. Collection cards follow the name rule without a frame. The same tag (`{% photo_credit %}`) is on the
+  species cards of the trip, genus, family/order and species ("more observations") pages.
   Managers, under the alphabetical sort only: photo / video filters (`media`: video with no photo, photo with no
   video, video with no Google Drive copy -- the page carries the Drive ids as `#drive-videos`).
 - **Collection cards** open the trip page (`/trip/<code>/`); its "This trip in the gallery" button (`/?sort=alpha&trip=<id>`)
@@ -487,6 +503,41 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
   - It keeps the visitor's filters unless they would hide the taxon, and scrolls to its card.
 - **Duplicated logic:** the italics rule, the count wording and the translations are duplicated
   server-side and in `app.js`. **Change both** (tests check some of this).
+
+### 7.2a Ratings and views of photos and videos (`ratings.py`, `test_media_ratings.py`)
+
+- **Six fields on every observation** (`Sample`): `photographer_image_rating` / `photographer_video_rating` (1-5, the
+  owner rating his own observation), `audience_image_rating` / `audience_video_rating` (a Bayesian average:
+  `(PRIOR_MEAN*PRIOR_WEIGHT + sum) / (PRIOR_WEIGHT + n)`, prior 3.0 x 3 ratings; null while unrated) and
+  `image_views` / `video_views`. The audience's individual stars are `MediaRating` rows (sample, media, stars, user
+  or guest `visitor` id); the average is recomputed from them on every change.
+- **Who rates:** anyone. A signed-in member as himself; a guest by the random id in his `seaslugs_rater` cookie
+  (2 years, httponly). The owner's stars go to the photographer field, never into the audience average. One rating
+  per rater, observation and medium: shown again whenever he opens it, changed by another star, cleared by clicking
+  the same star again (`stars=0`).
+- **Where:** five stars (`_media_rating.html`) under the hero photo / video of the species page and the trip page,
+  and in the lightbox under whatever photo or video it opened (`window.seaslugsMedia` in `_species_lightbox.html`).
+- **Views:** opening a photo in the lightbox, or playing a video (the lightbox player, or the hero's embedded player
+  -- `youtube-fallback.js` fires a `youtube-playing` event on its first PLAYING state). One per medium per browser tab
+  session (`sessionStorage`); not counted for the observation's photographer, the site owner
+  (`activity.is_excluded_user`), the `exclude_analytics` browser or bots.
+- **Endpoints:** `GET/POST /observations/<pk>/rating/` (`media`, `stars`), `POST /observations/<pk>/viewed/`
+  (`media`); published, live observations with that medium only (404 / 400 otherwise).
+- **Written with `queryset.update()`:** never changes `updated_at`, never logs an activity event, never invalidates a
+  transfer preview. **Per environment:** not in `table_transfer.TABLES`, and a samples transfer, which rebuilds each
+  observation from the file, carries the six fields over from the target's own row (`ratings.SAMPLE_FIELDS`,
+  `sample_transfer.sample_plan`); `python manage.py refresh_audience_ratings` recomputes every audience average from
+  the stored ratings (a full DB replacement, `/admin/db-replace/`,
+  does replace them with the Mac's). Read-only in the Sample admin.
+- **Gallery:** not shown, but four sorts -- users' rating of the video / photo, views of the video / photo (`sort=
+  rating_video|rating_image|views_video|views_image`, `MEDIA_SORTS`): a species card by its best observation among
+  those the filters leave; unrated (or unviewed) cards last; ties in taxonomic order. Collections keep their own
+  order (country, then year). catalog.js carries `rating_image`, `rating_video`, `views_image`, `views_video` per
+  observation.
+- **"My rating" sorts** (`sort=my_rating_video|my_rating_image`): the visitor's own stars -- catalog.js `my_ratings`
+  (`ratings.my_rating_map`: a member's MediaRating rows plus his photographer stars on his own observations, a
+  guest's rows by his rating cookie; sample id -> {image, video}). Same rules as above (best observation of the
+  card, unrated last); each option is offered only once he has rated something of that medium.
 
 ### 7.3 Language
 
@@ -714,7 +765,8 @@ never serves `MEDIA_ROOT` directly.** Every file goes through a view that checks
 | URL | Purpose |
 |---|---|
 | `/admin/images/` | Image manager: every media image with the observations using it, sort by file/alpha/taxonomy, kind groups, redundant-image detection, safe delete, rename. **Compare with the other environment** (export a list, upload it on the other side) and **transfer images** (up to 150 photos / 300 MB per upload). A downloaded photo carries every live observation that shows it (owner first, then gallery-image users such as a trip collection); the upload creates/updates all of them and links the others to the owner's file. |
-| `/admin/images/folder/` | Folder import: reviewed bulk import of a folder of images with an Excel sheet. One species selector per image (≤500). Staging in `folder-import-staging/`, auto-cleaned. |
+| `/admin/images/folder/` | Folder import: reviewed bulk import of a folder of images with an Excel sheet. One species selector per image (≤500). Staging in `folder-import-staging/`, auto-cleaned. New observations are opened under the trip's **photographer** (owner of most of the trip's observations, else the letter that starts the trip code = `Profile.trip_code`, else the site owner; changeable on the preview); existing ones keep theirs. When the trip has no collection yet, the import can end by creating its **collection observation** (kind `collection`) under the photographer, titled "<region> - <year>" (editable), whose picture is one of the imported photos chosen on the preview (`gallery_source`); a manager's save publishes it. |
+| `/admin/missing-descriptions/` | Species without a description: every species shown in the gallery (a SpeciesArea with a live published defining observation) whose `description_he` / `description_en` is empty -- either language, Hebrew only, English only or both; newest first or by name; observation count, first/last observation date, gallery pages, edit link. Read-only; per environment (descriptions travel with the species table). |
 | `/admin/table-transfer/` | Table transfer (§10.2) |
 | `/admin/local-videos/import/` | Video import by dive trip (Mac only): pick the trip and its Mac video folder; each video file gets a row with its observation (the one holding the file, else the match by species name, else a new species or trip-collection observation with species/cf./juv. guessed from the file name plus site, day, depth), the existing observation's fields, the Mac path, the Drive copy path and id, and a required YouTube link. Only rows of files that belong to a live observation and are not attached to it yet are selected and shown; the others (new observation, deleted observation, already attached) sit in a closed list below with their counts. A file of a deleted observation of the trip (no live one) is offered with it; choosing it restores the observation. Saving (backup, one transaction; nothing saved if any selected row is invalid; a link YouTube reports deleted is refused) sets the trip's folder, writes video_url / local_video_file / drive_video_id, creates the new observations (a manager's save publishes), then copies missing files into Drive and reads their ids (not yet uploaded -> `/admin/drive-videos/` later). Then transfer the samples table. |
 | `/admin/drive-videos/` | Google Drive video ids (Mac only): rescans the Drive copies' ids (`drive_videos.py`, the same scan as `fill_drive_video_ids`). A replaced file is a new Drive file, so the stored id showed the old preview and did not play. Sorts each observation into same / update (new id) / clear (copy gone, or no local file) / waiting (copy not uploaded yet: id kept) / missing (no copy); one button backs up and saves update + clear. Then transfer the samples table. |
@@ -929,6 +981,10 @@ Catalogue of test modules (test count) and what each guards:
 | `test_species_admin` | 17 | Editable species changelist |
 | `test_order_page_whole_order` | 17 | Order page holds the whole order; back-to-gallery `?up=` links |
 | `test_folder_import` | 16 | Folder import |
+| `test_folder_import_photographer` | 10 | Folder import: new observations under the trip's photographer (owner / code letter / site owner / chosen), the trip's collection observation with a chosen imported photo, one collection per trip |
+| `test_photo_credit` | 11 | Photographer tracking (credit / white / green frame, server cards and catalog viewer, app.js photoCredit) and the photographer filter's species / collections / exclusive boxes |
+| `test_media_ratings` | 18 | Photo / video ratings and views: Bayesian average, members / guests / photographer, change and clear, view exclusions, updated_at and transfer untouched, the page's stars, catalog values, gallery sorts (audience, views, my own) |
+| `test_missing_descriptions` | 6 | Gallery species without a description: per language, whitespace, only gallery species, order, superuser page, admin link |
 | `test_existing_image` | 15 | Reusing another observation's gallery image (`gallery_source`) |
 | `test_reference_links` | 15 | iNaturalist/WoRMS matching |
 | `test_taxon_transfer`, `test_transfer` | 15+15 | Table transfer of taxon texts and reference tables |

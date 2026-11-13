@@ -45,7 +45,13 @@
     }
     function watch(item) {
         try {
-            new YT.Player(item.iframe, { events: { onError: function () { swap(item.iframe, item.image, item.alt); } } });
+            new YT.Player(item.iframe, { events: {
+                onError: function () { swap(item.iframe, item.image, item.alt); },
+                // a "youtube-playing" event on the player when it starts playing (the observation pages count a
+                // view of the video: ratings.py, _species_lightbox.html)
+                onStateChange: function (e) {
+                    if (e.data === 1 && item.iframe.isConnected) item.iframe.dispatchEvent(new CustomEvent('youtube-playing', { bubbles: true }));
+                } } });
         } catch (_) {}
     }
     function load() {

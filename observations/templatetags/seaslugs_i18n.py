@@ -60,6 +60,11 @@ TRANSLATIONS = {
     'סינון': 'Filter',
     'איפוס סינון': 'Reset filters',
     'צילום:': 'Photo:',
+    # ratings of an observation's photo / video (_media_rating.html, ratings.py)
+    'הדירוג שלך:': 'Your rating:',
+    'דירוג הצלם:': "Photographer's rating:",
+    'כוכבים': 'stars',
+    'לחיצה נוספת על אותו כוכב מבטלת את הדירוג': 'Click the same star again to clear your rating',
     'צפייה בסרטון': 'Watch the video',
     'הגדלת התמונה': 'Enlarge photo',
     'סגירה': 'Close',
@@ -559,3 +564,20 @@ def by_language(value, lang):
 def gallery_title(sample, lang):
     """A sample's gallery title in the page's language, or the only one there is (Sample.gallery_title)."""
     return sample.gallery_title(lang) if hasattr(sample, 'gallery_title') else ''
+
+
+@register.simple_tag(takes_context=True)
+def photo_credit(context, sample, area=None):
+    """The photographer line and frame of a card whose picture is `sample`'s (observations/photo_credit.py): use as
+    {% photo_credit sample area as credit %}, then credit.name / credit.frame. The visitor's own species are read
+    once per request."""
+    from observations.photo_credit import credit, species_key, viewer_species_keys
+    request = context.get('request')
+    user = getattr(request, 'user', None)
+    keys = getattr(request, '_viewer_species_keys', None) if request is not None else None
+    if keys is None:
+        keys = viewer_species_keys(user)
+        if request is not None:
+            request._viewer_species_keys = keys
+    key = species_key(area.species_id, area.undetermined_variant) if area is not None else None
+    return credit(sample, user, keys, context.get('lang') or 'he', key)

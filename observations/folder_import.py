@@ -16,7 +16,8 @@ from django.db import transaction
 from django.shortcuts import render,redirect
 from django.utils import timezone
 from .forms import SampleForm
-from .models import Sample, Species, DiveTrip, Country, Region, normalize_sp_spacing, split_undetermined_variant
+from django.contrib.auth import get_user_model
+from .models import Sample, Species, DiveTrip, Country, Region, Profile, normalize_sp_spacing, split_undetermined_variant
 from .table_transfer import fingerprint,create_backup
 from .media_transfer import save_images
 
@@ -117,6 +118,46 @@ def plan_row(trip,species_id,owner,variant=''):
     return Sample(owner=owner,species_id=species_id,trip=trip,undetermined_variant=variant),'new'
 
 
+def trip_photographer(trip, fallback):
+    """The photographer the trip's new observations are opened under (Sample.owner -- a trip has no
+    photographer of its own, see Sample.photographer_name): the one who owns most of the trip's
+    observations; else the photographer whose letter starts the trip code (Profile.trip_code, e.g. the
+    "o" of oI26Aug -- see trip_naming); else the site owner (a code without a letter); else `fallback`
+    (the manager running the import). Only a suggestion: the operator can pick another on the preview."""
+    from collections import Counter
+    User = get_user_model()
+    owners = Counter(Sample.objects.filter(trip=trip, deleted_at__isnull=True)
+                     .exclude(kind=Sample.Kind.PLANNED).values_list('owner_id', flat=True))
+    if owners:
+        return User.objects.get(pk=owners.most_common(1)[0][0])
+    letters = re.match(r'^([a-z][a-z0-9]*)(?=[A-Z])', trip.code or '')
+    if letters:
+        profile = Profile.objects.filter(trip_code=letters.group(1)).select_related('user').first()
+        if profile:
+            return profile.user
+    from .trip_naming import default_photographer_username
+    return User.objects.filter(username=default_photographer_username()).first() or fallback
+
+
+def trip_collection(trip):
+    """The trip's live collection ("אוסף מינים / מסע צלילה") observation, if it already has one."""
+    return Sample.objects.filter(kind=Sample.Kind.COLLECTION, trip=trip, deleted_at__isnull=True).order_by('pk').first()
+
+
+def collection_titles(trip):
+    """Suggested gallery titles for the trip's collection, like the existing ones ("תאילנד - 2019" /
+    "Thailand - 2019"): the trip's region (else its country) and year."""
+    def place(lang):
+        for obj, text in ((trip.region if trip.region_id else None, trip.region_name),
+                          (trip.country if trip.country_id else None, trip.country_name)):
+            name = ((obj.name_en if lang == 'en' else obj.name) or obj.name) if obj else text
+            if (name or '').strip():
+                return name.strip()
+        return trip.title
+    year = f' - {trip.year}' if trip.year else ''
+    return f'{place("he")}{year}', f'{place("en")}{year}'
+
+
 @staff_member_required
 def folder_import(request):
     if not request.user.is_superuser:raise PermissionDenied
@@ -199,7 +240,19 @@ def folder_import(request):
                         else:
                             row['checked']=False
                             if row['species_id'] and not row['error']:row['description']+=' — תמונה נוספת לאותו מין, לא נבחרה'
-                    snapshot=fingerprint();manifest={'trip':trip.pk,'rows':rows,'snapshot':snapshot,'user':request.user.pk}
+                    # The photographer the new observations (and the trip's collection) are opened under,
+                    # and the collection observation that sums up the trip -- offered only when the trip
+                    # has none yet; its picture is one of the imported photos (a gallery image).
+                    from .photographers import photographer_users, photographer_label
+                    photographer=trip_photographer(trip,request.user)
+                    existing_collection=trip_collection(trip)
+                    title,title_en=collection_titles(trip)
+                    cover=next((row['index'] for row in rows if row['checked']),None)
+                    for row in rows:row['cover']=row['index']==cover
+                    choices=photographer_users(also=[photographer.pk])
+                    context.update(photographers=[(u.pk,photographer_label(u)) for u in choices],photographer=photographer.pk,
+                                   existing_collection=existing_collection,collection_title=title,collection_title_en=title_en)
+                    snapshot=fingerprint();manifest={'trip':trip.pk,'rows':rows,'snapshot':snapshot,'user':request.user.pk,'photographer':photographer.pk}
                     raw=json.dumps(manifest,ensure_ascii=False).encode();(stage/'manifest.json').write_bytes(raw)
                     token=signing.dumps({'stage':stage.name,'digest':hashlib.sha256(raw).hexdigest(),'user':request.user.pk},salt='folder-import')
                     context.update(rows=rows,token=token,chosen_trip=trip)
@@ -213,7 +266,19 @@ def folder_import(request):
                 stage=root/token['stage'];raw=(stage/'manifest.json').read_bytes()
                 if hashlib.sha256(raw).hexdigest()!=token['digest']:raise ValidationError('ההכנה השתנתה; בצעו בדיקה מחדש.')
                 manifest=json.loads(raw);trip=DiveTrip.objects.get(pk=manifest['trip'])
+                from .photographers import photographer_users, mark_photographer
+                photographer=photographer_users(also=[manifest.get('photographer')]).filter(
+                    pk=request.POST.get('photographer') or manifest.get('photographer') or request.user.pk).first()
+                if photographer is None:raise ValidationError('יש לבחור צלם מהרשימה.')
                 selected=set(request.POST.getlist('selected'));prepared=[];seen=set();skipped=0
+                make_collection=request.POST.get('collection')=='yes'
+                if make_collection:
+                    if trip_collection(trip):raise ValidationError('למסע הזה כבר יש תצפית אוסף; לא תיווצר נוספת. בטלו את סימון יצירת תצפית האוסף.')
+                    collection_title=normalized(request.POST.get('collection_title',''))
+                    collection_title_en=normalized(request.POST.get('collection_title_en',''))
+                    if not collection_title:raise ValidationError('יש להזין כותרת לתצפית האוסף.')
+                    cover=request.POST.get('collection_image','')
+                    if cover not in selected:raise ValidationError('יש לבחור את תמונת תצפית האוסף מבין התמונות המסומנות לייבוא.')
                 for row in manifest['rows']:
                     if str(row['index']) not in selected:continue
                     if row['error']:raise ValidationError(row['error'])
@@ -249,16 +314,20 @@ def folder_import(request):
                     seen.add(key)
                     image=(stage/f"{row['index']}.jpg").read_bytes()
                     if hashlib.sha256(image).hexdigest()!=row['digest']:raise ValidationError('התמונה השתנתה; בצעו בדיקה מחדש.')
-                    prepared.append((species.pk if species else None,proposal,image,variant))
+                    prepared.append((species.pk if species else None,proposal,image,variant,str(row['index'])))
                 if not prepared:raise ValidationError('לא סומנו תמונות.')
-                create_backup();old_names=[];created_species=0
+                if make_collection and cover not in {entry[4] for entry in prepared}:
+                    raise ValidationError('תמונת תצפית האוסף דולגה כתמונה נוספת לאותו מין. בחרו את התמונה שתיובא בפועל.')
+                create_backup();old_names=[];created_species=0;imported={};collection=None
                 with transaction.atomic():
                     Species.objects.filter(pk=-1).update(scientific_name='')
                     if fingerprint()!=manifest['snapshot']:raise ValidationError('הנתונים השתנו מאז הבדיקה. בחרו תיקייה ובדקו מחדש.')
-                    for species_id,proposal,image,variant in prepared:
+                    for species_id,proposal,image,variant,index in prepared:
                         if species_id is None:
                             species=Species(**proposal);species.full_clean();species.save();species_id=species.pk;created_species+=1
-                        item,_=plan_row(trip,species_id,request.user,variant);old_names.append(item.image.name)
+                        # A new observation is opened under the trip's photographer, not the manager running
+                        # the import; an existing one keeps its own photographer.
+                        item,_=plan_row(trip,species_id,photographer,variant);old_names.append(item.image.name)
                         # Canonical, meaningful name (trip code + species -- see
                         # Sample.canonical_image_name) rather than a content hash: the file
                         # is written under it BEFORE full_clean() runs (unlike the batch
@@ -274,6 +343,16 @@ def folder_import(request):
                         # publishes it and registers the SpeciesArea entry that makes the
                         # species show up in the gallery.
                         item.save_reviewed(actor=request.user)
+                        imported[index]=item
+                    if make_collection:
+                        # The trip's collection observation, under the photographer, showing the chosen
+                        # imported photo as its gallery image (gallery_source: no copy of the file). A
+                        # manager's save publishes it.
+                        collection=Sample(kind=Sample.Kind.COLLECTION,trip=trip,owner=photographer,title=collection_title,
+                                          title_en=collection_title_en,gallery_source=imported[cover],
+                                          image=imported[cover].image.name)   # mirrored by clean(); set here for its media check
+                        collection.save_reviewed(actor=request.user,approve=True)
+                    mark_photographer(photographer)
                 media=Path(settings.MEDIA_ROOT).resolve()
                 for name in set(old_names):
                     if name and not Sample.objects.filter(image=name).exists():
@@ -281,7 +360,8 @@ def folder_import(request):
                         if not path.is_symlink() and path.resolve().is_relative_to(media):path.unlink(missing_ok=True)
                 import shutil
                 shutil.rmtree(stage)
-                messages.success(request,f'נוצרו {created_species} מינים חדשים. יובאו {len(prepared)} תמונות; דולגו {skipped} תמונות כפולות. נשמרה הראשונה שנבחרה לכל מין לפי סדר הרשימה. תמונות קודמות שאינן בשימוש נמחקו ללא גיבוי תמונה.')
+                messages.success(request,f'נוצרו {created_species} מינים חדשים. יובאו {len(prepared)} תמונות; דולגו {skipped} תמונות כפולות. נשמרה הראשונה שנבחרה לכל מין לפי סדר הרשימה. תמונות קודמות שאינן בשימוש נמחקו ללא גיבוי תמונה.'
+                                 +(f' נוצרה תצפית אוסף "{collection.title}" על שם הצלם.' if collection else ''))
                 return redirect('image-manager')
         except (ValidationError,ValueError,DiveTrip.DoesNotExist,Species.DoesNotExist,signing.BadSignature,OSError) as exc:
             context['error']='; '.join(exc.messages) if isinstance(exc,ValidationError) else 'הנתונים או הקבצים אינם זמינים. יש לבחור תיקייה ולבדוק מחדש.'

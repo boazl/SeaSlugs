@@ -67,6 +67,60 @@ function otherAreasTotals(sp) {
     return t && t.areas > 1 ? t : null;
 }
 
+// ---- photographer tracking ----
+// The signed-in visitor (catalog.js "viewer": his user id and the "species_id|variant" keys of the species he has
+// observations of; null when not signed in). The rule mirrors observations/photo_credit.py: an anonymous visitor
+// always sees who took a card's picture; a member sees it only for someone else's picture, which then gets a thin
+// frame -- white when he has an observation of that species himself, green when he has none; his own pictures
+// get neither.
+const viewer = catalog.viewer || null;
+const viewerSpecies = new Set(viewer ? viewer.species : []);
+function photoCredit(sample, sp) {
+    if (!sample || !sample.photographer) return { name: '', frame: '' };
+    if (viewer && sample.owner === viewer.id) return { name: '', frame: '' };
+    const name = photographerLabel(sample);
+    if (!viewer || !sp) return { name, frame: '' };
+    return { name, frame: viewerSpecies.has(`${sp.species_id}|${sp.variant || ''}`) ? 'viewer-has' : 'viewer-new' };
+}
+// The observation whose picture a species card shows when no filter picks another: its defining sample.
+function definingSample(sp) {
+    return sp.samples.find(sm => sm.sample_id === sp.defining_sample_id) || sp.samples[0];
+}
+// "Exclusive": the species only one photographer has observed (over all areas -- the same species as the
+// "species from multiple areas" key; an unmarked "Genus sp." card counts on its own).
+const speciesPhotographers = new Map();
+const exclusiveKey = sp => sameSpeciesKey(sp) || `area-${sp.area_id}`;
+for (const sp of speciesList) {
+    const key = exclusiveKey(sp);
+    if (!speciesPhotographers.has(key)) speciesPhotographers.set(key, new Set());
+    for (const sm of sp.samples) if (sm.photographer) speciesPhotographers.get(key).add(sm.photographer);
+}
+function exclusivePhotographer(sp) {
+    const names = speciesPhotographers.get(exclusiveKey(sp));
+    return names && names.size === 1 ? [...names][0] : null;
+}
+// The photographer filter ticks a photographer's species, collections or exclusive species separately: each box is
+// "<name>::<kind>" in state.photographers (and in the link's photographer= parameter).
+const PHOTOGRAPHER_KINDS = ['species', 'collections', 'exclusive'];
+const photographerKey = (name, kind) => `${name}::${kind}`;
+// A bare name (a link or saved view from before the per-kind boxes) means what it meant then: his species and his
+// collections. Unknown kinds are dropped.
+function normalizePhotographerKeys(values) {
+    const out = new Set();
+    for (const value of values) {
+        const cut = value.lastIndexOf('::');
+        if (cut < 0) { out.add(photographerKey(value, 'species')); out.add(photographerKey(value, 'collections')); }
+        else if (PHOTOGRAPHER_KINDS.includes(value.slice(cut + 2))) out.add(value);
+    }
+    return out;
+}
+// Does an observation pass the photographer filter: its photographer's species are ticked, or his exclusive species
+// are and this species is one of them.
+function photographerMatchesSample(sm, sp) {
+    if (state.photographers.has(photographerKey(sm.photographer, 'species'))) return true;
+    return !!sp && state.photographers.has(photographerKey(sm.photographer, 'exclusive')) && exclusivePhotographer(sp) === sm.photographer;
+}
+
 let language = 'he';
 
 const grid = document.querySelector('#grid');
@@ -276,6 +330,9 @@ function tripCount(area, id) {
 }
 function photographerSpeciesCount(area, name) {
     return tally(speciesList.filter(sp => matchesAreaFilter(sp, area) && sp.samples.some(sm => sm.photographer === name)));
+}
+function photographerExclusiveCount(area, name) {
+    return tally(speciesList.filter(sp => matchesAreaFilter(sp, area) && exclusivePhotographer(sp) === name));
 }
 function photographerCollectionCount(area, name) {
     let n = 0;
@@ -514,32 +571,26 @@ function renderSidebar() {
         .map(id => { const t = siteCount(area, id); return [id, labelFor(id, siteLabelsData), t.compact, t.title]; })
         .sort((a, b) => a[1].localeCompare(b[1], language === 'he' ? 'he' : 'en'));
     renderCheckboxGroup(document.querySelector('#siteOptions'), siteEntries, state.sites, () => { renderSidebar(); render(); });
-    // Each photographer gets two count lines under the checkbox: species cards, then collections.
+    // Each photographer: his name as a heading, then three boxes -- his species, his dive-trip collections, and the
+    // species only he has observed ("exclusive") -- each with its count.
     const photographerEntries = [...opts.photographers]
         .map(name => [name, opts.photographerLabels.get(name) || name, null])
         .sort((a, b) => a[1].localeCompare(b[1], language === 'he' ? 'he' : 'en'));
     const photographerBox = document.querySelector('#photographerOptions');
-    renderCheckboxGroup(photographerBox, photographerEntries, state.photographers);
-    for (const row of [...photographerBox.querySelectorAll('.filter-check')]) {
-        const name = row.querySelector('input').value;
-        const photographerTally = photographerSpeciesCount(area, name);
-        const rows = [
-            [language === 'he' ? 'מינים' : 'Species', photographerTally.compact],
-            [language === 'he' ? 'אוספים' : 'Collections', photographerCollectionCount(area, name)],
-        ];
-        let anchor = row;
-        for (const [label, count, tip] of rows) {
-            const sub = document.createElement('div');
-            sub.className = 'filter-sub';
-            const text = document.createElement('span');
-            text.textContent = label;
-            const small = document.createElement('small');
-            small.textContent = count;
-            if (tip) sub.title = tip;
-            sub.append(text, small);
-            anchor.after(sub);
-            anchor = sub;
-        }
+    photographerBox.replaceChildren();
+    for (const [name, label] of photographerEntries) {
+        const head = document.createElement('div');
+        head.className = 'filter-photographer-name';
+        head.textContent = label;
+        const group = document.createElement('div');
+        renderCheckboxGroup(group, [
+            [photographerKey(name, 'species'), language === 'he' ? 'מינים' : 'Species', photographerSpeciesCount(area, name).compact],
+            [photographerKey(name, 'collections'), language === 'he' ? 'אוספים' : 'Collections', photographerCollectionCount(area, name)],
+            [photographerKey(name, 'exclusive'), language === 'he' ? 'אקסקלוסיבי' : 'Exclusive', photographerExclusiveCount(area, name).compact,
+             language === 'he' ? 'מינים שרק הצלם הזה צילם' : 'Species only this photographer has observed'],
+        ], state.photographers);
+        for (const row of group.children) row.classList.add('filter-photographer-kind');
+        photographerBox.append(head, ...group.children);
     }
     const yearEntries = [...opts.years]
         .map(year => { const t = yearCount(area, year); return [year, year, t.compact, t.title]; })
@@ -563,10 +614,10 @@ function renderSidebar() {
 
 // ---- matching / search ----
 
-function sampleMatchesFilters(sm) {
+function sampleMatchesFilters(sm, sp) {
     if (state.regions.size && !state.regions.has(sm.region)) return false;
     if (state.sites.size && !(sm.site && state.sites.has(sm.site))) return false;
-    if (state.photographers.size && !state.photographers.has(sm.photographer)) return false;
+    if (state.photographers.size && !photographerMatchesSample(sm, sp)) return false;
     if (state.years.size && !state.years.has(String(sm.year))) return false;
     return true;
 }
@@ -586,7 +637,7 @@ function scopedSamples(sp) {
         if (byTrip.length) pool = byTrip;
     }
     if (state.regions.size || state.sites.size || state.photographers.size || state.years.size) {
-        const byGeo = pool.filter(sampleMatchesFilters);
+        const byGeo = pool.filter(sm => sampleMatchesFilters(sm, sp));
         if (byGeo.length) pool = byGeo;
     }
     return pool;
@@ -614,7 +665,7 @@ function speciesMatches(sp, q) {
     if (state.superfamily !== 'all' && sp.superfamily !== state.superfamily) return false;
     if (state.family !== 'all' && sp.family !== state.family) return false;
     if (state.genus !== 'all' && sp.genus !== state.genus) return false;
-    if ((state.regions.size || state.sites.size || state.photographers.size || state.years.size) && !sp.samples.some(sampleMatchesFilters)) return false;
+    if ((state.regions.size || state.sites.size || state.photographers.size || state.years.size) && !sp.samples.some(sm => sampleMatchesFilters(sm, sp))) return false;
     if (multiObsOn() && observationCount(sp) < 2) return false;
     const media = activeMedia();
     if (media && !(scopedSamples(sp) || sp.samples).some(sm => mediaMatches(sm, media))) return false;
@@ -645,7 +696,7 @@ function collectionMatches(c, q) {
     if (!collectionMatchesArea(c, state.area)) return false;
     if (state.regions.size && !state.regions.has(c.region)) return false;
     if (state.sites.size) return false;
-    if (state.photographers.size && !state.photographers.has(c.photographer)) return false;
+    if (state.photographers.size && !state.photographers.has(photographerKey(c.photographer, 'collections'))) return false;
     if (state.years.size && !state.years.has(String(c.year))) return false;
     if (state.order !== 'all' || state.subOrder !== 'all' || state.superfamily !== 'all' || state.family !== 'all' || state.genus !== 'all') return false;
     if (q) {
@@ -822,7 +873,9 @@ function buildCollectionCard(c, index) {
     if (galleryTitle(c)) summary.textContent = collectionTitle(c);
     const credit = document.createElement('span');
     credit.className = 'photographer';
-    if (c.photographer) credit.textContent = (language === 'he' ? 'צילום: ' : 'Photography: ') + photographerLabel(c);
+    // the photographer-tracking rule (photoCredit): no frame -- a collection is not one species
+    const collectionCredit = photoCredit(c, null);
+    if (collectionCredit.name) credit.textContent = (language === 'he' ? 'צילום: ' : 'Photography: ') + collectionCredit.name;
     const meta = document.createElement('span');
     meta.className = 'card-meta';
     const region = document.createElement('span');
@@ -831,7 +884,7 @@ function buildCollectionCard(c, index) {
     meta.append(region);
     info.append(h3);
     if (summary.textContent) info.append(summary);
-    info.append(credit);
+    if (credit.textContent) info.append(credit);
     info.append(meta);
     button.append(wrap, info);
     if (!c.trip_code) button.addEventListener('click', () => playCollection(c, button));
@@ -932,12 +985,13 @@ function buildSpeciesCard(sp, index) {
     const sub = document.createElement('span');
     sub.className = 'common-name';
     if (common) sub.textContent = common;
+    // Who took the picture on the card (the observation it shows), by the photographer-tracking rule (photoCredit):
+    // its own line under the names, and for a signed-in member a thin frame around someone else's picture.
     const credit = document.createElement('span');
     credit.className = 'photographer';
-    const creditSample = cardSample || (sp.samples.length === 1 ? sp.samples[0] : null);
-    if (creditSample && creditSample.photographer) {
-        credit.textContent = (language === 'he' ? 'צילום: ' : 'Photography: ') + photographerLabel(creditSample);
-    }
+    const pictureCredit = photoCredit(pickSamples ? pickSamples[0] : definingSample(sp), sp);
+    if (pictureCredit.name) credit.textContent = (language === 'he' ? 'צילום: ' : 'Photography: ') + pictureCredit.name;
+    if (pictureCredit.frame) wrap.classList.add(pictureCredit.frame);
     const meta = document.createElement('span');
     meta.className = 'card-meta';
     const area = document.createElement('span');
@@ -960,10 +1014,10 @@ function buildSpeciesCard(sp, index) {
     const where = document.createElement('span');
     where.className = 'card-where';
     where.append(area);
-    if (credit.textContent) where.append(' · ', credit);
     meta.append(where, label);
     info.append(h3);
     if (common) info.append(sub);
+    if (credit.textContent) info.append(credit);
     // Under the migrant-species filter: when the species was first and last recorded in
     // the Mediterranean (Species.first/last_observed_year).
     if (state.area === 'migrant' && (sp.first_observed_year || sp.last_observed_year)) {
@@ -1060,6 +1114,36 @@ function speciesCountCompare(a, b) {
     if (ca !== cb) return cb - ca;
     return speciesSortCompare(a, b);
 }
+// Sorts by the audience's rating or the number of views of the photo / video (observations/ratings.py; catalog.js
+// rating_image, rating_video, views_image, views_video). The values are never shown in the gallery. A species card
+// counts its best observation -- among those the active filters leave (scopedSamples); cards without a rating (or
+// views) come last, in taxonomic order like ties. Dive-trip collections keep their own order (collectionCompare).
+// The visitor's own stars sort the same way (my_rating_video / my_rating_image; catalog.js my_ratings: sample id ->
+// {image, video} -- a member's, a guest's by his rating cookie, a photographer's own photographer stars).
+const MEDIA_SORTS = { rating_video: 'rating_video', rating_image: 'rating_image', views_video: 'views_video', views_image: 'views_image', my_rating_video: 'my_rating_video', my_rating_image: 'my_rating_image' };
+const myRatings = catalog.my_ratings || {};
+function sortFieldValue(item, field) {
+    if (field.startsWith('my_rating_')) {
+        const mine = myRatings[String(item.sample_id)];
+        return (mine && mine[field.slice('my_rating_'.length)]) || null;
+    }
+    return item[field];
+}
+function mediaSortValue(items, field) {
+    let best = null;
+    for (const item of items) { const v = sortFieldValue(item, field); if (v != null && (best === null || v > best)) best = v; }
+    return field.startsWith('views_') && best === 0 ? null : best;
+}
+function mediaValueCompare(va, vb) {
+    if (va === vb) return 0;
+    if (va === null) return 1;
+    if (vb === null) return -1;
+    return vb - va;
+}
+function speciesMediaCompare(field) {
+    return (a, b) => mediaValueCompare(mediaSortValue(scopedSamples(a) || a.samples, field), mediaSortValue(scopedSamples(b) || b.samples, field))
+        || speciesSortCompare(a, b);
+}
 // The observation-year sort only makes sense for the migrant species, so its <option> is in
 // the sort menu only while that area filter is active (removed, not just hidden: Safari
 // ignores `hidden` on options). Leaving the migrant view while sorted by year falls back to
@@ -1068,15 +1152,22 @@ const sortSelect = document.querySelector('#sortSelect');
 const yearSortOption = sortSelect.querySelector('option[value="year"]');
 // Likewise the number-of-observations sort is offered only under its own filter.
 const countSortOption = sortSelect.querySelector('option[value="count"]');
+// The "my rating" sorts are offered only to a visitor who has rated something of that medium.
+const myRatingSortOptions = ['video', 'image'].map(media => [media, sortSelect.querySelector(`option[value="my_rating_${media}"]`)]);
 function syncSortControl() {
+    for (const [media, option] of myRatingSortOptions) {
+        if (!option || Object.values(myRatings).some(r => r && r[media])) continue;
+        if (state.sort === `my_rating_${media}`) { state.sort = defaultSort(); state.sortChosen = false; }
+        option.remove();
+    }
     if (state.area === 'migrant') {
-        if (!yearSortOption.parentNode) sortSelect.append(yearSortOption);
+        if (!yearSortOption.parentNode) sortSelect.insertBefore(yearSortOption, sortSelect.querySelector('option[value="rating_video"]'));
     } else {
         if (state.sort === 'year') { state.sort = defaultSort(); state.sortChosen = false; }
         yearSortOption.remove();
     }
     if (multiObsOn()) {
-        if (!countSortOption.parentNode) sortSelect.append(countSortOption);
+        if (!countSortOption.parentNode) sortSelect.insertBefore(countSortOption, sortSelect.querySelector('option[value="rating_video"]'));
     } else {
         if (state.sort === 'count') { state.sort = defaultSort(); state.sortChosen = false; }
         countSortOption.remove();
@@ -1389,6 +1480,7 @@ function restoreGalleryView() {
     if (!saved || !saved.state) return null;
     Object.assign(state, saved.state);
     GALLERY_VIEW_SETS.forEach(k => { state[k] = savedSet(saved.state[k]); });
+    state.photographers = normalizePhotographerKeys(state.photographers);
     search.value = saved.search || '';
     syncSortControl();
     levelSelect.value = state.level;
@@ -1452,7 +1544,7 @@ function focusUpCard() {
 const AREA_PSEUDO_CODES = { 'multi-area': 'multi', migrant: 'migrant' };
 const GALLERY_URL_KEYS = ['area', 'sort', 'level', 'in', 'others', 'region', 'site', 'photographer', 'year', 'obs', 'trip', 'trips', 'media', 'q'];
 const GALLERY_URL_SETS = [['region', 'regions'], ['site', 'sites'], ['photographer', 'photographers'], ['year', 'years']];
-const GALLERY_SORTS = ['taxonomic', 'alpha', 'year', 'count'];
+const GALLERY_SORTS = ['taxonomic', 'alpha', 'year', 'count', ...Object.keys(MEDIA_SORTS)];
 function areaCode(key) {
     if (AREA_PSEUDO_CODES[key]) return AREA_PSEUDO_CODES[key];
     const entry = areaLabelsData[key];
@@ -1499,6 +1591,7 @@ function applyGalleryQuery(params) {
     const area = areaFromCode(params.get('area'));
     if (area) state.area = area;
     GALLERY_URL_SETS.forEach(([name, key]) => { state[key] = new Set(params.getAll(name).filter(Boolean)); });
+    state.photographers = normalizePhotographerKeys(state.photographers);
     state.observations = new Set(params.get('obs') === 'multi' ? ['multi'] : []);
     const trip = params.get('trip');
     state.collection = trip && tripLabelsData[trip] ? trip : null;
@@ -1639,6 +1732,7 @@ function recordGalleryHistory() {
 function applyGalleryEntry(entry) {
     Object.assign(state, entry.state);
     GALLERY_VIEW_SETS.forEach(k => { state[k] = savedSet(entry.state[k]); });
+    state.photographers = normalizePhotographerKeys(state.photographers);
     search.value = entry.search || '';
     syncSortControl();
     levelSelect.value = state.level;
@@ -1673,11 +1767,13 @@ function render() {
     // the manager's photo / video filter belongs to the alphabetical sort
     const mediaGroup = document.querySelector('#mediaGroup');
     if (mediaGroup) mediaGroup.hidden = state.sort !== 'alpha';
+    const mediaSort = MEDIA_SORTS[state.sort];
     const filteredCollections = taxonomic || state.hideTrips ? [] : collectionsList.filter(c => collectionMatches(c, q)).sort(collectionCompare);
     let filteredSpecies = speciesList.filter(sp => speciesMatches(sp, q));
     if (state.sort === 'alpha') filteredSpecies = [...filteredSpecies].sort(speciesSortCompare);
     if (state.sort === 'year') filteredSpecies = [...filteredSpecies].sort(speciesYearCompare);
     if (state.sort === 'count') filteredSpecies = [...filteredSpecies].sort(speciesCountCompare);
+    if (mediaSort) filteredSpecies = [...filteredSpecies].sort(speciesMediaCompare(mediaSort));
     grid.replaceChildren();
     grid.dataset.level = '';       // set by renderTaxonLevel: the rank the cards are of (styles.css sizes them by it)
     const frag = document.createDocumentFragment();
@@ -2071,6 +2167,18 @@ function setLanguage(value) {
     levelSelect.setAttribute('aria-label', en ? 'Gallery level' : 'רמת התצוגה');
     LEVELS.forEach(v => { levelSelect.querySelector(`option[value="${v}"]`).textContent = rankName(v); });
     countSortOption.textContent = en ? 'Number of observations (most first)' : 'מספר תצפיות (מהגדול לקטן)';
+    const mediaSortLabels = {
+        rating_video: en ? 'Video rating (highest first)' : 'דירוג המשתמשים — סרטון (מהגבוה לנמוך)',
+        rating_image: en ? 'Photo rating (highest first)' : 'דירוג המשתמשים — תמונה (מהגבוה לנמוך)',
+        views_video: en ? 'Video views (most first)' : 'מספר צפיות — סרטון (מהגדול לקטן)',
+        views_image: en ? 'Photo views (most first)' : 'מספר צפיות — תמונה (מהגדול לקטן)',
+        my_rating_video: en ? 'My rating — video (highest first)' : 'הדירוג שלי — סרטון (מהגבוה לנמוך)',
+        my_rating_image: en ? 'My rating — photo (highest first)' : 'הדירוג שלי — תמונה (מהגבוה לנמוך)',
+    };
+    for (const [value, label] of Object.entries(mediaSortLabels)) {
+        const option = document.querySelector(`#sortSelect option[value="${value}"]`);
+        if (option) option.textContent = label;
+    }
     yearSortOption.textContent = en ? 'Observation year (earliest first)' : 'שנת תצפית (מהמוקדם למאוחר)';
     languageButton.textContent = en ? 'עברית' : 'English';
     languageButton.lang = en ? 'he' : 'en';

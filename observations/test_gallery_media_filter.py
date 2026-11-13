@@ -109,6 +109,8 @@ class GalleryMediaFilterRestoreTests(TestCase):
             " observations: new Set(), media: new Set(), sort: 'alpha', level: 'order'};",
             source[start:source.index('\n', source.index('const savedSet = ', start)) + 1],
             "const GALLERY_VIEW_KEY = 'k';",
+            source[source.index('const PHOTOGRAPHER_KINDS = '):source.index('\n', source.index('const photographerKey = ')) + 1],
+            _function_source(source, 'normalizePhotographerKeys'),
             _function_source(source, 'saveGalleryView'),
             _function_source(source, 'restoreGalleryView'),
             saved_state,

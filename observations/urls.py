@@ -1,6 +1,7 @@
 from django.urls import path
 from django.contrib.auth import views as auth
 from . import views
+from . import ratings
 urlpatterns=[
  path('trips/',views.trips,name='dive-trips'),
  path('',views.listing,name='observations'),
@@ -21,6 +22,8 @@ urlpatterns=[
  path('<int:pk>/action/',views.observation_action,name='observation-action'),
  path('<int:pk>/make-main/',views.make_main_observation,name='observation-make-main'),
  path('<int:pk>/photo/',views.photo,name='observation-photo'),
+ path('<int:pk>/rating/',ratings.rating,name='observation-rating'),
+ path('<int:pk>/viewed/',ratings.viewed,name='observation-viewed'),
  path('<int:pk>/local-video/',views.local_video,name='observation-local-video'),
  path('signup/',views.signup,name='signup'),
  path('login/',auth.LoginView.as_view(template_name='observations/login.html'),name='login'),

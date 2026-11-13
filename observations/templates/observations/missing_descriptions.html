@@ -1,0 +1,22 @@
+{% extends 'observations/base.html' %}{% block site_hero %}{% endblock %}
+{% block content %}<a href="{% url 'admin:index' %}">חזרה לניהול האתר</a>
+<h1>מינים בגלריה ללא תיאור</h1>
+<p class="helptext">סריקה של כל המינים שמוצגים בגלריה (מין באזור עם תצפית מפורסמת), ובדיקה לאילו מהם עדיין לא הוזן תיאור (השדות "תיאור בעברית" / "תיאור באנגלית" של המין, שמוצגים בעמוד המין תחת "תיאור"). מסד הנתונים במק ובאתר החי נפרדים: תיאור שהוזן כאן מגיע לצד השני בהעברת טבלת המינים.</p>
+<form method="get"><p><label>הצגה <select name="missing">{% for value,label in missing_choices %}<option value="{{value}}"{% if value == missing %} selected{% endif %}>{{label}}</option>{% endfor %}</select></label>
+<label>מיון <select name="sort">{% for value,label in sort_choices %}<option value="{{value}}"{% if value == sort %} selected{% endif %}>{{label}}</option>{% endfor %}</select></label> <button>הצגה</button></p></form>
+<p><strong>{{ rows|length }}</strong> מתוך {{ gallery_total }} מינים בגלריה{% if missing == 'any' %} ({{ both_count }} מהם ללא תיאור בשתי השפות){% endif %}.</p>
+{% if rows %}<table class="missing-descriptions">
+<thead><tr><th>#</th><th>תמונה</th><th>מין</th><th>חסר תיאור ב…</th><th>תצפיות</th><th>תצפית ראשונה באתר</th><th>תצפית אחרונה</th><th>עמודי המין בגלריה</th><th>עריכה</th></tr></thead>
+<tbody>{% for row in rows %}<tr>
+<td>{{ forloop.counter }}</td>
+<td>{% if row.picture %}<img src="{% url 'observation-photo' row.picture.pk %}" alt="" style="width:72px;height:auto;display:block" loading="lazy">{% else %}—{% endif %}</td>
+<td dir="ltr">{{ row.species.scientific_name }}{% if row.species.name_he %} <small dir="rtl">({{ row.species.name_he }})</small>{% endif %}</td>
+<td>{{ row.missing_label }}</td>
+<td>{{ row.count }}</td>
+<td>{{ row.first|date:"d/m/Y"|default:"—" }}</td>
+<td>{{ row.last|date:"d/m/Y"|default:"—" }}</td>
+<td>{% for area in row.areas %}{% if area.slug %}<a href="{% url 'species-page' area.slug %}" target="_blank" rel="noopener">{% endif %}{{ area.country.name }} · {{ area.sea.name }}{% if area.undetermined_variant %} ({{ area.undetermined_variant }}){% endif %}{% if area.slug %}</a>{% endif %}{% if not forloop.last %}<br>{% endif %}{% endfor %}</td>
+<td><a href="{% url 'admin:observations_species_change' row.species.pk %}" target="_blank" rel="noopener">עריכת המין</a></td>
+</tr>{% endfor %}</tbody></table>
+{% else %}<p><strong>לכל המינים בגלריה יש תיאור.</strong></p>{% endif %}
+{% endblock %}

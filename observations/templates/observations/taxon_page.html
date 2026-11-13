@@ -148,11 +148,11 @@ gtag('config', 'G-CPGTC09P2P');</script>
             <h2>{% areas_count_text areas lang %}</h2>
             <div class="grid">
                 {% for area in areas %}
-                <article class="card">
+                {% photo_credit area.defining_sample area as credit %}<article class="card">
                     <a class="video-button" href="{% url 'species-page' area.slug %}{% if lang == 'en' %}?lang=en{% endif %}">
-                        <span class="image-wrap"><img src="{% if area.defining_sample.image %}{% url 'observation-photo' area.defining_sample.pk %}{% else %}{{ area.defining_sample.thumbnail }}{% endif %}" alt="" width="640" height="360" loading="lazy">{% if area.has_photo and area.has_video %}<span class="play play-both{% if area.local_video_missing %} no-local{% endif %}" aria-hidden="true"><b>▶</b><i>⤢</i></span>{% elif area.has_video %}<span class="play{% if area.local_video_missing %} no-local{% endif %}" aria-hidden="true">▶</span>{% else %}<span class="play" aria-hidden="true">⤢</span>{% endif %}{% include 'observations/_count_badge.html' %}</span>
+                        <span class="image-wrap{% if credit.frame %} {{ credit.frame }}{% endif %}"><img src="{% if area.defining_sample.image %}{% url 'observation-photo' area.defining_sample.pk %}{% else %}{{ area.defining_sample.thumbnail }}{% endif %}" alt="" width="640" height="360" loading="lazy">{% if area.has_photo and area.has_video %}<span class="play play-both{% if area.local_video_missing %} no-local{% endif %}" aria-hidden="true"><b>▶</b><i>⤢</i></span>{% elif area.has_video %}<span class="play{% if area.local_video_missing %} no-local{% endif %}" aria-hidden="true">▶</span>{% else %}<span class="play" aria-hidden="true">⤢</span>{% endif %}{% include 'observations/_count_badge.html' %}</span>
                         <span class="card-info">
-                            <h3 class="hebrew" dir="ltr">{{ area.species.scientific_name|name_html }}{% if area.undetermined_variant %} {{ area.undetermined_variant }}{% endif %}{% if area.species.author %} <span class="card-author">{{ area.species.author }}</span>{% endif %}</h3>
+                            <h3 class="hebrew" dir="ltr">{{ area.species.scientific_name|name_html }}{% if area.undetermined_variant %} {{ area.undetermined_variant }}{% endif %}{% if area.species.author %} <span class="card-author">{{ area.species.author }}</span>{% endif %}</h3>{% if credit.name %}<span class="photographer">{{ "צילום:"|t:lang }} {{ credit.name }}</span>{% endif %}
                             <span class="card-meta"><span>{{ area.country|loc:lang }} · {{ area.sea|loc:lang }}</span>{% if area.observation_count > 1 %}<span>{{ area.observation_count }} {{ "תצפיות"|t:lang }}</span>{% endif %}</span>
                         </span>
                     </a>

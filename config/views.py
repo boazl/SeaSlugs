@@ -67,6 +67,10 @@ def gallery_file(request, filename='index.html'):
         from django.http import HttpResponse
         from observations.models import Sample, SpeciesArea, TaxonOrder, TaxonFamily, TaxonGenus, youtube_id
 
+        def media_stats(s):
+            return {'rating_image': s.audience_image_rating, 'rating_video': s.audience_video_rating,
+                    'views_image': s.image_views, 'views_video': s.video_views}
+
         def sample_out(s, region):
             return {
                 'sample_id': s.pk, 'trip_id': s.trip_id,
@@ -77,12 +81,18 @@ def gallery_file(request, filename='index.html'):
                 # so a registered user's credit shows in the page's own language (see
                 # sampleSubtitle/collectionSubtitle/buildSpeciesCard in app.js).
                 'photographer': s.photographer_name,
+                # the owner's user id: the photographer-tracking rule (app.js photoCredit) compares it with the
+                # signed-in visitor's (data['viewer'])
+                'owner': s.owner_id,
                 'photographer_he': s.photographer_display_name('he'),
                 'photographer_en': s.photographer_display_name('en'),
                 'year': s.trip.year, 'month': s.trip.month,
                 'video_id': youtube_id(s.video_url) if s.video_url else None,
                 'image_url': f'/observations/{s.pk}/photo/' if s.image else None,
                 'thumbnail': f'/observations/{s.pk}/photo/' if s.image else s.thumbnail,
+                # The audience ratings and views of its photo / video (observations/ratings.py) -- never shown in
+                # the gallery, only sorted by (app.js MEDIA_SORTS).
+                **media_stats(s),
             }
 
         # Taxon lookups, keyed by the exact Species.genus/family/order text values, used to
@@ -252,6 +262,8 @@ def gallery_file(request, filename='index.html'):
                 'taxon_family_id': str(family_obj.pk) if family_obj else None,
                 'taxon_genus_id': str(genus_obj.pk) if genus_obj else None,
                 'thumbnail': primary['thumbnail'], 'image_url': primary['image_url'], 'video_id': primary['video_id'],
+                # the observation whose picture the card shows by default (its photographer is credited under it)
+                'defining_sample_id': primary['sample_id'],
                 # Where/when the card's own photo was taken (the defining sample's, not
                 # necessarily the whole species-in-area's) -- shown on the card instead of
                 # the coarser country+sea area label, e.g. "Anilao, 2017" rather than
@@ -286,6 +298,7 @@ def gallery_file(request, filename='index.html'):
                 'sample_id': item.pk, 'trip_id': item.trip_id, 'trip_code': item.trip.code,   # its page: /trip/<code>/
                 'title': item.title, 'title_en': item.title_en,
                 'photographer': item.photographer_name,
+                'owner': item.owner_id,
                 'photographer_he': item.photographer_display_name('he'),
                 'photographer_en': item.photographer_display_name('en'),
                 'area': area_key,
@@ -295,6 +308,7 @@ def gallery_file(request, filename='index.html'):
                 'image_url': f'/observations/{item.pk}/photo/' if item.image else None,
                 'thumbnail': f'/observations/{item.pk}/photo/' if item.image else item.thumbnail,
                 'species_count': item.trip.display_species_count,
+                **media_stats(item),
             })
 
         # One species_count per distinct trip (not per sample/collection row) -- reused
@@ -328,7 +342,14 @@ def gallery_file(request, filename='index.html'):
             taxa_superfamilies[sf.superfamily] = entry
         taxa = {'orders': taxa_orders, 'families': taxa_families, 'genera': taxa_genera,
                 'superfamilies': taxa_superfamilies, 'order_pages': order_pages}
-        data = {'species': species_out, 'collections': collections_out, 'areas': area_labels, 'regions': region_out, 'sites': site_out, 'trips': trip_out, 'taxa': taxa}
+        # The signed-in visitor (None for an anonymous one) and the species he has observations of: the cards credit
+        # and frame pictures by observations/photo_credit.py's rule (app.js photoCredit). catalog.js is no-store.
+        from observations.photo_credit import viewer_data
+        from observations.ratings import my_rating_map
+        data = {'species': species_out, 'collections': collections_out, 'areas': area_labels, 'regions': region_out, 'sites': site_out, 'trips': trip_out, 'taxa': taxa,
+                'viewer': viewer_data(request.user),
+                # the visitor's own stars (a member's, or a guest's by his rating cookie), for the "my rating" sorts
+                'my_ratings': my_rating_map(request)}
         response = HttpResponse('window.SEASLUGS = ' + json.dumps(data, ensure_ascii=False).replace('<', '\u003c') + ';', content_type='text/javascript; charset=utf-8')
         response['Cache-Control'] = 'no-store'
         return response

@@ -927,6 +927,19 @@ class Sample(models.Model):
     # caught).
     image_hash = models.CharField(max_length=64, blank=True, default='', editable=False, db_index=True)
     status = models.CharField('מצב פרסום', choices=Status.choices, default=Status.PENDING, max_length=20)
+    # Ratings and views of the observation's photo and video (ratings.py). Kept up to date by ratings.py with
+    # queryset.update() -- never through save(), so they never touch updated_at, the activity log or a transfer
+    # preview. Per environment: the live site's and the Mac's are separate and never transfer (not in
+    # table_transfer.TABLES). The photographer's own stars (the owner rating his observation) are kept apart from
+    # the audience's; the audience rating is a Bayesian average of MediaRating rows (ratings.bayesian).
+    photographer_image_rating = models.PositiveSmallIntegerField('דירוג הצלם לתמונה', null=True, blank=True,
+        validators=[MinValueValidator(1), MaxValueValidator(5)])
+    photographer_video_rating = models.PositiveSmallIntegerField('דירוג הצלם לסרטון', null=True, blank=True,
+        validators=[MinValueValidator(1), MaxValueValidator(5)])
+    audience_image_rating = models.FloatField('דירוג הקהל לתמונה (ממוצע משוקלל)', null=True, blank=True)
+    audience_video_rating = models.FloatField('דירוג הקהל לסרטון (ממוצע משוקלל)', null=True, blank=True)
+    image_views = models.PositiveIntegerField('מספר צפיות בתמונה', default=0)
+    video_views = models.PositiveIntegerField('מספר צפיות בסרטון', default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     deleted_at = models.DateTimeField(null=True, blank=True)
@@ -1785,3 +1798,31 @@ def _connect_macro_diver_sync():
 
 
 _connect_macro_diver_sync()
+
+
+class MediaRating(models.Model):
+    """One visitor's stars (1-5) for an observation's photo or video (ratings.py). A signed-in member is his user;
+    a guest is the random id in his browser's rating cookie (ratings.RATER_COOKIE). The observation's photographer
+    rating his own observation is not a row here: it is Sample.photographer_*_rating. Per environment (never
+    transferred)."""
+    class Media(models.TextChoices):
+        IMAGE = 'image', 'תמונה'
+        VIDEO = 'video', 'סרטון'
+    sample = models.ForeignKey(Sample, on_delete=models.CASCADE, related_name='ratings', verbose_name='תצפית')
+    media = models.CharField('מדיה', max_length=5, choices=Media.choices)
+    stars = models.PositiveSmallIntegerField('כוכבים', validators=[MinValueValidator(1), MaxValueValidator(5)])
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.CASCADE, related_name='media_ratings', verbose_name='משתמש')
+    visitor = models.CharField('מזהה אורח', max_length=32, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'דירוג מדיה'; verbose_name_plural = 'דירוגי מדיה'
+        constraints = [
+            models.UniqueConstraint(fields=['sample', 'media', 'user'], condition=models.Q(user__isnull=False), name='unique_media_rating_user'),
+            models.UniqueConstraint(fields=['sample', 'media', 'visitor'], condition=~models.Q(visitor=''), name='unique_media_rating_visitor'),
+            models.CheckConstraint(condition=models.Q(user__isnull=False, visitor='') | models.Q(user__isnull=True) & ~models.Q(visitor=''),
+                                   name='media_rating_one_rater'),
+        ]
+
+    def __str__(self): return f'{self.sample_id} {self.media} {self.stars}'

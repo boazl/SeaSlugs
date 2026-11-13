@@ -1,9 +1,81 @@
-{% load seaslugs_i18n %}    <dialog class="lightbox" id="lightbox" aria-label="{{ "הגדלת התמונה"|t:lang }}"><button type="button" class="close" id="lightbox-close" aria-label="{{ "סגירה"|t:lang }}">✕</button><img id="lightbox-img" alt="{{ page_title }}"><div id="lightbox-video" class="lightbox-video" hidden></div></dialog>
+{% load seaslugs_i18n %}    <dialog class="lightbox" id="lightbox" aria-label="{{ "הגדלת התמונה"|t:lang }}"><button type="button" class="close" id="lightbox-close" aria-label="{{ "סגירה"|t:lang }}">✕</button><img id="lightbox-img" alt="{{ page_title }}"><div id="lightbox-video" class="lightbox-video" hidden></div>{% include 'observations/_media_rating.html' with sample=None %}</dialog><span hidden>{% csrf_token %}</span>
     <script>
+    // Ratings and views of an observation's photo / video (observations/ratings.py): five stars under the hero media
+    // and in the lightbox show the visitor's own rating (the photographer's own on his observation) and change it --
+    // a click on the same star again clears it. Opening a photo large or playing a video counts one view per
+    // medium per tab session.
+    window.seaslugsMedia = (function(){
+        var mine = {};          // sample id -> promise of {image, video, photographer}
+        var csrf = function(){ var i = document.querySelector('input[name=csrfmiddlewaretoken]'); return i ? i.value : ''; };
+        var post = function(url, data){
+            var body = new URLSearchParams(data);
+            return fetch(url, {method: 'POST', body: body, credentials: 'same-origin', headers: {'X-CSRFToken': csrf()}})
+                .then(function(r){ return r.ok ? r.json() : null; }).catch(function(){ return null; });
+        };
+        var load = function(sample){
+            if (!mine[sample]) mine[sample] = fetch('/observations/' + sample + '/rating/', {credentials: 'same-origin'})
+                .then(function(r){ return r.ok ? r.json() : null; }).catch(function(){ return null; });
+            return mine[sample];
+        };
+        var paint = function(el, data){
+            var media = el.dataset.media, value = data ? data[media] || 0 : 0;
+            el.querySelector('.media-rating-label').textContent = data && data.photographer ? el.dataset.labelPhotographer : el.dataset.labelMine;
+            el.querySelectorAll('.star').forEach(function(b){
+                var on = Number(b.dataset.stars) <= value;
+                b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(Number(b.dataset.stars) === value));
+            });
+        };
+        var bind = function(el){
+            if (el.dataset.bound) return; el.dataset.bound = '1';
+            el.querySelectorAll('.star').forEach(function(b){
+                b.addEventListener('click', function(e){
+                    e.stopPropagation();
+                    var sample = el.dataset.sample, media = el.dataset.media;
+                    load(sample).then(function(data){
+                        var current = data ? data[media] || 0 : 0, stars = Number(b.dataset.stars);
+                        if (stars === current) stars = 0;
+                        post('/observations/' + sample + '/rating/', {media: media, stars: stars}).then(function(result){
+                            if (!result) return;
+                            mine[sample] = Promise.resolve(result);
+                            document.querySelectorAll('.media-rating[data-sample="' + sample + '"]').forEach(function(other){ paint(other, result); });
+                        });
+                    });
+                });
+            });
+        };
+        var show = function(el){
+            if (!el || !el.dataset.sample) return;
+            bind(el);
+            load(el.dataset.sample).then(function(data){ paint(el, data); el.hidden = false; });
+        };
+        var viewed = function(sample, media){
+            if (!sample || !media) return;
+            var key = 'seaslugs-viewed:' + sample + ':' + media;
+            try { if (sessionStorage.getItem(key)) return; sessionStorage.setItem(key, '1'); } catch (_) {}
+            post('/observations/' + sample + '/viewed/', {media: media});
+        };
+        // the lightbox shows the stars of what it opened; nothing for an item without an observation behind it
+        var opened = function(sample, media){
+            var el = document.getElementById('lightbox-rating');
+            if (!el) return;
+            if (!sample || !media) { el.hidden = true; return; }
+            el.dataset.sample = sample; el.dataset.media = media;
+            viewed(sample, media);
+            show(el);
+        };
+        document.querySelectorAll('.media-rating[data-sample]').forEach(show);
+        // the hero's own video (an embedded player): a view when it starts playing (youtube-fallback.js)
+        document.addEventListener('youtube-playing', function(e){
+            var holder = e.target.closest && e.target.closest('[data-rated-sample]');
+            if (holder) viewed(holder.dataset.ratedSample, 'video');
+        });
+        return {opened: opened, viewed: viewed};
+    })();
     (function(){
         var box = document.getElementById('lightbox'), img = document.getElementById('lightbox-img');
         if (!box || !box.showModal) return;
         var frame = document.getElementById('lightbox-video');
+        var rated = function(el, media){ window.seaslugsMedia.opened(el && el.dataset.sample, el && el.dataset.sample ? media : ''); };
         var open = function(src){ frame.hidden = true; frame.replaceChildren(); img.hidden = false; img.src = src; box.showModal(); };
         // YouTube video id from a watch / youtu.be / shorts / embed / live URL.
         var youtubeId = function(url){
@@ -22,7 +94,7 @@
             if (window.youtubeFallback) window.youtubeFallback(f, '', f.title);
         };
         document.querySelectorAll('.species-thumb').forEach(function(b){
-            b.addEventListener('click', function(){ open(b.dataset.full); });
+            b.addEventListener('click', function(){ open(b.dataset.full); rated(b, 'image'); });
         });
         // Photo and video links open in the same lightbox on the page; a new tab only when
         // explicitly asked for (Cmd/Ctrl/Shift-click, middle click, or "open in new tab").
@@ -32,8 +104,8 @@
                 if (a.dataset.video) {
                     var id = youtubeId(a.href);
                     if (!id) return;          // not a YouTube link: follow it normally
-                    e.preventDefault(); openVideo(id);
-                } else { e.preventDefault(); open(a.href); }
+                    e.preventDefault(); openVideo(id); rated(a, 'video');
+                } else { e.preventDefault(); open(a.href); rated(a, 'image'); }
             });
         });
         // A manager's local (Mac) copy of an observation's video plays in the same lightbox.
@@ -50,7 +122,7 @@
                     v = document.createElement('video');
                     v.src = a.href; v.controls = true; v.autoplay = true; v.playsInline = true;
                 }
-                frame.replaceChildren(v); frame.hidden = false; box.showModal();
+                frame.replaceChildren(v); frame.hidden = false; box.showModal(); rated(null);
             });
         });
         document.getElementById('lightbox-close').addEventListener('click', function(){ box.close(); });

@@ -711,7 +711,9 @@ class SampleAdmin(admin.ModelAdmin):
         context['species_options']=species_name_options()
         return super().render_change_form(request,context,*args,**kwargs)
     search_fields=['title','species__scientific_name','species_other','order','family','genus','owner__username','source_id','trip__title']
-    readonly_fields=['publication_warning','source_metadata','source_id','status','created_at','updated_at','deleted_at','deleted_by','approved_at','approved_by']
+    readonly_fields=['publication_warning','source_metadata','source_id','status','created_at','updated_at','deleted_at','deleted_by','approved_at','approved_by',
+                     # ratings and views (ratings.py): shown, never edited by hand
+                     'photographer_image_rating','photographer_video_rating','audience_image_rating','audience_video_rating','image_views','video_views']
     actions=['approve','soft_remove','restore']
     def has_delete_permission(self,request,obj=None): return False
     @admin.display(description='מסע צלילה',ordering='trip__code')

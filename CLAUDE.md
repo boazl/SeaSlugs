@@ -57,7 +57,8 @@ node -e "new Function(require('fs').readFileSync('dist/app.js','utf8'))"   # app
 7. **Published URLs never change:** `SpeciesArea.slug` is permanent. A rename needs a 301
    (`species_redirects.py`).
 8. Ask before deleting files or rows, or before any irreversible data operation.
-9. **Per-environment data:** the activity log (`ActivityEvent`), news posts (`NewsPost`) and the visit counter are
+9. **Per-environment data:** the activity log (`ActivityEvent`), news posts (`NewsPost`), the visit counter and the
+   photo / video ratings and views (`MediaRating`, the six rating fields on `Sample`, `ratings.py`) are
    written separately on the Mac and on the live site and never transfer. The owner's own visits and logins are never
    counted (superusers, `ACTIVITY_EXCLUDED_USERNAMES`, the `exclude_analytics` cookie).
 

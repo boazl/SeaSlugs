@@ -214,3 +214,24 @@ body:has(.controls-panel) .collection-selection:empty{margin:0}
 @media(min-width:1300px){.controls-row{align-items:stretch}}
 /* the observations forum's "add a comment" button in the gallery head (forum.py) */
 .forum-link{border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:8px 12px;font-size:14px;white-space:nowrap;flex-shrink:0;text-decoration:none}.forum-link:hover{background:var(--panel)}
+/* Photographer tracking (observations/photo_credit.py, app.js photoCredit): a signed-in member sees a thin frame
+   around a picture someone else took -- white when he has an observation of that species himself, green when he
+   has none. Drawn inside the picture (:after, so it never meets a taxon card's :before frame). */
+:root{--frame-viewer-has-color:#ffffff;--frame-viewer-new-color:#3fd25a;--frame-viewer-width:2px}
+.image-wrap.viewer-has,.image-wrap.viewer-new{position:relative}
+.image-wrap.viewer-has:after,.image-wrap.viewer-new:after{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;border:var(--frame-viewer-width) solid var(--frame-viewer-color);border-radius:inherit}
+.image-wrap.viewer-has{--frame-viewer-color:var(--frame-viewer-has-color)}
+.image-wrap.viewer-new{--frame-viewer-color:var(--frame-viewer-new-color)}
+/* the photographer filter: the photographer's name heads his three checkboxes (species, collections, exclusive) */
+.filter-photographer-name{font-size:14px;font-weight:600;padding:8px 6px 2px}
+.filter-check.filter-photographer-kind{padding-inline-start:22px;font-size:13px}
+/* Rating an observation's photo / video (observations/ratings.py, _media_rating.html): five stars under the hero
+   media and in the lightbox -- the visitor's own rating (the photographer's own on his observation). */
+.media-rating{display:flex;align-items:center;gap:10px;margin:10px 0 4px;font-size:14px;color:var(--muted)}
+.media-rating[hidden]{display:none}
+.media-rating-stars{display:inline-flex;direction:ltr;gap:2px}
+.media-rating .star{background:none;border:0;padding:0 2px;font-size:24px;line-height:1;color:#4a6470;cursor:pointer}
+.media-rating .star.on{color:#ffd23f}
+.media-rating-stars:hover .star{color:#ffd23f}
+.media-rating-stars .star:hover~.star{color:#4a6470}
+.lightbox .media-rating{justify-content:flex-start;margin:10px 4px 0;color:#ddd}

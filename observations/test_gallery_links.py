@@ -136,8 +136,12 @@ class GalleryQueryTests(SimpleTestCase):
             _const_line(source, 'AREA_PSEUDO_CODES'),
             _const_line(source, 'GALLERY_URL_KEYS'),
             _const_line(source, 'GALLERY_URL_SETS'),
+            _const_line(source, 'MEDIA_SORTS'),
             _const_line(source, 'GALLERY_SORTS'),
             _const_line(source, 'MEDIA_FILTERS'),
+            _const_line(source, 'PHOTOGRAPHER_KINDS'),
+            _const_line(source, 'photographerKey'),
+            _function_source(source, 'normalizePhotographerKeys'),
             _const_line(source, 'activeMedia'),
             _function_source(source, 'areaCode'),
             _function_source(source, 'areaFromCode'),
@@ -179,12 +183,17 @@ class GalleryQueryTests(SimpleTestCase):
         self.assertEqual(self.view('area=migrant')['sort'], 'year')   # the migrant view's own default sort
 
     def test_filters_round_trip(self):
-        query = self.url('state.regions.add("3"); state.regions.add("4"); state.photographers.add("בעז ליבס");'
+        query = self.url('state.regions.add("3"); state.regions.add("4"); state.photographers.add("בעז ליבס::exclusive");'
                          ' state.observations.add("multi"); state.collection = "7"; search.value = "Flabellina";')
         v = self.view(query.split('?', 1)[1])
         self.assertEqual(v['regions'], ['3', '4'])
-        self.assertEqual(v['photographers'], ['בעז ליבס'])
+        self.assertEqual(v['photographers'], ['בעז ליבס::exclusive'])
         self.assertEqual((v['obs'], v['trip'], v['q'], v['level']), (['multi'], '7', 'Flabellina', 'species'))
+
+    def test_an_old_photographer_link_means_his_species_and_collections(self):
+        # links from before the per-kind boxes carried the bare name; an unknown kind is dropped
+        v = self.view('photographer=בעז+ליבס&photographer=דנה::nonsense')
+        self.assertEqual(v['photographers'], ['בעז ליבס::species', 'בעז ליבס::collections'])
 
     def test_taxon_drilled_into_round_trips(self):
         query = self.url('state.drill = {level: "order", id: "Nudibranchia"}; state.level = "family";')

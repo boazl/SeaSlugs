@@ -366,7 +366,10 @@ def sample_plan(document, fields, restore_deleted=True):
             if allow_collision: candidate._allow_species_collision = True
             if obj:
                 candidate.pk = obj.pk; candidate._state.adding = False
-                for field in ('created_at','approved_by_id','approved_at'):
+                # created_at / approval, and the ratings and views (ratings.py: per environment, never in the file),
+                # stay the target's own
+                from .ratings import SAMPLE_FIELDS as RATING_FIELDS
+                for field in ('created_at','approved_by_id','approved_at') + RATING_FIELDS:
                     setattr(candidate,field,getattr(obj,field))
             # a transfer id still held here by the observation it is being taken from (see free_transfer_ids)
             try: candidate.full_clean(exclude=['transfer_id'] if retid else None)

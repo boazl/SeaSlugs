@@ -58,7 +58,10 @@ class GalleryScriptTests(SimpleTestCase):
         self.assertIn('direction:ltr;text-align:left;font-weight:400;font-size:18px', css)   # names align left in Hebrew too
         self.assertIn('.card-meta>span:last-child{color:var(--accent)}', css)   # the photographer inside card-where is not teal
         self.assertIn("where.className = 'card-where'", js)
-        self.assertIn("where.append(' · ', credit)", js)                      # place/year and photographer on one line
+        # the photographer has a line of his own under the names (photographer tracking, photoCredit)
+        self.assertIn("if (credit.textContent) info.append(credit);", js)
+        self.assertNotIn("where.append(' · ', credit)", js)
+        self.assertIn("'אקסקלוסיבי'", js)
         self.assertIn('info.append(meta);', js)
         self.assertNotIn('info.append(credit, meta)', js)
         self.assertEqual(css.count('.card h3{'), 2)        # the later override must not bring the old 24px back

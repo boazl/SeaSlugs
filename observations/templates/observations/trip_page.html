@@ -41,14 +41,15 @@ gtag('config', 'G-CPGTC09P2P');</script>
             <div class="species-media">
                 {% with s=main_sample %}
                 {% if video_id %}
-                <div class="species-video"><iframe src="https://www.youtube-nocookie.com/embed/{{ video_id }}?enablejsapi=1" data-fallback-image="{{ thumbnail|default:'' }}" data-fallback-alt="{{ title }}" title="{{ title }}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
+                <div class="species-video" data-rated-sample="{{ s.pk }}"><iframe src="https://www.youtube-nocookie.com/embed/{{ video_id }}?enablejsapi=1" data-fallback-image="{{ thumbnail|default:'' }}" data-fallback-alt="{{ title }}" title="{{ title }}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
                 {% elif image_url %}
-                <a class="species-hero-link lightbox-link" href="{% url 'observation-photo' s.pk %}" aria-label="{{ "הגדלת התמונה"|t:lang }}">
+                <a class="species-hero-link lightbox-link" data-sample="{{ s.pk }}" href="{% url 'observation-photo' s.pk %}" aria-label="{{ "הגדלת התמונה"|t:lang }}">
                     <img src="{{ image_url }}" alt="{{ title }}" width="800" height="600">
                     <span class="play" aria-hidden="true">⤢</span>
                 </a>
                 {% endif %}
                 {% if s.local_video_url %}<div class="local-video-box"><p>{{ "סרטון מקומי (offline)"|t:lang }}</p><video controls playsinline preload="metadata" src="{{ s.local_video_url }}" title="{{ title }}"></video></div>{% elif s.drive_video_url %}<div class="local-video-box"><p>{{ "סרטון מקומי (offline)"|t:lang }} · Google Drive</p><iframe class="drive-video" src="{{ s.drive_video_url }}" title="{{ title }}" allow="autoplay; fullscreen" allowfullscreen loading="lazy"></iframe></div>{% elif s.local_video_missing %}<p class="local-video-missing">{{ "אין גרסה מקומית (offline) לסרטון"|t:lang }}</p>{% endif %}
+                {% if video_id %}{% include 'observations/_media_rating.html' with sample=s media='video' %}{% elif image_url %}{% include 'observations/_media_rating.html' with sample=s media='image' %}{% endif %}
                 {% with photog=s|photographer_name:lang %}{% if photog %}<p class="species-caption">{{ "צילום:"|t:lang }} {{ photog }}</p>{% endif %}{% endwith %}
                 {% endwith %}
             </div>
@@ -57,7 +58,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
                 <p class="species-area">{{ place }}{% if date_text %} · {{ date_text }}{% endif %}</p>
                 <div class="species-badges"><a class="badge" href="#species">{{ species_text }}</a></div>
                 {% if video_id and main_sample.image %}
-                <button type="button" class="species-thumb" data-full="{% url 'observation-photo' main_sample.pk %}" aria-label="{{ "הגדלת התמונה"|t:lang }}"><img src="{% url 'observation-photo' main_sample.pk %}" alt="{{ title }}" width="160" height="107" loading="lazy"><span aria-hidden="true">⤢</span></button>
+                <button type="button" class="species-thumb" data-sample="{{ main_sample.pk }}" data-full="{% url 'observation-photo' main_sample.pk %}" aria-label="{{ "הגדלת התמונה"|t:lang }}"><img src="{% url 'observation-photo' main_sample.pk %}" alt="{{ title }}" width="160" height="107" loading="lazy"><span aria-hidden="true">⤢</span></button>
                 {% endif %}
                 {% if can_copy_image and main_sample.image %}<button type="button" class="copy-photo-url" data-copy-url="{% url 'observation-photo' main_sample.pk %}" data-done="{{ "הכתובת הועתקה"|t:lang }}" style="margin-top:8px;padding:4px 10px;font-size:13px">{{ "העתקת כתובת התמונה"|t:lang }}</button>{% endif %}
                 {% if trip.link %}<div class="species-links"><a href="{{ trip.link }}" target="_blank" rel="noopener">{{ "קישור נוסף ↗"|t:lang }}</a></div>{% endif %}

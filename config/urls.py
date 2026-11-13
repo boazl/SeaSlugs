@@ -10,6 +10,7 @@ from observations.release_views import releases
 from observations.image_manager import manager as image_manager, image_file
 from observations.local_video_views import local_videos
 from observations.video_check_views import video_check
+from observations.missing_descriptions import missing_descriptions
 from observations.drive_video_views import drive_videos
 from observations.video_import import video_import
 
@@ -39,6 +40,7 @@ urlpatterns = [
     path('admin/local-videos/import/', video_import, name='video-import'),
     path('admin/local-videos/', local_videos, name='local-videos'),
     path('admin/video-check/', video_check, name='video-check'),
+    path('admin/missing-descriptions/', missing_descriptions, name='missing-descriptions'),
     path('admin/drive-videos/', drive_videos, name='drive-videos'),
     path('admin/db-replace/', db_replace, name='db-replace'),
     path('admin/db-replace/download/', db_replace_download, name='db-replace-download'),
