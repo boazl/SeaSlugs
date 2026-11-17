@@ -1770,6 +1770,9 @@ class IdentificationIssue(models.Model):
     - misidentified: the species was identified wrongly -> `corrected_species`.
     - worms_name: the genus or species name changed in WoRMS -> `corrected_name`.
     - classification: a classification that differs from WoRMS because of other research -> `research_link`.
+    - book_edition: a name to update by the 3rd edition of Gosliner, Valdés & Behrens (2026) -- an undescribed
+      species ("Genus sp. N") whose number or genus changed since the 2nd edition (2018) -> `corrected_name`.
+      The site's order of authority: WoRMS first, then the 3rd edition, then the 2nd edition or other publications.
     - other: a report from a member or anything else.
     The manager adds, edits and removes rows and marks a priority; `opened_on` / `fixed_on` date the issue (marking it
     fixed fills `fixed_on` with today when it is empty). Every reference is kept loose (SET_NULL): a deleted or merged
@@ -1781,6 +1784,7 @@ class IdentificationIssue(models.Model):
         MISIDENTIFIED = 'misidentified', 'הגדרה שגויה של המין'
         WORMS_NAME = 'worms_name', 'תיקון שם הסוג או המין לפי WoRMS'
         CLASSIFICATION = 'classification', 'מיון מנוגד ל-WoRMS על פי מחקרים אחרים'
+        BOOK_EDITION = 'book_edition', 'עדכון שם לפי המהדורה השלישית של Gosliner et al.'
         OTHER = 'other', 'פנייה / אחר'
     class Status(models.TextChoices):
         OPEN = 'open', 'פתוחה'
@@ -1844,6 +1848,53 @@ class IdentificationIssue(models.Model):
         if self.status == self.Status.FIXED and not self.fixed_on:
             self.fixed_on = timezone.localdate()
         super().save(*args, **kwargs)
+
+
+class DiscussionTopic(models.Model):
+    """A row in the "topics for discussion" table (/admin/discussion-topics/, discussion_topics.py): a taxonomic question
+    on which the sources disagree -- above all where the 3rd edition of Gosliner, Valdés & Behrens (2026) departs from
+    WoRMS -- with each source's treatment, the site's current treatment and the decision taken.
+
+    The site's order of authority is WoRMS first, then the 3rd edition, then the 2nd edition (2018) or other
+    publications; a topic records a disagreement and the reasoning, it changes nothing in the catalogue by itself.
+    The table travels between the Mac and the live site with the table transfer (table `discussions`,
+    discussion_topic_transfer.py), matched by `transfer_id`."""
+    class Rank(models.TextChoices):
+        ORDER = 'order', 'סדרה ומעלה'
+        FAMILY = 'family', 'משפחה'
+        GENUS = 'genus', 'סוג'
+        SPECIES = 'species', 'מין'
+        OTHER = 'other', 'אחר'
+    class Status(models.TextChoices):
+        OPEN = 'open', 'פתוח לדיון'
+        DECIDED = 'decided', 'הוחלט'
+        CLOSED = 'closed', 'נסגר'
+    topic = models.CharField('נושא', max_length=200)
+    rank = models.CharField('דרגה', max_length=10, choices=Rank.choices, default=Rank.OTHER)
+    status = models.CharField('מצב', max_length=10, choices=Status.choices, default=Status.OPEN, db_index=True)
+    priority = models.PositiveSmallIntegerField('עדיפות', choices=IdentificationIssue.Priority.choices,
+                                                default=IdentificationIssue.Priority.MEDIUM)
+    opened_on = models.DateField('תאריך פתיחה', default=timezone.localdate)
+    book_treatment = models.TextField('במהדורה השלישית (Gosliner et al. 2026)', blank=True)
+    worms_treatment = models.TextField('ב-WoRMS', blank=True)
+    site_treatment = models.TextField('באתר כיום', blank=True)
+    decision = models.TextField('החלטה', blank=True)
+    sources = models.TextField('מקורות', blank=True)
+    worms_link = models.URLField('קישור ל-WoRMS', max_length=500, blank=True)
+    notes = models.TextField('הערות', blank=True)
+    created_at = models.DateTimeField('נוצר', default=timezone.now)
+    updated_at = models.DateTimeField('עודכן', default=timezone.now)
+    # The same in both environments: the table transfer's key (discussion_topic_transfer.py).
+    transfer_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    class Meta:
+        db_table = 'discussion_topics'
+        ordering = ['priority', 'topic', 'pk']
+        verbose_name = 'נושא לדיון'; verbose_name_plural = 'נושאים לדיון'
+    def __str__(self):
+        return self.topic
+    @property
+    def is_open(self):
+        return self.status == self.Status.OPEN
 
 
 # --- the macro diving partners list (views.partners) and the "Macro diver" group ---------------------------------------

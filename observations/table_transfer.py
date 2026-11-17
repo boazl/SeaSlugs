@@ -19,6 +19,8 @@ from .models import ForumMessage
 from .forum_transfer import FORUM_FIELDS, forum_plan, forum_row
 from .models import IdentificationIssue
 from .identification_issue_transfer import ISSUE_FIELDS, issue_plan, issue_row
+from .models import DiscussionTopic
+from .discussion_topic_transfer import TOPIC_FIELDS, topic_plan, topic_row
 
 # Ordered to match the actual transfer dependency chain (see TABLE-TRANSFER.md): each table
 # only ever references ones earlier in this dict, so exporting/importing in this order (as
@@ -43,7 +45,9 @@ TABLES = {'groups': ACCOUNT_TABLES['groups'], 'users': ACCOUNT_TABLES['users'],
           # the observations forum's conversations (forum_transfer.py): after Users and Samples, which they refer to
           'forum': (ForumMessage, FORUM_FIELDS),
           # the identification-issues worklist (identification_issue_transfer.py): after Samples and species
-          'identissues': (IdentificationIssue, ISSUE_FIELDS)}
+          'identissues': (IdentificationIssue, ISSUE_FIELDS),
+          # the topics for discussion (discussion_topic_transfer.py): no references
+          'discussions': (DiscussionTopic, TOPIC_FIELDS)}
 # Fields a file exported before they existed may lack: the target then keeps its own values.
 NOTE_FIELDS = ('note_he', 'note_en')
 # The manager's chosen main observation, added later still: a row without it keeps the target's choice.
@@ -71,6 +75,8 @@ def row(obj, fields):
         return forum_row(obj, fields)
     if isinstance(obj, IdentificationIssue):
         return issue_row(obj, fields)
+    if isinstance(obj, DiscussionTopic):
+        return topic_row(obj, fields)
     if isinstance(obj, Sample):
         from .sample_transfer import sample_row
         return sample_row(obj, fields, include_deleted=True)
@@ -156,6 +162,8 @@ def plan(document):
         return forum_plan(document)
     if document['table'] == 'identissues':
         return issue_plan(document)
+    if document['table'] == 'discussions':
+        return topic_plan(document)
     if document['table'] == 'samples':
         from .sample_transfer import sample_plan
         return sample_plan(document, TABLES['samples'][1])

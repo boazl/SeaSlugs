@@ -1,4 +1,4 @@
-{% load seaslugs_i18n seo %}<!doctype html>
+{% load seaslugs_i18n seo seaslugs_books %}<!doctype html>
 <html lang="{{ lang }}" dir="{% if lang == 'en' %}ltr{% else %}rtl{% endif %}">
 
 <head>
@@ -104,7 +104,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
             {% if info.identification or info.similar %}
             <section class="info-card">
                 <h2><span class="info-icon" aria-hidden="true">◎</span>{{ "זיהוי"|t:lang }}</h2>
-                {% if info.identification %}<p>{{ info.identification|linebreaksbr }}</p>{% endif %}
+                {% if info.identification %}<p>{% book_cited info.identification lang %}</p>{% endif %}
                 {% if info.similar %}<h3>{{ "מינים דומים"|t:lang }}</h3><p>{{ info.similar|linebreaksbr }}</p>{% endif %}
             </section>
             {% endif %}

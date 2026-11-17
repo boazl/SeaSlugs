@@ -41,6 +41,11 @@ if PRODUCTION:
     SECURE_HSTS_SECONDS = 3600
 DATA_DIR = Path(os.environ.get("SEASLUGS_DATA_DIR", "/var/data" if PRODUCTION else str(BASE_DIR)))
 MEDIA_ROOT = DATA_DIR / "media"
+# The owner's personal PDF copies of Gosliner, Valdés & Behrens (2nd and 3rd editions, English and Hebrew), on the Mac
+# only: citations of the book get page links for superusers when the folder exists (observations/book_links.py). Never
+# on the live site -- the books are not the site's to publish.
+BOOK_PDF_DIR = Path(os.environ.get("SEASLUGS_BOOK_DIR", "" if PRODUCTION else
+                                   "/Users/boazliebes/Opisthobranchia/IDENTIFICATION/My Digital Editions/pdf"))
 if len(sys.argv) > 1 and sys.argv[1] == "test":
     # Tests that upload files must never write into the real media folder (they used to leave hundreds
     # of "%PDF-1.4 fake" files in media/articles/species): use a throw-away folder, removed on exit.

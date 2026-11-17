@@ -73,7 +73,11 @@ node -e "new Function(require('fs').readFileSync('dist/app.js','utf8'))"   # app
     area and trip collections included) -- deliberately more than the gallery's cards. "מינים חדשים" = species new to
     the site; "מינים חדשים לאזור" = new gallery cards.
 - **Names:** scientific names are italic for genus + epithet only, never for cf./aff./sp./author/juv.
-  Every full species needs an author. Merge duplicates into the WoRMS accepted name. When checking a
+  Every full species needs an author. Merge duplicates into the WoRMS accepted name.
+  Order of authority for names: WoRMS first, then the 3rd edition of Gosliner, Valdés & Behrens (2026), then the 2nd
+  edition (2018) or other publications. "sp. N" numbers changed between the editions -- never carry one across unchecked.
+  A species may keep its 2nd-edition "sp. N" name (neither numbering is better), but every text and source must say
+  which edition it follows. When checking a
   list, fix the catalogue, not the list. The labels burned into photos are deliberately fully slanted;
   don't flag them.
 - **Taxonomy:** WoRMS ranks only:

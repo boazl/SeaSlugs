@@ -653,7 +653,7 @@ class ArticleFilesLinkTests(TestCase):
         self.assertIn('href="/admin/article-files/"', html)
         self.assertIn('ניהול והעברת מאמרים', html)
         self.assertIn('Articles: manage and transfer', self.client.get('/observations/trips/?lang=en').content.decode())
-        self.assertIn('מאמרים — העברה בין המק לאתר', self.client.get('/admin/').content.decode())
+        self.assertIn('<strong>מאמרים</strong>', self.client.get('/admin/').content.decode())
         self.client.force_login(staff)
         self.assertNotIn('href="/admin/article-files/"', self.client.get('/observations/trips/').content.decode())
 

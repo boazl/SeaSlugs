@@ -1,0 +1,30 @@
+{% extends 'observations/base.html' %}{% load seaslugs_books %}{% block site_hero %}{% endblock %}
+{% block content %}<style>main{max-width:1500px}.topics{width:100%;border-collapse:collapse;font-size:14px;line-height:1.45}.topics th,.topics td{border-bottom:1px solid #36515a;padding:8px 6px;vertical-align:top;text-align:right}.topics th{position:sticky;top:0;background:#0d2732;font-size:13px}.topics tr.p1 td:first-child{border-right:4px solid #ff8a7a}.topics tr.p2 td:first-child{border-right:4px solid #ffcf5c}.topics tr.p3 td:first-child{border-right:4px solid #6c8b93}.topics tr.done{opacity:.6}.topics .text{white-space:pre-line;min-width:200px;max-width:340px}.topics small{display:block}.topics select{min-width:0;padding:4px;font-size:13px}.topics form{margin:0}.topic-quick{display:flex;flex-direction:column;gap:4px}.summary{display:flex;gap:8px 18px;flex-wrap:wrap;font-size:14px;color:#b8ccd0}.kind-tag{display:inline-block;padding:2px 8px;border:1px solid #36515a;border-radius:999px;font-size:12px}.book-links{font-size:12px;white-space:nowrap}.book-link{margin:0 2px}</style>
+<a href="{% url 'admin:index' %}">חזרה לניהול האתר</a>
+<h1>נושאים לדיון</h1>
+<p class="helptext">שאלות טקסונומיות שבהן המקורות חלוקים — בעיקר היכן שהמהדורה השלישית של Gosliner, Valdés &amp; Behrens (2026) שונה מ-WoRMS. סדר העדיפויות באתר: WoRMS, אחר כך המהדורה השלישית, ולבסוף המהדורה השנייה או פרסומים אחרים. נושא לדיון רק מתעד; שינויים בקטלוג נרשמים ב<a href="{% url 'identification-issues' %}">טבלת בעיות הזיהוי</a>. הטבלה עוברת לצד השני בהעברת הטבלה <span dir="ltr">discussions</span> (ב"העברת טבלאות").</p>
+<p><a class="button" href="{% url 'discussion-topic-new' %}?back={{ query|urlencode }}">הוספת נושא</a></p>
+<div class="summary"><span>סה״כ {{ total }} נושאים:</span>{% for label, n in status_totals %}<span>{{ label }} {{ n }}</span>{% endfor %}</div>
+<form method="get" class="filter-row" style="margin-top:16px">
+<label>מצב <select name="state">{% for value,label in state_filters %}<option value="{{ value }}"{% if value == state %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+<label>דרגה <select name="rank"><option value="">הכול</option>{% for value,label in rank_choices %}<option value="{{ value }}"{% if value == rank %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+<label>חיפוש <input type="text" name="q" value="{{ q }}" placeholder="שם טקסון, מקור, הערה"></label>
+<div class="filter-actions"><button>הצגה</button> <a href="{% url 'discussion-topics' %}">ניקוי</a> <span>{{ topics|length }} נושאים</span></div></form>
+{% if topics %}<table class="topics">
+<thead><tr><th>#</th><th>עדיפות / מצב</th><th>נושא</th><th>במהדורה השלישית</th><th>ב-WoRMS</th><th>באתר כיום</th><th>החלטה</th><th>מקורות והערות</th><th></th></tr></thead>
+<tbody>{% for topic in topics %}<tr id="topic-{{ topic.pk }}" class="p{{ topic.priority }}{% if not topic.is_open %} done{% endif %}">
+<td>{{ topic.pk }}</td>
+<td><form method="post" class="topic-quick">{% csrf_token %}<input type="hidden" name="topic" value="{{ topic.pk }}"><input type="hidden" name="back" value="{{ query }}">
+<select name="priority" aria-label="עדיפות" onchange="this.form.submit()">{% for value,label in priority_choices %}<option value="{{ value }}"{% if value == topic.priority %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+<select name="status" aria-label="מצב" onchange="this.form.submit()">{% for value,label in status_choices %}<option value="{{ value }}"{% if value == topic.status %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+<noscript><button>שמירה</button></noscript></form></td>
+<td><strong dir="auto">{{ topic.topic }}</strong><small><span class="kind-tag">{{ topic.get_rank_display }}</span> נפתח {{ topic.opened_on|date:"d/m/Y" }}</small>{% if topic.worms_link %}<small><a href="{{ topic.worms_link }}" target="_blank" rel="noopener">WoRMS</a></small>{% endif %}</td>
+<td class="text" dir="auto">{% book_cited topic.book_treatment %}</td>
+<td class="text" dir="auto">{{ topic.worms_treatment }}</td>
+<td class="text" dir="auto">{{ topic.site_treatment }}</td>
+<td class="text" dir="auto">{{ topic.decision }}</td>
+<td class="text" dir="auto">{% book_cited topic.sources %}{% if topic.notes %}<small>{{ topic.notes }}</small>{% endif %}</td>
+<td><a href="{% url 'discussion-topic-edit' topic.pk %}?back={{ query|urlencode }}">עריכה</a><br><a href="{% url 'discussion-topic-delete' topic.pk %}?back={{ query|urlencode }}">מחיקה</a></td>
+</tr>{% endfor %}</tbody></table>
+{% else %}<p><strong>אין נושאים שמתאימים לסינון.</strong></p>{% endif %}
+{% endblock %}

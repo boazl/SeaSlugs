@@ -1,0 +1,14 @@
+<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">
+<title>Gosliner et al. · מהדורה {{ edition }} · דף {{ page }}</title>
+<style>body{margin:0;background:#0b1d24;color:#e6f0f2;font:15px/1.4 system-ui,-apple-system,sans-serif}.bar{position:sticky;top:0;display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:10px 16px;background:#0d2732;border-bottom:1px solid #36515a}.bar strong{margin-left:auto}.bar a,.bar span.off{padding:6px 12px;border:1px solid #36515a;border-radius:8px;color:#61dfcc;text-decoration:none}.bar span.off{color:#5d7780}.bar a:hover{border-color:#61dfcc}.sheet{display:block;max-width:100%;margin:12px auto;background:#fff;box-shadow:0 2px 14px #0008}form{display:inline}input{width:4.5em;padding:5px;border-radius:6px;border:1px solid #36515a;background:#0b1d24;color:inherit}</style></head>
+<body><div class="bar">
+<strong dir="ltr">Gosliner, Valdés &amp; Behrens · {% if edition == '3' %}3rd ed. (2026){% else %}2nd ed. (2018){% endif %} · {% if lang == 'he' %}עברית{% else %}English{% endif %}</strong>
+{% if previous_url %}<a href="{{ previous_url }}" id="prev">→ הקודם</a>{% else %}<span class="off">→ הקודם</span>{% endif %}
+<form method="get" onsubmit="location.href=location.pathname.replace(/\/\d+\/$/,'/'+this.p.value+'/');return false"><label>דף <input name="p" type="number" min="1" max="{{ total }}" value="{{ page }}"> מתוך {{ total }}</label></form>
+{% if next_url %}<a href="{{ next_url }}" id="next">הבא ←</a>{% else %}<span class="off">הבא ←</span>{% endif %}
+{% if other_url %}<a href="{{ other_url }}">{{ other_name }}</a>{% endif %}
+<a href="{{ pdf_url }}" target="_blank" rel="noopener">כל הקובץ</a>
+</div>
+<img class="sheet" src="{{ image_url }}" alt="דף {{ page }}">
+<script>document.addEventListener('keydown',function(e){if(e.target.tagName==='INPUT')return;var a=document.getElementById(e.key==='ArrowLeft'?'next':e.key==='ArrowRight'?'prev':'');if(a)location.href=a.href;});</script>
+</body></html>

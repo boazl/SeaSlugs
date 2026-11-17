@@ -4,12 +4,13 @@ and disputes about the species identification of observations (IdentificationIss
 - The list: filters by state (by default the active ones: open + being checked), kind and priority, and a free search
   (species names, notes, corrected name, range, reporter, observation number). Sorted by priority, then newest first
   (or newest / oldest / by species); closed issues always come after the active ones.
-  Each row shows the observation(s) with their photo and a link to their page on the site and to their edit form.
+  Each row shows the observation(s) with their photo and a link to their page on the site and to their edit form; an
+  issue about a species alone shows that species' gallery observation.
 - A row's priority and state change right in the list (a small form per row); marking it fixed fills the fix date.
 - Add / edit form: observations are given by their number (the id shown on the observation's edit page), species by
   their scientific name from the catalogue (a list of names to pick from). A species left empty follows its
   observation. Kind-specific fields: second observation / species (duplicate), range (range), corrected species
-  (misidentified), corrected name (WoRMS), research link (classification).
+  (misidentified), corrected name (WoRMS; the 3rd edition of Gosliner et al.), research link (classification).
 - Delete: a confirmation step, then the row is removed for good.
 Superusers only, like the other custom admin pages. Per environment until moved with the table transfer (table
 `identissues`).
@@ -35,6 +36,7 @@ KIND_FIELDS = {
     Issue.Kind.MISIDENTIFIED: ('corrected_species',),
     Issue.Kind.WORMS_NAME: ('corrected_name',),
     Issue.Kind.CLASSIFICATION: ('research_link',),
+    Issue.Kind.BOOK_EDITION: ('corrected_name',),
 }
 
 
@@ -142,9 +144,31 @@ def issue_rows(state='active', kind='', priority='', q='', sort='priority'):
     return sorted(issues.order_by(*order), key=lambda issue: not issue.is_active)
 
 
+def _species_samples(issues):
+    """An issue about a species with no observation of its own (e.g. a catalogue name to update) shows the species'
+    gallery observation instead -- its area's defining observation, else its newest published one with a photo --
+    so the row still has a photo and links (`issue.species_sample`, None when the species has none)."""
+    from .models import SpeciesArea
+    wanted = {i.species_id for i in issues if not i.observation_id and i.species_id}
+    found = {}
+    for area in SpeciesArea.objects.filter(species_id__in=wanted, defining_sample__deleted_at__isnull=True,
+                                           defining_sample__status=Sample.Status.PUBLISHED).select_related(
+            'defining_sample__trip__country', 'defining_sample__trip__region__sea', 'defining_sample__species').order_by('pk'):
+        found.setdefault(area.species_id, area.defining_sample)
+    rest = wanted - set(found)
+    if rest:
+        for sample in Sample.objects.filter(species_id__in=rest, deleted_at__isnull=True, status=Sample.Status.PUBLISHED
+                                            ).exclude(image='').select_related(
+                'trip__country', 'trip__region__sea', 'species').order_by('-pk'):
+            found.setdefault(sample.species_id, sample)
+    for issue in issues:
+        issue.species_sample = None if issue.observation_id else found.get(issue.species_id)
+
+
 def _page_urls(issues):
     from .forum import observation_page_urls
-    samples = {s.pk: s for i in issues for s in (i.observation, i.second_observation) if s is not None}
+    samples = {s.pk: s for i in issues for s in (i.observation, i.second_observation, getattr(i, 'species_sample', None))
+               if s is not None}
     return observation_page_urls(list(samples.values()), 'he') if samples else {}
 
 
@@ -173,10 +197,12 @@ def identification_issues(request):
         return redirect(_back(request))
     filters = _filters(request)
     issues = issue_rows(**filters)
+    _species_samples(issues)
     page_urls = _page_urls(issues)
     for issue in issues:
         issue.page_url = page_urls.get(issue.observation_id)
         issue.second_page_url = page_urls.get(issue.second_observation_id)
+        issue.species_page_url = page_urls.get(getattr(issue.species_sample, 'pk', None))
     totals = {row['status']: row['n'] for row in Issue.objects.values('status').annotate(n=Count('id'))}
     active = Issue.objects.filter(status__in=[Issue.Status.OPEN, Issue.Status.CHECKING])
     by_kind = {row['kind']: row['n'] for row in active.values('kind').annotate(n=Count('id'))}

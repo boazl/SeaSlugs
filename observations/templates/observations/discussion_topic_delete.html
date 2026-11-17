@@ -1,0 +1,7 @@
+{% extends 'observations/base.html' %}{% block site_hero %}{% endblock %}
+{% block content %}<a href="{% url 'discussion-topics' %}{% if back %}?{{ back }}{% endif %}">חזרה לטבלת הנושאים לדיון</a>
+<h1>מחיקת נושא {{ topic.pk }}</h1>
+<p dir="auto">{{ topic.topic }} · {{ topic.get_rank_display }} · נפתח {{ topic.opened_on|date:"d/m/Y" }}</p>
+<p>הנושא יימחק לצמיתות. כדי לשמור תיעוד אפשר במקום זאת לסמן אותו "הוחלט" או "נסגר".</p>
+<form method="post">{% csrf_token %}<input type="hidden" name="back" value="{{ back }}"><div class="actions"><button style="background:#f79;color:#2a0808">מחיקה</button><a href="{% url 'discussion-topics' %}{% if back %}?{{ back }}{% endif %}">ביטול</a></div></form>
+{% endblock %}

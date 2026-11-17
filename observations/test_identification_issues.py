@@ -80,6 +80,7 @@ class IdentificationIssuesPageTests(IssueFixture):
     checked) -- with filters by state, kind and priority, a free search (species names, notes, observation number),
     sorted by priority. A row's priority and state change right from the list. The form adds and edits issues
     (observations by number, species by scientific name from the catalogue), the delete page asks before removing.
+    An issue about a species alone shows the species' gallery observation (photo and links).
     The admin's index links to the page."""
 
     def url(self, name='identification-issues', *args):
@@ -111,6 +112,19 @@ class IdentificationIssuesPageTests(IssueFixture):
         self.assertIn(reverse('observation-edit', args=[self.first.pk]), page)
         self.assertIn(f'#obs-{self.second.pk}', page)  # the observation on its species page
         self.assertIn(reverse('identification-issues'), self.client.get(reverse('admin:index')).content.decode())
+
+    def test_species_only_issue_shows_the_species_observation(self):
+        issue = Issue.objects.create(kind='worms_name', species=self.aurora, corrected_name='Mexichromis aurora')
+        rows = issue_rows()
+        from .identification_issues import _species_samples
+        _species_samples(rows)
+        self.assertEqual(rows[0].species_sample, self.second)
+        with_obs = Issue.objects.create(kind='range', observation=self.first)
+        _species_samples([with_obs])
+        self.assertIsNone(with_obs.species_sample)
+        page = self.client.get(self.url()).content.decode()
+        self.assertIn('תצפית של המין בגלריה', page)
+        self.assertIn(reverse('observation-edit', args=[self.second.pk]), page)
 
     def test_quick_priority_and_state_change(self):
         issue = Issue.objects.create(kind='range', species=self.maculosa)

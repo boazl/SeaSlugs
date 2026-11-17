@@ -1,1 +1,40 @@
-{% extends "admin/index.html" %}{% block content %}{% if user.is_superuser %}{% if site_locked %}<p><form method="post" action="{% url 'db-replace' %}">{% csrf_token %}<input type="hidden" name="action" value="unlock"><button style="background:#f79;color:#2a0808;padding:8px 16px">האתר נעול לתחזוקה — ביטול נעילה ושחרור</button></form></p>{% endif %}<a href="{% url 'releases' %}">ניהול גרסאות וגיבויים</a> <p><a href="{% url 'table-transfer' %}">העברת טבלאות — ייצוא, השוואה וייבוא</a></p><p><a href="{% url 'db-replace' %}">החלפה מלאה של מסד הנתונים</a></p><p><a href="{% url 'image-manager' %}">ניהול והעברת תמונות</a></p><p><a href="{% url 'local-videos' %}">סרטונים מקומיים (offline) — תיקיות ושמות קבצים במק</a></p><p><a href="{% url 'video-import' %}">שיוך סרטונים לתצפיות לפי מסע צלילה — קובץ במק, Google Drive ו-YouTube</a></p><p><a href="{% url 'drive-videos' %}">סרטונים ב-Google Drive — עדכון מזהים אחרי החלפת קבצים</a></p><p><a href="{% url 'video-check' %}">בדיקת סרטוני YouTube — קישורים לסרטונים שנמחקו</a></p><p><a href="{% url 'identification-issues' %}">בעיות זיהוי — טבלת תיקונים, שגיאות ומחלוקות בזיהוי ובמיון של מינים בתצפיות</a></p><p><a href="{% url 'missing-descriptions' %}">מינים בגלריה ללא תיאור — סריקה של מינים שנוספו ועדיין לא הוזן להם תיאור</a></p><p><a href="{% url 'article-files' %}">מאמרים — העברה בין המק לאתר, קבצי מאמרים וקובצי זיהוי, מחיקת קבצים ומאמרים מיותרים</a></p>{% endif %}{{ block.super }}{% endblock %}
+{% extends "admin/index.html" %}{% block content %}{% if user.is_superuser %}
+<style>
+/* Django's dashboard caps the page at 600px: use the whole width (the app list and recent actions follow) */
+.dashboard #content{width:auto;max-width:none}
+/* ...and reach over the column kept for the recent-actions box, which starts below the cards */
+html[dir=rtl] .colMS .tools{margin-left:-300px}html[dir=ltr] .colMS .tools{margin-right:-300px}
+.tools{margin:0 0 28px}.tools h2{font-size:15px;font-weight:600;color:var(--body-quiet-color);margin:22px 0 10px;padding:0;background:none;text-transform:none;letter-spacing:0}
+.tool-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+a.tool{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border:1px solid var(--hairline-color);border-radius:10px;background:var(--darkened-bg);color:var(--body-fg);text-decoration:none;transition:border-color .15s,transform .15s}
+a.tool:hover,a.tool:focus{border-color:var(--link-fg);transform:translateY(-1px)}
+.tool .tool-icon{flex:none;width:40px;height:40px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:var(--header-bg,var(--primary));color:#fff}
+.tool-icon svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tool strong{display:block;font-size:14px;color:var(--link-fg);margin-bottom:3px}.tool-text{display:block}.tool-text span{display:block;font-size:12px;line-height:1.45;color:var(--body-quiet-color)}
+.tool-lock{margin:0 0 16px}.tool-lock button{background:#f79;color:#2a0808;padding:8px 16px;border:0;border-radius:6px;cursor:pointer}
+</style>
+{% if site_locked %}<form method="post" action="{% url 'db-replace' %}" class="tool-lock">{% csrf_token %}<input type="hidden" name="action" value="unlock"><button>האתר נעול לתחזוקה — ביטול נעילה ושחרור</button></form>{% endif %}
+<div class="tools">
+<h2>מסד נתונים והעברה בין המק לאתר</h2>
+<div class="tool-grid">
+<a class="tool" href="{% url 'releases' %}"><span class="tool-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16v13H4z"/><path d="M8 3h8v4H8zM9 12h6"/></svg></span><span class="tool-text"><strong>ניהול גרסאות וגיבויים</strong><span>גרסאות האתר, גיבויים ושחזור</span></span></a>
+<a class="tool" href="{% url 'table-transfer' %}"><span class="tool-icon"><svg viewBox="0 0 24 24"><path d="M4 8h13l-3-3M20 16H7l3 3"/></svg></span><span class="tool-text"><strong>העברת טבלאות</strong><span>ייצוא, השוואה וייבוא בין המק לאתר החי</span></span></a>
+<a class="tool" href="{% url 'db-replace' %}"><span class="tool-icon"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/></svg></span><span class="tool-text"><strong>החלפה מלאה של מסד הנתונים</strong><span>החלפת כל המסד בקובץ אחר</span></span></a>
+</div>
+<h2>תמונות וסרטונים</h2>
+<div class="tool-grid">
+<a class="tool" href="{% url 'image-manager' %}"><span class="tool-icon"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-8 8"/></svg></span><span class="tool-text"><strong>ניהול והעברת תמונות</strong><span>העברת קובצי תמונות בין המק לאתר</span></span></a>
+<a class="tool" href="{% url 'local-videos' %}"><span class="tool-icon"><svg viewBox="0 0 24 24"><path d="M3 6h7l2 2h9v11H3z"/><path d="M10 12l4 2-4 2z"/></svg></span><span class="tool-text"><strong>סרטונים מקומיים (offline)</strong><span>תיקיות ושמות קבצים במק</span></span></a>
+<a class="tool" href="{% url 'video-import' %}"><span class="tool-icon"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3"/></svg></span><span class="tool-text"><strong>שיוך סרטונים לתצפיות</strong><span>לפי מסע צלילה — קובץ במק, Google Drive ו-YouTube</span></span></a>
+<a class="tool" href="{% url 'drive-videos' %}"><span class="tool-icon"><svg viewBox="0 0 24 24"><path d="M8 4h8l5 9-4 7H7l-4-7z"/><path d="M8 4l9 16M16 4L7 20"/></svg></span><span class="tool-text"><strong>סרטונים ב-Google Drive</strong><span>עדכון מזהים אחרי החלפת קבצים</span></span></a>
+<a class="tool" href="{% url 'video-check' %}"><span class="tool-icon"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="4"/><path d="M8 12l3 3 5-6"/></svg></span><span class="tool-text"><strong>בדיקת סרטוני YouTube</strong><span>איתור קישורים לסרטונים שנמחקו</span></span></a>
+</div>
+<h2>מינים, זיהוי ותוכן</h2>
+<div class="tool-grid">
+<a class="tool" href="{% url 'identification-issues' %}"><span class="tool-icon"><svg viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg></span><span class="tool-text"><strong>בעיות זיהוי</strong><span>טבלת תיקונים, שגיאות ומחלוקות בזיהוי ובמיון של מינים בתצפיות</span></span></a>
+<a class="tool" href="{% url 'discussion-topics' %}"><span class="tool-icon"><svg viewBox="0 0 24 24"><path d="M21 14a2 2 0 0 1-2 2H9l-4 4V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/><path d="M9 9h8M9 12h5"/></svg></span><span class="tool-text"><strong>נושאים לדיון</strong><span>חילוקי דעות טקסונומיים בין WoRMS, המהדורה השלישית של <bdi dir="ltr">Gosliner et al.</bdi> ומקורות אחרים</span></span></a>
+<a class="tool" href="{% url 'missing-descriptions' %}"><span class="tool-icon"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h4"/></svg></span><span class="tool-text"><strong>מינים בגלריה ללא תיאור</strong><span>מינים שנוספו ועדיין לא הוזן להם תיאור</span></span></a>
+<a class="tool" href="{% url 'article-files' %}"><span class="tool-icon"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5M8 7h7M8 11h7"/></svg></span><span class="tool-text"><strong>מאמרים</strong><span>העברה בין המק לאתר, קבצי מאמרים וקובצי זיהוי, מחיקת קבצים ומאמרים מיותרים</span></span></a>
+</div>
+</div>
+{% endif %}{{ block.super }}{% endblock %}

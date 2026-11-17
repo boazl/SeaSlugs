@@ -12,6 +12,8 @@ from observations.local_video_views import local_videos
 from observations.video_check_views import video_check
 from observations.missing_descriptions import missing_descriptions
 from observations.identification_issues import identification_issues, identification_issue_new, identification_issue_edit, identification_issue_delete
+from observations.book_links import book_pdf, book_page, book_page_image
+from observations.discussion_topics import discussion_topics, discussion_topic_new, discussion_topic_edit, discussion_topic_delete
 from observations.drive_video_views import drive_videos
 from observations.video_import import video_import
 
@@ -46,6 +48,13 @@ urlpatterns = [
     path('admin/identification-issues/new/', identification_issue_new, name='identification-issue-new'),
     path('admin/identification-issues/<int:pk>/edit/', identification_issue_edit, name='identification-issue-edit'),
     path('admin/identification-issues/<int:pk>/delete/', identification_issue_delete, name='identification-issue-delete'),
+    path('admin/book/<str:edition>/<str:lang>/', book_pdf, name='book-pdf'),
+    path('admin/book/<str:edition>/<str:lang>/<int:page>/', book_page, name='book-page'),
+    path('admin/book/<str:edition>/<str:lang>/<int:page>/image.jpg', book_page_image, name='book-page-image'),
+    path('admin/discussion-topics/', discussion_topics, name='discussion-topics'),
+    path('admin/discussion-topics/new/', discussion_topic_new, name='discussion-topic-new'),
+    path('admin/discussion-topics/<int:pk>/edit/', discussion_topic_edit, name='discussion-topic-edit'),
+    path('admin/discussion-topics/<int:pk>/delete/', discussion_topic_delete, name='discussion-topic-delete'),
     path('admin/drive-videos/', drive_videos, name='drive-videos'),
     path('admin/db-replace/', db_replace, name='db-replace'),
     path('admin/db-replace/download/', db_replace_download, name='db-replace-download'),

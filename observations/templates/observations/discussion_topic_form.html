@@ -1,0 +1,9 @@
+{% extends 'observations/base.html' %}{% block site_hero %}{% endblock %}
+{% block content %}<a href="{% url 'discussion-topics' %}{% if back %}?{{ back }}{% endif %}">חזרה לטבלת הנושאים לדיון</a>
+<h1>{% if topic %}עריכת נושא {{ topic.pk }}{% else %}נושא חדש לדיון{% endif %}</h1>
+<form method="post">{% csrf_token %}<input type="hidden" name="back" value="{{ back }}">
+{{ form.non_field_errors }}
+{% for field in form %}<p>{{ field.label_tag }} {{ field }}{% if field.help_text %}<span class="helptext">{{ field.help_text }}</span>{% endif %}{{ field.errors }}</p>{% endfor %}
+<div class="actions"><button>שמירה</button>{% if topic %}<a href="{% url 'discussion-topic-delete' topic.pk %}?back={{ back|urlencode }}">מחיקת הנושא</a>{% endif %}</div>
+</form>
+{% endblock %}

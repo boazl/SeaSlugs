@@ -308,12 +308,26 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
   - `kind`: `duplicate` (two observations / the same photo identified as different species → `second_observation`,
     `second_species`), `range` (outside the species' range → `native_range`), `misidentified` (→ `corrected_species`),
     `worms_name` (a WoRMS name change → `corrected_name`), `classification` (differs from WoRMS by other research →
-    `research_link`), `other` (a report).
+    `research_link`), `book_edition` (a name to update by the 3rd edition of Gosliner, Valdés & Behrens 2026 -- an
+    undescribed "Genus sp. N" renumbered or moved since the 2nd edition → `corrected_name`), `other` (a report).
   - `status` open / checking / fixed / rejected; `priority` 1 high / 2 medium / 3 low; `opened_on`, `fixed_on` (filled
     with today when marked fixed); `reporter`, `notes`; `observation`, `species` (follows the observation when empty).
   - All references SET_NULL: a deleted or merged observation / species leaves the issue in place.
   - `transfer_id` (UUID, the transfer key); `created_at` / `updated_at` (the transfer keeps the later edit).
   - Migration `0104` added Claude's findings of 2026-11-17 (16 rows; fixed transfer ids, so the same rows on both sides).
+  - Migration `0106` added the comparison of the 2nd (2018) and 3rd (2026) editions of Gosliner et al. with WoRMS
+    (71 rows: renumbered / moved "sp. N", species described since, catalogue names WoRMS no longer accepts, photos
+    to check, catalogue gaps) and 18 topics for discussion; an empty catalogue (a new or test database) gets nothing.
+  - Migration `0107` writes identification texts (he / en) for 36 gallery "Genus sp. N" species, in Claude's own words
+    from the book's accounts, each ending with the book, edition, page and the name used there (both editions where
+    the 3rd renamed the species); only where both identification fields are empty.
+- **`DiscussionTopic`** (table `discussion_topics`, migration `0105`): a row in the "topics for discussion" table
+  (`/admin/discussion-topics/`): a taxonomic question on which the sources disagree -- above all where the 3rd edition
+  of Gosliner et al. departs from WoRMS. `topic`, `rank` (order / family / genus / species / other), `status` (open /
+  decided / closed), `priority` (as the issues), `opened_on`, `book_treatment`, `worms_treatment`, `site_treatment`,
+  `decision`, `sources`, `worms_link`, `notes`, `created_at` / `updated_at`, `transfer_id`. It documents only; the
+  catalogue changes go to the identification issues. **The site's order of authority: WoRMS first, then the 3rd
+  edition, then the 2nd edition or other publications.**
 - **`ForumMessage`** (migration `0094`): a message in the observations forum (§7.5): `observation` FK→Sample (required),
   `created_at`, `user`, `manager_only`, `subject` (optional), `text`, soft delete `deleted_at`/`deleted_by`, and
   `transfer_id` (UUID, the transfer key). Travels with the table transfer (table `forum`, §10.2).
@@ -785,8 +799,10 @@ never serves `MEDIA_ROOT` directly.** Every file goes through a view that checks
 |---|---|
 | `/admin/images/` | Image manager: every media image with the observations using it, sort by file/alpha/taxonomy, kind groups, redundant-image detection, safe delete, rename. **Compare with the other environment** (export a list, upload it on the other side) and **transfer images** (up to 150 photos / 300 MB per upload). A downloaded photo carries every live observation that shows it (owner first, then gallery-image users such as a trip collection); the upload creates/updates all of them and links the others to the owner's file. |
 | `/admin/images/folder/` | Folder import: reviewed bulk import of a folder of images with an Excel sheet. One species selector per image (≤500). Staging in `folder-import-staging/`, auto-cleaned. New observations are opened under the trip's **photographer** (owner of most of the trip's observations, else the letter that starts the trip code = `Profile.trip_code`, else the site owner; changeable on the preview); existing ones keep theirs. When the trip has no collection yet, the import can end by creating its **collection observation** (kind `collection`) under the photographer, titled "<region> - <year>" (editable), whose picture is one of the imported photos chosen on the preview (`gallery_source`); a manager's save publishes it. |
+| `/admin/book/<edition>/<lang>/` | The owner's PDF of Gosliner, Valdés & Behrens (edition 2 / 3, `he` / `en`), superusers only and only on the Mac (`settings.BOOK_PDF_DIR`, `book_links.py`). Page references to the book in species identification texts, issue notes and discussion topics get small links (`{% book_cited %}`, `seaslugs_books`) that open a page viewer (`/admin/book/<edition>/<lang>/<pdf page>/`: the page as an image rendered with pypdfium2, previous / next, the other language, the whole PDF; all links reuse one named tab) at the right PDF page (2nd ed. book page + 1, 3rd ed. book page // 2 + 2) -- a reader like the Acrobat extension ignores `#page=N`; the edition is the nearest edition mark before the page. Nobody else, and never the live site, sees or gets the files. |
+| `/admin/discussion-topics/` | Topics for discussion (`discussion_topics.py`, `DiscussionTopic`, §5.4): where the sources disagree (above all the 3rd edition of Gosliner et al. vs WoRMS) -- the book's, WoRMS's and the site's treatment and the decision. List with filters (state -- default open --, rank, search), sorted by priority then topic; priority / state change in place; add / edit form, delete with confirmation. Travels with the table transfer (table `discussions`). |
 | `/admin/missing-descriptions/` | Species without a description: every species shown in the gallery (a SpeciesArea with a live published defining observation) whose `description_he` / `description_en` is empty -- either language, Hebrew only, English only or both; newest first or by name; observation count, first/last observation date, gallery pages, edit link. Read-only; per environment (descriptions travel with the species table). |
-| `/admin/identification-issues/` | Identification issues (`identification_issues.py`): the manager's worklist of corrections, errors and disputes about species identification and classification (`IdentificationIssue`, §5.4). List with filters (state -- default open + checking --, kind, priority, search by names / notes / observation number), sorted by priority (closed rows last); each row shows the observation(s) with photo, species-page and edit links, and changes priority / state in place. Add / edit form (observations by number, species by scientific name from a list; the kind's own fields are highlighted; `?observation=<id>&kind=` prefills), delete with confirmation. Travels with the table transfer (table `identissues`). |
+| `/admin/identification-issues/` | Identification issues (`identification_issues.py`): the manager's worklist of corrections, errors and disputes about species identification and classification (`IdentificationIssue`, §5.4). List with filters (state -- default open + checking --, kind, priority, search by names / notes / observation number), sorted by priority (closed rows last); each row shows the observation(s) with photo, species-page and edit links (an issue about a species alone shows the species' gallery observation), and changes priority / state in place. Add / edit form (observations by number, species by scientific name from a list; the kind's own fields are highlighted; `?observation=<id>&kind=` prefills), delete with confirmation. Travels with the table transfer (table `identissues`). |
 | `/admin/table-transfer/` | Table transfer (§10.2) |
 | `/admin/local-videos/import/` | Video import by dive trip (Mac only): pick the trip and its Mac video folder; each video file gets a row with its observation (the one holding the file, else the match by species name, else a new species or trip-collection observation with species/cf./juv. guessed from the file name plus site, day, depth), the existing observation's fields, the Mac path, the Drive copy path and id, and a required YouTube link. Only rows of files that belong to a live observation and are not attached to it yet are selected and shown; the others (new observation, deleted observation, already attached) sit in a closed list below with their counts. A file of a deleted observation of the trip (no live one) is offered with it; choosing it restores the observation. Saving (backup, one transaction; nothing saved if any selected row is invalid; a link YouTube reports deleted is refused) sets the trip's folder, writes video_url / local_video_file / drive_video_id, creates the new observations (a manager's save publishes), then copies missing files into Drive and reads their ids (not yet uploaded -> `/admin/drive-videos/` later). Then transfer the samples table. |
 | `/admin/drive-videos/` | Google Drive video ids (Mac only): rescans the Drive copies' ids (`drive_videos.py`, the same scan as `fill_drive_video_ids`). A replaced file is a new Drive file, so the stored id showed the old preview and did not play. Sorts each observation into same / update (new id) / clear (copy gone, or no local file) / waiting (copy not uploaded yet: id kept) / missing (no copy); one button backs up and saves update + clear. Then transfer the samples table. |
@@ -847,6 +863,7 @@ The owner curates data mostly on the Mac and moves it to production. Rules that 
 8. Taxonomy tables again, to apply defining samples now that the samples exist.
 9. Forum (`forum`): the conversations, in both directions (needs Users and Samples).
 10. Identification issues (`identissues`), in both directions (needs Samples and species).
+11. Topics for discussion (`discussions`), in both directions (no references).
 
 ### 10.2 Table transfer details
 
@@ -856,6 +873,8 @@ The owner curates data mostly on the Mac and moves it to production. Rules that 
 - **Identification issues** (table `identissues`, `identification_issue_transfer.py`): matched by `transfer_id`,
   observations by Sample `transfer_id`, species by scientific name (a row whose reference is missing is skipped with a
   reason); an existing row is updated only by a copy with a later `updated_at`; nothing is removed.
+- **Topics for discussion** (table `discussions`, `discussion_topic_transfer.py`): matched by `transfer_id`, no
+  references; an existing row is updated only by a copy with a later `updated_at`; nothing is removed.
 - **Forum messages** (table `forum`, last): matched by `transfer_id`, observation by Sample `transfer_id`, users by
   username; only new messages and deletions travel (see §7.5).
 - **Trips** carry `summary_trip` by code; a summary trip that is new in the same file is linked after all rows are
@@ -1008,6 +1027,9 @@ Catalogue of test modules (test count) and what each guards:
 | `test_folder_import_photographer` | 10 | Folder import: new observations under the trip's photographer (owner / code letter / site owner / chosen), the trip's collection observation with a chosen imported photo, one collection per trip |
 | `test_photo_credit` | 11 | Photographer tracking (credit / white / green frame, server cards and catalog viewer, app.js photoCredit) and the photographer filter's species / collections / exclusive boxes |
 | `test_media_ratings` | 18 | Photo / video ratings and views: Bayesian average, members / guests / photographer, change and clear, view exclusions, updated_at and transfer untouched, the page's stars, catalog values, gallery sorts (audience, views, my own) |
+| `test_book_links` | 5 | Book page links: PDF page per edition, superuser and files only, edition from the nearest mark, page language first, text escaped, PDF view superusers only |
+| `test_discussion_topics` | 12 | Topics for discussion: superuser page, filters / search / order, quick priority and state, add / edit / delete, required topic; `discussions` transfer (export, round trip, newer copy wins, strict format); the `book_edition` issue kind; the editions-comparison migration (rows once, missing species skipped, corrected species linked, empty catalogue gets nothing) |
+| `test_sp_identification_texts` | 3 | Migration 0107: writes only empty identification fields, cites the edition (both editions for a renamed species), reversible; every text bilingual and sourced |
 | `test_identification_issues` | 16 | Identification issues: species follow the observations, fixed date, duplicate needs a second one, SET_NULL; superuser page, filters / search / order, quick priority and state, add / edit / delete, form errors, prefill; `identissues` transfer (export, round trip, newer copy wins, missing references skipped, strict format); the findings migration |
 | `test_missing_descriptions` | 6 | Gallery species without a description: per language, whitespace, only gallery species, order, superuser page, admin link |
 | `test_existing_image` | 15 | Reusing another observation's gallery image (`gallery_source`) |
