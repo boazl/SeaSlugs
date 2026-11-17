@@ -148,6 +148,7 @@ observations/
   ratings.py         ratings and views of an observation's photo / video (§7.2a)
   photo_credit.py    photographer tracking: the credit and frame under a card's picture (mirrors app.js photoCredit)
   missing_descriptions.py  /admin/missing-descriptions/: gallery species with no description yet
+  identification_issues.py  /admin/identification-issues/: the identification-issues worklist (+ identification_issue_transfer.py)
   views.trip_picker_context + _trip_picker.html / _trip_picker_script.html  the observation form's trip picker (country / region / site / year filters, initTripPicker), shared with the folder and video import tools
   video_import.py    /admin/local-videos/import/: attach a trip's video files to observations (Mac file, Drive copy, YouTube)
   drive_videos.py, drive_video_views.py  /admin/drive-videos/: re-read the Google Drive ids of the video copies
@@ -302,6 +303,17 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
 - **`SiteImage`**: (`key`) → home intro photo.
 - **`ActivityEvent`**, **`NewsPost`**, **`DailyPageView`**, **`DailyVisitor`**: the activity log, the manager's
   news posts and the visit counter (§7.4). Per environment; none of them travels between the Mac and the site.
+- **`IdentificationIssue`** (table `identification_issues`, migrations `0103`–`0104`): a row in the identification-issues
+  worklist (§9.2): corrections, errors and disputes about an observation's species identification or classification.
+  - `kind`: `duplicate` (two observations / the same photo identified as different species → `second_observation`,
+    `second_species`), `range` (outside the species' range → `native_range`), `misidentified` (→ `corrected_species`),
+    `worms_name` (a WoRMS name change → `corrected_name`), `classification` (differs from WoRMS by other research →
+    `research_link`), `other` (a report).
+  - `status` open / checking / fixed / rejected; `priority` 1 high / 2 medium / 3 low; `opened_on`, `fixed_on` (filled
+    with today when marked fixed); `reporter`, `notes`; `observation`, `species` (follows the observation when empty).
+  - All references SET_NULL: a deleted or merged observation / species leaves the issue in place.
+  - `transfer_id` (UUID, the transfer key); `created_at` / `updated_at` (the transfer keeps the later edit).
+  - Migration `0104` added Claude's findings of 2026-11-17 (16 rows; fixed transfer ids, so the same rows on both sides).
 - **`ForumMessage`** (migration `0094`): a message in the observations forum (§7.5): `observation` FK→Sample (required),
   `created_at`, `user`, `manager_only`, `subject` (optional), `text`, soft delete `deleted_at`/`deleted_by`, and
   `transfer_id` (UUID, the transfer key). Travels with the table transfer (table `forum`, §10.2).
@@ -767,6 +779,7 @@ never serves `MEDIA_ROOT` directly.** Every file goes through a view that checks
 | `/admin/images/` | Image manager: every media image with the observations using it, sort by file/alpha/taxonomy, kind groups, redundant-image detection, safe delete, rename. **Compare with the other environment** (export a list, upload it on the other side) and **transfer images** (up to 150 photos / 300 MB per upload). A downloaded photo carries every live observation that shows it (owner first, then gallery-image users such as a trip collection); the upload creates/updates all of them and links the others to the owner's file. |
 | `/admin/images/folder/` | Folder import: reviewed bulk import of a folder of images with an Excel sheet. One species selector per image (≤500). Staging in `folder-import-staging/`, auto-cleaned. New observations are opened under the trip's **photographer** (owner of most of the trip's observations, else the letter that starts the trip code = `Profile.trip_code`, else the site owner; changeable on the preview); existing ones keep theirs. When the trip has no collection yet, the import can end by creating its **collection observation** (kind `collection`) under the photographer, titled "<region> - <year>" (editable), whose picture is one of the imported photos chosen on the preview (`gallery_source`); a manager's save publishes it. |
 | `/admin/missing-descriptions/` | Species without a description: every species shown in the gallery (a SpeciesArea with a live published defining observation) whose `description_he` / `description_en` is empty -- either language, Hebrew only, English only or both; newest first or by name; observation count, first/last observation date, gallery pages, edit link. Read-only; per environment (descriptions travel with the species table). |
+| `/admin/identification-issues/` | Identification issues (`identification_issues.py`): the manager's worklist of corrections, errors and disputes about species identification and classification (`IdentificationIssue`, §5.4). List with filters (state -- default open + checking --, kind, priority, search by names / notes / observation number), sorted by priority (closed rows last); each row shows the observation(s) with photo, species-page and edit links, and changes priority / state in place. Add / edit form (observations by number, species by scientific name from a list; the kind's own fields are highlighted; `?observation=<id>&kind=` prefills), delete with confirmation. Travels with the table transfer (table `identissues`). |
 | `/admin/table-transfer/` | Table transfer (§10.2) |
 | `/admin/local-videos/import/` | Video import by dive trip (Mac only): pick the trip and its Mac video folder; each video file gets a row with its observation (the one holding the file, else the match by species name, else a new species or trip-collection observation with species/cf./juv. guessed from the file name plus site, day, depth), the existing observation's fields, the Mac path, the Drive copy path and id, and a required YouTube link. Only rows of files that belong to a live observation and are not attached to it yet are selected and shown; the others (new observation, deleted observation, already attached) sit in a closed list below with their counts. A file of a deleted observation of the trip (no live one) is offered with it; choosing it restores the observation. Saving (backup, one transaction; nothing saved if any selected row is invalid; a link YouTube reports deleted is refused) sets the trip's folder, writes video_url / local_video_file / drive_video_id, creates the new observations (a manager's save publishes), then copies missing files into Drive and reads their ids (not yet uploaded -> `/admin/drive-videos/` later). Then transfer the samples table. |
 | `/admin/drive-videos/` | Google Drive video ids (Mac only): rescans the Drive copies' ids (`drive_videos.py`, the same scan as `fill_drive_video_ids`). A replaced file is a new Drive file, so the stored id showed the old preview and did not play. Sorts each observation into same / update (new id) / clear (copy gone, or no local file) / waiting (copy not uploaded yet: id kept) / missing (no copy); one button backs up and saves update + clear. Then transfer the samples table. |
@@ -826,12 +839,16 @@ The owner curates data mostly on the Mac and moves it to production. Rules that 
 7. SpeciesArea (needs Samples; the slug of an existing row is never overwritten).
 8. Taxonomy tables again, to apply defining samples now that the samples exist.
 9. Forum (`forum`): the conversations, in both directions (needs Users and Samples).
+10. Identification issues (`identissues`), in both directions (needs Samples and species).
 
 ### 10.2 Table transfer details
 
 - Export a single table as JSON. Import up to 20 MB and 10,000 rows. The preview shows additions and
   before/after values.
 - The format is checked strictly: "fields do not match" means the two environments run different code.
+- **Identification issues** (table `identissues`, `identification_issue_transfer.py`): matched by `transfer_id`,
+  observations by Sample `transfer_id`, species by scientific name (a row whose reference is missing is skipped with a
+  reason); an existing row is updated only by a copy with a later `updated_at`; nothing is removed.
 - **Forum messages** (table `forum`, last): matched by `transfer_id`, observation by Sample `transfer_id`, users by
   username; only new messages and deletions travel (see §7.5).
 - **Trips** carry `summary_trip` by code; a summary trip that is new in the same file is linked after all rows are
@@ -984,6 +1001,7 @@ Catalogue of test modules (test count) and what each guards:
 | `test_folder_import_photographer` | 10 | Folder import: new observations under the trip's photographer (owner / code letter / site owner / chosen), the trip's collection observation with a chosen imported photo, one collection per trip |
 | `test_photo_credit` | 11 | Photographer tracking (credit / white / green frame, server cards and catalog viewer, app.js photoCredit) and the photographer filter's species / collections / exclusive boxes |
 | `test_media_ratings` | 18 | Photo / video ratings and views: Bayesian average, members / guests / photographer, change and clear, view exclusions, updated_at and transfer untouched, the page's stars, catalog values, gallery sorts (audience, views, my own) |
+| `test_identification_issues` | 16 | Identification issues: species follow the observations, fixed date, duplicate needs a second one, SET_NULL; superuser page, filters / search / order, quick priority and state, add / edit / delete, form errors, prefill; `identissues` transfer (export, round trip, newer copy wins, missing references skipped, strict format); the findings migration |
 | `test_missing_descriptions` | 6 | Gallery species without a description: per language, whitespace, only gallery species, order, superuser page, admin link |
 | `test_existing_image` | 15 | Reusing another observation's gallery image (`gallery_source`) |
 | `test_reference_links` | 15 | iNaturalist/WoRMS matching |

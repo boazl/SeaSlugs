@@ -1,0 +1,18 @@
+{% extends 'observations/base.html' %}{% block site_hero %}{% endblock %}
+{% block content %}<style>.issue-form .kind-field{display:none}.issue-form .kind-field.show{display:block;border-right:3px solid #61dfcc;padding-right:12px}.issue-form .all-fields .kind-field{display:block}.issue-obs{display:flex;gap:10px;align-items:flex-start;margin:0 0 12px}.issue-obs img{width:180px;height:120px;object-fit:cover;border-radius:4px}.issue-obs small{display:block}</style>
+<a href="{% url 'identification-issues' %}{% if back %}?{{ back }}{% endif %}">חזרה לטבלת בעיות הזיהוי</a>
+<h1>{% if issue %}עריכת רשומה {{ issue.pk }}{% else %}רשומה חדשה — בעיית זיהוי{% endif %}</h1>
+{% for sample, page_url in observations %}{% include 'observations/_identification_issue_obs.html' with sample=sample page_url=page_url %}{% endfor %}
+<form method="post" class="issue-form" id="issue-form">{% csrf_token %}<input type="hidden" name="back" value="{{ back }}">
+{{ form.non_field_errors }}
+{% for field in form %}<p class="{% if field.name in kind_field_names %}kind-field{% endif %}" data-field="{{ field.name }}">{{ field.label_tag }} {{ field }}{% if field.help_text %}<span class="helptext">{{ field.help_text }}</span>{% endif %}{{ field.errors }}</p>{% endfor %}
+<p><label class="filter-check" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="show-all"> הצגת כל השדות</label></p>
+<div class="actions"><button>שמירה</button>{% if issue %}<a href="{% url 'identification-issue-delete' issue.pk %}?back={{ back|urlencode }}">מחיקת הרשומה</a>{% endif %}</div>
+</form>
+<datalist id="species-names">{% for name in species_names %}<option value="{{ name }}">{% endfor %}</datalist>
+{{ kind_fields|json_script:"kind-fields" }}
+<script>(function(){var form=document.getElementById('issue-form'),fields=JSON.parse(document.getElementById('kind-fields').textContent),kind=form.querySelector('[name=kind]'),all=document.getElementById('show-all');
+function show(){var wanted=fields[kind.value]||[];form.querySelectorAll('.kind-field').forEach(function(p){var input=p.querySelector('input,select,textarea');var filled=input&&input.value;p.classList.toggle('show',wanted.indexOf(p.dataset.field)>=0||!!filled);});form.classList.toggle('all-fields',all.checked);}
+kind.addEventListener('change',show);all.addEventListener('change',show);show();})();</script>
+<noscript><style>.issue-form .kind-field{display:block}</style></noscript>
+{% endblock %}

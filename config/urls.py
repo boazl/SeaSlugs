@@ -11,6 +11,7 @@ from observations.image_manager import manager as image_manager, image_file
 from observations.local_video_views import local_videos
 from observations.video_check_views import video_check
 from observations.missing_descriptions import missing_descriptions
+from observations.identification_issues import identification_issues, identification_issue_new, identification_issue_edit, identification_issue_delete
 from observations.drive_video_views import drive_videos
 from observations.video_import import video_import
 
@@ -41,6 +42,10 @@ urlpatterns = [
     path('admin/local-videos/', local_videos, name='local-videos'),
     path('admin/video-check/', video_check, name='video-check'),
     path('admin/missing-descriptions/', missing_descriptions, name='missing-descriptions'),
+    path('admin/identification-issues/', identification_issues, name='identification-issues'),
+    path('admin/identification-issues/new/', identification_issue_new, name='identification-issue-new'),
+    path('admin/identification-issues/<int:pk>/edit/', identification_issue_edit, name='identification-issue-edit'),
+    path('admin/identification-issues/<int:pk>/delete/', identification_issue_delete, name='identification-issue-delete'),
     path('admin/drive-videos/', drive_videos, name='drive-videos'),
     path('admin/db-replace/', db_replace, name='db-replace'),
     path('admin/db-replace/download/', db_replace_download, name='db-replace-download'),

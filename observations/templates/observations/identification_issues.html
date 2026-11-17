@@ -1,0 +1,34 @@
+{% extends 'observations/base.html' %}{% block site_hero %}{% endblock %}
+{% block content %}<style>main{max-width:1500px}.issues{width:100%;border-collapse:collapse;font-size:14px;line-height:1.45}.issues th,.issues td{border-bottom:1px solid #36515a;padding:8px 6px;vertical-align:top;text-align:right}.issues th{position:sticky;top:0;background:#0d2732;font-size:13px}.issues tr.p1 td:first-child{border-right:4px solid #ff8a7a}.issues tr.p2 td:first-child{border-right:4px solid #ffcf5c}.issues tr.p3 td:first-child{border-right:4px solid #6c8b93}.issues tr.done{opacity:.6}.issue-obs{display:flex;gap:8px;align-items:flex-start;min-width:210px}.issue-obs img{width:90px;height:60px;object-fit:cover;border-radius:4px}.issues small{display:block}.issues .notes{white-space:pre-line;min-width:260px;max-width:420px}.issues select{min-width:0;padding:4px;font-size:13px}.issues form{margin:0}.issue-quick{display:flex;flex-direction:column;gap:4px}.summary{display:flex;gap:8px 18px;flex-wrap:wrap;font-size:14px;color:#b8ccd0}.summary a{white-space:nowrap}.kind-tag{display:inline-block;padding:2px 8px;border:1px solid #36515a;border-radius:999px;font-size:12px}</style>
+<a href="{% url 'admin:index' %}">חזרה לניהול האתר</a>
+<h1>בעיות זיהוי</h1>
+<p class="helptext">טבלת עבודה של תיקונים, שגיאות ומחלוקות בזיהוי ובמיון של מינים בתצפיות: פניות, אי-התאמות שהתגלו ונושאים לבדיקה ולמחקר. אפשר להוסיף, לערוך ולמחוק רשומות, לסמן עדיפות ולעדכן מצב (סימון "תוקנה" ממלא את תאריך התיקון). מסד הנתונים במק ובאתר החי נפרדים: הטבלה עוברת לצד השני בהעברת הטבלה <span dir="ltr">identissues</span> (ב"העברת טבלאות").</p>
+<p><a class="button" href="{% url 'identification-issue-new' %}?back={{ query|urlencode }}">הוספת רשומה</a></p>
+<div class="summary"><span>סה״כ {{ total }} רשומות:</span>{% for label, n in status_totals %}<span>{{ label }} {{ n }}</span>{% endfor %}</div>
+<div class="summary"><span>פתוחות ובבדיקה לפי סוג:</span>{% for value, label, n in kind_totals %}<a href="?state=active&kind={{ value }}">{{ label }} ({{ n }})</a>{% endfor %}</div>
+<form method="get" class="filter-row" style="margin-top:16px">
+<label>מצב <select name="state">{% for value,label in state_filters %}<option value="{{ value }}"{% if value == state %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+<label>סוג התקלה <select name="kind"><option value="">כל הסוגים</option>{% for value,label in kind_choices %}<option value="{{ value }}"{% if value == kind %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+<label>עדיפות <select name="priority"><option value="">הכול</option>{% for value,label in priority_choices %}<option value="{{ value }}"{% if value|stringformat:"s" == priority %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+<label>מיון <select name="sort">{% for value,label in sort_choices %}<option value="{{ value }}"{% if value == sort %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+<label>חיפוש <input type="text" name="q" value="{{ q }}" placeholder="שם מין, הערה, מספר תצפית"></label>
+<div class="filter-actions"><button>הצגה</button> <a href="{% url 'identification-issues' %}">ניקוי</a> <span>{{ issues|length }} רשומות</span></div></form>
+{% if issues %}<table class="issues">
+<thead><tr><th>#</th><th>עדיפות / מצב</th><th>סוג התקלה</th><th>נפתחה</th><th>תוקנה</th><th>תצפית ומין</th><th>תצפית / מין שני</th><th>תיקון / אזור תפוצה / מחקר</th><th>הערות</th><th></th></tr></thead>
+<tbody>{% for issue in issues %}<tr id="issue-{{ issue.pk }}" class="p{{ issue.priority }}{% if not issue.is_active %} done{% endif %}">
+<td>{{ issue.pk }}</td>
+<td><form method="post" class="issue-quick">{% csrf_token %}<input type="hidden" name="issue" value="{{ issue.pk }}"><input type="hidden" name="back" value="{{ query }}">
+<select name="priority" aria-label="עדיפות" onchange="this.form.submit()">{% for value,label in priority_choices %}<option value="{{ value }}"{% if value == issue.priority %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+<select name="status" aria-label="מצב" onchange="this.form.submit()">{% for value,label in status_choices %}<option value="{{ value }}"{% if value == issue.status %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+<noscript><button>שמירה</button></noscript></form></td>
+<td><span class="kind-tag">{{ issue.get_kind_display }}</span>{% if issue.reporter %}<small>מקור: {{ issue.reporter }}</small>{% endif %}</td>
+<td>{{ issue.opened_on|date:"d/m/Y" }}</td>
+<td>{{ issue.fixed_on|date:"d/m/Y"|default:"—" }}</td>
+<td>{% include 'observations/_identification_issue_obs.html' with sample=issue.observation page_url=issue.page_url %}{% if issue.species %}<small dir="ltr">מין: <i>{{ issue.species.scientific_name }}</i> <span dir="rtl">(#{{ issue.species.pk }})</span></small>{% endif %}</td>
+<td>{% include 'observations/_identification_issue_obs.html' with sample=issue.second_observation page_url=issue.second_page_url %}{% if issue.second_species %}<small dir="ltr">מין: <i>{{ issue.second_species.scientific_name }}</i> <span dir="rtl">(#{{ issue.second_species.pk }})</span></small>{% endif %}</td>
+<td>{% if issue.corrected_species %}<small>מין מתוקן: <i dir="ltr">{{ issue.corrected_species.scientific_name }}</i> (#{{ issue.corrected_species.pk }})</small>{% endif %}{% if issue.corrected_name %}<small>שם מתוקן: <i dir="ltr">{{ issue.corrected_name }}</i></small>{% endif %}{% if issue.native_range %}<small>אזור התפוצה: <bdi dir="auto">{{ issue.native_range }}</bdi></small>{% endif %}{% if issue.research_link %}<small><a href="{{ issue.research_link }}" target="_blank" rel="noopener">קישור למחקר</a></small>{% endif %}</td>
+<td class="notes">{{ issue.notes }}</td>
+<td><a href="{% url 'identification-issue-edit' issue.pk %}?back={{ query|urlencode }}">עריכה</a><br><a href="{% url 'identification-issue-delete' issue.pk %}?back={{ query|urlencode }}">מחיקה</a></td>
+</tr>{% endfor %}</tbody></table>
+{% else %}<p><strong>אין רשומות שמתאימות לסינון.</strong></p>{% endif %}
+{% endblock %}

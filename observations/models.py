@@ -1758,6 +1758,94 @@ class ForumMessage(models.Model):
         return self.observation.owner
 
 
+class IdentificationIssue(models.Model):
+    """A row in the identification-issues table (/admin/identification-issues/, identification_issues.py): a report or
+    an error found in how an observation's species was identified or classified -- the manager's worklist and the basis
+    for checking and researching identification and classification problems.
+
+    Kinds (`kind`) and the fields each one uses besides the observation / species and the notes:
+    - duplicate: two observations, or the same photo, identified as different species -> `second_observation` /
+      `second_species`.
+    - range: a species observed in an area outside its known range -> `native_range` (the range, else in the notes).
+    - misidentified: the species was identified wrongly -> `corrected_species`.
+    - worms_name: the genus or species name changed in WoRMS -> `corrected_name`.
+    - classification: a classification that differs from WoRMS because of other research -> `research_link`.
+    - other: a report from a member or anything else.
+    The manager adds, edits and removes rows and marks a priority; `opened_on` / `fixed_on` date the issue (marking it
+    fixed fills `fixed_on` with today when it is empty). Every reference is kept loose (SET_NULL): a deleted or merged
+    observation / species leaves the issue in place. The table travels between the Mac and the live site with the table
+    transfer (table `identissues`, identification_issue_transfer.py), matched by `transfer_id`."""
+    class Kind(models.TextChoices):
+        DUPLICATE = 'duplicate', 'תצפיות או תמונות זהות שהוגדרו כמינים שונים'
+        RANGE = 'range', 'מין מחוץ לאזור התפוצה שלו'
+        MISIDENTIFIED = 'misidentified', 'הגדרה שגויה של המין'
+        WORMS_NAME = 'worms_name', 'תיקון שם הסוג או המין לפי WoRMS'
+        CLASSIFICATION = 'classification', 'מיון מנוגד ל-WoRMS על פי מחקרים אחרים'
+        OTHER = 'other', 'פנייה / אחר'
+    class Status(models.TextChoices):
+        OPEN = 'open', 'פתוחה'
+        CHECKING = 'checking', 'בבדיקה'
+        FIXED = 'fixed', 'תוקנה'
+        REJECTED = 'rejected', 'נדחתה (אינה שגיאה)'
+    class Priority(models.IntegerChoices):
+        HIGH = 1, 'גבוהה'
+        MEDIUM = 2, 'בינונית'
+        LOW = 3, 'נמוכה'
+    kind = models.CharField('סוג התקלה', max_length=20, choices=Kind.choices)
+    status = models.CharField('מצב', max_length=10, choices=Status.choices, default=Status.OPEN, db_index=True)
+    priority = models.PositiveSmallIntegerField('עדיפות', choices=Priority.choices, default=Priority.MEDIUM)
+    opened_on = models.DateField('תאריך פתיחה', default=timezone.localdate)
+    fixed_on = models.DateField('תאריך תיקון', null=True, blank=True)
+    observation = models.ForeignKey('Sample', null=True, blank=True, on_delete=models.SET_NULL,
+                                    related_name='identification_issues', verbose_name='תצפית')
+    species = models.ForeignKey('Species', null=True, blank=True, on_delete=models.SET_NULL, related_name='+', verbose_name='מין')
+    second_observation = models.ForeignKey('Sample', null=True, blank=True, on_delete=models.SET_NULL, related_name='+',
+                                           verbose_name='תצפית שנייה')
+    second_species = models.ForeignKey('Species', null=True, blank=True, on_delete=models.SET_NULL, related_name='+',
+                                       verbose_name='מין שני')
+    corrected_species = models.ForeignKey('Species', null=True, blank=True, on_delete=models.SET_NULL, related_name='+',
+                                          verbose_name='מין מתוקן')
+    corrected_name = models.CharField('שם סוג / מין מתוקן', max_length=200, blank=True)
+    native_range = models.CharField('אזור התפוצה', max_length=300, blank=True)
+    research_link = models.URLField('קישור למחקר', max_length=500, blank=True)
+    reporter = models.CharField('מקור הפנייה', max_length=200, blank=True, help_text='מי דיווח או איך התגלתה התקלה.')
+    notes = models.TextField('הערות', blank=True)
+    created_at = models.DateTimeField('נוצרה', default=timezone.now)
+    updated_at = models.DateTimeField('עודכנה', default=timezone.now)
+    # The same in both environments: the table transfer's key (identification_issue_transfer.py).
+    transfer_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    class Meta:
+        db_table = 'identification_issues'
+        ordering = ['priority', '-opened_on', '-pk']
+        verbose_name = 'בעיית זיהוי'; verbose_name_plural = 'בעיות זיהוי'
+    def __str__(self):
+        name = self.species.scientific_name if self.species_id else (self.observation.taxon_name if self.observation_id else '')
+        return f'{self.get_kind_display()} · {name}' if name else self.get_kind_display()
+    @property
+    def is_active(self):
+        return self.status in (self.Status.OPEN, self.Status.CHECKING)
+    def clean(self):
+        errors = {}
+        if self.kind == self.Kind.DUPLICATE and not (self.second_observation_id or self.second_species_id):
+            errors['second_observation'] = 'בתקלה מסוג "תצפיות זהות" יש לציין תצפית שנייה או מין שני.'
+        if self.observation_id and self.observation_id == self.second_observation_id:
+            errors['second_observation'] = 'התצפית השנייה זהה לתצפית הראשונה.'
+        if self.fixed_on and self.opened_on and self.fixed_on < self.opened_on:
+            errors['fixed_on'] = 'תאריך התיקון מוקדם מתאריך הפתיחה.'
+        if errors:
+            raise ValidationError(errors)
+    def save(self, *args, **kwargs):
+        # The species follows the observation when only the observation was given (so a list sorted or searched by
+        # species keeps the name the observation had when the issue was opened).
+        if self.observation_id and not self.species_id and self.observation.species_id:
+            self.species_id = self.observation.species_id
+        if self.second_observation_id and not self.second_species_id and self.second_observation.species_id:
+            self.second_species_id = self.second_observation.species_id
+        if self.status == self.Status.FIXED and not self.fixed_on:
+            self.fixed_on = timezone.localdate()
+        super().save(*args, **kwargs)
+
+
 # --- the macro diving partners list (views.partners) and the "Macro diver" group ---------------------------------------
 # A member is listed when they ticked "interested in finding macro diving partners" (Profile.macro_diver) and "show my
 # profile to members", and belong to the "Macro diver" group. The tick and the group follow each other both ways: the

@@ -1,0 +1,8 @@
+{% extends 'observations/base.html' %}{% block site_hero %}{% endblock %}
+{% block content %}<a href="{% url 'identification-issues' %}{% if back %}?{{ back }}{% endif %}">חזרה לטבלת בעיות הזיהוי</a>
+<h1>מחיקת רשומה {{ issue.pk }}</h1>
+<p>{{ issue.get_kind_display }}{% if issue.species %} · <i dir="ltr">{{ issue.species.scientific_name }}</i>{% endif %}{% if issue.observation_id %} · תצפית #{{ issue.observation_id }}{% endif %} · נפתחה {{ issue.opened_on|date:"d/m/Y" }}</p>
+{% if issue.notes %}<p class="notice">{{ issue.notes }}</p>{% endif %}
+<p>הרשומה תימחק לצמיתות. כדי לשמור תיעוד אפשר במקום זאת לסמן אותה "נדחתה" או "תוקנה".</p>
+<form method="post">{% csrf_token %}<input type="hidden" name="back" value="{{ back }}"><div class="actions"><button style="background:#f79;color:#2a0808">מחיקה</button><a href="{% url 'identification-issues' %}{% if back %}?{{ back }}{% endif %}">ביטול</a></div></form>
+{% endblock %}

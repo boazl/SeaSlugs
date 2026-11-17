@@ -17,6 +17,8 @@ from .models import TaxonOrder, TaxonFamily, TaxonGenus
 from .taxon_transfer import TAXON_TABLES, taxon_plan
 from .models import ForumMessage
 from .forum_transfer import FORUM_FIELDS, forum_plan, forum_row
+from .models import IdentificationIssue
+from .identification_issue_transfer import ISSUE_FIELDS, issue_plan, issue_row
 
 # Ordered to match the actual transfer dependency chain (see TABLE-TRANSFER.md): each table
 # only ever references ones earlier in this dict, so exporting/importing in this order (as
@@ -39,7 +41,9 @@ TABLES = {'groups': ACCOUNT_TABLES['groups'], 'users': ACCOUNT_TABLES['users'],
           'samples': (Sample, ['title','title_en','kind','trip','owner','order','family','genus','species','identification_qualifier','life_stage','site','species_other','undetermined_variant','site_other','day','depth','video_url','status','source_id','gallery_order','source_metadata','transfer_id','image','gallery_source','note_he','note_en','local_video_file','drive_video_id']),
           'speciesareas': (SpeciesArea, ['species','country','sea','undetermined_variant','defining_sample','note_he','note_en','chosen_sample']),
           # the observations forum's conversations (forum_transfer.py): after Users and Samples, which they refer to
-          'forum': (ForumMessage, FORUM_FIELDS)}
+          'forum': (ForumMessage, FORUM_FIELDS),
+          # the identification-issues worklist (identification_issue_transfer.py): after Samples and species
+          'identissues': (IdentificationIssue, ISSUE_FIELDS)}
 # Fields a file exported before they existed may lack: the target then keeps its own values.
 NOTE_FIELDS = ('note_he', 'note_en')
 # The manager's chosen main observation, added later still: a row without it keeps the target's choice.
@@ -65,6 +69,8 @@ def row(obj, fields):
         return account_row(obj, fields)
     if isinstance(obj, ForumMessage):
         return forum_row(obj, fields)
+    if isinstance(obj, IdentificationIssue):
+        return issue_row(obj, fields)
     if isinstance(obj, Sample):
         from .sample_transfer import sample_row
         return sample_row(obj, fields, include_deleted=True)
@@ -148,6 +154,8 @@ def plan(document):
         return taxon_plan(document)
     if document['table'] == 'forum':
         return forum_plan(document)
+    if document['table'] == 'identissues':
+        return issue_plan(document)
     if document['table'] == 'samples':
         from .sample_transfer import sample_plan
         return sample_plan(document, TABLES['samples'][1])
