@@ -235,3 +235,8 @@ body:has(.controls-panel) .collection-selection:empty{margin:0}
 .media-rating-stars:hover .star{color:#ffd23f}
 .media-rating-stars .star:hover~.star{color:#4a6470}
 .lightbox .media-rating{justify-content:flex-start;margin:10px 4px 0;color:#ddd}
+.card.area-group{position:relative}
+.area-group-toggle{position:absolute;z-index:3;top:10px;right:10px;background:#ffd23f;color:#2a2100;border:0;border-radius:14px;height:26px;padding:0 10px;font-size:12px;font-weight:700;line-height:26px;white-space:nowrap;box-shadow:0 1px 4px #0008}
+.area-group-toggle:hover{background:#ffe27a}
+.card.area-group.open .image-wrap{outline:2px solid #ffd23f;outline-offset:3px}
+.card.area-member .image-wrap{outline:1px dashed #ffd23f99;outline-offset:3px}

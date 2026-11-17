@@ -129,14 +129,15 @@ class GallerySameSpeciesCountTests(TestCase):
     the species' number of areas and total observations. A single observation in a single area shows no number.
     "Same species" = sameSpeciesKey in app.js (species + variant letter; a bare "sp." never matches), mirroring
     gallery_data.same_species_areas; catalog.js carries the variant for it. The "species from multiple areas"
-    button uses the same rule."""
+    button uses the same rule. A species' grouped card (test_gallery_area_groups) shows the number of areas instead;
+    its opened area cards keep this badge."""
 
     def setUp(self):
         self.js = (Path(settings.BASE_DIR) / 'dist' / 'app.js').read_text(encoding='utf-8')
         self.css = (Path(settings.BASE_DIR) / 'dist' / 'styles.css').read_text(encoding='utf-8')
 
     def test_badge_rule_in_every_sort(self):
-        self.assertIn('if (displayCount > 1 || otherAreas) {', self.js)
+        self.assertIn('if (!group && (displayCount > 1 || otherAreas)) {', self.js)
         self.assertIn("badge.classList.add('other-areas');", self.js)
         self.assertNotIn('alphaView', self.js)
 

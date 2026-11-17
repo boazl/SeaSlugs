@@ -67,6 +67,62 @@ function otherAreasTotals(sp) {
     return t && t.areas > 1 ? t : null;
 }
 
+// ---- one card per species: its cards from several areas grouped ----
+// In the species cards (alphabetical, year, count and media sorts, and the taxonomic view at the species level) the
+// cards on screen of one species (sameSpeciesKey) from several areas become one card, with the number of areas on it.
+// The card shows the Mediterranean card when the species has one (the site's focus), else the card with the most
+// observations; clicking the number opens the species' other area cards right after it, and clicking again closes
+// them. The group sits where its first card would have been. Only the cards that pass the filters are grouped and
+// counted; a species left with one card on screen is an ordinary card. state.openGroups holds the open groups' keys.
+const MED_AREA_CODE = 'med';
+function isMediterraneanArea(key) {
+    const entry = areaLabelsData[key];
+    return !!entry && entry.code === MED_AREA_CODE;
+}
+function groupRepresentative(members) {
+    const pool = members.some(sp => isMediterraneanArea(sp.area)) ? members.filter(sp => isMediterraneanArea(sp.area)) : members;
+    return pool.reduce((best, sp) => (observationCount(sp) > observationCount(best) ? sp : best), pool[0]);
+}
+// The cards in their order -> [{sp, members, key}]: sp the card to show, members every card of the group (sp
+// first, the rest in their order), key the group's key (null for a card on its own).
+function groupSpeciesByArea(list) {
+    const byKey = new Map();
+    for (const sp of list) {
+        const key = sameSpeciesKey(sp);
+        if (key === null) continue;
+        if (!byKey.has(key)) byKey.set(key, []);
+        byKey.get(key).push(sp);
+    }
+    const entries = [];
+    const placed = new Set();
+    for (const sp of list) {
+        const key = sameSpeciesKey(sp);
+        const members = key === null ? null : byKey.get(key);
+        if (!members || members.length < 2) { entries.push({ sp, members: [sp], key: null }); continue; }
+        if (placed.has(key)) continue;
+        placed.add(key);
+        const rep = groupRepresentative(members);
+        entries.push({ sp: rep, members: [rep, ...members.filter(m => m !== rep)], key });
+    }
+    return entries;
+}
+function areaGroupText(n) {
+    return language === 'he' ? `${n} אזורים` : `${n} areas`;
+}
+function areaGroupTip(members) {
+    const observations = members.reduce((sum, sp) => sum + observationCount(sp), 0);
+    return otherAreasTip({ areas: members.length, observations })
+        + (language === 'he' ? ' -- לחיצה מציגה את כל האזורים' : ' -- click to show every area');
+}
+function toggleAreaGroup(key) {
+    const open = new Set(state.openGroups || []);
+    if (open.has(key)) open.delete(key); else open.add(key);
+    state.openGroups = [...open];
+    const y = window.scrollY;
+    render();
+    window.scrollTo(0, y);
+}
+
 // ---- photographer tracking ----
 // The signed-in visitor (catalog.js "viewer": his user id and the "species_id|variant" keys of the species he has
 // observations of; null when not signed in). The rule mirrors observations/photo_credit.py: an anonymous visitor
@@ -156,6 +212,8 @@ const state = {
     // True once the visitor picks a sort by hand; until then the sort follows the area
     // (the migrant-species view defaults to observation year, every other view to taxonomic).
     sortChosen: false,
+    // The keys of the species area groups opened on the cards (groupSpeciesByArea); not part of the link.
+    openGroups: [],
 };
 const multiObsOn = () => state.observations.has('multi');
 const activeMedia = () => (driveVideoIds && state.sort === 'alpha' && [...state.media][0]) || null;
@@ -931,9 +989,11 @@ function otherAreasTip(t) {
         : `This species was observed in ${t.areas} areas, ${t.observations} observations in total`;
 }
 
-function buildSpeciesCard(sp, index) {
+// group: {members, key, open} for the card of a species' area group (groupSpeciesByArea), member: true for one of an
+// open group's other area cards.
+function buildSpeciesCard(sp, index, group = null, member = false) {
     const article = document.createElement('article');
-    article.className = 'card';
+    article.className = 'card' + (group ? ' area-group' + (group.open ? ' open' : '') : '') + (member ? ' area-member' : '');
     // Real navigation to the species' own dedicated, crawlable page when one exists
     // (every species+area does, once slugs have been backfilled) -- otherwise (older
     // data without a slug, in theory) fall back to the in-page preview dialog.
@@ -960,8 +1020,9 @@ function buildSpeciesCard(sp, index) {
     const displayCount = pickSamples ? pickSamples.length : sp.samples.length;
     // The card's observation count, in every sort: shown above 1, and also at 1 when the same species has cards
     // from other areas -- then the number is yellow and its tooltip gives the species' areas and total observations.
+    // A group's card carries the number of areas instead (the button below).
     const otherAreas = otherAreasTotals(sp);
-    if (displayCount > 1 || otherAreas) {
+    if (!group && (displayCount > 1 || otherAreas)) {
         const badge = document.createElement('span');
         badge.className = 'count-badge';
         badge.textContent = displayCount;
@@ -1040,6 +1101,17 @@ function buildSpeciesCard(sp, index) {
     button.append(wrap, info);
     if (!sp.slug) button.addEventListener('click', () => openSpeciesDialog(sp, button));
     article.append(button);
+    if (group) {
+        // A button of its own beside the link (a button can't sit inside a link), over the picture's corner.
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'area-group-toggle';
+        toggle.textContent = areaGroupText(group.members.length) + (group.open ? ' ▴' : ' ▾');
+        toggle.title = areaGroupTip(group.members);
+        toggle.setAttribute('aria-expanded', group.open ? 'true' : 'false');
+        toggle.addEventListener('click', () => toggleAreaGroup(group.key));
+        article.append(toggle);
+    }
     return article;
 }
 // Thin group-heading panel shown above the first card of a new order/family/genus group
@@ -1480,6 +1552,7 @@ function restoreGalleryView() {
     if (!saved || !saved.state) return null;
     Object.assign(state, saved.state);
     GALLERY_VIEW_SETS.forEach(k => { state[k] = savedSet(saved.state[k]); });
+    state.openGroups = Array.isArray(saved.state.openGroups) ? saved.state.openGroups : [];
     state.photographers = normalizePhotographerKeys(state.photographers);
     search.value = saved.search || '';
     syncSortControl();
@@ -1492,7 +1565,7 @@ window.addEventListener('pagehide', () => { saveGalleryView(); keepScrollInHisto
 // A species / genus / family / order page links back to "/?up=<rank>:<key>" (e.g. up=genus:12): the gallery
 // opens in the taxonomic view one rank above that page's taxon -- among its siblings, e.g. the genera of its
 // family -- keeping the visitor's area and filters unless they would hide that taxon.
-const FRESH_VIEW = { ...state, regions: null, sites: null, photographers: null, years: null, observations: null, media: null };
+const FRESH_VIEW = { ...state, openGroups: null, regions: null, sites: null, photographers: null, years: null, observations: null, media: null };
 let upFocus = null;      // the card to bring into view once the gallery is drawn
 function applyUpParam() {
     const params = new URLSearchParams(window.location.search);
@@ -1710,8 +1783,10 @@ function galleryEntry() {
     GALLERY_VIEW_SETS.forEach(k => { saved[k] = [...state[k]]; });
     return { state: saved, search: search.value };
 }
+// Opening or closing a species' area group is not a new view: it updates the current history entry.
 function sameView(a, b) {
-    return !!a && !!b && JSON.stringify(a.state) === JSON.stringify(b.state);
+    const bare = s => JSON.stringify({ ...s, openGroups: undefined });
+    return !!a && !!b && bare(a.state) === bare(b.state);
 }
 function keepScrollInHistory() {
     const entry = history.state && history.state.gallery;
@@ -1732,6 +1807,7 @@ function recordGalleryHistory() {
 function applyGalleryEntry(entry) {
     Object.assign(state, entry.state);
     GALLERY_VIEW_SETS.forEach(k => { state[k] = savedSet(entry.state[k]); });
+    state.openGroups = Array.isArray(entry.state.openGroups) ? entry.state.openGroups : [];
     state.photographers = normalizePhotographerKeys(state.photographers);
     search.value = entry.search || '';
     syncSortControl();
@@ -1795,7 +1871,11 @@ function render() {
         heading.append(groupCount(filteredSpecies.length, filteredSpecies, true));
         frag.append(heading);
         let prev = null;
-        filteredSpecies.forEach((sp, i) => {
+        // one card per species: its cards from several areas grouped (groupSpeciesByArea)
+        const openGroups = new Set(state.openGroups || []);
+        let index = 0;
+        cardCount = 0;
+        groupSpeciesByArea(filteredSpecies).forEach(({ sp, members, key }) => {
             if (state.sort === 'taxonomic') {
                 const orderChanged = !prev || prev.taxon_order_id !== sp.taxon_order_id;
                 const familyChanged = orderChanged || prev.taxon_family_id !== sp.taxon_family_id;
@@ -1805,7 +1885,10 @@ function render() {
                 if (sp.taxon_genus_id && genusChanged) frag.append(renderTaxonPanel('genus', sp.taxon_genus_id));
                 prev = sp;
             }
-            frag.append(buildSpeciesCard(sp, i));
+            const open = key !== null && openGroups.has(key);
+            frag.append(buildSpeciesCard(sp, index++, key === null ? null : { members, key, open }));
+            cardCount += 1;
+            if (open) members.slice(1).forEach(m => { frag.append(buildSpeciesCard(m, index++, null, true)); cardCount += 1; });
         });
     }
     grid.append(frag);

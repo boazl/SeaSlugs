@@ -464,6 +464,13 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
   species cards of the trip, genus, family/order and species ("more observations") pages.
   Managers, under the alphabetical sort only: photo / video filters (`media`: video with no photo, photo with no
   video, video with no Google Drive copy -- the page carries the Drive ids as `#drive-videos`).
+- **One card per species** (`groupSpeciesByArea`, `test_gallery_area_groups.py`): among the species cards on screen,
+  a species' cards from several areas (`sameSpeciesKey`; a bare "Genus sp." never groups) become one card with a yellow
+  "N אזורים" button in place of the count. The card shown is the Mediterranean one (area code `med`) when there is one,
+  else the one with the most observations; the group stands where its first card was. Only cards that pass the filters
+  count, so a species left with one card is an ordinary card. The button opens the other area cards right after it
+  (dashed yellow frame) and closes them; open groups live in `state.openGroups` (history entry and saved view, not the
+  link), and opening one updates the current history entry rather than adding a view.
 - **Collection cards** open the trip page (`/trip/<code>/`); its "This trip in the gallery" button (`/?sort=alpha&trip=<id>`)
   filters the gallery to the trip.
 - **Sorts:** taxonomic (default), alphabetical, observation year (only under the migrant filter), number
