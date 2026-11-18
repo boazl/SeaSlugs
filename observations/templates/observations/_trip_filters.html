@@ -5,7 +5,7 @@
 <label>{{ "אזור"|t:lang }}<select name="region" id="f-region"><option value="">{{ "כל האזורים"|t:lang }}</option>{% for r in regions %}<option value="{{ r.pk }}" data-country="{{ r.country_id }}"{% if region.pk == r.pk %} selected{% endif %}>{{ r|loc:lang }}</option>{% endfor %}</select></label>
 <label>{{ "אתר"|t:lang }}<select name="site" id="f-site"><option value="">{{ "כל האתרים"|t:lang }}</option>{% for s in sites %}<option value="{{ s.pk }}" data-region="{{ s.region_id }}" data-country="{{ s.region.country_id }}"{% if site.pk == s.pk %} selected{% endif %}>{{ s|loc:lang }}</option>{% endfor %}</select></label>
 <label>{{ "שנה"|t:lang }}<select name="year" id="f-year"><option value="">{{ "כל השנים"|t:lang }}</option>{% for y in years %}<option value="{{ y }}"{% if y == year %} selected{% endif %}>{{ y }}</option>{% endfor %}</select></label>
-<div class="filter-actions"><button type="submit">{{ "סינון"|t:lang }}</button><a href="{{ reset_url }}">{{ "איפוס סינון"|t:lang }}</a>{% if trip_management %}<a class="button" id="add-trip" href="{{ add_url }}">+ הוספת מסע</a>{% endif %}</div>
+<div class="filter-actions"><button type="submit">{{ "סינון"|t:lang }}</button><a href="{{ reset_url }}">{{ "איפוס סינון"|t:lang }}</a>{% if trip_management %}<a class="button" id="add-trip" href="{{ add_url }}">{{ "+ הוספת מסע"|t:lang }}</a>{% endif %}</div>
 </form>
 <style>.trip-filters{display:flex;flex-wrap:wrap;gap:12px 16px}.trip-filters label{flex:0 1 170px;width:170px;max-width:100%}.trip-filters select{width:170px;max-width:100%;min-width:0}.trip-filters .filter-actions{flex-basis:100%}.trip-filters #f-year{width:125px}</style>
 {{ trip_places|json_script:"trip-places" }}{{ always_years|json_script:"always-years" }}
@@ -32,6 +32,7 @@
     if (add) {
       const query = new URLSearchParams();
       for (const el of [country, region, site, document.getElementById('f-year')]) if (el.value) query.set(el.name, el.value);
+      if ('{{ lang }}' === 'en') query.set('lang', 'en');
       add.href = "{% url 'trip-add' %}" + (query.size ? '?' + query : '');
     }
   }

@@ -436,14 +436,24 @@ TRANSLATIONS = {
 }
 
 
+# The observation form's texts (observations/form_translations.py); an entry already above wins.
+from ..form_translations import FORM_TRANSLATIONS, translate_pattern
+for _hebrew, _english in FORM_TRANSLATIONS.items():
+    TRANSLATIONS.setdefault(_hebrew, _english)
+
+
 @register.filter
 def t(value, lang):
     # `value` is usually a plain Hebrew string, but callers also run this over
     # objects that stringify to one (e.g. a django.contrib.messages Message,
     # which isn't hashable, so it must go through str() before a dict lookup).
+    # A message that carries a value (a name, a size) is matched by form_translations.FORM_PATTERNS.
     if lang != 'en':
         return value
-    return TRANSLATIONS.get(str(value), value)
+    text = str(value)
+    if text in TRANSLATIONS:
+        return TRANSLATIONS[text]
+    return translate_pattern(text) or value
 
 
 @register.filter

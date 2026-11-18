@@ -27,9 +27,10 @@ class ManagerSavePublishesTests(TestCase):
         sample = Sample.objects.get(title='Night dive')
         self.assertEqual((sample.status, sample.approved_by), ('published', self.manager))
 
-    def test_a_managers_incomplete_collection_still_waits(self):
-        # a free-text "other" dive site still has to be replaced by a site from the table
-        response = self.post(self.manager, site='other', site_other='Somewhere new')
+    def test_a_managers_incomplete_observation_still_waits(self):
+        # a free-text "other" species still has to be replaced by a species from the table (an "other" dive site is no
+        # longer free text: the save adds it to the dive sites -- test_quick_trip.py)
+        response = self.post(self.manager, kind='species', title='Night dive', species_other='Unknown slug')
         self.assertEqual(response.status_code, 302, getattr(response, 'context', None) and response.context['form'].errors)
         self.assertEqual(Sample.objects.get(title='Night dive').status, 'pending')
 

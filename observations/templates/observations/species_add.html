@@ -1,12 +1,12 @@
-{% extends 'observations/base.html' %}{% block content %}
-<h1>הוספת מין חדש לרשימה</h1>
-<p>המין יתווסף לרשימת המינים ותחזרו לטופס התצפית כשהוא כבר נבחר. כל מין חייב מחבר ושנת תיאור (רק sp. שטרם תואר פטור), ואם הסוג כבר קיים המשפחה והסדרה יתמלאו לבד.</p>
+{% extends 'observations/base.html' %}{% load seaslugs_i18n %}{% block content %}
+<h1>{{ "הוספת מין חדש לרשימה"|t:lang }}</h1>
+<p>{{ "המין יתווסף לרשימת המינים ותחזרו לטופס התצפית כשהוא כבר נבחר. כל מין חייב מחבר ושנת תיאור (רק sp. שטרם תואר פטור), ואם הסוג כבר קיים המשפחה והסדרה יתמלאו לבד."|t:lang }}</p>
 <form method="post" id="species-add-form">{% csrf_token %}<input type="hidden" name="next" value="{{ next }}">
 {{ form.non_field_errors }}
 <div class="filter-row" style="margin-top:0">
 {% for field in form %}<label>{{ field.label }}{{ field.errors }}{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}</label>{% endfor %}
 </div>
-<div class="actions"><button type="submit">הוספת המין</button><a href="{{ next }}">ביטול</a></div>
+<div class="actions"><button type="submit">{{ "הוספת המין"|t:lang }}</button><a href="{{ next }}">{{ "ביטול"|t:lang }}</a></div>
 </form>
 <datalist id="dl-orders">{% for o in taxonomy.orders %}<option value="{{ o }}">{% endfor %}</datalist>
 <datalist id="dl-families">{% for f in taxonomy.families %}<option value="{{ f.0 }}">{% endfor %}</datalist>

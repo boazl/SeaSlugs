@@ -37,7 +37,7 @@ html[data-theme="light"] body.change-form #id_full_name{color:#0b5fa5;-webkit-te
     toggle(qualEl,level>=4);toggle(otherEl,level>=4);toggle(lifeEl,level>=1);
     // An order/family/genus observation has no dive trip (nor the dive site and day that hang on it).
     const onDive=!(level>=1&&level<=3);
-    ['trip','site','site_other','day'].forEach(n=>toggle($(n),onDive));
+    ['trip','site','site_other','site_other_en','day','create_trip','new_trip_region','new_trip_year','new_trip_month'].forEach(n=>toggle($(n),onDive));
     // A dive-trip planning has no media (and no observation day or depth): it becomes a regular dive trip later.
     // Hidden rather than disabled, so the image picker's own enable/disable rules stay untouched.
     const planned=kind()==='planned';

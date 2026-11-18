@@ -93,7 +93,15 @@ class ProfileForm(forms.ModelForm):
 
 
 class TripChoiceField(forms.ModelChoiceField):
+    lang = 'he'
     def label_from_instance(self, obj):
+        if self.lang == 'en':
+            # a trip's title is Hebrew only: in English its place and date (trip_page.trip_title), with English names
+            from .trip_page import trip_title
+            where = ' · '.join(x for x in [english_name(obj.region) if obj.region_id else obj.region_name,
+                                           english_name(obj.country) if obj.country_id else obj.country_name] if x)
+            title = trip_title(obj, 'en')
+            return f'{title} ({where})' if where else title
         where = ' · '.join(x for x in [str(obj.region) if obj.region_id else obj.region_name, str(obj.country) if obj.country_id else obj.country_name] if x)
         when = f'{obj.month}/{obj.year}' if obj.month and obj.year else (str(obj.year) if obj.year else '')
         bits = ' · '.join(x for x in [where, when] if x)
@@ -145,18 +153,65 @@ def _size_validator(limit):
 validate_taxon_file_size = _size_validator(TAXON_FILE_MAX_BYTES)
 
 
+def english_name(obj):
+    """A Country / Region / Site / reference row's English name, or its Hebrew one when it has none."""
+    return (getattr(obj, 'name_en', '') or '').strip() or obj.name
+
+
+def localize_fields(form, lang):
+    """A form in the page's language. In English: every label, help text, placeholder and choice through the site's
+    translation table (form_translations.py), and the chosen values by their English names where they have one
+    (otherwise the Hebrew name stays): regions, dive sites, countries, photographers (the profile's English name).
+    The observation form and the add pages it links to (trip, dive site, species, guest photographer) use it."""
+    form.lang = lang
+    if lang != 'en':
+        return
+    from .templatetags.seaslugs_i18n import t
+    from .models import full_name_for
+    for name, field in form.fields.items():
+        if field.label: field.label = t(field.label, lang)
+        if field.help_text: field.help_text = t(str(field.help_text), lang)
+        placeholder = field.widget.attrs.get('placeholder')
+        if placeholder: field.widget.attrs['placeholder'] = t(placeholder, lang)
+        if isinstance(field, forms.ModelChoiceField):
+            if field.empty_label: field.empty_label = t(field.empty_label, lang)
+            model = field.queryset.model
+            if hasattr(field, 'lang'):
+                field.lang = lang                      # TripChoiceField / RegionChoiceField name their rows themselves
+            elif model is User:
+                field.label_from_instance = lambda user: full_name_for(user, 'en') + ('' if user.is_active else ' (guest photographer)')
+            elif model in (Region, Site, Country):
+                field.label_from_instance = english_name
+        elif isinstance(field, forms.ChoiceField):
+            field.choices = [(value, t(label, lang)) for value, label in field.choices]
+
+
+def localize_errors(form):
+    """The form's own error messages in the page's language (Django's built-in ones already are when the view
+    validates with the page's language active -- translation.override)."""
+    if getattr(form, 'lang', 'he') != 'en' or not form._errors:
+        return
+    from .templatetags.seaslugs_i18n import t
+    for errors in form._errors.values():
+        errors.data[:] = [str(t(message, 'en')) for message in errors]
+
+
 class ReferenceSelect(forms.Select):
     """A <select> whose values come from an admin-editable reference table, with an "add a value"
     link to that table's admin page when `add_url` is set (managers only)."""
     add_url = None
+    lang = 'he'
     def render(self, name, value, attrs=None, renderer=None):
+        from .templatetags.seaslugs_i18n import t
         html = super().render(name, value, attrs, renderer)
         if self.add_url:
-            html += format_html(' <a href="{}" target="_blank" rel="noopener">+ הוספת ערך חדש לרשימה</a>', self.add_url)
+            html += format_html(' <a href="{}" target="_blank" rel="noopener">{}</a>', self.add_url, t('+ הוספת ערך חדש לרשימה', self.lang))
         return html
 
 
-def reference_choices(model):
+def reference_choices(model, lang='he'):
+    if lang == 'en':
+        return [('', 'None')] + [(row.code, f'{row.code} — {english_name(row)}' if row.name else row.code) for row in model.objects.all()]
     return [('', 'ללא')] + [(row.code, str(row)) for row in model.objects.all()]
 
 
@@ -215,6 +270,22 @@ class TaxonTextField(forms.CharField):
         return super().to_python(value).replace('\r\n', '\n')
 
 
+# The trip field's help on the observation form: a missing trip is added on the trips page, or made from this observation
+# itself (the "create_trip" box -- a one-dive trip, SampleForm.create_quick_trip).
+TRIP_HELP = ('אם המסע לא מופיע ניתן להוסיף מסע באזור המסעות ולחזור על התהליך, או להשתמש בנתונים מתצפית זאת ליצירת מסע '
+             'של צלילה אחת (ואפשר גם להוסיף לו תצפיות). סמנו את התיבה שלמטה ליצירה אוטומטית של מסע מתצפית זו.')
+# The dive site list's "other" choice, first in the list: the new site's Hebrew and English names open under it and the
+# save adds the site to the region's sites (SampleForm.create_new_site).
+SITE_OTHER_LABEL = 'אחר...'
+
+
+class RegionChoiceField(forms.ModelChoiceField):
+    lang = 'he'
+    def label_from_instance(self, obj):
+        name = english_name if self.lang == 'en' else (lambda x: x.name)
+        return f'{name(obj)} · {name(obj.country)}' if obj.country_id else name(obj)
+
+
 class SampleForm(forms.ModelForm):
     # A native text input backed by a <datalist> (rendered in form.html from
     # species_options) rather than a <select> -- there can be hundreds of species, and
@@ -242,7 +313,7 @@ class SampleForm(forms.ModelForm):
         'cf. = דומה ל…, aff. = קרוב ל… — מוצג בין הסוג למין. רק בדגימה מסוג ״מין״. הערכים נשמרים בטבלת העזר.')
     life_stage = reference_field(LifeStage, 'שלב חיים', 'למשל juv. = פרט צעיר — מוצג אחרי השם. הערכים נשמרים בטבלת העזר.')
     site = forms.ChoiceField(label='אתר צלילה',required=False)
-    trip = TripChoiceField(label='מסע צלילה', queryset=DiveTrip.objects.exclude(code__in=LIBRARY_TRIP_CODES), required=False, help_text='לא מוצא/ת את המסע? אפשר להוסיף מסע חדש ולחזור לכאן.')
+    trip = TripChoiceField(label='מסע צלילה', queryset=DiveTrip.objects.exclude(code__in=LIBRARY_TRIP_CODES), required=False, help_text=TRIP_HELP)
     class Meta:
         model = Sample
         fields = ['title','title_en','kind','order','family','genus','species','full_name','identification_qualifier','life_stage','species_other','trip','site','site_other','day','depth','video_url','image','note_he','note_en']
@@ -275,10 +346,29 @@ class SampleForm(forms.ModelForm):
                 self.fields['existing_image'].widget.attrs['data-own-image'] = '1'
                 self.fields['existing_image'].help_text += ' לתצפית יש תמונה חלופית משלה — כדי לבחור תמונה קיימת יש למחוק אותה קודם.'
         self.fields['species_other'].help_text = 'אם המין לא נמצא ברשימה שלמעלה, אפשר לפרט כאן במקום לבחור מהרשימה.'
-        self.fields['site'].choices = [('', 'בחרו…')] + [(str(x.pk), str(x)) for x in Site.objects.all()] + [('other','אחר — פירוט')]
+        self.fields['site'].choices = [('', 'בחרו…'), ('other', SITE_OTHER_LABEL)] + [(str(x.pk), str(x)) for x in Site.objects.all()]
         if self.instance.pk:
             self.initial['site'] = str(self.instance.site_id or ('other' if self.instance.site_other else ''))
-        self.fields['site_other'].widget.attrs['data-other-for'] = 'site'
+        # "Other...": the new site's names. Saving adds it to the dive sites of the trip's region (create_new_site).
+        self.fields['site_other'].label = 'שם אתר הצלילה החדש בעברית'
+        self.fields['site_other'].help_text = 'האתר יתווסף לרשימת אתרי הצלילה של האזור של המסע.'
+        self.fields['site_other'].widget.attrs.update({'data-other-for': 'site', 'data-other-required': '1'})
+        self.fields['site_other_en'] = forms.CharField(required=False, max_length=180, label='שם אתר הצלילה החדש באנגלית (לא חובה)',
+            widget=forms.TextInput(attrs={'dir': 'ltr', 'data-other-for': 'site'}))
+        # A new observation may make its own one-dive trip instead of picking one (create_quick_trip): the box and the
+        # trip's region, year and month follow the trip field; the observation's site and day complete it.
+        if not self.instance.pk:
+            self.fields['create_trip'] = forms.BooleanField(required=False, label='יצירה אוטומטית של מסע מתצפית זו',
+                help_text='בחירת המסע מהרשימה מושבתת, וייווצר מסע של צלילה אחת לפי האזור, השנה, החודש, האתר והיום של התצפית.')
+            self.fields['new_trip_region'] = RegionChoiceField(Region.objects.select_related('country').order_by('name'),
+                required=False, label='אזור המסע', widget=forms.Select(attrs={'data-new-trip': '1'}))
+            self.fields['new_trip_year'] = forms.IntegerField(required=False, min_value=1900, max_value=2100, label='שנת הצלילה',
+                widget=forms.NumberInput(attrs={'data-new-trip': '1', 'style': 'width:7em'}))
+            self.fields['new_trip_month'] = forms.IntegerField(required=False, min_value=1, max_value=12, label='חודש הצלילה',
+                widget=forms.NumberInput(attrs={'data-new-trip': '1', 'style': 'width:5em'}))
+        self._place_after('trip', 'create_trip', 'new_trip_region', 'new_trip_year', 'new_trip_month')
+        self._place_after('site_other', 'site_other_en')
+        self.created_site = self.created_trip = None
         # Changing the species of an existing observation: two extra choices, shown by the form's script only when
         # the species was actually changed (and the server checks them either way, see species_change below).
         self._original_identity = None
@@ -305,10 +395,121 @@ class SampleForm(forms.ModelForm):
         self.fields['trip'].widget.attrs['required'] = True   # browser-side check; a disabled field is exempt from it
         kind_now = (self.data.get('kind') if self.is_bound else None) or self.initial.get('kind') or self.instance.kind
         if kind_now in self.TAXON_KINDS:
-            for name in ('trip', 'site', 'site_other', 'day'):
-                self.fields[name].disabled = True
+            for name in ('trip', 'site', 'site_other', 'site_other_en', 'day', 'create_trip', 'new_trip_region', 'new_trip_year', 'new_trip_month'):
+                if name in self.fields: self.fields[name].disabled = True
             self.fields['trip'].help_text = 'לא נדרש לתצפית ברמת סדרה, משפחה או סוג.'
     TAXON_KINDS = (Sample.Kind.ORDER, Sample.Kind.FAMILY, Sample.Kind.GENUS)
+
+    def localize(self, lang):
+        """The observation form in the page's language (localize_fields), plus what is special to it: the existing
+        gallery photo's extra help, the cf./juv. reference rows and the dive sites sorted by their English names.
+        Called by the view once every field is in place (the photographer field and the manager fields are added
+        there)."""
+        if lang == 'en':
+            suffix = ' לתצפית יש תמונה חלופית משלה — כדי לבחור תמונה קיימת יש למחוק אותה קודם.'
+            field = self.fields.get('existing_image')
+            extra = ''
+            if field is not None and str(field.help_text).endswith(suffix):
+                field.help_text, extra = str(field.help_text)[:-len(suffix)], suffix
+        localize_fields(self, lang)
+        if lang != 'en':
+            return
+        from .templatetags.seaslugs_i18n import t
+        from .models import IdentificationQualifier, LifeStage
+        if extra: self.fields['existing_image'].help_text += t(extra, lang)
+        for name, model in (('identification_qualifier', IdentificationQualifier), ('life_stage', LifeStage)):
+            if name in self.fields:
+                self.fields[name].choices = reference_choices(model, lang)
+                self.fields[name].widget.lang = lang
+        sites = {str(x.pk): english_name(x) for x in Site.objects.all()}
+        choices = [(value, sites.get(value) or label) for value, label in self.fields['site'].choices]
+        self.fields['site'].choices = [c for c in choices if c[0] not in sites] + sorted((c for c in choices if c[0] in sites), key=lambda c: c[1].lower())
+
+    def localize_errors(self):
+        localize_errors(self)
+
+    def _post_clean(self):
+        super()._post_clean()
+        # "create a trip from this observation" ticked but not done (its own fields have errors): the model's "choose a
+        # dive trip" would only repeat them
+        if self.cleaned_data.get('create_trip') and not self.cleaned_data.get('trip') and 'trip' in self._errors:
+            del self._errors['trip']
+
+    def _place_after(self, anchor, *names):
+        """Moves the given fields (those that exist) right after `anchor`, so as_p shows them together."""
+        names = [n for n in names if n in self.fields]
+        if anchor not in self.fields or not names: return
+        moved = {n: self.fields.pop(n) for n in names}
+        fields = {}
+        for key, field in self.fields.items():
+            fields[key] = field
+            if key == anchor: fields.update(moved)
+        self.fields = fields
+
+    def clean_new_place(self, data):
+        """The "other" dive site and the "create a trip from this observation" box. Checks what they need -- the new
+        trip's region, year and month; the new site's Hebrew name and a region to put it in -- and, when the rest of the
+        form is valid, adds the site and the trip and puts them into the observation. The rows are created here, before
+        the model's own checks (which need a trip), so the view runs the validation in a transaction that is rolled back
+        when the form is invalid in the end (views.edit)."""
+        create_trip = bool(data.get('create_trip')) and 'create_trip' in self.fields and not self.fields['create_trip'].disabled
+        other_site = data.get('site') == 'other' and not self.fields['site'].disabled
+        region = None
+        if create_trip:
+            region = data.get('new_trip_region')
+            for name, message in (('new_trip_region', 'יש לבחור את אזור המסע.'), ('new_trip_year', 'יש לציין את שנת הצלילה.'),
+                                  ('new_trip_month', 'יש לציין את חודש הצלילה.')):
+                if not data.get(name) and name not in self.errors: self.add_error(name, message)
+            day, year, month = data.get('day'), data.get('new_trip_year'), data.get('new_trip_month')
+            if day and year and month:
+                from datetime import date
+                try: date(year, month, day)
+                except ValueError: self.add_error('day', 'תאריך לא תקין.')
+            site = data.get('site')
+            if isinstance(site, Site) and region and site.region_id != region.pk:
+                self.add_error('site', 'אתר הצלילה אינו שייך לאזור המסע.')
+        elif data.get('trip'):
+            region = data['trip'].region
+        if other_site:
+            name, name_en = (data.get('site_other') or '').strip(), ' '.join((data.get('site_other_en') or '').split())
+            name = ' '.join(name.split())
+            if not name:
+                if 'site_other' not in self.errors: self.add_error('site_other', 'יש לכתוב את שם אתר הצלילה בעברית.')
+            elif region is None and not (create_trip and 'new_trip_region' in self.errors):
+                self.add_error('site', 'כדי להוסיף אתר צלילה חדש יש לבחור מסע צלילה (שהאזור שלו ידוע) או לסמן יצירת מסע מתצפית זו ולבחור אזור.')
+        if self.errors:
+            return
+        if other_site:
+            site = self.create_new_site(region, name, name_en)
+            data['site'], data['site_other'] = site, ''
+        if create_trip:
+            data['trip'] = self.create_quick_trip(data, region)
+
+    def create_new_site(self, region, name, name_en):
+        """The "other" dive site: a site of that region with the same Hebrew or English name (any case) is used as is;
+        otherwise a new one is added."""
+        wanted = {n.lower() for n in (name, name_en) if n}
+        same = next((x for x in Site.objects.filter(region=region) if wanted & ({x.name.lower(), x.name_en.lower()} - {''})), None)
+        if same:
+            return same
+        self.created_site = Site.objects.create(region=region, name=name, name_en=name_en)
+        return self.created_site
+
+    def create_quick_trip(self, data, region):
+        """A one-dive trip made from this observation: its region, year, month, day and site, named and coded like a trip
+        added on the trips page (trip_naming), after the observation's photographer."""
+        from .trip_naming import suggest_title, suggest_code, photographer_letter, region_code
+        photographer = data.get('photographer') or self.instance.owner
+        site = data.get('site') if isinstance(data.get('site'), Site) else None
+        year, month, day = data['new_trip_year'], data['new_trip_month'], data.get('day')
+        region_code(region, persist=True)
+        photographer_letter(photographer, persist=True)
+        trip = DiveTrip.objects.create(
+            title=suggest_title(photographer, region, site, year, month, day), code=suggest_code(photographer, region, year, month, day),
+            year=year, month=month, start_day=day, duration_days=1, region=region, site=site, country=region.country,
+            country_name=region.country.name_en or region.country.name, region_name=region.name_en or region.name)
+        self.created_trip = trip
+        return trip
 
     @staticmethod
     def taxon_for(kind, order='', family='', genus=''):
@@ -524,8 +725,7 @@ class SampleForm(forms.ModelForm):
 
         value = data.get('site')
         if value == 'other':
-            if not data.get('site_other','').strip(): self.add_error('site_other','יש לפרט את הערך האחר.')
-            data['site'] = None
+            data['site'] = 'other'     # becomes a dive site of the region in clean_new_place (below)
         elif value:
             try:
                 data['site'] = Site.objects.get(pk=value)
@@ -539,6 +739,8 @@ class SampleForm(forms.ModelForm):
             data['site_other'] = ''
         self.species_change = self._check_species_change(data)
         self.clean_taxon_files(data)
+        if data.get('trip') and data.get('create_trip'):
+            data['trip'] = None        # the box wins over a trip left chosen (the browser disables the list anyway)
         # A dive-trip planning is written only for a trip that has not ended yet; one whose date has passed is closed
         # (planned_trips.py) and can only be turned into a regular dive trip (kind "collection" with media).
         trip = data.get('trip')
@@ -547,6 +749,9 @@ class SampleForm(forms.ModelForm):
             if trip.series_end_date() < date.today():
                 self.add_error('trip', 'תאריך המסע כבר עבר, ולכן התכנון נסגר. אפשר להפוך אותו למסע צלילה רגיל: '
                                        'בחרו את הסוג "אוסף מינים / מסע צלילה" והוסיפו סרטון או תמונה.')
+        self.clean_new_place(data)
+        if data.get('site') == 'other':
+            data['site'] = None        # not saved (the form has errors): the choice and the names stay on the page
         return data
     def _check_species_change(self, data):
         """None unless an existing species observation is being given another catalogued species (or sp. letter). Then
@@ -750,7 +955,8 @@ class SiteQuickForm(forms.ModelForm):
             wanted = {n.lower() for n in (name, name_en) if n}
             same = next((x for x in Site.objects.filter(region=region) if wanted & ({x.name.lower(), x.name_en.lower()} - {''})), None)
             if same:
-                self.add_error('name', f'האתר "{same.name}" כבר קיים באזור הזה. בחרו אותו מרשימת האתרים.')
+                shown = english_name(same) if getattr(self, 'lang', 'he') == 'en' else same.name
+                self.add_error('name', f'האתר "{shown}" כבר קיים באזור הזה. בחרו אותו מרשימת האתרים.')
         data['name'], data['name_en'] = name, name_en
         return data
 

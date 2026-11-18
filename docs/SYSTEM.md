@@ -253,7 +253,21 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
   - `identification_qualifier` (cf./aff. code), `life_stage` (juv.).
   - `undetermined_variant`: a letter separating forms of one "Genus sp.".
   - Free text "other": `species_other` (species not yet catalogued) and `site_other`. Either blocks
-    publication.
+    publication. On the observation form "אחר..." (first in the dive site list) no longer leaves free text: it asks
+    for the new site's Hebrew and English names and the save adds the site to the trip's region (an existing site of
+    that region with the same name is reused). `site_other` stays only on older rows.
+  - Quick trip (new observations only): the box "יצירה אוטומטית של מסע מתצפית זו" under the trip field disables the
+    trip list and requires the new trip's region, year and month; the save adds a one-dive trip (`trip_naming` name and
+    code after the photographer, the observation's site and day) and puts the observation in it
+    (`SampleForm.clean_new_place`). `views.edit` validates in a transaction rolled back when the form is invalid, so a
+    failed save leaves no site or trip behind (`test_quick_trip.py`).
+  - The observation form in English: `form_translations.py` (merged into `TRANSLATIONS`; values with a name in them
+    via `FORM_PATTERNS`), `SampleForm.localize(lang)` / `localize_errors()` in `views.edit` (validation runs under
+    `translation.override(lang)` for Django's own messages). Chosen values use `name_en` where it exists (sites,
+    regions, countries, trip filters, photographers' English names, cf./juv. rows); trips show place and date
+    (`trip_page.trip_title`). `test_observation_form_english.py`. The same in English for the pages it links to
+    (trip, dive site + popup, species, guest photographer) and the trips management page: `forms.localize_fields` /
+    `localize_errors`, `views._validate_localized` (`test_add_pages_english.py`).
   - Media: `image` (stored photo) and/or `video_url` (YouTube). `gallery_source` FK→Sample means
     "show another observation's photo", and the image follows its source.
   - `image_hash` (sha256).
@@ -1018,6 +1032,9 @@ Catalogue of test modules (test count) and what each guards:
 | `test_canonical_image_naming` | 26 | `canonical_image_name()` rules and collisions |
 | `test_species_change` | 25 | Changing an observation's species in place |
 | `test_seo_phase1` | 25 | Sitemap rules, `/index.html` 301, lang in links, species titles and descriptions |
+| `test_observation_form_english` | 6 | The observation form in English: labels, values by English name, errors, messages; Hebrew page unchanged |
+| `test_add_pages_english` | 6 | The add pages (trip, site, species, guest photographer) and the trips management page in English |
+| `test_quick_trip` | 14 | "אחר..." dive site added to the region, one-dive trip created from the observation, rollback when invalid |
 | `test_taxon_files_form` | 24 | Manager-only taxon texts/articles/identification file on the observation form |
 | `test_db_replace` | 21 | Full DB replacement and the maintenance lock |
 | `test_species_redirects` | 20 | Historical 301 redirects |

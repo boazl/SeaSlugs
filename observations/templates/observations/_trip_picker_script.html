@@ -1,4 +1,4 @@
-{# Inline (not a static file) so it needs no collectstatic on the Mac. #}<script>
+{% load seaslugs_i18n %}{# Inline (not a static file) so it needs no collectstatic on the Mac. #}<script>
 // The dive-trip picker's filters (country / region / site / year), shared by the observation form and the admin
 // import tools (folder import of photos, video import). The trip list keeps growing: the filters (not submitted)
 // narrow it to the relevant trips. `locations` is views.trip_picker_data(). An "add a trip" link in
@@ -11,8 +11,8 @@ function initTripPicker(tripEl,locations){
     const first=document.createElement('option');first.value='';first.textContent=all;s.appendChild(first);
     for(const it of items){const o=document.createElement('option');o.value=it.id;o.textContent=it.name;for(const k of ['country_id','region_id'])if(it[k]!=null)o.dataset[k==='country_id'?'country':'region']=it[k];s.appendChild(o);}
     l.appendChild(s);wrap.appendChild(l);return s;};
-  const country=make('tf-country','מדינה','כל המדינות',f.countries),region=make('tf-region','אזור','כל האזורים',f.regions),
-    site=make('tf-site','אתר','כל האתרים',f.sites),year=make('tf-year','שנה','כל השנים',f.years.map(y=>({id:y,name:y})));
+  const country=make('tf-country','{{ "מדינה"|t:lang|escapejs }}','{{ "כל המדינות"|t:lang|escapejs }}',f.countries),region=make('tf-region','{{ "אזור"|t:lang|escapejs }}','{{ "כל האזורים"|t:lang|escapejs }}',f.regions),
+    site=make('tf-site','{{ "אתר"|t:lang|escapejs }}','{{ "כל האתרים"|t:lang|escapejs }}',f.sites),year=make('tf-year','{{ "שנה"|t:lang|escapejs }}','{{ "כל השנים"|t:lang|escapejs }}',f.years.map(y=>({id:y,name:y})));
   const row=tripEl.closest('p');row.parentNode.insertBefore(wrap,row);
   const count=document.createElement('small');count.id='trip-filter-count';row.appendChild(count);
   // The "add a trip" link sits right under the trip field and carries the current filters into the add form.
@@ -20,6 +20,7 @@ function initTripPicker(tripEl,locations){
   if(addHolder)row.after(addHolder);
   function syncAddLink(){if(!addLink)return;const q=new URLSearchParams({next:location.pathname,select_trip:'1'});
     for(const [name,el] of [['region',region],['site',site],['year',year]])if(el.value)q.set(name,el.value);
+    const lang=new URLSearchParams(location.search).get('lang');if(lang)q.set('lang',lang);
     addLink.href=addLink.pathname+'?'+q;}
   const shown=t=>(!country.value||String(t.country_id)===country.value)&&(!region.value||String(t.region_id)===region.value)
     &&(!site.value||String(t.site_id)===site.value)&&(!year.value||String(t.year)===year.value);
@@ -41,7 +42,7 @@ function initTripPicker(tripEl,locations){
     if(userChange&&any&&!tripEl.value){const open=[...tripEl.options].filter(o=>o.value&&!o.disabled);
       if(open.length===1){tripEl.value=open[0].value;tripEl.dispatchEvent(new Event('change'));}}
     syncAddLink();
-    const n=[...tripEl.options].filter(o=>o.value&&!o.disabled).length;count.textContent=any?(n===0?'אין מסע שמתאים למסננים.':'מסעות שמתאימים למסננים: '+n):'';
+    const n=[...tripEl.options].filter(o=>o.value&&!o.disabled).length;count.textContent=any?(n===0?'{{ "אין מסע שמתאים למסננים."|t:lang|escapejs }}':'{{ "מסעות שמתאימים למסננים: "|t:lang|escapejs }}'+n):'';
   }
   country.addEventListener('change',()=>apply(true));
   region.addEventListener('change',()=>{if(region.value){const r=f.regions.find(x=>String(x.id)===region.value);if(r)country.value=r.country_id;}apply(true);});

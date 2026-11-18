@@ -1,14 +1,14 @@
 {% extends 'observations/base.html' %}{% load seaslugs_i18n %}{% block content %}<h1>{{ title|by_language:lang }}</h1>{% if password_change_url %}<p><a href="{{ password_change_url|with_lang:lang }}">{{ "החלפת סיסמה"|t:lang }}</a></p>{% endif %}
-{% if observation_form %}<p>בחרו את סוג הדגימה: מין יחיד, סוג, משפחה, סדרה או אוסף מינים. הסדרה, המשפחה, הסוג והמין משפיעים זה על זה, ורק השדות שמתאימים לסוג הדגימה זמינים. דגימת מין מחייבת מין; אוסף מחייב כותרת, ללא בחירת מין. בשניהם נדרש מסע צלילה (הכולל מדינה, אזור ושנה) ותמונה או סרטון (אפשר גם שניהם). אוספים מתפרסמים במסעות הצלילה לאחר אישור מנהל. ללא העלאת תמונה תוצג התמונה המקדימה של YouTube. מין חדש לאזור מתפרסם מיד אם כל הנתונים מזוהים; אחרת התצפית ממתינה לבדיקה.</p>{% endif %}
+{% if observation_form %}<p>{{ "בחרו את סוג הדגימה: מין יחיד, סוג, משפחה, סדרה או אוסף מינים. הסדרה, המשפחה, הסוג והמין משפיעים זה על זה, ורק השדות שמתאימים לסוג הדגימה זמינים. דגימת מין מחייבת מין; אוסף מחייב כותרת, ללא בחירת מין. בשניהם נדרש מסע צלילה (הכולל מדינה, אזור ושנה) ותמונה או סרטון (אפשר גם שניהם). אוספים מתפרסמים במסעות הצלילה לאחר אישור מנהל. ללא העלאת תמונה תוצג התמונה המקדימה של YouTube. מין חדש לאזור מתפרסם מיד אם כל הנתונים מזוהים; אחרת התצפית ממתינה לבדיקה."|t:lang }}</p>{% endif %}
 {% if trip_form %}<p>מסע צלילה מייצג ביקור אחד באתר בתאריך מסוים. לאחר השמירה תחזרו לטופס התצפית עם המסע החדש נבחר.</p>{% endif %}
 <form method="post" enctype="multipart/form-data">{% csrf_token %}{% if trip_form or observation_form %}<input type="hidden" name="next" value="{{ next }}">{% endif %}{% if trip_form or observation_form %}{{ form.as_p }}{% else %}{{ form.non_field_errors }}{% for field in form %}<p>{{ field.errors }}<label for="{{ field.id_for_label }}">{{ field.label|t:lang }}:</label> {{ field }}{% if field.help_text %}<span class="helptext">{{ field.help_text|t:lang|safe }}</span>{% endif %}</p>{% endfor %}{% endif %}{% if observation_form %}<p id="defining-status" class="notice" hidden></p>{% endif %}<button type="submit">{{ "שמירה"|t:lang }}</button></form>
 {% if observation_form and form.instance.pk %}<div class="actions form-actions" style="margin:24px 0">
-<form method="post" action="{% url 'observation-action' form.instance.pk %}" id="release-species-form" hidden>{% csrf_token %}<input type="hidden" name="action" value="release_species"><button type="submit">מחיקת התצפית מהמין</button></form>
-<form method="post" action="{% url 'observation-action' form.instance.pk %}"><input type="hidden" name="action" value="delete_image">{% csrf_token %}<button type="submit" id="delete-image-btn" data-has-image="{% if form.instance.image %}1{% endif %}" {% if not form.instance.image %}disabled{% endif %}>מחיקת התמונה</button></form>
-<form method="post" action="{% url 'observation-action' form.instance.pk %}"><input type="hidden" name="action" value="delete_video">{% csrf_token %}<button type="submit" id="delete-video-btn" data-has-video="{% if form.instance.video_url %}1{% endif %}" {% if not form.instance.video_url %}disabled{% endif %}>מחיקת קישור הסרטון</button></form>
+<form method="post" action="{% url 'observation-action' form.instance.pk %}" id="release-species-form" hidden>{% csrf_token %}<input type="hidden" name="action" value="release_species"><button type="submit">{{ "מחיקת התצפית מהמין"|t:lang }}</button></form>
+<form method="post" action="{% url 'observation-action' form.instance.pk %}"><input type="hidden" name="action" value="delete_image">{% csrf_token %}<button type="submit" id="delete-image-btn" data-has-image="{% if form.instance.image %}1{% endif %}" {% if not form.instance.image %}disabled{% endif %}>{{ "מחיקת התמונה"|t:lang }}</button></form>
+<form method="post" action="{% url 'observation-action' form.instance.pk %}"><input type="hidden" name="action" value="delete_video">{% csrf_token %}<button type="submit" id="delete-video-btn" data-has-video="{% if form.instance.video_url %}1{% endif %}" {% if not form.instance.video_url %}disabled{% endif %}>{{ "מחיקת קישור הסרטון"|t:lang }}</button></form>
 </div>{% endif %}
-{% if observation_form and species_add_url %}<p id="species-add-holder"><a id="species-add-link" href="{{ species_add_url }}?next={{ request.path|urlencode }}">המין לא ברשימה? הוספת מין חדש לרשימה</a></p>{% endif %}
-{% if observation_form and photographer_add_url %}<p id="photographer-add-holder"><a id="photographer-add-link" href="{{ photographer_add_url }}?next={{ request.path|urlencode }}">הצלם לא ברשימה? הוספת צלם אורח (צלם בלי חשבון באתר)</a></p>
+{% if observation_form and species_add_url %}<p id="species-add-holder"><a id="species-add-link" href="{{ species_add_url }}?next={{ request.path|urlencode }}{% if lang == 'en' %}&amp;lang=en{% endif %}">{{ "המין לא ברשימה? הוספת מין חדש לרשימה"|t:lang }}</a></p>{% endif %}
+{% if observation_form and photographer_add_url %}<p id="photographer-add-holder"><a id="photographer-add-link" href="{{ photographer_add_url }}?next={{ request.path|urlencode }}{% if lang == 'en' %}&amp;lang=en{% endif %}">{{ "הצלם לא ברשימה? הוספת צלם אורח (צלם בלי חשבון באתר)"|t:lang }}</a></p>
 <script>
 // The photographer chosen on the form travels with the "add" links (a trip is named after its photographer), so coming
 // back from adding a trip, a species or a photographer keeps it.
@@ -30,16 +30,43 @@ document.addEventListener('DOMContentLoaded', function () {
   update();
 });
 </script>{% endif %}
-{% if observation_form and trip_add_url %}<p id="trip-add-holder"><a id="trip-add-link" href="{{ trip_add_url }}?next={{ request.path|urlencode }}&amp;select_trip=1">המסע או אתר הצלילה לא ברשימה? הוספת מסע חדש (אפשר להוסיף בו גם אתר חדש)</a></p>{% endif %}
+{% if observation_form and trip_add_url %}<p id="trip-add-holder"><a id="trip-add-link" href="{{ trip_add_url }}?next={{ request.path|urlencode }}&amp;select_trip=1{% if lang == 'en' %}&amp;lang=en{% endif %}">{{ "המסע או אתר הצלילה לא ברשימה? הוספת מסע חדש (אפשר להוסיף בו גם אתר חדש)"|t:lang }}</a></p>{% endif %}
 {% if observation_form %}{% include 'observations/_trip_picker_script.html' %}{{ locations|json_script:'locations' }}<script>
 const locations=JSON.parse(document.getElementById('locations').textContent);
 const otherFields=['site'];
-function updateOther(){for(const name of otherFields){const other=document.querySelector('[data-other-for="'+name+'"]');if(!other)continue;const el=document.getElementById('id_'+name);const enabled=el.value==='other';other.closest('p').hidden=!enabled;other.disabled=!enabled;other.required=enabled;}}
+// "Other..." (first in the dive site list) opens the new site's Hebrew and English names.
+function updateOther(){for(const name of otherFields){const el=document.getElementById('id_'+name);if(!el)continue;
+  for(const other of document.querySelectorAll('[data-other-for="'+name+'"]')){const enabled=el.value==='other'&&!el.disabled;
+    other.closest('p').hidden=!enabled;other.disabled=!enabled;other.required=enabled&&other.dataset.otherRequired==='1';}}}
+// "Create a trip from this observation": the trip list is disabled and the new trip's region, year and month are required.
+const createTripEl=document.getElementById('id_create_trip');
+const newTripEls=[...document.querySelectorAll('[data-new-trip]')];
+function updateCreateTrip(){
+  const tripField=document.getElementById('id_trip');if(!createTripEl||!tripField)return;
+  const on=createTripEl.checked&&!createTripEl.disabled;
+  if(on&&tripField.value){tripField.value='';tripField.dispatchEvent(new Event('change'));}
+  tripField.disabled=on||createTripEl.disabled;tripField.required=!tripField.disabled;
+  if(on){   // the trip filters' region and year start the new trip
+    const region=document.getElementById('id_new_trip_region'),year=document.getElementById('id_new_trip_year');
+    const fr=document.getElementById('tf-region'),fy=document.getElementById('tf-year');
+    if(region&&!region.value&&fr&&fr.value)region.value=fr.value;
+    if(year&&!year.value&&fy&&fy.value)year.value=fy.value;
+  }
+  for(const el of newTripEls){el.closest('p').hidden=!on;el.disabled=!on;el.required=on;}
+  updateSites(true);
+}
+// The dive sites shown are those of the trip's region -- the new trip's region, or the region chosen in the trip filters.
+function siteRegion(){
+  const tripField=document.getElementById('id_trip');
+  if(createTripEl&&createTripEl.checked){const r=document.getElementById('id_new_trip_region');return r&&r.value?r.value:null;}
+  const trip=tripField?locations.trips.find(t=>String(t.id)===tripField.value):null;
+  if(trip)return trip.region_id;
+  const filter=document.getElementById('tf-region');return filter&&filter.value?filter.value:null;
+}
 function updateSites(reset){
   const tripField=document.getElementById('id_trip');const siteField=document.getElementById('id_site');
   if(!tripField||!siteField)return;
-  const trip=locations.trips.find(t=>String(t.id)===tripField.value);
-  const regionId=trip?trip.region_id:null;
+  const regionId=siteRegion();
   for(const option of siteField.options){
     if(!option.value||option.value==='other')continue;
     const row=locations.sites.find(x=>String(x.id)===option.value);
@@ -55,7 +82,7 @@ function updateSites(reset){
   const fileInput=document.getElementById('id_image'),row=input.closest('p');
   if(fileInput&&fileInput.closest('p'))fileInput.closest('p').after(row);
   const preview=document.createElement('img');preview.alt='';preview.hidden=true;preview.style.cssText='display:block;max-width:220px;max-height:160px;object-fit:contain;margin:6px 0';
-  const pick=document.createElement('button');pick.type='button';pick.textContent='בחירה מתמונות הגלריה';pick.style.marginInlineStart='10px';
+  const pick=document.createElement('button');pick.type='button';pick.textContent='{{ "בחירה מתמונות הגלריה"|t:lang|escapejs }}';pick.style.marginInlineStart='10px';
   input.after(pick);row.appendChild(preview);
   const photoOf=v=>{const m=/\/observations\/(\d+)\/photo\/?(?:[?#].*)?$/.exec((v||'').trim());return m?'/observations/'+m[1]+'/photo/':'';};
   function showPreview(){const u=photoOf(input.value);preview.hidden=!u;if(u)preview.src=u;}
@@ -71,7 +98,7 @@ function updateSites(reset){
   if(fileInput)fileInput.addEventListener('change',()=>{syncFields();showPreview();});
   showPreview();syncFields();
   const dlg=document.createElement('dialog');dlg.style.cssText='width:min(960px,94vw);max-height:90vh;background:#081c25;color:#e4f3f4;border:1px solid #36515a;border-radius:10px;padding:18px';
-  dlg.innerHTML='<form method="dialog" style="margin:0;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><input type="search" id="ip-q" placeholder="חיפוש לפי מין, סוג, משפחה, כותרת או מסע" style="flex:1;min-width:220px"><label style="display:flex;gap:6px;align-items:center" id="ip-trip-label"><input type="checkbox" id="ip-trip">רק ממסע זה</label><button value="cancel">סגירה</button></form><p id="ip-status" style="margin:10px 0"></p><div id="ip-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;overflow:auto;max-height:62vh"></div><p><button type="button" id="ip-more" hidden>טעינת עוד</button></p>';
+  dlg.innerHTML='<form method="dialog" style="margin:0;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><input type="search" id="ip-q" placeholder="{{ "חיפוש לפי מין, סוג, משפחה, כותרת או מסע"|t:lang|escapejs }}" style="flex:1;min-width:220px"><label style="display:flex;gap:6px;align-items:center" id="ip-trip-label"><input type="checkbox" id="ip-trip">{{ "רק ממסע זה"|t:lang|escapejs }}</label><button value="cancel">{{ "סגירה"|t:lang|escapejs }}</button></form><p id="ip-status" style="margin:10px 0"></p><div id="ip-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;overflow:auto;max-height:62vh"></div><p><button type="button" id="ip-more" hidden>{{ "טעינת עוד"|t:lang|escapejs }}</button></p>';
   document.body.appendChild(dlg);
   const q=dlg.querySelector('#ip-q'),tripOnly=dlg.querySelector('#ip-trip'),grid=dlg.querySelector('#ip-grid'),status=dlg.querySelector('#ip-status'),more=dlg.querySelector('#ip-more');
   let next=0,token=0;
@@ -79,7 +106,7 @@ function updateSites(reset){
     if(reset){next=0;grid.replaceChildren();}
     const mine=++token,params=new URLSearchParams({q:q.value.trim(),offset:next});
     const trip=document.getElementById('id_trip');if(tripOnly.checked&&trip&&trip.value)params.set('trip',trip.value);
-    status.textContent='טוען…';
+    status.textContent='{{ "טוען…"|t:lang|escapejs }}';
     try{
       const r=await fetch('{% url "image-search" %}?'+params);if(!r.ok||mine!==token)return;const data=await r.json();
       for(const it of data.results){
@@ -90,8 +117,8 @@ function updateSites(reset){
         b.addEventListener('click',()=>{input.value=location.origin+it.url;if(fileInput)fileInput.value='';syncFields();showPreview();dlg.close();});
         grid.appendChild(b);
       }
-      next=data.next;more.hidden=next==null;status.textContent=grid.children.length?'':'לא נמצאו תמונות.';
-    }catch(e){status.textContent='שגיאה בטעינת התמונות.';}
+      next=data.next;more.hidden=next==null;status.textContent=grid.children.length?'':'{{ "לא נמצאו תמונות."|t:lang|escapejs }}';
+    }catch(e){status.textContent='{{ "שגיאה בטעינת התמונות."|t:lang|escapejs }}';}
   }
   let debounce=null;q.addEventListener('input',()=>{clearTimeout(debounce);debounce=setTimeout(()=>load(true),300);});
   tripOnly.addEventListener('change',()=>load(true));more.addEventListener('click',()=>load(false));
@@ -106,7 +133,13 @@ if(tripEl)tripEl.addEventListener('change',()=>updateSites(true));
 // The trip list keeps growing: filters (not submitted) narrow it to the relevant trips (trip_picker.js).
 initTripPicker(tripEl,locations);
 for(const name of otherFields){const el=document.getElementById('id_'+name);if(el)el.addEventListener('change',updateOther);}
-updateSites(false);updateOther();
+if(createTripEl){createTripEl.addEventListener('change',updateCreateTrip);
+  const r=document.getElementById('id_new_trip_region');if(r)r.addEventListener('change',()=>updateSites(true));}
+{const f=document.getElementById('tf-region');if(f)f.addEventListener('change',()=>updateSites(true));}
+// the kind select (taxonomy script) disables the trip, the site and the box together: follow it
+{const k=document.getElementById('id_kind');if(k)k.addEventListener('change',()=>setTimeout(()=>{updateCreateTrip();updateOther();}));}
+updateSites(false);updateOther();if(createTripEl)updateCreateTrip();
+window.addEventListener('load',()=>{if(createTripEl)updateCreateTrip();updateOther();});   // after the taxonomy script's first pass
 
 // Whether this sample is (or would be) the species' defining/gallery sample depends on
 // both the species and the trip fields together (a SpeciesArea is species+country+sea),
@@ -150,7 +183,7 @@ const keepRow=keepEl?keepEl.closest('p'):null;
 const conflictRow=conflictEl?conflictEl.closest('p'):null;
 const changeNotice=document.createElement('p');
 changeNotice.id='species-change-notice';changeNotice.hidden=true;changeNotice.className='notice';
-changeNotice.textContent='שינוי המין: התצפית תעודכן במקומה, והמין הקודם יפסיק להציג אותה. התמונה מכילה את שם המין הקודם — העלו תמונה מעודכנת (עם שם המין החדש על גבי התמונה). הקובץ הקודם יימחק.';
+changeNotice.textContent='{{ "שינוי המין: התצפית תעודכן במקומה, והמין הקודם יפסיק להציג אותה. התמונה מכילה את שם המין הקודם — העלו תמונה מעודכנת (עם שם המין החדש על גבי התמונה). הקובץ הקודם יימחק."|t:lang|escapejs }}';
 if(keepRow)keepRow.before(changeNotice);
 let originalSpecies=null;     // the full name as the page loaded (the taxonomy script that defines fullSpeciesText runs after this one)
 window.addEventListener('load',()=>{if(speciesEl&&sampleId!==null&&window.fullSpeciesText){originalSpecies=window.fullSpeciesText().trim();updateDefiningStatus();}});
@@ -175,15 +208,15 @@ function updateDefiningStatus(){
     statusEl.hidden=false;
     setDefiningControls(data.is_defining);
     if(data.is_defining){
-      const lines=['תצפית זו מגדירה את המין.'];
+      const lines=['{{ "תצפית זו מגדירה את המין."|t:lang|escapejs }}'];
       if(data.next){
-        if(data.next.kind==='with_media')lines.push('הדגימה הבאה: '+data.next.id);
-        else if(data.next.kind==='without_media')lines.push('הדגימה הבאה ללא מדיה');
-        else lines.push('דגימה יחידה');
+        if(data.next.kind==='with_media')lines.push('{{ "הדגימה הבאה: "|t:lang|escapejs }}'+data.next.id);
+        else if(data.next.kind==='without_media')lines.push('{{ "הדגימה הבאה ללא מדיה"|t:lang|escapejs }}');
+        else lines.push('{{ "דגימה יחידה"|t:lang|escapejs }}');
       }
       statusEl.textContent=lines.join('\n');
     }else{
-      statusEl.textContent=data.appears?'המין שנבחר מופיע בגלריה.':'המין שנבחר אינו מופיע בגלריה.';
+      statusEl.textContent=data.appears?'{{ "המין שנבחר מופיע בגלריה."|t:lang|escapejs }}':'{{ "המין שנבחר אינו מופיע בגלריה."|t:lang|escapejs }}';
     }
   }).catch(()=>{statusEl.hidden=true;setDefiningControls(true);});
 }

@@ -1,10 +1,10 @@
-{% extends 'observations/base.html' %}{% block content %}
-<h1>הוספת מסע צלילה</h1>
-<p>בחרו מקום, שנה וחודש (ברירת המחדל: החודש הנוכחי) ואפשר להוסיף יום. השם והסימון מוצעים אוטומטית ואפשר לשנות אותם.</p>
+{% extends 'observations/base.html' %}{% load seaslugs_i18n %}{% block content %}
+<h1>{{ "הוספת מסע צלילה"|t:lang }}</h1>
+<p>{{ "בחרו מקום, שנה וחודש (ברירת המחדל: החודש הנוכחי) ואפשר להוסיף יום. השם והסימון מוצעים אוטומטית ואפשר לשנות אותם."|t:lang }}</p>
 <form method="post" id="trip-add-form">{% csrf_token %}<input type="hidden" name="next" value="{{ next }}">{% if select_trip %}<input type="hidden" name="select_trip" value="1">{% endif %}
 {{ form.non_field_errors }}
 <p>{{ form.region.errors }}<label for="id_region">{{ form.region.label }}</label>{{ form.region }}</p>
-<p>{{ form.site.errors }}<label for="id_site">{{ form.site.label }}</label>{{ form.site }} <a href="{% url 'site-new' %}?popup=1" id="add-site" class="button" target="_blank" title="הוספת אתר צלילה חדש" aria-label="הוספת אתר צלילה חדש" style="padding:4px 12px;font-weight:700">+</a><span class="helptext">רשימת האתרים מסוננת לפי האזור. בלי אתר השם נבנה לפי האזור.</span></p>
+<p>{{ form.site.errors }}<label for="id_site">{{ form.site.label }}</label>{{ form.site }} <a href="{% url 'site-new' %}?popup=1{% if lang == 'en' %}&amp;lang=en{% endif %}" id="add-site" class="button" target="_blank" title="{{ "הוספת אתר צלילה חדש"|t:lang }}" aria-label="{{ "הוספת אתר צלילה חדש"|t:lang }}" style="padding:4px 12px;font-weight:700">+</a><span class="helptext">{{ "רשימת האתרים מסוננת לפי האזור. בלי אתר השם נבנה לפי האזור."|t:lang }}</span></p>
 <div class="filter-row" style="margin-top:0">
 <label>{{ form.year.label }}{{ form.year.errors }}{{ form.year }}</label>
 <label>{{ form.month.label }}{{ form.month.errors }}{{ form.month }}</label>
@@ -12,9 +12,9 @@
 <label>{{ form.duration_days.label }}{{ form.duration_days.errors }}{{ form.duration_days }}</label>
 <label>{{ form.photographer.label }}{{ form.photographer.errors }}{{ form.photographer }}</label>
 </div>
-<p>{{ form.title.errors }}<label for="id_title">{{ form.title.label }}</label>{{ form.title }}<span class="helptext">מוצע לפי הבחירות. אם תשנו אותו ידנית הוא יפסיק להשתנות לבד.</span></p>
-<p>{{ form.code.errors }}<label for="id_code">{{ form.code.label }}</label><bdi dir="ltr">{{ form.code }}</bdi><span class="helptext">צלם (אות, אם זה לא בעל האתר) + אזור + שנה + חודש, למשל I26Aug. בלי יום, אלא אם הסימון כבר תפוס.</span></p>
-<div class="actions"><button type="submit">שמירת המסע</button><a href="{{ next }}">ביטול</a></div>
+<p>{{ form.title.errors }}<label for="id_title">{{ form.title.label }}</label>{{ form.title }}<span class="helptext">{{ "מוצע לפי הבחירות. אם תשנו אותו ידנית הוא יפסיק להשתנות לבד."|t:lang }}</span></p>
+<p>{{ form.code.errors }}<label for="id_code">{{ form.code.label }}</label><bdi dir="ltr">{{ form.code }}</bdi><span class="helptext">{{ "צלם (אות, אם זה לא בעל האתר) + אזור + שנה + חודש, למשל I26Aug. בלי יום, אלא אם הסימון כבר תפוס."|t:lang }}</span></p>
+<div class="actions"><button type="submit">{{ "שמירת המסע"|t:lang }}</button><a href="{{ next }}">{{ "ביטול"|t:lang }}</a></div>
 </form>
 {{ site_regions|json_script:'site-regions' }}
 <script>
@@ -43,7 +43,7 @@ $('site').addEventListener('change',()=>{if($('site').value){$('region').value=s
 for(const n of ['year','month','day','photographer'])if($(n))$(n).addEventListener('change',refresh);
 for(const n of ['year','day'])if($(n))$(n).addEventListener('input',refresh);
 // "+": the site-add page opens in a small window; the site it creates is added to the list and chosen here.
-$('site').closest('p').querySelector('.helptext').textContent='רשימת האתרים מסוננת לפי האזור. בלי אתר השם נבנה לפי האזור. האתר לא ברשימה? לחצו על + כדי להוסיף אותו.';
+$('site').closest('p').querySelector('.helptext').textContent='{{ "רשימת האתרים מסוננת לפי האזור. בלי אתר השם נבנה לפי האזור. האתר לא ברשימה? לחצו על + כדי להוסיף אותו."|t:lang|escapejs }}';
 document.getElementById('add-site').addEventListener('click', event => {
   const url = new URL(event.currentTarget.href); if ($('region').value) url.searchParams.set('region', $('region').value);
   const win = window.open(url, 'add-site', 'width=620,height=560');

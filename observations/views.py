@@ -1072,19 +1072,23 @@ def divetrip_locations(request):
     })
 
 
-def trip_picker_data():
+def trip_picker_data(lang='he'):
     """What the observation form's trip filters (country / region / site / year) need: every trip's
     place and year, and the names of the places that have a trip, so the browser can narrow the long
-    trip list without a round trip. Also keeps the region->site mapping the site field already uses."""
+    trip list without a round trip. Also keeps the region->site mapping the site field already uses.
+    In English the place names are the English ones where they exist."""
+    from .forms import english_name
     trips = list(DiveTrip.objects.exclude(code__in=LIBRARY_TRIP_CODES).values('id', 'region_id', 'country_id', 'site_id', 'year'))
     used = lambda key: {t[key] for t in trips if t[key]}
+    name = english_name if lang == 'en' else str
+    by_name = lambda rows: sorted(rows, key=lambda row: row['name'].lower())
     return {
         'trips': trips,
         'sites': list(Site.objects.values('id', 'region_id')),
         'filters': {
-            'countries': [{'id': c.pk, 'name': str(c)} for c in Country.objects.filter(pk__in=used('country_id')).order_by('name')],
-            'regions': [{'id': r.pk, 'name': str(r), 'country_id': r.country_id} for r in Region.objects.filter(pk__in=used('region_id')).order_by('name')],
-            'sites': [{'id': x.pk, 'name': str(x), 'region_id': x.region_id} for x in Site.objects.filter(pk__in=used('site_id')).order_by('name')],
+            'countries': by_name([{'id': c.pk, 'name': name(c)} for c in Country.objects.filter(pk__in=used('country_id'))]),
+            'regions': by_name([{'id': r.pk, 'name': name(r), 'country_id': r.country_id} for r in Region.objects.filter(pk__in=used('region_id'))]),
+            'sites': by_name([{'id': x.pk, 'name': name(x), 'region_id': x.region_id} for x in Site.objects.filter(pk__in=used('site_id'))]),
             'years': sorted(used('year'), reverse=True),
         },
     }
@@ -1165,9 +1169,26 @@ def edit(request,pk=None):
     else:
         # the observation note is shown publicly on the species page: managers write it
         for name in ('note_he', 'note_en'): form.fields.pop(name, None)
-    if request.method=='POST' and form.is_valid():
+    lang=get_lang(request)
+    form.localize(lang)        # labels, help texts and chosen values (sites, trips, photographers...) in the page's language
+    valid=False
+    if request.method=='POST':
+        # Validation may add a dive site ("other...") and a one-dive trip ("create a trip from this observation") -- the
+        # model's own checks need the trip -- so it runs in a transaction that is rolled back when the form is invalid.
+        # Django's own messages ("this field is required") follow the page's language.
+        from django.utils import translation
+        with transaction.atomic(), translation.override(lang):
+            valid=form.is_valid()
+            if not valid: transaction.set_rollback(True)
+            form.localize_errors()
+    if valid:
         item=form.save(commit=False)
         if manager and form.cleaned_data.get('photographer'): item.owner=form.cleaned_data['photographer']
+        if form.created_site or form.created_trip:
+            from .forms import english_name
+            from .trip_page import trip_title
+            if form.created_site: messages.info(request,f'אתר הצלילה נוסף: {english_name(form.created_site) if lang=="en" else form.created_site.name}.')
+            if form.created_trip: messages.info(request,f'נוצר מסע צלילה מהתצפית: {trip_title(form.created_trip,lang)} ({form.created_trip.code}).')
         restoring=bool(item.deleted_at and form.cleaned_data.get('restore'))
         if restoring: item.deleted_at=None; item.deleted_by=None       # a manager brings a deleted observation back
         change=form.species_change
@@ -1178,7 +1199,7 @@ def edit(request,pk=None):
             return render(request,'observations/form.html',{'form':form,'title':'תצפית / Observation','observation_form':True,
                 'trip_new_url':reverse('trip-new'),'trip_add_url':reverse('trip-add'),'species_add_url':reverse('species-new') if manager else '','next':next_url,
                 'photographer_add_url':reverse('photographer-new') if manager else '',
-                'species_options':species_name_options(),'taxonomy':taxonomy_for_form(),'locations':trip_picker_data()})
+                'species_options':species_name_options(),'taxonomy':taxonomy_for_form(),'locations':trip_picker_data(lang)})
         def canonical_image_write(source_sample, target_sample=None):
             # Store under the same stable, meaningful name the bulk folder importer and
             # the image manager use (see Sample.canonical_image_name) -- target_sample's
@@ -1246,7 +1267,7 @@ def edit(request,pk=None):
         'photographer_add_url':reverse('photographer-new') if manager else '',
         'species_options':species_name_options(),
         'taxonomy':taxonomy_for_form(),
-        'locations':trip_picker_data()})
+        'locations':trip_picker_data(lang)})
 
 
 @login_required
@@ -1265,9 +1286,21 @@ def image_search(request):
             | Q(family__icontains=term) | Q(order__icontains=term) | Q(title__icontains=term)
             | Q(trip__title__icontains=term) | Q(trip__code__icontains=term))
     page = list(rows.order_by('-created_at', '-pk')[offset:offset + 49])
+    from .trip_page import trip_title
+    lang = get_lang(request)
     return JsonResponse({'results': [{'id': x.pk, 'url': reverse('observation-photo', args=[x.pk]), 'label': x.taxon_label,
-                                      'trip': x.trip.title if x.trip_id else ''} for x in page[:48]],
+                                      'trip': trip_title(x.trip, lang) if x.trip_id else ''} for x in page[:48]],
                          'next': offset + 48 if len(page) > 48 else None})
+
+
+def _validate_localized(form, lang):
+    """is_valid() with Django's own messages in the page's language, then the form's own messages translated too."""
+    from django.utils import translation
+    from .forms import localize_errors
+    with translation.override(lang):
+        valid = form.is_valid()
+        localize_errors(form)
+    return valid
 
 
 @login_required
@@ -1278,12 +1311,16 @@ def site_new(request):
     next_url = request.POST.get('next') or request.GET.get('next') or reverse('trip-add')
     if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
         next_url = reverse('trip-add')
+    from .forms import english_name, localize_fields
+    lang = get_lang(request)
     form = SiteQuickForm(request.POST or None, initial={'region': _int(request.GET.get('region'))})
-    if request.method == 'POST' and form.is_valid():
+    localize_fields(form, lang)
+    if request.method == 'POST' and _validate_localized(form, lang):
         site = form.save()
+        name = english_name(site) if lang == 'en' else site.name
         if popup:
-            return render(request, 'observations/site_added.html', {'site': {'id': site.pk, 'name': site.name, 'region_id': site.region_id}, 'next': next_url})
-        messages.success(request, f'אתר הצלילה נוסף: {site.name}.')
+            return render(request, 'observations/site_added.html', {'site': {'id': site.pk, 'name': name, 'region_id': site.region_id}, 'next': next_url})
+        messages.success(request, f'אתר הצלילה נוסף: {name}.')
         return redirect(next_url)
     return render(request, 'observations/site_add.html', {'form': form, 'popup': popup, 'next': next_url})
 
@@ -1297,10 +1334,14 @@ def photographer_new(request):
     next_url = request.POST.get('next') or request.GET.get('next') or reverse('observation-new')
     if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
         next_url = reverse('observation-new')
+    from .forms import localize_fields
+    from .models import full_name_for
+    lang = get_lang(request)
     form = GuestPhotographerForm(request.POST or None)
-    if request.method == 'POST' and form.is_valid():
+    localize_fields(form, lang)
+    if request.method == 'POST' and _validate_localized(form, lang):
         user = form.save()
-        messages.success(request, f'הצלם נוסף: {user.get_full_name()}. אפשר להוסיף תצפיות על שמו.')
+        messages.success(request, f'הצלם נוסף: {full_name_for(user, lang)}. אפשר להוסיף תצפיות על שמו.')
         from urllib.parse import urlsplit, urlunsplit, parse_qsl
         parts = urlsplit(next_url)
         query = [(k, v) for k, v in parse_qsl(parts.query) if k != 'photographer'] + [('photographer', user.pk)]
@@ -1317,8 +1358,11 @@ def species_new(request):
     next_url = request.POST.get('next') or request.GET.get('next') or reverse('observation-new')
     if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
         next_url = reverse('observation-new')
+    from .forms import localize_fields
+    lang = get_lang(request)
     form = SpeciesQuickForm(request.POST or None)
-    if request.method == 'POST' and form.is_valid():
+    localize_fields(form, lang)
+    if request.method == 'POST' and _validate_localized(form, lang):
         species = form.save()
         messages.success(request, f'המין נוסף לרשימה: {species.full_name}.')
         return redirect(next_url + ('&' if '?' in next_url else '?') + urlencode({'new_species': species.pk}))
@@ -1500,6 +1544,8 @@ def trips_manage(request):
     rows, filters = _trip_list_context(request, rows, management=True)
     rows = group_series(list(rows))
     lang = get_lang(request)
+    from .trip_page import trip_title
+    for trip in rows: trip.display_title = trip_title(trip, lang)     # a trip's title is Hebrew only: in English its place and date
     base = {k: v for k, v in request.GET.items() if k in ('country', 'region', 'site', 'year', 'sort', 'lang') and v}
     states = [{'key': key, 'label': label, 'count': counts[key], 'active': key == state,
                'url': '?' + urlencode({**base, 'state': key})} for key, label in TRIP_STATES.items()]
@@ -1518,11 +1564,15 @@ def trip_add(request):
         next_url = reverse('trips-manage')
     # Coming from the observation form: go back to it with the new trip already selected.
     select_trip = bool(request.POST.get('select_trip') or request.GET.get('select_trip'))
+    from .forms import localize_fields
+    lang = get_lang(request)
     if request.method == 'POST':
         form = TripQuickForm(request.POST, user=request.user)
-        if form.is_valid():
+        localize_fields(form, lang)
+        if _validate_localized(form, lang):
             trip = form.save()
-            messages.success(request, f'המסע נוסף: {trip.title} ({trip.code}).')
+            from .trip_page import trip_title
+            messages.success(request, f'המסע נוסף: {trip_title(trip, lang)} ({trip.code}).')
             if select_trip:
                 next_url += ('&' if '?' in next_url else '?') + urlencode({'trip': trip.pk})
             return redirect(next_url)
@@ -1534,6 +1584,7 @@ def trip_add(request):
         chosen = photographer_users().filter(pk=_int(request.GET.get('photographer'))).first() if is_manager(request.user) else None
         form = TripQuickForm(user=request.user, initial={'region': region, 'site': site, 'year': year or today.year,
             'month': today.month, 'photographer': chosen or request.user})
+        localize_fields(form, lang)
     return render(request, 'observations/trip_add.html', {'form': form, 'next': next_url, 'select_trip': select_trip,
         'site_regions': {s.pk: s.region_id for s in Site.objects.all()}})
 
