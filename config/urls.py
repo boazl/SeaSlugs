@@ -26,7 +26,7 @@ from observations.trip_page import trip_page
 from observations.views import site_image, species_page, genus_page, genus_identification, genus_identification_preview, order_page, family_page, divetrip_locations
 from observations.articles import article_list, article_page, article_pdf, article_thumb, species_article, genus_article, family_article, order_article
 from observations.db_replace import db_replace, db_replace_download
-from observations.article_files import article_files, article_file_open, article_file_delete, unused_article_delete, article_transfer_file, article_delete
+from observations.article_files import article_files, article_file_open, article_file_delete, unused_article_delete, article_transfer_file, article_delete, identification_transfer_file
 
 urlpatterns = [
     path('admin/images/folder/',folder_import,name='folder-import'),
@@ -39,6 +39,7 @@ urlpatterns = [
     path('admin/article-files/delete-articles/', unused_article_delete, name='unused-article-delete'),
     path('admin/article-files/transfer-file/', article_transfer_file, name='article-transfer-file'),
     path('admin/article-files/delete-chosen-articles/', article_delete, name='article-delete'),
+    path('admin/article-files/identification-file/', identification_transfer_file, name='identification-transfer-file'),
     path('admin/table-transfer/', transfer, name='table-transfer'),
     path('admin/local-videos/import/', video_import, name='video-import'),
     path('admin/local-videos/', local_videos, name='local-videos'),

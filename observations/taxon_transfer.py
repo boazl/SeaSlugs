@@ -4,7 +4,7 @@ identification and sources in Hebrew/English, plus a genus' identification capti
 Only the text of rows that already exist at the destination is updated: a row is matched by its
 identity (below), never created -- rows carry links to other taxa that this transfer doesn't move --
 and a row with no counterpart is reported as skipped. The files themselves (article PDFs, the
-identification file) travel through the image manager, not here."""
+identification file) travel on /admin/article-files/ (article_transfer.py, identification_transfer.py), not here."""
 from django.core.exceptions import ValidationError
 from .models import TaxonOrder, TaxonFamily, TaxonGenus, Sample
 

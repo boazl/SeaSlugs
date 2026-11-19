@@ -822,7 +822,7 @@ never serves `MEDIA_ROOT` directly.** Every file goes through a view that checks
 | `/admin/drive-videos/` | Google Drive video ids (Mac only): rescans the Drive copies' ids (`drive_videos.py`, the same scan as `fill_drive_video_ids`). A replaced file is a new Drive file, so the stored id showed the old preview and did not play. Sorts each observation into same / update (new id) / clear (copy gone, or no local file) / waiting (copy not uploaded yet: id kept) / missing (no copy); one button backs up and saves update + clear. Then transfer the samples table. |
 | `/admin/video-check/` | YouTube video check: a scan asks YouTube's oEmbed about every live observation's video (200 ok, 404/400 deleted, 401/403 private or embedding blocked, no answer = check failed; parallel, no API key). The problem ids are kept in the session; each observation still using one gets: update the link (re-uploaded video: must exist and be unused; local/Drive copies kept; not logged as a new video), remove the link (only with a photo; clears the local/Drive copy fields) or delete the observation (only without a photo; soft delete). Per environment: transfer the samples table or scan on both sides. |
 | `/admin/local-videos/` | Local (offline) video copies: per-trip Mac folder, each video observation's file (auto-match pre-selected), automatic fill, local playback (§8) |
-| `/admin/article-files/` | Article PDFs and genus identification files: which row uses each, open, delete orphans and unused library articles, article transfer between environments |
+| `/admin/article-files/` | Article PDFs and genus identification files: which row uses each, open, delete orphans and unused library articles, article transfer between environments, and the **identification-file transfer** (`identification_transfer.py`): export a list of every genus's identification files (fingerprint, stored name, preview page per language), compare it on the other side (missing here / only here / different file or page), download the ticked genera (`<genus>.identification.json` + `<genus>-identification-he|en.<ext>`) and upload them there -- the genus must exist, the file keeps its source name, the preview page follows, a different existing file is replaced only when confirmed, nothing is deleted. The image manager links here (these files are not observation images). |
 | `/admin/releases/` | Download a ZIP of a verified DB backup plus all media (and the count and size of the backups folder; automatic `table-transfer-*` backups are kept 7 days, always at least the newest 5, hand-named ones never pruned) (contains private data; never upload it to GitHub). Mac launcher: `Release Manager.command`. |
 | `/admin/db-replace/` | Full DB replacement: back up → lock the site (flag file, `MaintenanceModeMiddleware`; staff, `/admin/` and `/healthz` pass) → download live DB → upload replacement + missing images → review → apply → release |
 | `/observations/home-text/` | Edit home-page sections, per language, in a small markup (`home_markup.py`: `#`, `##`, lists, `**bold**`, `[text](link)` with keywords `contribute`, `gallery`, `migrant`, and `[[text]]` for the green button). Clearing a section restores the default. |
@@ -901,8 +901,8 @@ The owner curates data mostly on the Mac and moves it to production. Rules that 
 - `Sea.url_code` (gallery link codes): set by migration `0090` on each site, else in the admin on each site.
 
 - Article PDFs travel through the article transfer on `/admin/article-files/`.
-- Genus identification files and their preview page numbers are uploaded directly on each site, in the
-  observation edit form of the genus observation or in the admin.
+- Genus identification files and their preview page numbers travel through the identification-file transfer on
+  `/admin/article-files/` (§9.2); their caption and source travel with the `genera` table.
 
 ## 11. SEO and Google
 
@@ -1047,6 +1047,8 @@ Catalogue of test modules (test count) and what each guards:
 | `test_book_links` | 5 | Book page links: PDF page per edition, superuser and files only, edition from the nearest mark, page language first, text escaped, PDF view superusers only |
 | `test_discussion_topics` | 12 | Topics for discussion: superuser page, filters / search / order, quick priority and state, add / edit / delete, required topic; `discussions` transfer (export, round trip, newer copy wins, strict format); the `book_edition` issue kind; the editions-comparison migration (rows once, missing species skipped, corrected species linked, empty catalogue gets nothing) |
 | `test_sp_identification_texts` | 3 | Migration 0107: writes only empty identification fields, cites the edition (both editions for a renamed species), reversible; every text bilingual and sourced |
+| `test_identification_transfer` | 5 | Genus identification files between environments: manifest, comparison, download, receive (new / same / replace only when confirmed / unknown genus / bad files), page section and the image manager's link |
+| `test_thuridilla_source_migration` | 1 | Migration 0108: the Thuridilla article's author line accents |
 | `test_identification_issues` | 16 | Identification issues: species follow the observations, fixed date, duplicate needs a second one, SET_NULL; superuser page, filters / search / order, quick priority and state, add / edit / delete, form errors, prefill; `identissues` transfer (export, round trip, newer copy wins, missing references skipped, strict format); the findings migration |
 | `test_missing_descriptions` | 6 | Gallery species without a description: per language, whitespace, only gallery species, order, superuser page, admin link |
 | `test_existing_image` | 15 | Reusing another observation's gallery image (`gallery_source`) |

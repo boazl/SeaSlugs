@@ -120,6 +120,30 @@ def article_files(request):
                 except (ValueError, UnicodeDecodeError):
                     raise ValidationError('קובץ השוואת מאמרים לא תקין.')
                 context['comparison'] = article_transfer.compare_manifest(manifest)
+            elif action == 'export_identification':
+                from . import identification_transfer
+                body = json.dumps(identification_transfer.build_manifest(), ensure_ascii=False, indent=2)
+                response = HttpResponse(body, content_type='application/json; charset=utf-8')
+                response['Content-Disposition'] = f'attachment; filename="seaslugs-identification-{"local" if context["local"] else "render"}.json"'
+                return response
+            elif action == 'compare_identification':
+                from . import identification_transfer
+                upload = request.FILES.get('manifest')
+                if not upload:
+                    raise ValidationError('יש לבחור קובץ השוואה.')
+                try:
+                    manifest = json.loads(upload.read())
+                except (ValueError, UnicodeDecodeError):
+                    raise ValidationError('קובץ השוואת קובצי זיהוי לא תקין.')
+                context['identification_comparison'] = identification_transfer.compare_manifest(manifest)
+            elif action == 'upload_identification':
+                from . import identification_transfer
+                done, notes = identification_transfer.receive(request.FILES.getlist('files'), replace=request.POST.get('replace') == 'yes')
+                if done:
+                    messages.success(request, f'קובצי זיהוי של {len(done)} סוגים: ' + ', '.join(f'{name} ({what})' for name, what in done))
+                for note in notes:
+                    messages.warning(request, note)
+                return redirect('article-files')
             elif action == 'upload_articles':
                 done, notes = article_transfer.receive(request.FILES.getlist('files'), replace=request.POST.get('replace') == 'yes')
                 messages.success(request, f'הועברו {len(done)} מאמרים: ' + ', '.join(f'{title} ({what})' for what, title in done))
@@ -127,7 +151,7 @@ def article_files(request):
                     messages.warning(request, note)
                 return redirect('article-files')
         except ValidationError as exc:
-            context['transfer_error'] = '; '.join(exc.messages)
+            context['identification_error' if action and 'identification' in action else 'transfer_error'] = '; '.join(exc.messages)
     used = references()
     rows = []
     for name, size, modified in stored_files():
@@ -137,8 +161,9 @@ def article_files(request):
     on_disk = {r['name'] for r in rows}
     missing = [(name, uses) for name, uses in sorted(used.items()) if name not in on_disk]
     orphans = [r for r in rows if not r['uses']]
+    from .identification_transfer import genera_with_files
     response = render(request, 'observations/article_files.html', {**context,
-        'library': list(Article.objects.order_by('slug')),
+        'library': list(Article.objects.order_by('slug')), 'identification_genera': list(genera_with_files()),
         'rows': rows, 'orphans': orphans, 'missing': missing, 'unused_articles': unused_articles(),
         'total_mb': round(sum(r['size_mb'] for r in rows), 1), 'orphan_mb': round(sum(r['size_mb'] for r in orphans), 1)})
     response['Cache-Control'] = 'private, no-store'
@@ -241,3 +266,30 @@ def article_delete(request):
             article.delete()
         messages.success(request, f'נמחקו {len(chosen)} מאמרים, עם הקבצים שלהם ובחירתם בכל העמודים: {names}')
     return redirect('article-files')
+
+
+@staff_member_required
+def identification_transfer_file(request):
+    """One file of a genus's identification files for moving them to the other environment: the details
+    (part=details, <genus>.identification.json) or the file in one language (part=he / en,
+    <genus>-identification-he.<ext>)."""
+    _superuser(request)
+    from . import identification_transfer
+    import json
+    genus = TaxonGenus.objects.filter(name=request.GET.get('genus', '')).first()
+    part = request.GET.get('part')
+    if genus is None or part not in ('details', 'he', 'en'):
+        raise Http404
+    if part == 'details':
+        body = json.dumps(identification_transfer.details_document(genus), ensure_ascii=False, indent=2)
+        response = HttpResponse(body, content_type='application/json; charset=utf-8')
+        response['Content-Disposition'] = f'attachment; filename="{genus.name}.identification.json"'
+    else:
+        field = genus.identification_file_in(part)
+        if not field or not field.storage.exists(field.name):
+            raise Http404
+        name = identification_transfer.file_download_name(genus, part)
+        response = FileResponse(field.open('rb'), as_attachment=True, filename=name,
+                                content_type=mimetypes.guess_type(name)[0] or 'application/octet-stream')
+    response['Cache-Control'] = 'private, no-store'
+    return response

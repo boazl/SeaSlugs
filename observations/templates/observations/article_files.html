@@ -33,6 +33,29 @@
 <p>מעלים את הקבצים שהורדו בסביבה השנייה, בלי לשנות את שמם: לכל מאמר את קובץ הפרטים ואת קובצי ה־PDF שלו. מאמר חסר נוסף; מאמר קיים מתעדכן (כותרות, מקור, תאריך, העמודים שבחרו בו). העמודים מקושרים לפי שם; עמוד שאינו קיים כאן מדווח ולא מקושר. לפני ההעברה נוצר גיבוי של המסד.</p>
 <form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="action" value="upload_articles"><p><input type="file" name="files" accept=".json,application/json,application/pdf" multiple required></p><p><label><input type="checkbox" name="replace" value="yes"> לאשר החלפת קובצי PDF קיימים (הקובץ הקודם נמחק)</label></p><button>העלאת המאמרים</button></form>
 
+<h2 id="identification-transfer">העברת קובצי זיהוי של סוגים בין הסביבות</h2>
+<p>קובץ הזיהוי של סוג (תרשים, לוח תמונות או מפתח — PDF או תמונה, בעברית ובאנגלית) שייך לסוג ולא לתצפית, ולכן אינו מופיע בהשוואת התמונות. כאן הוא מועבר כמו מאמר: ייצוא רשימה קטנה (בלי הקבצים עצמם) עם טביעת אצבע לכל קובץ ועמוד התצוגה המקדימה, השוואה בסביבה השנייה, הורדת הסוגים המסומנים והעלאה בצד השני. הכיתוב ומקור הקובץ הם טקסטים של הסוג ועוברים בהעברת טבלת <span dir="ltr">genera</span>.</p>
+<form method="post">{% csrf_token %}<input type="hidden" name="action" value="export_identification"><button>ייצוא רשימת קובצי זיהוי להשוואה</button></form>
+<form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="action" value="compare_identification"><p><input type="file" name="manifest" accept="application/json" required></p><button>השוואה מול קובץ שיוצא בסביבה השנייה</button></form>
+{% if identification_error %}<p class="errorlist" role="alert">{{ identification_error }}</p>{% endif %}
+{% with c=identification_comparison %}{% if c %}<div class="comparison">
+<h3>חסרים כאן, קיימים בסביבה השנייה ({{ c.missing_here|length }})</h3>
+{% if c.missing_here %}<ul>{% for g in c.missing_here %}<li><i dir="ltr">{{ g.genus }}</i> — {{ g.langs|join:", " }}{% if g.no_genus %} <strong>(הסוג עצמו אינו קיים כאן)</strong>{% endif %}</li>{% endfor %}</ul><p class="helptext">יש לסמן ולהוריד אותם בסביבה השנייה ולהעלות כאן.</p>{% else %}<p>אין קובצי זיהוי חסרים כאן.</p>{% endif %}
+<h3>קיימים רק כאן, חסרים בסביבה השנייה ({{ c.only_here|length }})</h3>
+{% if c.only_here %}<ul>{% for g in c.only_here %}<li><i dir="ltr">{{ g.genus }}</i> — {{ g.langs|join:", " }}</li>{% endfor %}</ul>{% else %}<p>אין קובצי זיהוי שקיימים רק כאן.</p>{% endif %}
+<h3>קיימים בשתי הסביבות עם הבדלים ({{ c.different|length }})</h3>
+{% if c.different %}<ul class="article-diff">{% for g in c.different %}<li><strong><i dir="ltr">{{ g.genus }}</i></strong>{% for f in g.items %}<br>{{ f.label }}: {{ f.state }}{% if f.newer %} — החדש יותר {{ f.newer }}{% endif %}{% if f.size_here %} ({{ f.size_here|filesizeformat }} כאן, {{ f.size_there|filesizeformat }} שם){% endif %}{% endfor %}</li>{% endfor %}</ul>{% else %}<p>לכל הסוגים המשותפים אותם קובצי זיהוי ואותו עמוד תצוגה מקדימה.</p>{% endif %}
+{% if c.send %}<p><button type="button" class="quiet select-genera" data-source="identification-send">סימון הסוגים שקיימים רק כאן או שונים, לקראת הורדה</button></p>{{ c.send|json_script:"identification-send" }}{% endif %}
+</div>{% endif %}{% endwith %}
+<h3>קובצי הזיהוי בסביבה זו</h3>
+{% if identification_genera %}<p class="toolbar"><button type="button" id="select-all-genera" class="quiet">בחירת הכול / ביטול</button> <button type="button" id="download-genera">הורדת קובצי הזיהוי המסומנים</button></p>
+<ul class="library">{% for g in identification_genera %}<li><label><input type="checkbox" class="genus-box" value="{{ g.name }}" data-files="{% url 'identification-transfer-file' %}?genus={{ g.name|urlencode }}&amp;part=details{% if g.identification_file %} {% url 'identification-transfer-file' %}?genus={{ g.name|urlencode }}&amp;part=he{% endif %}{% if g.identification_file_en %} {% url 'identification-transfer-file' %}?genus={{ g.name|urlencode }}&amp;part=en{% endif %}"> <i dir="ltr">{{ g.name }}</i></label>{% if g.identification_file %} · עברית{% endif %}{% if g.identification_file_en %} · אנגלית{% endif %}</li>{% endfor %}</ul>
+<p class="helptext">לכל סוג יורדים קובץ פרטים (<span dir="ltr">&lt;סוג&gt;.identification.json</span>) וקובצי הזיהוי שלו (<span dir="ltr">&lt;סוג&gt;-identification-he / -en</span>). הדפדפן עשוי לבקש אישור להורדת כמה קבצים.</p>
+{% else %}<p>אין קובצי זיהוי של סוגים בסביבה זו.</p>{% endif %}
+<h3>העברת קובצי זיהוי לסביבה זו</h3>
+<p>מעלים את הקבצים שהורדו בסביבה השנייה בלי לשנות את שמם: לכל סוג את קובץ הפרטים ואת קובצי הזיהוי שלו. הסוג חייב להיות קיים כאן. הקובץ נשמר בשם שיש לו בסביבה השנייה, עמוד התצוגה המקדימה נקבע לפי הקובץ, והתצוגה המקדימה נוצרת מחדש. לפני ההעברה נוצר גיבוי של המסד.</p>
+<form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="action" value="upload_identification"><p><input type="file" name="files" accept=".json,application/json,application/pdf,image/*" multiple required></p><p><label><input type="checkbox" name="replace" value="yes"> לאשר החלפת קובצי זיהוי קיימים (הקובץ הקודם נמחק)</label></p><button>העלאת קובצי הזיהוי</button></form>
+
 <h2>קבצים</h2>
 <p>כל קובצי המאמרים (PDF ותצוגות מקדימות) וקובצי הזיהוי של הסוגים (PDF או תמונה) שעל השרת: {{ rows|length }} קבצים, {{ total_mb }}MB. {% if orphans %}<strong>{{ orphans|length }} מהם יתומים</strong> (אף שורה לא משתמשת בהם, {{ orphan_mb }}MB) ואפשר למחוק אותם.{% else %}אין קבצים יתומים.{% endif %}</p>
 <p>קובץ שבשימוש לא נמחק מכאן: להסרתו מסמנים "לסלק" בעמוד העריכה של השורה (או את תיבת הניקוי בטופס התצפית) ושומרים — הקובץ נמחק גם מהדיסק.</p>
@@ -61,6 +84,29 @@
 <ul>{% for name, uses in missing %}<li dir="ltr">{{ name }} — {% for kind, text, url in uses %}{{ kind }}: {% if url %}<a href="{{ url }}">{{ text }}</a>{% else %}{{ text }}{% endif %}{% if not forloop.last %}; {% endif %}{% endfor %}</li>{% endfor %}</ul>{% endif %}
 <style>.article-files{border-collapse:collapse;width:100%}.article-files th,.article-files td{padding:8px 10px;border-bottom:1px solid #345;text-align:start;vertical-align:top}.article-files tr.orphan{background:rgba(255,120,120,.08)}.danger{background:#c33;color:#fff}.danger:disabled{opacity:.5;cursor:default}.quiet{background:transparent;color:#64dfce;border:1px solid #64dfce}.toolbar{display:flex;gap:12px;flex-wrap:wrap}.unused-articles{list-style:none;padding:0}.unused-articles li{margin:6px 0}.unused-articles label{display:inline}.library{list-style:none;padding:0}.library li{margin:4px 0}.library label{display:inline}.article-diff li{margin:8px 0}.comparison{border:1px solid #36515a;border-radius:10px;padding:4px 18px;margin:12px 0}</style>
 <script>
+(function(){
+    var boxes = Array.prototype.slice.call(document.querySelectorAll('.genus-box'));
+    var all = document.getElementById('select-all-genera');
+    if (all) all.addEventListener('click', function(){
+        var on = !boxes.every(function(b){ return b.checked; }); boxes.forEach(function(b){ b.checked = on; });
+    });
+    document.querySelectorAll('.select-genera').forEach(function(button){
+        button.addEventListener('click', function(){
+            var names = JSON.parse(document.getElementById(button.dataset.source).textContent);
+            boxes.forEach(function(b){ b.checked = names.indexOf(b.value) !== -1; });
+            document.getElementById('download-genera').scrollIntoView({behavior: 'smooth'});
+        });
+    });
+    var download = document.getElementById('download-genera');
+    if (download) download.addEventListener('click', async function(){
+        for (const box of boxes.filter(function(b){ return b.checked; })) {
+            for (const url of box.dataset.files.split(' ')) {
+                const a = document.createElement('a'); a.href = url; a.download = ''; document.body.append(a); a.click(); a.remove();
+                await new Promise(function(r){ setTimeout(r, 500); });
+            }
+        }
+    });
+})();
 (function(){
     var boxes = Array.prototype.slice.call(document.querySelectorAll('.article-box'));
     var all = document.getElementById('select-all-articles');

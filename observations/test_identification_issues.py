@@ -210,7 +210,7 @@ class IdentificationIssueTransferTests(IssueFixture):
         issue = self.make()
         document = export_table('identissues')
         row = document['rows'][0]
-        row['status'] = 'fixed'; row['fixed_on'] = '2026-11-18'
+        row['status'] = 'fixed'; row['fixed_on'] = (issue.opened_on + timedelta(days=1)).isoformat()
         row['updated_at'] = (issue.updated_at + timedelta(minutes=5)).isoformat()
         items = issue_plan(document)
         self.assertEqual(items[0]['action'], 'update')

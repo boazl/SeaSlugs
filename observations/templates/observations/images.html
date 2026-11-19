@@ -4,6 +4,7 @@
 <p><a href="http://127.0.0.1:8000/admin/images/">תמונות במק</a> · <a href="https://seaslugs.onrender.com/admin/images/" target="_blank" rel="noopener">תמונות באתר</a></p>
 <h2>השוואת תמונות בין הסביבות</h2>
 <p>ייצוא מפיק קובץ JSON קטן (ללא תוכן התמונות עצמן) עם טביעת אצבע (Hash) לכל תמונה בסביבה זו. יש להעלות אותו בסביבה השנייה כדי לדעת אילו תמונות חסרות שם ואילו קיימות רק כאן.</p>
+<p class="helptext">קובצי זיהוי של סוגים (תרשים, לוח תמונות או מפתח) אינם תמונות של תצפיות ואינם נכללים בהשוואה כאן — הם מועברים ב<a href="{% url 'article-files' %}#identification-transfer">קבצי מאמרים וקובצי זיהוי</a>.</p>
 <form method="post">{% csrf_token %}<input type="hidden" name="action" value="export_manifest"><button>ייצוא רשימת תמונות להשוואה</button></form>
 <form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="action" value="compare_manifest"><p><input type="file" name="manifest" accept="application/json" required></p><button>השוואה מול קובץ שיוצא בסביבה השנייה</button></form>
 {% if comparison %}<div class="comparison">
