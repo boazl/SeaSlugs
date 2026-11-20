@@ -137,6 +137,21 @@ class Article(models.Model):
     editorial_he = models.TextField('הערת עריכה (עברית)', blank=True, help_text='מוצגת בקטן בסוף המאמר.')
     editorial_en = models.TextField('הערת עריכה (אנגלית)', blank=True)
     link = models.URLField('קישור חיצוני (DOI וכד׳)', max_length=300, blank=True)
+    # The library is a bibliography too: each entry has a kind (the section of /articles/ it is listed in), its full
+    # bibliographic reference, and the short form species cite it by. An entry may be a reference only -- no PDF and
+    # no sections (a book, or a paper not kept on the site): it is listed with its reference and its link.
+    class Kind(models.TextChoices):
+        GENERAL = 'general', 'מאמר מדעי בנושא כללי'
+        GUIDE = 'guide', 'מגדיר / ספר זיהוי'
+        DESCRIPTION = 'description', 'תיאור והגדרת מינים'
+    kind = models.CharField('סוג', max_length=12, choices=Kind.choices, default=Kind.GENERAL,
+        help_text='מגדירים; מאמרים שבהם תוארו או הוגדרו מינים (התיאור המקורי, מספור sp.); או מאמר מדעי בנושא כללי.')
+    citation = models.TextField('ביבליוגרפיה', blank=True,
+        help_text='הפניה מלאה: מחברים (שנה). כותרת. כתב העת / ההוצאה, כרך(גיליון): עמודים. מוצגת ברשימת המאמרים כפי שהיא.')
+    short_ref = models.CharField('קיצור לציטוט', max_length=200, blank=True, db_index=True,
+        help_text='הקיצור שבו מינים מצטטים את הפרסום, בדיוק כמו בשדה "מקור השם" של המין, '
+                  'למשל "NSSI-2 Gosliner, Valdés & Behrens, 2018" או "Martín-Hervás et al., 2021". '
+                  'כך "(Source: …)" בעמוד המין מקשר לכאן.')
     pdf_he = models.FileField('PDF בעברית', upload_to='articles/', blank=True,
         validators=[FileExtensionValidator(['pdf']), validate_article_pdf_size])
     pdf_en = models.FileField('PDF באנגלית', upload_to='articles/', blank=True,
@@ -169,6 +184,14 @@ class Article(models.Model):
                 ensure_thumbnail(self, code)
     def title(self, lang):
         return (self.title_en or self.title_he) if lang == 'en' else (self.title_he or self.title_en)
+    @property
+    def is_reference_only(self):
+        """A bibliography entry only: no PDF and no sections on the site."""
+        return not (self.pdf_he or self.pdf_en) and not self.is_written
+    def list_url(self, lang):
+        from django.urls import reverse
+        url = reverse('article-list') + ('?lang=en' if lang == 'en' else '')
+        return f'{url}#{self.slug}'
     def thumb_url(self, lang):
         from django.urls import reverse
         code = self.pdf_lang(lang)
@@ -210,6 +233,13 @@ class Species(models.Model):
     genus = models.TextField('Genus — סוג', blank=True)
     species = models.TextField('Species — שם המין', blank=True)
     author = models.TextField('Author — מחבר ושנת תיאור', blank=True)
+    # An undescribed species marked "sp." with a number (or a number and a year) has no author: its name is the number a
+    # book or paper gave it. This is that publication, e.g. "NSSI-2 Gosliner, Valdés & Behrens, 2018" or
+    # "Martín-Hervás et al., 2021"; the site shows "(Source: ...)" where a described species shows its author
+    # (Species.author_text, app.js authorText).
+    name_source = models.CharField('מקור השם (sp. עם מספר)', max_length=200, blank=True,
+        help_text='למין שטרם תואר ומסומן sp. עם מספר: הספר או המאמר שבו מופיע המספר, למשל "NSSI-2 Gosliner, Valdés & Behrens, 2018" '
+                  'או "Martín-Hervás et al., 2021". מוצג במקום המחבר: (Source: …). ריק — לא מוצג דבר.')
     order = models.TextField('Order — סדרה', blank=True)
     family = models.TextField('Family — משפחה', blank=True)
     superfamily = models.TextField('Superfamily — על־משפחה', blank=True)
@@ -284,6 +314,43 @@ class Species(models.Model):
         if genus and epithet or not name:
             name = f'{genus} {epithet}'.strip()
         self.genus, self.species, self.scientific_name = genus, epithet, name
+    SOURCE_LABEL = {'he': 'מקור', 'en': 'Source'}
+    @property
+    def is_undescribed(self):
+        """An undescribed species: its epithet is "sp." (with or without a number or letter)."""
+        return bool(re.match(r'^sp\.', (self.species or '').strip()))
+    def author_text(self, lang='he'):
+        """What follows the name: the author and year of a described species; for an undescribed "sp." species the
+        source of its number, "(Source: NSSI-2 Gosliner, Valdés & Behrens, 2018)"; '' when there is neither.
+        dist/app.js authorText follows the same rule -- keep the two in step."""
+        source = (self.name_source or '').strip()
+        if self.is_undescribed and source:
+            return f'({self.SOURCE_LABEL.get(lang, "Source")}: {source})'
+        return (self.author or '').strip()
+    def source_article(self):
+        """The library entry (Article) the source of an undescribed species' name refers to -- the one whose short
+        reference (Article.short_ref) is exactly that source; None for a site observation or an unknown source."""
+        source = (self.name_source or '').strip()
+        if not (self.is_undescribed and source):
+            return None
+        return Article.objects.filter(short_ref=source).first()
+    @property
+    def is_marked_sp(self):
+        """A "sp." with a mark -- a number or a letter ("sp. 7", "sp. A"), not a bare "sp." (an unidentified animal)."""
+        return bool(re.match(r'^sp\.\s*\S', (self.species or '').strip()))
+    def site_source(self):
+        """For a species marked on this site (the owner's own "sp. A" / "sp. 3"): the observation that defines it -- the
+        earliest published observation of the species on the site, as "SeaSlugs.org.il observation: <photographer>,
+        <region>, <year>" (in English, like a book citation); '' when it has none."""
+        samples = Sample.objects.filter(species=self, kind=Sample.Kind.SPECIES, status=Sample.Status.PUBLISHED,
+                                        deleted_at__isnull=True).select_related('trip__region', 'owner__profile')
+        first = min(samples, key=lambda s: (s.trip.year or 9999, s.trip.month or 13, s.trip.start_day or 99, s.pk), default=None)
+        if first is None:
+            return ''
+        trip = first.trip
+        parts = [full_name_for(first.owner, 'en') if first.owner_id else '',
+                 (trip.region.name_en or trip.region.name) if trip.region_id else '', str(trip.year or '')]
+        return 'SeaSlugs.org.il observation: ' + ', '.join(p for p in parts if p)
     @property
     def full_name(self):
         """The scientific name followed by its author and year, e.g.
@@ -968,16 +1035,17 @@ class Sample(models.Model):
         if self.kind == self.Kind.FAMILY: return self.family
         if self.kind == self.Kind.GENUS: return self.genus
         return str(self.species) if self.species_id else self.species_other
-    def taxon_parts(self):
+    def taxon_parts(self, lang='he'):
         """(name, author, life stage) -- the three pieces taxon_full_name joins; the author is
-        only ever non-empty for a catalogued species."""
+        only ever non-empty for a catalogued species (for an undescribed "sp." one: the source of its
+        number, Species.author_text)."""
         if self.kind == self.Kind.SPECIES and self.species_id:
             sp = self.species
             if self.identification_qualifier and sp.genus and sp.species:
                 name = f'{sp.genus} {self.identification_qualifier} {sp.species}'
             else:
                 name = sp.scientific_name
-            return name, (sp.author or '').strip(), self.life_stage
+            return name, sp.author_text(lang), self.life_stage
         return self.taxon_name, '', self.life_stage if self.kind not in (self.Kind.COLLECTION, self.Kind.PLANNED) else ''
     def _taxon_text(self, with_author):
         name, author, stage = self.taxon_parts()

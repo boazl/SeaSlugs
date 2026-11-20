@@ -29,6 +29,8 @@ LANGS = ('he', 'en')
 DETAIL_FIELDS = ('title_he', 'title_en', 'source', 'link', 'published_on', 'show_on_home')
 DETAIL_LABELS = {'title_he': 'כותרת (עברית)', 'title_en': 'כותרת (אנגלית)', 'source': 'מקור', 'link': 'קישור חיצוני',
                  'published_on': 'תאריך פרסום', 'show_on_home': 'הצגה בדף הבית'}
+BIBLIOGRAPHY_FIELDS = ('kind', 'citation', 'short_ref')
+BIBLIOGRAPHY_LABELS = {'kind': 'סוג (מגדיר / תיאור מינים / כללי)', 'citation': 'ביבליוגרפיה', 'short_ref': 'קיצור לציטוט'}
 PAGE_LABELS = {'species': 'מינים', 'genera': 'סוגים', 'families': 'משפחות', 'orders': 'סדרות', 'trips': 'מסעות צלילה'}
 MAX_UPLOAD_FILES = 60
 MAX_UPLOAD_BYTES = 150 * 1024 * 1024
@@ -70,6 +72,8 @@ def article_entry(article):
         'slug': article.slug, 'title_he': article.title_he, 'title_en': article.title_en, 'source': article.source,
         'link': article.link, 'published_on': article.published_on.isoformat() if article.published_on else '',
         'show_on_home': article.show_on_home,
+        # the bibliography (added later: a list from before it lacks these, and the destination keeps its own)
+        'kind': article.kind, 'citation': article.citation, 'short_ref': article.short_ref,
         'files': {lang: _file_details(getattr(article, 'pdf_' + lang)) for lang in LANGS},
         'pages': _pages(article),
         # An article written on the site: its texts, sections (a figure's observation by its fixed transfer id,
@@ -126,6 +130,10 @@ def _valid_entry(entry):
         return False
     if not isinstance(entry.get('show_on_home'), bool) or not isinstance(entry.get('files'), dict) or not isinstance(entry.get('pages'), dict):
         return False
+    if any(f in entry and not isinstance(entry[f], str) for f in BIBLIOGRAPHY_FIELDS):
+        return False
+    if 'kind' in entry and entry['kind'] not in Article.Kind.values:
+        return False
     for lang in LANGS:
         value = entry['files'].get(lang)
         if value is not None and not (isinstance(value, list) and len(value) == 3 and isinstance(value[0], str)
@@ -176,6 +184,7 @@ def compare_manifest(manifest):
             result['only_here'].append({'slug': slug, 'title': str(article)})
             continue
         details = [DETAIL_LABELS[f] for f in DETAIL_FIELDS if here[f] != there[f]]
+        details += [BIBLIOGRAPHY_LABELS[f] for f in BIBLIOGRAPHY_FIELDS if f in there and here[f] != there[f]]
         if there.get('content') is not None and here['content'] != there['content']:
             details.append('תוכן המאמר (קטעים, כותרת משנה, קרדיט, מקורות)')
         pdfs = []
@@ -276,6 +285,9 @@ def receive(uploads, replace=False):
             article = article or Article(slug=slug)
             for field in ('title_he', 'title_en', 'source', 'link', 'show_on_home'):
                 setattr(article, field, entry[field])
+            for field in BIBLIOGRAPHY_FIELDS:
+                if field in entry:
+                    setattr(article, field, entry[field])
             if entry['published_on']:
                 try:
                     article.published_on = date.fromisoformat(entry['published_on'])
@@ -299,8 +311,9 @@ def receive(uploads, replace=False):
             if content is not None:
                 for field in TEXT_FIELDS:
                     setattr(article, field, content[field])
-            if not (article.pdf_he or article.pdf_en) and not (content and content['blocks']):
-                raise ValidationError(f'{slug}: למאמר אין תוכן — לא PDF ולא קטעים.')
+            if not (article.pdf_he or article.pdf_en) and not (content and content['blocks']) \
+                    and not (article.citation.strip() or article.link):
+                raise ValidationError(f'{slug}: למאמר אין תוכן — לא PDF, לא קטעים ולא ביבליוגרפיה או קישור.')
             try:
                 article.full_clean()
             except ValidationError as exc:

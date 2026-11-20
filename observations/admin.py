@@ -164,9 +164,27 @@ class SpeciesAdmin(SaveAndViewMixin, admin.ModelAdmin):
     # no need to open a species' full change form just to flag it as migrant.
     list_editable = ['is_migrant','name_he','name_en','first_observed_year','last_observed_year','author','family','order']
     search_fields = ['scientific_name','genus','species','author','family','name_he']
+    actions = ['fill_site_source']
+    @admin.action(description='מקור השם מהתצפית הראשונה באתר (למיני sp. מסומנים שסימנתי בעצמי, כשהמקור ריק)')
+    def fill_site_source(self, request, queryset):
+        # The owner's own marks ("sp. A", or a number he gave): the source of the name is the site observation that
+        # defines the species -- photographer, region, year (Species.site_source). Never overwrites a source.
+        done, skipped = [], []
+        for species in queryset:
+            source = species.site_source() if species.is_marked_sp and not species.name_source.strip() else ''
+            if source:
+                species.name_source = source
+                species.save(update_fields=['name_source'])
+                done.append(species.scientific_name)
+            else:
+                skipped.append(species.scientific_name)
+        if done:
+            self.message_user(request, f'נקבע מקור ל-{len(done)} מינים: ' + ', '.join(done))
+        if skipped:
+            self.message_user(request, 'דולגו (לא sp. מסומן, כבר יש מקור, או אין תצפית מפורסמת): ' + ', '.join(skipped), level='warning')
     list_filter = ['order','family','genus','is_migrant']
     fieldsets = [
-        ('זיהוי מדעי', {'fields':['phylogenetic_order','genus','species','author','scientific_name','full_name_display','formatted_author','reference_author','full_species_name_with_order']}),
+        ('זיהוי מדעי', {'fields':['phylogenetic_order','genus','species','author','name_source','scientific_name','full_name_display','formatted_author','reference_author','full_species_name_with_order']}),
         ('סיווג טקסונומי', {'fields':['order','superfamily','family','accepted_genus','accepted_species']}),
         ('שמות ותפוצה', {'fields':['name_he','name_en','common_name','transliteration','language','distribution']}),
         ('תוכן לעמוד המין', {'fields':['description_he','description_en','identification_he','identification_en','similar_species_he','similar_species_en','size_from','size_to','size_max','link','reference_link','articles']}),
@@ -522,8 +540,9 @@ class ArticleBlockFormSet(forms.BaseInlineFormSet):
             return
         kept = [f for f in self.forms if f.cleaned_data and not f.cleaned_data.get('DELETE')]
         article = self.instance
-        if not kept and not (article.pdf_he or article.pdf_en):
-            raise forms.ValidationError('למאמר צריך תוכן: קטעים שנכתבים כאן, או קובץ PDF בעברית או באנגלית.')
+        if not kept and not (article.pdf_he or article.pdf_en) and not ((article.citation or '').strip() or article.link):
+            raise forms.ValidationError('למאמר צריך תוכן: קטעים שנכתבים כאן, קובץ PDF בעברית או באנגלית, '
+                                        'או — לרשומה ביבליוגרפית בלבד (ספר, מאמר שאינו באתר) — ביבליוגרפיה או קישור.')
         for f in kept:
             if f.cleaned_data.get('kind') == ArticleBlock.Kind.FIGURE and not f.cleaned_data.get('sample'):
                 raise forms.ValidationError('באיור יש לבחור תצפית שתמונתה תוצג.')
@@ -556,12 +575,15 @@ class ArticleReferenceInline(admin.TabularInline):
 class ArticleAdmin(admin.ModelAdmin):
     """The article library: each article is uploaded here once and then picked from the "מאמרים" field of
     the species, orders, families, genera and dive trips it concerns (shown on all their pages)."""
-    list_display = ['__str__', 'title_en', 'source', 'published_on', 'show_on_home', 'used_on']
-    list_filter = ['show_on_home']
-    search_fields = ['title_he', 'title_en', 'source', 'slug']
+    list_display = ['__str__', 'kind', 'short_ref', 'source', 'published_on', 'show_on_home', 'used_on']
+    list_filter = ['kind', 'show_on_home']
+    search_fields = ['title_he', 'title_en', 'source', 'slug', 'citation', 'short_ref']
     prepopulated_fields = {'slug': ['title_en']}
     fieldsets = [
         (None, {'fields': ['title_he', 'title_en', 'slug', 'source', 'link']}),
+        ('ביבליוגרפיה', {'fields': ['kind', 'citation', 'short_ref'],
+                         'description': 'רשומה ביבליוגרפית בלבד (ספר, או מאמר שאינו שמור באתר) אפשרית בלי PDF ובלי קטעים: '
+                                        'מספיקים ביבליוגרפיה או קישור.'}),
         ('מאמר שנכתב באתר', {'fields': [('subtitle_he', 'subtitle_en'), ('byline_he', 'byline_en'), ('editorial_he', 'editorial_en')],
                              'description': 'למאמר שנכתב כאן: הקטעים והמקורות בתחתית הדף. העמוד /articles/&lt;כתובת&gt;/ מציג אותו בשפת האתר, '
                                             'עם כפתור הדפסה / שמירה כ־PDF.'}),

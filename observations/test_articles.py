@@ -416,7 +416,8 @@ class MoveOldPdfsIntoTheLibraryMigrationTests(MediaMixin, TransactionTestCase):
                             slug='phyllidia-undula-israel-red-sea-gulf-of-aqaba', note_he='קיימת', note_en='Kept')
         MigrationExecutor(connection).migrate([('observations', '0077_article_pdfs_into_library')])
         self.forward_to_latest()
-        self.assertEqual(sorted(Article.objects.values_list('slug', 'pdf_en')),
+        # (the bibliography entries of the guides, migration 0113, have no PDF)
+        self.assertEqual(sorted(Article.objects.exclude(pdf_en='').values_list('slug', 'pdf_en')),
                          [('coryphellina', 'articles/genera/Coryphellina.pdf'), ('zookeys-1006-001', 'articles/families/zookeys-1006-001.pdf')])
         shared = Article.objects.get(slug='zookeys-1006-001')
         self.assertEqual(sorted(f.name for f in shared.families.all()), ['Dorididae', 'Phyllidiidae'])
@@ -963,11 +964,11 @@ class WrittenArticleTests(ArticleFixture):
         self.assertIn('name="references-0-text"', html)
         self.assertIn('מאמר שנכתב באתר', html)
         response = self.client.post('/admin/observations/article/add/', {
-            'title_he': 'ריק', 'slug': 'empty', 'published_on': '2026-10-23',
+            'title_he': 'ריק', 'slug': 'empty', 'published_on': '2026-10-23', 'kind': 'general',
             'blocks-TOTAL_FORMS': '0', 'blocks-INITIAL_FORMS': '0', 'references-TOTAL_FORMS': '0', 'references-INITIAL_FORMS': '0'})
         self.assertContains(response, 'למאמר צריך תוכן')
         response = self.client.post('/admin/observations/article/add/', {
-            'title_he': 'מאמר', 'slug': 'written', 'published_on': '2026-10-23',
+            'title_he': 'מאמר', 'slug': 'written', 'published_on': '2026-10-23', 'kind': 'general',
             'blocks-TOTAL_FORMS': '1', 'blocks-INITIAL_FORMS': '0', 'blocks-0-position': '10', 'blocks-0-kind': 'paragraph',
             'blocks-0-text_he': 'שלום', 'references-TOTAL_FORMS': '0', 'references-INITIAL_FORMS': '0'})
         self.assertEqual(response.status_code, 302)

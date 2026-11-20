@@ -1,0 +1,2815 @@
+[
+ {
+  "source_id": 133768,
+  "slug": "od-adams-1848-133768",
+  "title": "Mollusca",
+  "source": "Adams, A. & Reeve, L. A. (1848)",
+  "citation": "Adams, A. & Reeve, L. A. (1848-1850). Mollusca. In A. Adams (ed.), The zoology of the voyage of H.M.S. Samarang, under the command of Captain Sir Edward Belcher, C.B., F.R.A.S., F.G.S., during the years 1843-1846. Reeve & Benham, London, x + 87 pp., 24 pls. [Pt. I. Preface to Mollusca (iii–x, by Adams only), 1–24, pls. 1–9, 1 November 1848; Pt. II, 25–44, pls. 10–17, 1 May 1850; Pt. III, Preface and plate explanations (i-xv), 45–87, pls. 18–24, 1 September 1850.].",
+  "link": "https://doi.org/10.5962/bhl.title.60405",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=133768",
+  "species": [
+   {
+    "name": "Mexichromis trilineata",
+    "aphia": 597888,
+    "page": "68, pl. 17, figs 4-4a.",
+    "original_name": "Goniodoris trilineata A. Adams & Reeve, 1850"
+   }
+  ]
+ },
+ {
+  "source_id": 288778,
+  "slug": "od-adams-1850-288778",
+  "title": "Monograph of the family Bullidae",
+  "source": "Adams, A. (1850)",
+  "citation": "Adams, A. (1850). Monograph of the family Bullidae. In G. B. Sowerby II (ed.), Thesaurus conchyliorum, or monographs of genera of shells. Vol. 2 (11): 553-608, pls 119-125. London, privately published.",
+  "link": "https://www.biodiversitylibrary.org/page/43936916",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=288778",
+  "species": [
+   {
+    "name": "Diniatys dentifer",
+    "aphia": 599459,
+    "page": null,
+    "original_name": "Bulla (Atys) dentifera A. Adams, 1850"
+   }
+  ]
+ },
+ {
+  "source_id": 39135,
+  "slug": "od-alder-1864-39135",
+  "title": "Notice of a collection of nudibranchiate Mollusca made in India by Walter Elliot Esq. with descriptions of several new genera and species",
+  "source": "Alder, J.; Hancock, A. (1864)",
+  "citation": "Alder, J.; Hancock, A. (1864). Notice of a collection of nudibranchiate Mollusca made in India by Walter Elliot Esq. with descriptions of several new genera and species. Transactions of the Zoological Society of London. 5: 113-147.",
+  "link": "https://doi.org/10.1111/j.1096-3642.1864.tb00643.x",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=39135",
+  "species": [
+   {
+    "name": "Caloria militaris",
+    "aphia": 872548,
+    "page": "144, Plate 33, Figure 15",
+    "original_name": "Eolis militaris Alder & Hancock, 1864"
+   }
+  ]
+ },
+ {
+  "source_id": 336087,
+  "slug": "od-austin-2018-336087",
+  "title": "Systematic revision, diversity patterns and trophic ecology of the tropical Indo-West Pacific sea slug genus Phanerophthalmus A. Adams, 1850 (Cephalaspidea, Haminoeidae)",
+  "source": "Austin J., Gosliner T. & Malaquias M.A.E. (2018)",
+  "citation": "Austin J., Gosliner T. & Malaquias M.A.E. (2018). Systematic revision, diversity patterns and trophic ecology of the tropical Indo-West Pacific sea slug genus Phanerophthalmus A. Adams, 1850 (Cephalaspidea, Haminoeidae). Invertebrate Systematics. 32(6): 1336-1387.",
+  "link": "https://doi.org/10.1071/is17086",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=336087",
+  "species": [
+   {
+    "name": "Phanerophthalmus anettae",
+    "aphia": 1313732,
+    "page": "1374, figs 15K-N, 21, 24",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 288774,
+  "slug": "od-baba-1938-288774",
+  "title": "Opisthobranchia of Kii, Middle Japan",
+  "source": "Baba, K. (1938)",
+  "citation": "Baba, K. (1938). Opisthobranchia of Kii, Middle Japan. Journal of the Department of Agriculture, Kyushu Imperial University. 6(1): 1-19.",
+  "link": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=288774",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=288774",
+  "species": [
+   {
+    "name": "Biuve fulvipunctata",
+    "aphia": 1055233,
+    "page": "3, fig. 1",
+    "original_name": "Chelidonura fulvipunctata Baba, 1938"
+   }
+  ]
+ },
+ {
+  "source_id": 229478,
+  "slug": "od-baba-1949-229478",
+  "title": "Opisthobranchia of Sagami Bay collected by His Majesty the Emperor of Japan",
+  "source": "Baba, K. (1949)",
+  "citation": "Baba, K. (1949). Opisthobranchia of Sagami Bay collected by His Majesty the Emperor of Japan. Iwanami Shoten, Tokyo, 194pp., 50 pls.",
+  "link": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=229478",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=229478",
+  "species": [
+   {
+    "name": "Kaloplocamus acutus",
+    "aphia": 599486,
+    "page": null,
+    "original_name": null
+   },
+   {
+    "name": "Mariaglaja inornata",
+    "aphia": 1055243,
+    "page": "22",
+    "original_name": "Chelidonura inornata Baba, 1949"
+   },
+   {
+    "name": "Pelagella felis",
+    "aphia": 1723491,
+    "page": null,
+    "original_name": "Goniodoris felis Baba, 1949"
+   }
+  ]
+ },
+ {
+  "source_id": 501909,
+  "slug": "od-baba-1953-501909",
+  "title": "Three new species and two new records of the genus Glossodoris from Japan",
+  "source": "Baba, K. (1953)",
+  "citation": "Baba, K. (1953). Three new species and two new records of the genus Glossodoris from Japan. Publications of the Seto Marine Biological Laboratory. 3(2), 205-211.",
+  "link": "https://doi.org/10.5134/174468",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=501909",
+  "species": [
+   {
+    "name": "Mexichromis multituberculata",
+    "aphia": 558673,
+    "page": null,
+    "original_name": "Glossodoris multituberculata Baba, 1953"
+   }
+  ]
+ },
+ {
+  "source_id": 288053,
+  "slug": "od-baba-1955-288053",
+  "title": "Opisthobranchia of Sagami Bay. supplement. 59 pp., 20 pls",
+  "source": "Baba, K. (1955)",
+  "citation": "Baba, K. (1955). Opisthobranchia of Sagami Bay. supplement. 59 pp., 20 pls. Iwanami Shoten.",
+  "link": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=288053",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=288053",
+  "species": [
+   {
+    "name": "Favorinus mirabilis",
+    "aphia": 599289,
+    "page": null,
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 366026,
+  "slug": "od-baba-1964-366026",
+  "title": "Record of Favorinus tsuruganus n. sp., from Tsuruga Bay, Japan (Nudibranchia-Eolidoidea)",
+  "source": "Baba, K. & Abe, T. (1964)",
+  "citation": "Baba, K. & Abe, T. (1964). Record of Favorinus tsuruganus n. sp., from Tsuruga Bay, Japan (Nudibranchia-Eolidoidea). Publications of the Seto Marine Biological Laboratory. 12 (2): 163–164.",
+  "link": "https://doi.org/10.5134/175358",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=366026",
+  "species": [
+   {
+    "name": "Favorinus tsuruganus",
+    "aphia": 599253,
+    "page": "163",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 555834,
+  "slug": "od-baba-1972-555834",
+  "title": "Thecacera picta spec. nov. from Suruga Bay, Japan",
+  "source": "Baba, K. (1972)",
+  "citation": "Baba, K. (1972). Thecacera picta spec. nov. from Suruga Bay, Japan. The Veliger. 15(2): 88-90.",
+  "link": "https://www.biodiversitylibrary.org/page/42397189#page/140/mode/1up",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=555834",
+  "species": [
+   {
+    "name": "Thecacera picta",
+    "aphia": 527538,
+    "page": null,
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 331507,
+  "slug": "od-bergh-1869-331507",
+  "title": "Bidrag til kundskab om Phyllidierne, en anatomisk undersogelse",
+  "source": "Bergh, L. S. R. (1869)",
+  "citation": "Bergh, L. S. R. (1869). Bidrag til kundskab om Phyllidierne, en anatomisk undersogelse. Naturhistorisk Tidsskrift. ser. 3, 5(3): 357–542, pls 14–24.",
+  "link": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=331507",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=331507",
+  "species": [
+   {
+    "name": "Phyllidia elegans",
+    "aphia": 536617,
+    "page": "439, 506, pls 18B, 19",
+    "original_name": null
+   },
+   {
+    "name": "Phyllidia rueppelii",
+    "aphia": 537013,
+    "page": "514",
+    "original_name": "Fryeria rueppelii Bergh, 1869"
+   }
+  ]
+ },
+ {
+  "source_id": 386131,
+  "slug": "od-bergh-1870-386131",
+  "title": "Malacologische Untersuchungen",
+  "source": "Bergh, L. S. R. (1870)",
+  "citation": "Bergh, L. S. R. (1870). Malacologische Untersuchungen. In: C. Semper, (ed.) Reisen im Archipel der Philippinen. Theil 1, Heft 1. Wiesbaden: Kreidel, 1–30, plates 1–8. [20 Feb. 1870].",
+  "link": "https://www.biodiversitylibrary.org/page/14451259",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=386131",
+  "species": [
+   {
+    "name": "Cyerce nigra",
+    "aphia": 1814148,
+    "page": "pl. 1 fig. 10",
+    "original_name": null
+   },
+   {
+    "name": "Phestilla lugubris",
+    "aphia": 536542,
+    "page": null,
+    "original_name": "Cratena lugubris Bergh, 1870"
+   },
+   {
+    "name": "Pteraeolidia semperi",
+    "aphia": 764917,
+    "page": "18, pl. 2, pl. 3 figs 1-15",
+    "original_name": "Flabellina semperi Bergh, 1870"
+   }
+  ]
+ },
+ {
+  "source_id": 386137,
+  "slug": "od-bergh-1872-386137",
+  "title": "Malacologische Untersuchungen",
+  "source": "Bergh, L. S. R. (1872)",
+  "citation": "Bergh, L. S. R. (1872). Malacologische Untersuchungen. In: C. Semper (ed.) Reisen im Archipel der Philippinen, Wissenschaftliche Resultate. Theil 1, Heft 4: 177-204, pls 21-24. [15 Dec. 1872].",
+  "link": "https://www.biodiversitylibrary.org/page/14451397",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=386137",
+  "species": [
+   {
+    "name": "Elysia pusilla",
+    "aphia": 536474,
+    "page": "201",
+    "original_name": "Elysiella pusilla Bergh, 1872"
+   }
+  ]
+ },
+ {
+  "source_id": 479124,
+  "slug": "od-bergh-1873-479124",
+  "title": "Neue Nacktschnecken der Südsee, malacologische Untersuchungen I. Journal des Museum Godeffroy. 1(2): 65-96 [137-168], pls IX-XII",
+  "source": "Bergh, L. S. R. (1873)",
+  "citation": "Bergh, L. S. R. (1873). Neue Nacktschnecken der Südsee, malacologische Untersuchungen I. Journal des Museum Godeffroy. 1(2): 65-96 [137-168], pls IX-XII.",
+  "link": "https://doi.org/10.5962/bhl.title.10280",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=479124",
+  "species": [
+   {
+    "name": "Phyllidiella rosans",
+    "aphia": 536695,
+    "page": "67-72, pl. 9 figs 1-4, pl. 10 figs 1-18",
+    "original_name": "Phyllidia rosans Bergh, 1873"
+   }
+  ]
+ },
+ {
+  "source_id": 150192,
+  "slug": "od-bergh-1875-150192",
+  "title": "Neue Nacktschnecken der Südsee, malacologische Untersuchungen III. Journal des Museum Godeffroy. 3(8): 53-100 [185-232], pl. 7-11",
+  "source": "Bergh, L. S. R. (1875)",
+  "citation": "Bergh, L. S. R. (1875). Neue Nacktschnecken der Südsee, malacologische Untersuchungen III. Journal des Museum Godeffroy. 3(8): 53-100 [185-232], pl. 7-11.",
+  "link": "https://www.biodiversitylibrary.org/page/10861021",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=150192",
+  "species": [
+   {
+    "name": "Notodoris citrina",
+    "aphia": 531085,
+    "page": "64-67",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 386127,
+  "slug": "od-bergh-1876-386127",
+  "title": "Malacologische Untersuchungen",
+  "source": "Bergh, L. S. R. (1876)",
+  "citation": "Bergh, L. S. R. (1876). Malacologische Untersuchungen. In: Semper C, ed. Reisen im Archipel der Philippinen. theil 2, heft 10. Wiesbaden: Kreidel, 377–428, plates 50–53.",
+  "link": "https://www.biodiversitylibrary.org/page/14373973",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=386127",
+  "species": [
+   {
+    "name": "Jorunna rubescens",
+    "aphia": 534389,
+    "page": "413-419, pl. 33, fig. 8, pl. 49, figs 14-19, pl. 50, figs 1-8",
+    "original_name": "Kentrodoris rubescens Bergh, 1876"
+   }
+  ]
+ },
+ {
+  "source_id": 286613,
+  "slug": "od-bergh-1877-286613",
+  "title": "Malacologische Untersuchungen",
+  "source": "Bergh, L. S. R. (1877)",
+  "citation": "Bergh, L. S. R. (1877). Malacologische Untersuchungen. In: Semper C, ed. Reisen im Archipel der Philippinen. theil 2, heft 12. Wiesbaden: Kreidel, 495–546, plates 58–61.",
+  "link": "https://www.biodiversitylibrary.org/page/14374091",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=286613",
+  "species": [
+   {
+    "name": "Discodoris boholiensis",
+    "aphia": 578705,
+    "page": "519",
+    "original_name": null
+   },
+   {
+    "name": "Discodoris cebuensis",
+    "aphia": 578707,
+    "page": "526",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 386121,
+  "slug": "od-bergh-1877-386121",
+  "title": "Malacologische Untersuchungen",
+  "source": "Bergh, L. S. R. (1877)",
+  "citation": "Bergh, L. S. R. (1877). Malacologische Untersuchungen. In: Semper C, ed. Reisen im Archipel der Philippinen. theil 2, heft 11. Wiesbaden: Kreidel, 429–494, plates 54–7.",
+  "link": "https://www.biodiversitylibrary.org/page/14374025",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=386121",
+  "species": [
+   {
+    "name": "Chromodoris annae",
+    "aphia": 558229,
+    "page": "473-474",
+    "original_name": null
+   },
+   {
+    "name": "Chromodoris elisabethina",
+    "aphia": 527354,
+    "page": "466",
+    "original_name": null
+   },
+   {
+    "name": "Gymnodoris citrina",
+    "aphia": 214546,
+    "page": "442, pl. 41, fig. 5, pl. 56, figs 18-25",
+    "original_name": "Trevelyana citrina Bergh, 1877"
+   },
+   {
+    "name": "Nembrotha cristata",
+    "aphia": 527320,
+    "page": "458, pl. 33 (in volume 1) fig. 6",
+    "original_name": null
+   },
+   {
+    "name": "Nembrotha kubaryana",
+    "aphia": 527322,
+    "page": "454",
+    "original_name": null
+   },
+   {
+    "name": "Tambja morosa",
+    "aphia": 531173,
+    "page": "457, pl. 25, fig. 9; pl. 33, fig. 7",
+    "original_name": "Nembrotha morosa Bergh, 1877"
+   }
+  ]
+ },
+ {
+  "source_id": 280558,
+  "slug": "od-bergh-1878-280558",
+  "title": "Malacologische Untersuchungen",
+  "source": "Bergh, L. S. R. (1878)",
+  "citation": "Bergh, L. S. R. (1878). Malacologische Untersuchungen. In: C. Semper (ed.) Reisen im Archipel der Philippinen, Theil 2, Wissenschaftliche Resultate, Band 2, Theil 2, Heft 13: 547-601, pls 62-65; Heft 14: 603-645, I-L, pls 66-68.",
+  "link": "https://biodiversitylibrary.org/page/14374143",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=280558",
+  "species": [
+   {
+    "name": "Thorunna furtiva",
+    "aphia": 558609,
+    "page": "575, pl. 58 figs 30-32, pl. 63 figs 17-19",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 8666,
+  "slug": "od-bergh-1888-8666",
+  "title": "Malakologische Untersuchungen",
+  "source": "Bergh, L. S. R. (1888)",
+  "citation": "Bergh, L. S. R. (1888-1889). Malakologische Untersuchungen. Nudibranchien vom Meere der Insel Mauritius. In: Reisen im Archipel der Philippinen von Dr. C. Semper, vol. 2. part 3, pp. 755-872, pl. 77-84. [pp. 755-814, pl. 77-81, August 2, 1888; pp. 815-872, pl. 82-84, March 27, 1889, according to Winckworth, 1946].",
+  "link": "http://www.biodiversitylibrary.org/page/14376225",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=8666",
+  "species": [
+   {
+    "name": "Glossodoris cincta",
+    "aphia": 214506,
+    "page": "838",
+    "original_name": "Casella cincta Bergh, 1888"
+   }
+  ]
+ },
+ {
+  "source_id": 333279,
+  "slug": "od-bergh-1889-333279",
+  "title": "Malacologische Untersuchungen",
+  "source": "Bergh, L. S. R. (1889)",
+  "citation": "Bergh, L. S. R. (1889). Malacologische Untersuchungen. In C. Semper ed., Reisen im Archipel der Philippinen. Kreidel, Wiesbaden. Theil 3, Heft 16. Pages 815–872 pls 82–84.",
+  "link": "https://biodiversitylibrary.org/page/14376285",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=333279",
+  "species": [
+   {
+    "name": "Hypselodoris carnea",
+    "aphia": 560039,
+    "page": null,
+    "original_name": "Chromodoris carnea Bergh, 1889"
+   },
+   {
+    "name": "Phyllidiopsis striata",
+    "aphia": 536722,
+    "page": "866",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 285369,
+  "slug": "od-bergh-1890-285369",
+  "title": "Die Nudibranchien des “Sunda-Meeres”. Malacologische Untersuchungen",
+  "source": "Bergh, L. S. R. (1890)",
+  "citation": "Bergh, L. S. R. (1890). Die Nudibranchien des “Sunda-Meeres”. Malacologische Untersuchungen. In: Reisen im Archipel der Philippinen von Dr. Carl Gottfried Semper. Zweiter Theil. Wissenschaftliche Resultate. Band 2, Theil 3, Heft 17, pp. 873-992, pls. 85-89.",
+  "link": "https://biodiversitylibrary.org/page/14376343",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=285369",
+  "species": [
+   {
+    "name": "Glossodoris rufomarginata",
+    "aphia": 559960,
+    "page": "943",
+    "original_name": "Casella rufomarginata Bergh, 1890"
+   },
+   {
+    "name": "Marioniopsis arborescens",
+    "aphia": 1669262,
+    "page": "891",
+    "original_name": "Marionia arborescens Bergh, 1890"
+   }
+  ]
+ },
+ {
+  "source_id": 279284,
+  "slug": "od-bergh-1896-279284",
+  "title": "Eolidiens d'Amboine",
+  "source": "Bergh, L. S. R. (1896)",
+  "citation": "Bergh, L. S. R. (1896). Eolidiens d'Amboine. Revue Suisse de Zoologie. 4(2): 385-394.",
+  "link": "https://biodiversitylibrary.org/page/10198895",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=279284",
+  "species": [
+   {
+    "name": "Caloria indica",
+    "aphia": 181240,
+    "page": null,
+    "original_name": "Learchis indica Bergh, 1896"
+   },
+   {
+    "name": "Phyllodesmium briareum",
+    "aphia": 548882,
+    "page": "393, figs 14-15",
+    "original_name": "Ennoia briareus Bergh, 1896"
+   }
+  ]
+ },
+ {
+  "source_id": 172809,
+  "slug": "od-bergh-1905-172809",
+  "title": "Die Opisthobranchiata der Siboga-expedition",
+  "source": "Bergh, L. S. R. (1905)",
+  "citation": "Bergh, L. S. R. (1905). Die Opisthobranchiata der Siboga-expedition. In: Weber M. (ed.) Uitkomsten op Zoologisch, Botanisch, Oceanographisch en Geologisch Gebied verzameld in Nederlandsch Oost-Indië 1899-1900 aan boord H.M. Siboga onder commando van Luitenant ter zee 1e. kl. G.F. Tydeman. Siboga-Expeditie Monographie 50 (Livraison 25): 1-248, pls 1-20.",
+  "link": "https://doi.org/10.5962/bhl.title.11223",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=172809",
+  "species": [
+   {
+    "name": "Chelidonura amoena",
+    "aphia": 213149,
+    "page": "45",
+    "original_name": null
+   },
+   {
+    "name": "Nembrotha lineolata",
+    "aphia": 527325,
+    "page": "199, pl. 2, fig. 10, pl. 18, figs 15-18",
+    "original_name": null
+   },
+   {
+    "name": "Phestilla sibogae",
+    "aphia": 536544,
+    "page": "232-233, pl. 20 fig. 4-12",
+    "original_name": null
+   },
+   {
+    "name": "Phyllidia coelestis",
+    "aphia": 212836,
+    "page": "182, pl. 3, fig. 16.",
+    "original_name": null
+   },
+   {
+    "name": "Phyllodesmium longicirrum",
+    "aphia": 548881,
+    "page": "227, pl. 4 fig. 18, pl. 20 figs 20-29",
+    "original_name": "Myrrhine longicirra Bergh, 1905"
+   }
+  ]
+ },
+ {
+  "source_id": 383626,
+  "slug": "od-bonomo-2020-383626",
+  "title": "Adding stars to the Chromodoris (Nudibranchia, Chromodorididae) galaxy with the description of four new species",
+  "source": "Bonomo L.J. & Gosliner T.M. (2020)",
+  "citation": "Bonomo L.J. & Gosliner T.M. (2020). Adding stars to the Chromodoris (Nudibranchia, Chromodorididae) galaxy with the description of four new species. Zootaxa. 4819(3): 401-435.",
+  "link": "https://doi.org/10.11646/zootaxa.4819.3.1",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=383626",
+  "species": [
+   {
+    "name": "Chromodoris kalawakan",
+    "aphia": 1450726,
+    "page": "421, figs 2C-E, 7-8",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 145234,
+  "slug": "od-brown-1979-145234",
+  "title": "An investigation of the anatomy of Colpodaspis pusilla (Mollusca: Opisthobranchia) and a description of a new species of Colpodaspis from Tanzanian coastal waters",
+  "source": "Brown G.H. (1979)",
+  "citation": "Brown G.H. (1979). An investigation of the anatomy of Colpodaspis pusilla (Mollusca: Opisthobranchia) and a description of a new species of Colpodaspis from Tanzanian coastal waters. Journal of Zoology, London 187:201-221.",
+  "link": "https://doi.org/10.1111/j.1469-7998.1979.tb03944.x",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=145234",
+  "species": [
+   {
+    "name": "Colpodaspis thompsoni",
+    "aphia": 509679,
+    "page": null,
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 39324,
+  "slug": "od-bruguiere-1789-39324",
+  "title": "Encyclopédie méthodique ou par ordre de matières, par une Societe de gens de Lettres, de Savans et D'Artistes. [Methodical encyclopedia or by order of subjects, by a Society of Men of Letters, Scholars and Artists.]",
+  "source": "Bruguière, J.G. (1789)",
+  "citation": "Bruguière, J.G. (1789-1792). Encyclopédie méthodique ou par ordre de matières, par une Societe de gens de Lettres, de Savans et D'Artistes. [Methodical encyclopedia or by order of subjects, by a Society of Men of Letters, Scholars and Artists.]. Histoire naturelle des Vers, Paris: Pancoucke. volume 1: i-xviii, 1-344 [Livraison 32, June 1789]; 345-757 [Livraison 48, 13 Feb. 1792] [Dates after Evenhuis, 2003, Zootaxa, 166: 37; Zootaxa, 207, some modified by Evenhuis & Petit 2003 Zootaxa 207:1-4].",
+  "link": "https://doi.org/10.5962/bhl.title.49857",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=39324",
+  "species": [
+   {
+    "name": "Micromelo undatus",
+    "aphia": 140121,
+    "page": null,
+    "original_name": "Bulla undata Bruguière, 1792"
+   }
+  ]
+ },
+ {
+  "source_id": 488758,
+  "slug": "od-brunckhorst-1990-488758",
+  "title": "Description of a new species of Phyllidiopsis Bergh (Nudibranchia: Doridoidea: Phyllidiidae) from the tropical western Pacific, with comments on the Atlantic species",
+  "source": "Brunckhorst. (1990)",
+  "citation": "Brunckhorst. (1990). Description of a new species of Phyllidiopsis Bergh (Nudibranchia: Doridoidea: Phyllidiidae) from the tropical western Pacific, with comments on the Atlantic species. Journal of Molluscan Studies. 56: 577-584.",
+  "link": "https://doi.org/10.1093/mollus/56.4.577",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=488758",
+  "species": [
+   {
+    "name": "Phyllidiopsis shireenae",
+    "aphia": 536717,
+    "page": null,
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 491470,
+  "slug": "od-brunckhorst-1990-491470",
+  "title": "Description of a new genus and species belonging to the family Phyllidiidae (Nudibranchia: Doridoidea)",
+  "source": "Brunckhorst, D. J. (1990)",
+  "citation": "Brunckhorst, D. J. (1990). Description of a new genus and species belonging to the family Phyllidiidae (Nudibranchia: Doridoidea). Journal of Molluscan Studies. 56: 567–576.",
+  "link": "https://doi.org/10.1093/mollus/56.4.567",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=491470",
+  "species": [
+   {
+    "name": "Reticulidia halgerda",
+    "aphia": 536733,
+    "page": "570–575, figs 2A-C,3–7",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 147497,
+  "slug": "od-brunckhorst-1993-147497",
+  "title": "The systematics and phylogeny of phyllidiid nudibranchs (Doridoidea",
+  "source": "Brunckhorst D.J. (1993)",
+  "citation": "Brunckhorst D.J. (1993). The systematics and phylogeny of phyllidiid nudibranchs (Doridoidea. Records of the Australian Museum. suppl. 16: 1-108.",
+  "link": "https://doi.org/10.3853/j.0812-7387.16.1993.79",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=147497",
+  "species": [
+   {
+    "name": "Phyllidia carlsonhoffi",
+    "aphia": 536632,
+    "page": null,
+    "original_name": null
+   },
+   {
+    "name": "Phyllidiella granulata",
+    "aphia": 536707,
+    "page": "59",
+    "original_name": "Phyllidiella granulatus Brunckhorst, 1993"
+   },
+   {
+    "name": "Phyllidiella lizae",
+    "aphia": 536708,
+    "page": "61",
+    "original_name": null
+   },
+   {
+    "name": "Phyllidiopsis annae",
+    "aphia": 536725,
+    "page": "71",
+    "original_name": null
+   },
+   {
+    "name": "Phyllidiopsis fissurata",
+    "aphia": 536729,
+    "page": "74",
+    "original_name": "Phyllidiopsis fissuratus Brunckhorst, 1993"
+   }
+  ]
+ },
+ {
+  "source_id": 128201,
+  "slug": "od-burghardt-2004-128201",
+  "title": "A new solar powered species of the genus Phyllodesmium Ehrenberg, 1831 (Mollusca: Nudibranchia: Aeolidoidea) from Indonesia with analysis of its photosynthetic activity and notes on biology",
+  "source": "Burghardt I. & Wägele H. (2004)",
+  "citation": "Burghardt I. & Wägele H. (2004) A new solar powered species of the genus Phyllodesmium Ehrenberg, 1831 (Mollusca: Nudibranchia: Aeolidoidea) from Indonesia with analysis of its photosynthetic activity and notes on biology. Zootaxa 596 : 1-18",
+  "link": "https://doi.org/10.11646/zootaxa.596.1.1",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=128201",
+  "species": [
+   {
+    "name": "Phyllodesmium jakobsenae",
+    "aphia": 388630,
+    "page": null,
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 128200,
+  "slug": "od-burghardt-2006-128200",
+  "title": "Phyllodesmium rudmani (Mollusca: Nudibranchia: Aeolidoidea), a new solar powered species from the Indo-West Pacific with data on its symbiosis with zooxanthellae",
+  "source": "Burghardt, I.; Gosliner, T. M. (2006)",
+  "citation": "Burghardt, I.; Gosliner, T. M. (2006). Phyllodesmium rudmani (Mollusca: Nudibranchia: Aeolidoidea), a new solar powered species from the Indo-West Pacific with data on its symbiosis with zooxanthellae. Zootaxa. 1308: 31-47.",
+  "link": "https://doi.org/10.11646/zootaxa.1308.1.2",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=128200",
+  "species": [
+   {
+    "name": "Phyllodesmium rudmani",
+    "aphia": 390071,
+    "page": null,
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 39345,
+  "slug": "od-cantraine-1835-39345",
+  "title": "Diagnoses ou descriptions succinctes de quelques espèces nouvelles de mollusques",
+  "source": "Cantraine, F. J. (1835)",
+  "citation": "Cantraine, F. J. (1835). Diagnoses ou descriptions succinctes de quelques espèces nouvelles de mollusques. Bulletins de l'Académie Royale des Sciences et Belles-Lettres de Bruxelles. 2(11): 380-401.",
+  "link": "https://www.biodiversitylibrary.org/page/2880681",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=39345",
+  "species": [
+   {
+    "name": "Felimare tricolor",
+    "aphia": 597530,
+    "page": "383",
+    "original_name": "Doris tricolor Cantraine, 1835"
+   }
+  ]
+ },
+ {
+  "source_id": 555585,
+  "slug": "od-carlson-1973-555585",
+  "title": "Two new species of Gastropteridae from Guam, Marianas Islands (Opisthobranchia: Cephalaspidea)",
+  "source": "Carlson, C. H. & Hoff, P. J. (1973)",
+  "citation": "Carlson, C. H. & Hoff, P. J. (1973). Two new species of Gastropteridae from Guam, Marianas Islands (Opisthobranchia: Cephalaspidea). Publications of the Seto Marine Biological Laboratory, Kyōto University. 21(2): 141-151.",
+  "link": "https://doi.org/10.5134/175803",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=555585",
+  "species": [
+   {
+    "name": "Sagaminopteron nigropunctatum",
+    "aphia": 599449,
+    "page": null,
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 140410,
+  "slug": "od-carlson-2000-140410",
+  "title": "Three new Pacific species of Halgerda (Opisthobranchia: : Nudibranchia: Doridoidea)",
+  "source": "Carlson C.H. & Hoff P.J. (2000)",
+  "citation": "Carlson C.H. & Hoff P.J. (2000) Three new Pacific species of Halgerda (Opisthobranchia: : Nudibranchia: Doridoidea). The Veliger 43(2): 154-163.",
+  "link": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=140410",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=140410",
+  "species": [
+   {
+    "name": "Halgerda batangas",
+    "aphia": 457014,
+    "page": null,
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 220751,
+  "slug": "od-collingwood-1881-220751",
+  "title": "On some new species of nudibranchiate Mollusca from the eastern seas",
+  "source": "Collingwood, C. (1881)",
+  "citation": "Collingwood, C. (1881). On some new species of nudibranchiate Mollusca from the eastern seas. Transactions of the Linnean Society of London, Zoology, series 2. 2(2):123-140, pls. 9-10.",
+  "link": "https://doi.org/10.1111/j.1096-3642.1881.tb00300.x",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=220751",
+  "species": [
+   {
+    "name": "Hypselodoris bullockii",
+    "aphia": 560043,
+    "page": "128, pl. 9, figs 15-17.",
+    "original_name": "Chromodoris bullockii Collingwood, 1881"
+   }
+  ]
+ },
+ {
+  "source_id": 151552,
+  "slug": "od-crosse-1875-151552",
+  "title": "Description de nudibranches inédits, provenant de la Nouvelle-Calédonie, avec le catalogue des espèces actuellement connues",
+  "source": "Crosse, H. (1875)",
+  "citation": "Crosse, H. (1875). Description de nudibranches inédits, provenant de la Nouvelle-Calédonie, avec le catalogue des espèces actuellement connues. Journal de Conchyliologie. 23: 305-322.",
+  "link": "https://www.biodiversitylibrary.org/page/15674851",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=151552",
+  "species": [
+   {
+    "name": "Goniobranchus verrieri",
+    "aphia": 597344,
+    "page": "313-314",
+    "original_name": "Goniodoris verrieri Crosse, 1875"
+   }
+  ]
+ },
+ {
+  "source_id": 39457,
+  "slug": "od-cuvier-1804-39457",
+  "title": "Mémoire sur le genre Doris",
+  "source": "Cuvier, G. L. (1804)",
+  "citation": "Cuvier, G. L. (1804). Mémoire sur le genre Doris. Annales du Muséum d'Histoire Naturelle, Paris. 4: 447-473.",
+  "link": "https://biodiversitylibrary.org/page/48539720",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=39457",
+  "species": [
+   {
+    "name": "Doriprismatica atromarginata",
+    "aphia": 558499,
+    "page": "473, pl. 2 fig. 5",
+    "original_name": "Doris atromarginata Cuvier, 1804"
+   },
+   {
+    "name": "Hexabranchus lacer",
+    "aphia": 1571927,
+    "page": "453, pl. 73",
+    "original_name": "Doris lacera Cuvier, 1804"
+   }
+  ]
+ },
+ {
+  "source_id": 8687,
+  "slug": "od-cuvier-1804-8687",
+  "title": "Mémoire sur la phyllidie et le pleurobranche",
+  "source": "Cuvier G. (1804)",
+  "citation": "Cuvier G. (1804). Mémoire sur la phyllidie et le pleurobranche. Annales du Muséum d'Histoire Naturelle. 5: 266-276, pl. 18.",
+  "link": "https://www.biodiversitylibrary.org/page/48531444",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=8687",
+  "species": [
+   {
+    "name": "Phyllidia ocellata",
+    "aphia": 536623,
+    "page": "269, pl. 18 fig. 7",
+    "original_name": null
+   },
+   {
+    "name": "Phyllidiella pustulosa",
+    "aphia": 536574,
+    "page": "268, pl. 18 fig. 8",
+    "original_name": "Phyllidia pustulosa Cuvier, 1804"
+   },
+   {
+    "name": "Pleurobranchus peronii",
+    "aphia": 599477,
+    "page": "275, figs 1-6",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 164423,
+  "slug": "od-edmunds-1970-164423",
+  "title": "Opisthobranchiate Mollusca from Tanzania",
+  "source": "Edmunds, M. (1970)",
+  "citation": "Edmunds, M. (1970). Opisthobranchiate Mollusca from Tanzania. II. Eolidacea (Cuthonidae, Piseinotecidae and Facelinidae). Proceedings of the Malacological Society, London. 39(1): 15-57.",
+  "link": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=164423",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=164423",
+  "species": [
+   {
+    "name": "Cratena simba",
+    "aphia": 599286,
+    "page": null,
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 274208,
+  "slug": "od-ehrenberg-1828-274208",
+  "title": "Animalia evertebrata exclusis Insectis",
+  "source": "Ehrenberg, C. G. (1828)",
+  "citation": "Ehrenberg, C. G. (1828-1831). Animalia evertebrata exclusis Insectis. Series prima. In: F. G. Hemprich & C. G. Ehrenberg, Symbolae physicae, seu icones et descriptiones Mammalium, Avium, Insectorum et animalia evertebra, quae ex itinere per Africam borealem et Asiam occidentalem studio nova aut illustrata redierunt. 126 pp. (1831), 10 pls (1828).",
+  "link": "https://biodiversitylibrary.org/page/48517135",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=274208",
+  "species": [
+   {
+    "name": "Stiliger ornatus",
+    "aphia": 221337,
+    "page": "Mollusca I, fig. 3, legend of plate; description (text): 1831, folio i, p. 1 ",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 427299,
+  "slug": "od-ekimova-2022-427299",
+  "title": "Stripes Matter: Integrative Systematics of Coryphellina rubrolineata Species Complex (Gastropoda: Nudibranchia) from Vietnam",
+  "source": "Ekimova, I.; Deart, Y.; Antokhina, T.; Mikhlina, A.; Schepetov, D. (2022)",
+  "citation": "Ekimova, I.; Deart, Y.; Antokhina, T.; Mikhlina, A.; Schepetov, D. (2022). Stripes Matter: Integrative Systematics of Coryphellina rubrolineata Species Complex (Gastropoda: Nudibranchia) from Vietnam. Diversity. 14(4): 294.",
+  "link": "https://doi.org/10.3390/d14040294",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=427299",
+  "species": [
+   {
+    "name": "Coryphellina flamma",
+    "aphia": 1578296,
+    "page": "19, figs. 4, 6E, 7D, 10, 11",
+    "original_name": null
+   },
+   {
+    "name": "Coryphellina pseudolotos",
+    "aphia": 1578294,
+    "page": "13, figs. 4, 6C, 7B, 8",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 288776,
+  "slug": "od-eliot-1900-288776",
+  "title": "Notes on tectibranchs and naked mollusks from Samoa",
+  "source": "Eliot C.[N.E.]. (1900)",
+  "citation": "Eliot C.[N.E.]. (1900). Notes on tectibranchs and naked mollusks from Samoa. Proceedings of the Academy of Natural Sciences of Philadelphia. 51(3): 512-523, pl. 19.",
+  "link": "https://www.biodiversitylibrary.org/page/26300249",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=288776",
+  "species": [
+   {
+    "name": "Tubulophilinopsis pilsbryi",
+    "aphia": 1055261,
+    "page": "512-513, pl. 19 figs 1a-b",
+    "original_name": "Doridium (Aglaja) pilsbryi Eliot, 1900"
+   }
+  ]
+ },
+ {
+  "source_id": 417051,
+  "slug": "od-eliot-1903-417051",
+  "title": "Notes on some new or little known members of the family Doridiidae",
+  "source": "Eliot, N. E. (1903)",
+  "citation": "Eliot, N. E. (1903). Notes on some new or little known members of the family Doridiidae. Proceedings of the Malacological Society of London. 5: 331-336.",
+  "link": "https://www.biodiversitylibrary.org/page/15168692",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=417051",
+  "species": [
+   {
+    "name": "Chelidonura varians",
+    "aphia": 599344,
+    "page": "335",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 261455,
+  "slug": "od-eliot-1904-261455",
+  "title": "On some nudibranchs from east Africa and Zanzibar, part V. Proceedings of the Zoological Society of London. 2(83), 84-139, pls 3-4",
+  "source": "Eliot, C. N. E. (1904)",
+  "citation": "Eliot, C. N. E. (1904). On some nudibranchs from east Africa and Zanzibar, part V. Proceedings of the Zoological Society of London. 2(83), 84-139, pls 3-4.",
+  "link": "http://biodiversitylibrary.org/page/31206896",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=261455",
+  "species": [
+   {
+    "name": "Notodoris minor",
+    "aphia": 531090,
+    "page": null,
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 275579,
+  "slug": "od-eliot-1904-275579",
+  "title": "On some nudibranchs from East Africa and Zanzibar, part IV. Dorididae Cryptobranchiatae, II. Proceedings of the Zoological Society of London. 1904(1): 380-406, pls 23-24",
+  "source": "Eliot, C.N.E. (1904)",
+  "citation": "Eliot, C.N.E. (1904). On some nudibranchs from East Africa and Zanzibar, part IV. Dorididae Cryptobranchiatae, II. Proceedings of the Zoological Society of London. 1904(1): 380-406, pls 23-24.",
+  "link": "https://doi.org/10.1111/j.1469-7998.1904.tb08295.x",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=275579",
+  "species": [
+   {
+    "name": "Goniobranchus annulatus",
+    "aphia": 597348,
+    "page": "389",
+    "original_name": "Chromodoris annulata Eliot, 1904"
+   }
+  ]
+ },
+ {
+  "source_id": 176207,
+  "slug": "od-eliot-1906-176207",
+  "title": "Nudibranchiata, with some remarks on the families and genera and description of a new genus, Doridomorpha, pp. 540-573, pl. 32. In: J. Stanley Gardiner (Ed.) The fauna and geography of the Maldive and Laccadive Archipelagoes, being the account of the work carried on and of the collections ",
+  "source": "Eliot, C. N. E. (1906)",
+  "citation": "Eliot, C. N. E. (1906). Nudibranchiata, with some remarks on the families and genera and description of a new genus, Doridomorpha, pp. 540-573, pl. 32. In: J. Stanley Gardiner (Ed.) The fauna and geography of the Maldive and Laccadive Archipelagoes, being the account of the work carried on and of the collections made by an expedition during the years 1899 and 1900. vol. 2, pt. 1.",
+  "link": "https://www.biodiversitylibrary.org/page/11165304",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=176207",
+  "species": [
+   {
+    "name": "Doridomorpha gardineri",
+    "aphia": 597100,
+    "page": "544-545",
+    "original_name": null
+   },
+   {
+    "name": "Notodoris gardineri",
+    "aphia": 531087,
+    "page": "548",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 276361,
+  "slug": "od-eliot-1908-276361",
+  "title": "Reports on the Marine Biology of the Sudanese Red Sea.-XI. Notes of a Collection of Nudibranchs from the Red Sea",
+  "source": "Eliot, C. N. E. (1908)",
+  "citation": "Eliot, C. N. E. (1908). Reports on the Marine Biology of the Sudanese Red Sea.-XI. Notes of a Collection of Nudibranchs from the Red Sea. Journal of the Linnean Society of London, Zoology. 31(204): 86-122.",
+  "link": "https://doi.org/10.1111/j.1096-3642.1908.tb00457.x",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=276361",
+  "species": [
+   {
+    "name": "Martadoris limaciformis",
+    "aphia": 1036111,
+    "page": "98",
+    "original_name": "Nembrotha limaciformis Eliot, 1908"
+   }
+  ]
+ },
+ {
+  "source_id": 307128,
+  "slug": "od-epstein-2018-307128",
+  "title": "Reading between the lines: revealing cryptic species diversity and colour patterns in Hypselodoris nudibranchs (Mollusca: Heterobranchia: Chromodorididae)",
+  "source": "Epstein, H. E.; Hallas, J. M.; Johnson, R. F.; Lopez, A.; Gosliner, T. M. (2018)",
+  "citation": "Epstein, H. E.; Hallas, J. M.; Johnson, R. F.; Lopez, A.; Gosliner, T. M. (2018). Reading between the lines: revealing cryptic species diversity and colour patterns in Hypselodoris nudibranchs (Mollusca: Heterobranchia: Chromodorididae). Zoological Journal of the Linnean Society. 48: 1-74.",
+  "link": "https://doi.org/10.1093/zoolinnean/zly048",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=307128",
+  "species": [
+   {
+    "name": "Hypselodoris cerisae",
+    "aphia": 1297842,
+    "page": null,
+    "original_name": null
+   },
+   {
+    "name": "Hypselodoris melanesica",
+    "aphia": 1297847,
+    "page": null,
+    "original_name": null
+   },
+   {
+    "name": "Hypselodoris roo",
+    "aphia": 1297850,
+    "page": null,
+    "original_name": null
+   },
+   {
+    "name": "Hypselodoris skyleri",
+    "aphia": 1297852,
+    "page": null,
+    "original_name": null
+   },
+   {
+    "name": "Hypselodoris variobranchia",
+    "aphia": 1297853,
+    "page": null,
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 39543,
+  "slug": "od-eschscholtz-1831-39543",
+  "title": "Zoologischer Atlas - Beschreibungen neuer Thierarten, während des Flottcapitains von Kotzebue zweiter Reise um die Welt, auf der Russisch-Kaiserlichen Kriegsschlupp Predpriaetië in den Jahren 1823-1826.. G. Reimer, Berlin pt. 4: 1-19, pl. 16-20",
+  "source": "Eschscholtz J. F. (1831)",
+  "citation": "Eschscholtz J. F. (1831). Zoologischer Atlas - Beschreibungen neuer Thierarten, während des Flottcapitains von Kotzebue zweiter Reise um die Welt, auf der Russisch-Kaiserlichen Kriegsschlupp Predpriaetië in den Jahren 1823-1826.. G. Reimer, Berlin pt. 4: 1-19, pl. 16-20",
+  "link": "https://doi.org/10.5962/bhl.title.38058",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=39543",
+  "species": [
+   {
+    "name": "Fiona pinnata",
+    "aphia": 139942,
+    "page": null,
+    "original_name": "Eolidia pinnata Eschscholtz, 1831"
+   }
+  ]
+ },
+ {
+  "source_id": 220695,
+  "slug": "od-farran-1905-220695",
+  "title": "Report on the opisthobranchiate Mollusca collected by Professor Herdman, at Ceylon, in 1902. Report to the government of Ceylon on the pearl oyster fisheries of the Gulf of Manaar",
+  "source": "Farran G.P. (1905)",
+  "citation": "Farran G.P. (1905). Report on the opisthobranchiate Mollusca collected by Professor Herdman, at Ceylon, in 1902. Report to the government of Ceylon on the pearl oyster fisheries of the Gulf of Manaar. Part 3, Suppl. Report 21: 329-364.",
+  "link": "https://www.biodiversitylibrary.org/page/19654223",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=220695",
+  "species": [
+   {
+    "name": "Aegires villosus",
+    "aphia": 531083,
+    "page": "346, Plate III., figs. 18 to 22",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 350589,
+  "slug": "od-garrett-1873-350589",
+  "title": "Description of a new species of Goniodoris",
+  "source": "Garrett, A. (1873)",
+  "citation": "Garrett, A. (1873). Description of a new species of Goniodoris. Proceedings of the Academy of Natural Sciences of Philadelphia. 25: 232, pl. 4.",
+  "link": "https://www.biodiversitylibrary.org/page/26282015",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=350589",
+  "species": [
+   {
+    "name": "Hypselodoris tryoni",
+    "aphia": 558646,
+    "page": null,
+    "original_name": "Goniodoris tryoni Garrett, 1873"
+   }
+  ]
+ },
+ {
+  "source_id": 36038,
+  "slug": "od-gmelin-1791-36038",
+  "title": "Caroli a Linné Systema Naturae, ed. 13. Tome 1(6)",
+  "source": "Gmelin, J. F. (1791)",
+  "citation": "Gmelin, J. F. (1791). Caroli a Linné Systema Naturae, ed. 13. Tome 1(6). Vermes. G. E. Beer, Lipsiae [Leipzig]. pp. 3021-3910.",
+  "link": "http://www.biodiversitylibrary.org/item/83098#5",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=36038",
+  "species": [
+   {
+    "name": "Cratena peregrina",
+    "aphia": 146862,
+    "page": "3105",
+    "original_name": "Doris peregrina Gmelin, 1791"
+   },
+   {
+    "name": "Flabellina affinis",
+    "aphia": 139988,
+    "page": "3105",
+    "original_name": "Doris affinis Gmelin, 1791"
+   },
+   {
+    "name": "Tylodina perversa",
+    "aphia": 141877,
+    "page": "3714",
+    "original_name": "Patella perversa Gmelin, 1791"
+   }
+  ]
+ },
+ {
+  "source_id": 287201,
+  "slug": "od-gosliner-1991-287201",
+  "title": "Review of the Flabellinidae (Nudibranchia: Aeolidacea) from the tropical Indo-Pacific, with the descriptions of five new species",
+  "source": "Gosliner, T. M. & Willan, R. C. (1991)",
+  "citation": "Gosliner, T. M. & Willan, R. C. (1991). Review of the Flabellinidae (Nudibranchia: Aeolidacea) from the tropical Indo-Pacific, with the descriptions of five new species. The Veliger. 34 (2): 97-113.",
+  "link": "https://www.biodiversitylibrary.org/page/42478815",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=287201",
+  "species": [
+   {
+    "name": "Coryphellina delicata",
+    "aphia": 1047491,
+    "page": null,
+    "original_name": "Flabellina delicata Gosliner & Willan, 1991"
+   },
+   {
+    "name": "Coryphellina exoptata",
+    "aphia": 1047492,
+    "page": "118, figs 1F, 18-20",
+    "original_name": "Flabellina exoptata Gosliner & Willan, 1991"
+   },
+   {
+    "name": "Samla bilas",
+    "aphia": 1047248,
+    "page": null,
+    "original_name": "Flabellina bilas Gosliner & Willan, 1991"
+   }
+  ]
+ },
+ {
+  "source_id": 177791,
+  "slug": "od-gosliner-1995-177791",
+  "title": "The genus Thuridilla (Opisthobranchia: Elysiidae) from the tropical Indo-Pacific, with a revision of the phylogeny and systematics of the Elysiidae",
+  "source": "Gosliner, T. M. (1995)",
+  "citation": "Gosliner, T. M. (1995). The genus Thuridilla (Opisthobranchia: Elysiidae) from the tropical Indo-Pacific, with a revision of the phylogeny and systematics of the Elysiidae. Proceedings of the California Academy of Sciences. 49: 1-54.",
+  "link": "http://www.biodiversitylibrary.org/page/15776771",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=177791",
+  "species": [
+   {
+    "name": "Thuridilla albopustulosa",
+    "aphia": 494488,
+    "page": null,
+    "original_name": null
+   },
+   {
+    "name": "Thuridilla flavomaculata",
+    "aphia": 494493,
+    "page": null,
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 335613,
+  "slug": "od-gosliner-1996-335613",
+  "title": "Phylogeny of Ceratosoma (Nudibranchia: Chromodorididae), with descriptions of two new species",
+  "source": "Gosliner, T. M. (1996)",
+  "citation": "Gosliner, T. M. (1996). Phylogeny of Ceratosoma (Nudibranchia: Chromodorididae), with descriptions of two new species. Proceedings of the California Academy of Sciences. 49(3): 115-126.",
+  "link": "https://biodiversitylibrary.org/page/15776887",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=335613",
+  "species": [
+   {
+    "name": "Miamira alleni",
+    "aphia": 597461,
+    "page": null,
+    "original_name": "Ceratosoma alleni Gosliner, 1996"
+   }
+  ]
+ },
+ {
+  "source_id": 335620,
+  "slug": "od-gosliner-1997-335620",
+  "title": "Description of four new species of phanerobranch dorid (Mollusca: Nudibranchia) from the Indo-Pacific, with a redescription of Gymnodoris aurita Gould, 1852. Proceedings of the California Academy of Sciences. series 4: 49(9): 287-308",
+  "source": "Gosliner, T. M.; Behrens, D. W. (1997)",
+  "citation": "Gosliner, T. M.; Behrens, D. W. (1997). Description of four new species of phanerobranch dorid (Mollusca: Nudibranchia) from the Indo-Pacific, with a redescription of Gymnodoris aurita Gould, 1852. Proceedings of the California Academy of Sciences. series 4: 49(9): 287-308.",
+  "link": "https://biodiversitylibrary.org/page/15777063",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=335620",
+  "species": [
+   {
+    "name": "Nembrotha chamberlaini",
+    "aphia": 527317,
+    "page": null,
+    "original_name": null
+   },
+   {
+    "name": "Nembrotha milleri",
+    "aphia": 527328,
+    "page": "296, figs 7A, 8A, B, 9A-D",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 140628,
+  "slug": "od-gosliner-1998-140628",
+  "title": "Two new discodorid nudibranchs from the western Pacific with a redescription of Doris luteola Kelaart, 1858. Proceedings of the California Academy of Sciences. 4(50): 279-293",
+  "source": "Gosliner, T. M.; Behrens, D. W. (1998)",
+  "citation": "Gosliner, T. M.; Behrens, D. W. (1998). Two new discodorid nudibranchs from the western Pacific with a redescription of Doris luteola Kelaart, 1858. Proceedings of the California Academy of Sciences. 4(50): 279-293.",
+  "link": "http://www.biodiversitylibrary.org/page/15659891",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=140628",
+  "species": [
+   {
+    "name": "Taringa halgerda",
+    "aphia": 457500,
+    "page": null,
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 140629,
+  "slug": "od-gosliner-1998-140629",
+  "title": "Five new species of Chromodoris (Molluscs: Nudibranchia: Chromodorididae) from the tropical Indo-Pacific Ocean",
+  "source": "Gosliner, T. M.; Behrens, D. W. (1998)",
+  "citation": "Gosliner, T. M.; Behrens, D. W. (1998). Five new species of Chromodoris (Molluscs: Nudibranchia: Chromodorididae) from the tropical Indo-Pacific Ocean. Proceedings of the California Academy of Sciences. 4(50): 139-165.",
+  "link": "http://www.biodiversitylibrary.org/page/15659747",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=140629",
+  "species": [
+   {
+    "name": "Chromodoris joshi",
+    "aphia": 457496,
+    "page": "139-145",
+    "original_name": null
+   },
+   {
+    "name": "Goniobranchus hintuanensis",
+    "aphia": 597338,
+    "page": "155-159",
+    "original_name": "Chromodoris hintuanensis Gosliner & Behrens, 1998"
+   }
+  ]
+ },
+ {
+  "source_id": 125322,
+  "slug": "od-gosliner-1999-125322",
+  "title": "Phylogeny of the monophyletic genus Hypselodoris (Molllusca: Nudibranchia: Chromodorididae) from the Indo-Pacific, with the description of twelve new species",
+  "source": "Gosliner, T. M.; Johnson, R. F. (1999)",
+  "citation": "Gosliner, T. M.; Johnson, R. F. (1999). Phylogeny of the monophyletic genus Hypselodoris (Molllusca: Nudibranchia: Chromodorididae) from the Indo-Pacific, with the description of twelve new species. Zoological Journal of the Linnean Society. 125, 1-114.",
+  "link": "https://doi.org/10.1006/zjls.1997.0148",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=125322",
+  "species": [
+   {
+    "name": "Hypselodoris reidi",
+    "aphia": 457528,
+    "page": null,
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 128529,
+  "slug": "od-gosliner-2003-128529",
+  "title": "Systematic review and phylogenetic analysis of the nudibranch genus Melibe (Opisthobranchia: Dendronotacea) with descriptions of three new species",
+  "source": "Gosliner, T. M.; Smith, V. G. (2003)",
+  "citation": "Gosliner, T. M.; Smith, V. G. (2003). Systematic review and phylogenetic analysis of the nudibranch genus Melibe (Opisthobranchia: Dendronotacea) with descriptions of three new species. Proceedings of the California Academy of Sciences. 4(54): 302-356.",
+  "link": "http://researcharchive.calacademy.org/research/scipubs/pdfs/v54/proccas_v54_n18.pdf",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=128529",
+  "species": [
+   {
+    "name": "Melibe digitata",
+    "aphia": 388315,
+    "page": "305",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 128533,
+  "slug": "od-gosliner-2004-128533",
+  "title": "Phylogenetic systematics of Okenia, Sakishimaia, Hopkinsiella and Hopkinsia (Nudibranchia: Goniodorididae) with descriptions of new species from the tropical Indo-Pacific",
+  "source": "Gosliner, T. M. (2004)",
+  "citation": "Gosliner, T. M. (2004). Phylogenetic systematics of Okenia, Sakishimaia, Hopkinsiella and Hopkinsia (Nudibranchia: Goniodorididae) with descriptions of new species from the tropical Indo-Pacific. Proceedings of the California Academy of Sciences. ser. 4, 55(5): 125-161.",
+  "link": "http://researcharchive.calacademy.org/research/scipubs/pdfs/v55/proccas_v55_n05.pdf",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=128533",
+  "species": [
+   {
+    "name": "Bermudella brunneomaculata",
+    "aphia": 1723419,
+    "page": "129",
+    "original_name": "Okenia brunneomaculata Gosliner, 2004"
+   }
+  ]
+ },
+ {
+  "source_id": 140632,
+  "slug": "od-gosliner-2008-140632",
+  "title": "Systematics of Trapania (Mollusca: Nudibranchia: Goniodorididae) with descriptions of 16 new species",
+  "source": "Gosliner, T. M.; Fahey, S. J. (2008)",
+  "citation": "Gosliner, T. M.; Fahey, S. J. (2008). Systematics of Trapania (Mollusca: Nudibranchia: Goniodorididae) with descriptions of 16 new species. Systematics and Biodiversity. 6(1): 53-98.",
+  "link": "https://doi.org/10.1017/s1477200007002587",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=140632",
+  "species": [
+   {
+    "name": "Trapania euryeia",
+    "aphia": 457509,
+    "page": "75",
+    "original_name": null
+   },
+   {
+    "name": "Trapania miltabrancha",
+    "aphia": 457512,
+    "page": null,
+    "original_name": null
+   },
+   {
+    "name": "Trapania vitta",
+    "aphia": 457519,
+    "page": "78",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 164230,
+  "slug": "od-gosliner-2012-164230",
+  "title": "Diversification of filter-feeding nudibranchs: two remarkable new species of Melibe (Opisthobranchia: Tethyiidae) from the tropical western Pacific",
+  "source": "Gosliner, T. M.; Pola, M. (2012)",
+  "citation": "Gosliner, T. M.; Pola, M. (2012). Diversification of filter-feeding nudibranchs: two remarkable new species of Melibe (Opisthobranchia: Tethyiidae) from the tropical western Pacific. Systematics and Biodiversity. 10(3): 333-349.",
+  "link": "https://doi.org/10.1080/14772000.2012.717551",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=164230",
+  "species": [
+   {
+    "name": "Melibe colemani",
+    "aphia": 708806,
+    "page": "335",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 411738,
+  "slug": "od-gosliner-2021-411738",
+  "title": "Sleuthing cryptic chromodorids (Mollusca, Nudibranchia): adding to Philippine marine biodiversity",
+  "source": "Gosliner, T.M. (2021)",
+  "citation": "Gosliner, T.M. (2021). Sleuthing cryptic chromodorids (Mollusca, Nudibranchia): adding to Philippine marine biodiversity. Philippine Journal of Systematic Biology. 14(2): 10 pp. [\"2020\"; July 2021].",
+  "link": "https://doi.org/10.26757/pjsb2020b14014",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=411738",
+  "species": [
+   {
+    "name": "Chromodoris alcalai",
+    "aphia": 1533655,
+    "page": null,
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 39709,
+  "slug": "od-gray-1853-39709",
+  "title": "Revision of the families of nudibranch mollusks, with a description of a new genus of Phyllidiadae",
+  "source": "Gray J. E. (1853)",
+  "citation": "Gray J. E. (1853). Revision of the families of nudibranch mollusks, with a description of a new genus of Phyllidiadae. Annals and Magazine of Natural History. ser. 2, 11: 218-221.",
+  "link": "https://doi.org/10.1080/03745485609496246",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=39709",
+  "species": [
+   {
+    "name": "Phyllidiella annulata",
+    "aphia": 536687,
+    "page": "220",
+    "original_name": "Phyllidia annulata J. E. Gray, 1853"
+   }
+  ]
+ },
+ {
+  "source_id": 140647,
+  "slug": "od-hamatani-2001-140647",
+  "title": "Two new species of Goniodorididae (Opisthobranchia; Nudibranchia) with a new genus from Kuroshima Island, Okinawa, Japan",
+  "source": "Hamatani I. (2001)",
+  "citation": "Hamatani I. (2001) Two new species of Goniodorididae (Opisthobranchia; Nudibranchia) with a new genus from Kuroshima Island, Okinawa, Japan. Venus, 60(3): 151-156",
+  "link": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=140647",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=140647",
+  "species": [
+   {
+    "name": "Ceratodoris nakamotoensis",
+    "aphia": 1723464,
+    "page": null,
+    "original_name": "Hopkinsia nakamotoensis Hamatani, 2001"
+   }
+  ]
+ },
+ {
+  "source_id": 261476,
+  "slug": "od-hasselt-1824-261476",
+  "title": "In: A. Férussac",
+  "source": "Hasselt J.C. van. (1824)",
+  "citation": "Hasselt J.C. van. (1824). In: A. Férussac. Extrait d'une lettre du Dr. J. C. van Hasselt au Prof. van Swinderen, sur mollusques de Java (traduit de l'Algem. konst en letterbode, 1824, nos. 2, 3, 4.) Tjuringe (île Java), le 25 mai 1823 (I). Bulletin des Sciences Naturelle et de Géologie. 3: 237-245.",
+  "link": "http://biodiversitylibrary.org/page/4425159",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=261476",
+  "species": [
+   {
+    "name": "Asteronotus cespitosus",
+    "aphia": 215302,
+    "page": "238",
+    "original_name": "Doris cespitosus van Hasselt, 1824"
+   },
+   {
+    "name": "Dermatobranchus pustulosus",
+    "aphia": 558947,
+    "page": null,
+    "original_name": null
+   },
+   {
+    "name": "Miamira sinuata",
+    "aphia": 567583,
+    "page": "239",
+    "original_name": "Doris sinuata van Hasselt, 1824"
+   }
+  ]
+ },
+ {
+  "source_id": 41996,
+  "slug": "od-heller-1983-41996",
+  "title": "Opistobranch molluscs of the Sudanese Red Sea",
+  "source": "Heller, J. & Thompson, T. E. (1983)",
+  "citation": "Heller, J. & Thompson, T. E. (1983). Opistobranch molluscs of the Sudanese Red Sea. Zoological Journal of the Linnean Society. 78 (4): 317-348.",
+  "link": "https://doi.org/10.1111/j.1096-3642.1975.tb02263.x",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=41996",
+  "species": [
+   {
+    "name": "Thuridilla decorata",
+    "aphia": 494492,
+    "page": "336",
+    "original_name": "Elysia decorata Heller & T. E. Thompson, 1983"
+   }
+  ]
+ },
+ {
+  "source_id": 385544,
+  "slug": "od-hirano-1990-385544",
+  "title": "Flabellinid nudibranchs from the Bay of Naples, with a description of a new species, Flabellina ischitana",
+  "source": "Hirano, Y. J.; Thompson, T.E. (1990)",
+  "citation": "Hirano, Y. J.; Thompson, T.E. (1990). Flabellinid nudibranchs from the Bay of Naples, with a description of a new species, Flabellina ischitana. Journal of Molluscan Studies. 56(3): 345-354.",
+  "link": "https://doi.org/10.1093/mollus/56.3.345",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=385544",
+  "species": [
+   {
+    "name": "Flabellina ischitana",
+    "aphia": 139992,
+    "page": "347, figs 1-6",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 275932,
+  "slug": "od-ichikawa-1993-275932",
+  "title": "Saccoglossa (Opisthobranchia) from the Ryukyu Islands",
+  "source": "Ichikawa, M. (1993)",
+  "citation": "Ichikawa, M. (1993). Saccoglossa (Opisthobranchia) from the Ryukyu Islands. Publications of the Seto Marine Biological Laboratory. 36(3): 119-139.",
+  "link": "https://doi.org/10.5134/176229",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=275932",
+  "species": [
+   {
+    "name": "Costasiella kuroshimae",
+    "aphia": 494655,
+    "page": null,
+    "original_name": null
+   },
+   {
+    "name": "Costasiella usagi",
+    "aphia": 494660,
+    "page": null,
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 261454,
+  "slug": "od-johnson-1984-261454",
+  "title": "A new Indo-West Pacific species of the dendronotacean nudibranch Bornella (Mollusca: Opisthobranchia with anguilliform swimming behavior",
+  "source": "Johnson, S. (1984)",
+  "citation": "Johnson, S. (1984). A new Indo-West Pacific species of the dendronotacean nudibranch Bornella (Mollusca: Opisthobranchia with anguilliform swimming behavior. Micronesica. 19, 17-26.",
+  "link": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=261454",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=261454",
+  "species": [
+   {
+    "name": "Bornella anguilla",
+    "aphia": 549611,
+    "page": null,
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 140699,
+  "slug": "od-johnson-1998-140699",
+  "title": "The genus Pectenodoris (Nudibranchia Chromodorididae) from the Indo-Pacific, with the description of a new species",
+  "source": "Johnson R.F. & Gosliner T.M. (1998)",
+  "citation": "Johnson R.F. & Gosliner T.M. (1998) The genus Pectenodoris (Nudibranchia Chromodorididae) from the Indo-Pacific, with the description of a new species. Proceedings of the California Academy of Sciences (4) 50(12): 295-306.",
+  "link": "http://www.biodiversitylibrary.org/page/15659907",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=140699",
+  "species": [
+   {
+    "name": "Mexichromis aurora",
+    "aphia": 597877,
+    "page": null,
+    "original_name": "Pectenodoris aurora R. F. Johnson & Gosliner, 1998"
+   }
+  ]
+ },
+ {
+  "source_id": 168325,
+  "slug": "od-kelaart-1858-168325",
+  "title": "Description of a new Ceylonese nudibranch",
+  "source": "Kelaart E.F. (1858)",
+  "citation": "Kelaart E.F. (1858). Description of a new Ceylonese nudibranch. Annals and Magazine of Natural History. ser. 3, 1(4): 257-258, pl. 10B. [April 1858].",
+  "link": "https://doi.org/10.1080/00222935808696910",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=168325",
+  "species": [
+   {
+    "name": "Gymnodoris ceylonica",
+    "aphia": 214544,
+    "page": "257-258, Plate 10B",
+    "original_name": "Trevelyana ceylonica Kelaart, 1858"
+   }
+  ]
+ },
+ {
+  "source_id": 198090,
+  "slug": "od-kelaart-1858-198090",
+  "title": "Description of new and little known species of Ceylon nudibranchiate molluscs, and zoophytes",
+  "source": "Kelaart E.F. (1858)",
+  "citation": "Kelaart E.F. (1858). Description of new and little known species of Ceylon nudibranchiate molluscs, and zoophytes. Journal of the Ceylon Branch of the Royal Asiatic Society. 3 (9): 84-139. [May 1858].",
+  "link": "https://biodiversitylibrary.org/page/43940429",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=198090",
+  "species": [
+   {
+    "name": "Elysia grandifolia",
+    "aphia": 233598,
+    "page": "107",
+    "original_name": null
+   },
+   {
+    "name": "Goniobranchus fidelis",
+    "aphia": 597334,
+    "page": null,
+    "original_name": "Doris fidelis Kelaart, 1858"
+   },
+   {
+    "name": "Goniobranchus preciosus",
+    "aphia": 597340,
+    "page": null,
+    "original_name": "Doris preciosa Kelaart, 1858"
+   },
+   {
+    "name": "Jorunna funebris",
+    "aphia": 534383,
+    "page": "86, fig. on unnumbered plate.",
+    "original_name": "Doris funebris Kelaart, 1858"
+   },
+   {
+    "name": "Melibe viridis",
+    "aphia": 181237,
+    "page": "112-113",
+    "original_name": "Meliboea viridis Kelaart, 1858"
+   },
+   {
+    "name": "Plocamopherus ceylonicus",
+    "aphia": 404968,
+    "page": "114",
+    "original_name": "Polycera ceylanica Kelaart, 1858"
+   }
+  ]
+ },
+ {
+  "source_id": 197639,
+  "slug": "od-knutson-2014-197639",
+  "title": "Three new species of Gymnodoris Stimpson, 1855 (Opisthobranchia, Nudibranchia) from the Philippines",
+  "source": "Knutson V. & Gosliner T.M. (2014)",
+  "citation": "Knutson V. & Gosliner T.M. (2014). Three new species of Gymnodoris Stimpson, 1855 (Opisthobranchia, Nudibranchia) from the Philippines. The Coral Triangle: The 2011 Hearst Philippine Biodiversity Expedition (G.C. Williams. & T.M. Gosliner, eds). 129-143.",
+  "link": "http://slugsite.us/bow2007/knutson.pdf",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=197639",
+  "species": [
+   {
+    "name": "Gymnodoris tuberculosa",
+    "aphia": 847841,
+    "page": "135",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 287166,
+  "slug": "od-korshunova-2017-287166",
+  "title": "Polyphyly of the traditional family Flabellinidae affects a major group of Nudibranchia: aeolidacean taxonomic reassessment with descriptions of several new families, genera, and species (Mollusca, Gastropoda)",
+  "source": "Korshunova, T.; Martynov, A.; Bakken, T.; Evertsen, J.; Fletcher, K.; Mudianta, W.; Saito, H.; Lundin, K.; Schrödl, M.; Picton, B. (2017)",
+  "citation": "Korshunova, T.; Martynov, A.; Bakken, T.; Evertsen, J.; Fletcher, K.; Mudianta, W.; Saito, H.; Lundin, K.; Schrödl, M.; Picton, B. (2017). Polyphyly of the traditional family Flabellinidae affects a major group of Nudibranchia: aeolidacean taxonomic reassessment with descriptions of several new families, genera, and species (Mollusca, Gastropoda). ZooKeys. 717: 1-139.",
+  "link": "https://doi.org/10.3897/zookeys.717.21885",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=287166",
+  "species": [
+   {
+    "name": "Coryphellina lotos",
+    "aphia": 1047496,
+    "page": "49-50, fig. 38",
+    "original_name": null
+   },
+   {
+    "name": "Unidentia sandramillenae",
+    "aphia": 1049574,
+    "page": "59-60, fig. 43",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 514054,
+  "slug": "od-korshunova-2025-514054",
+  "title": "The endless forms are the most differentiated — how taxonomic pseudo-optimization masked natural diversity and evolution: the nudibranch case",
+  "source": "Korshunova, T.; Fletcher, K.; Martynov, A. (2025)",
+  "citation": "Korshunova, T.; Fletcher, K.; Martynov, A. (2025). The endless forms are the most differentiated — how taxonomic pseudo-optimization masked natural diversity and evolution: the nudibranch case. Zoological Journal of the Linnean Society. 204(4): zlaf057: 1-93.",
+  "link": "https://doi.org/10.1093/zoolinnean/zlaf057",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=514054",
+  "species": [
+   {
+    "name": "Coryphellina iurmanovi",
+    "aphia": 1831205,
+    "page": "61-63",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 39864,
+  "slug": "od-lamarck-1801-39864",
+  "title": "Système des animaux sans vertèbres, ou tableau général des classes, des ordres et des genres de ces animaux",
+  "source": "Lamarck, J. B. de. (1801)",
+  "citation": "Lamarck, J. B. de. (1801). Système des animaux sans vertèbres, ou tableau général des classes, des ordres et des genres de ces animaux. Published by the author and Deterville, Paris. : viii + 432 pp.",
+  "link": "https://doi.org/10.5962/bhl.title.14255",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=39864",
+  "species": [
+   {
+    "name": "Phyllidia varicosa",
+    "aphia": 212835,
+    "page": "66",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 39939,
+  "slug": "od-marcus-1963-39939",
+  "title": "Opistobranchs from the Lesser Antilles",
+  "source": "Marcus, Ev.; Marcus, Er. (1963)",
+  "citation": "Marcus, Ev.; Marcus, Er. (1963). Opistobranchs from the Lesser Antilles. Studies on the Fauna of Curaçao and Other Caribbean Islands: no 79. 19(1): 1-76.",
+  "link": "https://repository.naturalis.nl/pub/506042",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=39939",
+  "species": [
+   {
+    "name": "Felimida binza",
+    "aphia": 597414,
+    "page": null,
+    "original_name": "Chromodoris binza Ev. Marcus & Er. Marcus, 1963"
+   }
+  ]
+ },
+ {
+  "source_id": 229479,
+  "slug": "od-marcus-1965-229479",
+  "title": "Some Opisthobranchia from Micronesia",
+  "source": "Marcus, Er. (1965)",
+  "citation": "Marcus, Er. (1965). Some Opisthobranchia from Micronesia. Malacologia. 3(2): 263-286.",
+  "link": "https://biodiversitylibrary.org/page/13032313",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=229479",
+  "species": [
+   {
+    "name": "Thuridilla ratna",
+    "aphia": 494503,
+    "page": "270, figs 7-8",
+    "original_name": "Elysia ratna Er. Marcus, 1965"
+   }
+  ]
+ },
+ {
+  "source_id": 302709,
+  "slug": "od-matsuda-2018-302709",
+  "title": "Glossing over cryptic species: Descriptions of four new species of Glossodoris and three new species of Doriprismatica (Nudibranchia: Chromodorididae)",
+  "source": "Matsuda S.B. & Gosliner T.M. (2018)",
+  "citation": "Matsuda S.B. & Gosliner T.M. (2018). Glossing over cryptic species: Descriptions of four new species of Glossodoris and three new species of Doriprismatica (Nudibranchia: Chromodorididae). Zootaxa. 4444(5): 501-529.",
+  "link": "https://doi.org/10.11646/zootaxa.4444.5.1",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=302709",
+  "species": [
+   {
+    "name": "Doriprismatica balut",
+    "aphia": 1264646,
+    "page": "519, figs 2H, 11A, B, 12, 13A–C",
+    "original_name": null
+   },
+   {
+    "name": "Glossodoris acosti",
+    "aphia": 1264645,
+    "page": "513, figs 2E, 6C, D, 8E, F, 9A–E",
+    "original_name": null
+   },
+   {
+    "name": "Glossodoris buko",
+    "aphia": 1264642,
+    "page": "503, figs 1A–C, 2A, 3A–E, 4C–D",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 235389,
+  "slug": "od-meyers-munoz-2016-235389",
+  "title": "The phylogenetic position of a new species of Plakobranchus from West Papua, Indonesia (Mollusca, Opisthobranchia, Sacoglossa)",
+  "source": "Meyers-Muñoz M.A., van der Velde G., van der Meij S.E.T., Stoffels B.E.M.W., van Alen T., Tuti Y. & Hoeksema B.W. (2016)",
+  "citation": "Meyers-Muñoz M.A., van der Velde G., van der Meij S.E.T., Stoffels B.E.M.W., van Alen T., Tuti Y. & Hoeksema B.W. (2016). The phylogenetic position of a new species of Plakobranchus from West Papua, Indonesia (Mollusca, Opisthobranchia, Sacoglossa). ZooKeys. 594: 73-98.",
+  "link": "https://doi.org/10.3897/zookeys.594.5954",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=235389",
+  "species": [
+   {
+    "name": "Plakobranchus papua",
+    "aphia": 879682,
+    "page": null,
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 40015,
+  "slug": "od-montagu-1816-40015",
+  "title": "An account of some new and rare marine British shells and animals",
+  "source": "Montagu G. (1816)",
+  "citation": "Montagu G. (1816). An account of some new and rare marine British shells and animals. Transactions of the Linnean Society of London. 11(2): 179-204, pls 12-14 [\"1815\"; 24 January 1816].",
+  "link": "https://doi.org/10.1111/j.1096-3642.1813.tb00047.x",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=40015",
+  "species": [
+   {
+    "name": "Edmundsella pedata",
+    "aphia": 1047602,
+    "page": "197-198, pl. 14 fig. 1",
+    "original_name": "Doris pedata Montagu, 1816"
+   }
+  ]
+ },
+ {
+  "source_id": 140842,
+  "slug": "od-moore-2009-140842",
+  "title": "Three new species of Phyllodesmium Ehrenberg (Gastropoda: Nudibranchia: Aeolidoidea), and a revised phylogenetic analysis",
+  "source": "Moore, E.; Gosliner, T. M. (2009)",
+  "citation": "Moore, E.; Gosliner, T. M. (2009). Three new species of Phyllodesmium Ehrenberg (Gastropoda: Nudibranchia: Aeolidoidea), and a revised phylogenetic analysis. Zootaxa. 2201: 30-48.",
+  "link": "https://doi.org/10.11646/zootaxa.2201.1.6",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=140842",
+  "species": [
+   {
+    "name": "Phyllodesmium pinnatum",
+    "aphia": 457930,
+    "page": null,
+    "original_name": null
+   },
+   {
+    "name": "Phyllodesmium tuberculatum",
+    "aphia": 457931,
+    "page": null,
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 40087,
+  "slug": "od-morch-1863-40087",
+  "title": "Contributions à la faune malacologique des Antilles danoises",
+  "source": "Mörch [Mørch], O. A. L. (1863)",
+  "citation": "Mörch [Mørch], O. A. L. (1863). Contributions à la faune malacologique des Antilles danoises. Journal de Conchyliologie. 11(1): 21-43.",
+  "link": "http://biodiversitylibrary.org/page/15338052",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=40087",
+  "species": [
+   {
+    "name": "Aplysia parvula",
+    "aphia": 138757,
+    "page": "22-23",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 509271,
+  "slug": "od-moreno-2025-509271",
+  "title": "Phylogenetic systematics of the genus Cyerce Bergh, 1870 (Mollusca, Heterobranchia, Sacoglossa, Caliphyllidae) from the Pacific and Indian oceans with descriptions of nine new species",
+  "source": "Moreno, K.; Medrano, S.; Gosliner, T. M.; Wilson, N. G.; Krug, P. J.; Valdés, Á. (2025)",
+  "citation": "Moreno, K.; Medrano, S.; Gosliner, T. M.; Wilson, N. G.; Krug, P. J.; Valdés, Á. (2025). Phylogenetic systematics of the genus Cyerce Bergh, 1870 (Mollusca, Heterobranchia, Sacoglossa, Caliphyllidae) from the Pacific and Indian oceans with descriptions of nine new species. Zoological Journal of the Linnean Society. 204: zlaf030.",
+  "link": "https://doi.org/10.1093/zoolinnean/zlaf030",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=509271",
+  "species": [
+   {
+    "name": "Cyerce basi",
+    "aphia": 1814157,
+    "page": "15C, 17B, 18",
+    "original_name": null
+   },
+   {
+    "name": "Cyerce blackburnae",
+    "aphia": 1814155,
+    "page": "figs 9C, 11C, 13",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 40136,
+  "slug": "od-o-donoghue-1929-40136",
+  "title": "Report on the Opisthobranchiata [in] Zoological Results of the Cambridge Expedition to the Suez Canal",
+  "source": "O'Donoghue, C.H. (1929)",
+  "citation": "O'Donoghue, C.H. (1929). Report on the Opisthobranchiata [in] Zoological Results of the Cambridge Expedition to the Suez Canal. Transactions of the Zoological Society of London. 22(6): 713-841.",
+  "link": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=40136",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=40136",
+  "species": [
+   {
+    "name": "Coryphellina rubrolineata",
+    "aphia": 534029,
+    "page": "789-802",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 277123,
+  "slug": "od-ong-2017-277123",
+  "title": "Like a bat out of heaven: the phylogeny and diversity of the bat-winged slugs (Heterobranchia: Gastropteridae)",
+  "source": "Ong E., Hallas J.M. & Gosliner T.M. (2017)",
+  "citation": "Ong E., Hallas J.M. & Gosliner T.M. (2017). Like a bat out of heaven: the phylogeny and diversity of the bat-winged slugs (Heterobranchia: Gastropteridae). Zoological Journal of the Linnean Society. 180(4): 755-789.",
+  "link": "https://doi.org/10.1093/zoolinnean/zlw018",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=277123",
+  "species": [
+   {
+    "name": "Siphopteron makisig",
+    "aphia": 991538,
+    "page": "777, figs 14C, 17C, D, 18, 19",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 386789,
+  "slug": "od-oskars-2020-386789",
+  "title": "Systematic revision of the Indo-West Pacific colourful bubble-snails of the genus Lamprohaminoea Habe, 1952 (Cephalaspidea : Haminoeidae)",
+  "source": "Oskars, T. R.; Malaquias, M. A. E. (2020)",
+  "citation": "Oskars, T. R.; Malaquias, M. A. E. (2020). Systematic revision of the Indo-West Pacific colourful bubble-snails of the genus Lamprohaminoea Habe, 1952 (Cephalaspidea : Haminoeidae). Invertebrate Systematics. 34: 727–756.",
+  "link": "https://doi.org/10.1071/is20026",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=386789",
+  "species": [
+   {
+    "name": "Lamprohaminoea evelinae",
+    "aphia": 1458964,
+    "page": "Figs 3M–O, 13, 14",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 425945,
+  "slug": "od-paz-sedano-2022-425945",
+  "title": "Rediscovering the overlooked genus Murphydoris (Nudibranchia: Goniodorididae): the first phylogeny and addition of four new species",
+  "source": "Paz-Sedano, S., Smirnoff, D., Candás, M., Gosliner, T.M. & Pola, M. (2022)",
+  "citation": "Paz-Sedano, S., Smirnoff, D., Candás, M., Gosliner, T.M. & Pola, M. (2022). Rediscovering the overlooked genus Murphydoris (Nudibranchia: Goniodorididae): the first phylogeny and addition of four new species. Zoological Journal of the Linnean Society. DOI: 10.1093/zoolinnean/zlab122.",
+  "link": "https://doi.org/10.1093/zoolinnean/zlac002",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=425945",
+  "species": [
+   {
+    "name": "Murphydoris maracabranchia",
+    "aphia": 1568878,
+    "page": "figs 2E, 3G-H, 6A–C",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 473732,
+  "slug": "od-paz-sedano-2023-473732",
+  "title": "Shedding light on a species complex within the genus Goniodoridella Pruvot-Fol, 1933 (Nudibranchia: Goniodorididae), with the description of three new species",
+  "source": "Paz-Sedano, S.; Ekimova, I.; Smirnoff, D.; Gosliner, T. M.; Pola, M. (2023)",
+  "citation": "Paz-Sedano, S.; Ekimova, I.; Smirnoff, D.; Gosliner, T. M.; Pola, M. (2023). Shedding light on a species complex within the genus Goniodoridella Pruvot-Fol, 1933 (Nudibranchia: Goniodorididae), with the description of three new species. Journal of Molluscan Studies. 89(4).",
+  "link": "https://doi.org/10.1093/mollus/eyad020",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=473732",
+  "species": [
+   {
+    "name": "Goniodoridella geminae",
+    "aphia": 1719455,
+    "page": null,
+    "original_name": null
+   },
+   {
+    "name": "Goniodoridella unidonta",
+    "aphia": 1719457,
+    "page": null,
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 40237,
+  "slug": "od-pease-1860-40237",
+  "title": "Descriptions of new species of Mollusca from the Sandwich Islands",
+  "source": "Pease, W. H. (1860)",
+  "citation": "Pease, W. H. (1860). Descriptions of new species of Mollusca from the Sandwich Islands. Proceedings of the Zoological Society of London. 28: 18-36; 141-148.",
+  "link": "http://biodiversitylibrary.org/page/12866516",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=40237",
+  "species": [
+   {
+    "name": "Philinopsis speciosa",
+    "aphia": 559039,
+    "page": "21-22",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 229602,
+  "slug": "od-pease-1861-229602",
+  "title": "Descriptions of new species of Mollusca from the Pacific islands",
+  "source": "Pease, W. H. (1861)",
+  "citation": "Pease, W. H. (1861). Descriptions of new species of Mollusca from the Pacific islands. Proceedings of the Zoological Society of London. (1861): 242-247.",
+  "link": "https://www.biodiversitylibrary.org/page/28672772",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=229602",
+  "species": [
+   {
+    "name": "Berthellina delicata",
+    "aphia": 863427,
+    "page": "245",
+    "original_name": "Pleurobranchus delicatus Pease, 1861"
+   }
+  ]
+ },
+ {
+  "source_id": 410063,
+  "slug": "od-pease-1866-410063",
+  "title": "Remarks on Nudibranchiata inhabiting the Pacific Islands, with descriptions of two new genera",
+  "source": "Pease, W. H. (1866)",
+  "citation": "Pease, W. H. (1866). Remarks on Nudibranchiata inhabiting the Pacific Islands, with descriptions of two new genera. American Journal of Conchology. 2(3): 204-208, pl. 14.",
+  "link": "https://www.biodiversitylibrary.org/page/15841170",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=410063",
+  "species": [
+   {
+    "name": "Cyerce nigricans",
+    "aphia": 494516,
+    "page": "206",
+    "original_name": "Lobifera nigricans Pease, 1866"
+   }
+  ]
+ },
+ {
+  "source_id": 137330,
+  "slug": "od-pease-1868-137330",
+  "title": "Descriptions of marine Gasteropodæ inhabiting Polynesia",
+  "source": "Pease, W. H. (1868)",
+  "citation": "Pease, W. H. (1868). Descriptions of marine Gasteropodæ inhabiting Polynesia. American Journal of Conchology. 4(2): 71-80, pls 8-9 [1 October 1868]; 4(3): 91-102, pls 11,12 [3 November 1868].",
+  "link": "http://biodiversitylibrary.org/page/16070178",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=137330",
+  "species": [
+   {
+    "name": "Pleurobranchus grandis",
+    "aphia": 599475,
+    "page": null,
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 163819,
+  "slug": "od-pease-1871-163819",
+  "title": "Descriptions of new species of nudibranchiate Mollusca inhabiting Polynesia",
+  "source": "Pease, W. H. (1871)",
+  "citation": "Pease, W. H. (1871). Descriptions of new species of nudibranchiate Mollusca inhabiting Polynesia. Nº2. American Journal of Conchology. 7(1): 11-19.",
+  "link": "https://biodiversitylibrary.org/page/15918145",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=163819",
+  "species": [
+   {
+    "name": "Goniobranchus rufomaculatus",
+    "aphia": 597371,
+    "page": "17, plate 8, figure 1",
+    "original_name": "Chromodoris rufomaculata Pease, 1871"
+   },
+   {
+    "name": "Hypselodoris maculosa",
+    "aphia": 209597,
+    "page": "16-17, plate 7, figure 2",
+    "original_name": "Chromodoris maculosa Pease, 1871"
+   },
+   {
+    "name": "Verconia simplex",
+    "aphia": 866663,
+    "page": "17-18, plate 8, figure 2",
+    "original_name": "Chromodoris simplex Pease, 1871"
+   }
+  ]
+ },
+ {
+  "source_id": 261457,
+  "slug": "od-pease-1871-261457",
+  "title": "Descriptions of nudibranchiate Mollusca inhabiting Polynesia",
+  "source": "Pease, W. H. (1871)",
+  "citation": "Pease, W. H. (1871). Descriptions of nudibranchiate Mollusca inhabiting Polynesia. American Journal of Conchology. 6: 299-305, pls. 19-22.",
+  "link": "https://biodiversitylibrary.org/page/15854122",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=261457",
+  "species": [
+   {
+    "name": "Elysia marginata",
+    "aphia": 765107,
+    "page": "304, pl. 21 fig. 3",
+    "original_name": "Pterogasteron marginatus Pease, 1871"
+   },
+   {
+    "name": "Elysia nigropunctata",
+    "aphia": 494462,
+    "page": null,
+    "original_name": "Pterogasteron nigropunctata Pease, 1871"
+   }
+  ]
+ },
+ {
+  "source_id": 445768,
+  "slug": "od-philippi-1836-445768",
+  "title": "Enumeratio molluscorum Siciliae cum viventium tum in tellure tertiaria fossilium quae in itinere suo observavit",
+  "source": "Philippi, R. A. (1836)",
+  "citation": "Philippi, R. A. (1836). Enumeratio molluscorum Siciliae cum viventium tum in tellure tertiaria fossilium quae in itinere suo observavit. Vol. 1. xiv + 267 p., pls. 1-12. Sumptibus Simonis Schroppii et Sociorum. Berolini [Berlin].",
+  "link": "https://doi.org/10.5962/bhl.title.100735",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=445768",
+  "species": [
+   {
+    "name": "Felimare picta",
+    "aphia": 597522,
+    "page": "105",
+    "original_name": "Doris picta R. A. Philippi, 1836"
+   }
+  ]
+ },
+ {
+  "source_id": 8762,
+  "slug": "od-pilsbry-1895-8762",
+  "title": "Manual of conchology, structural and systematic, with illustrations of the species",
+  "source": "Pilsbry, H. A. (1895)",
+  "citation": "Pilsbry, H. A. (1895-1896). Manual of conchology, structural and systematic, with illustrations of the species. Ser. 1. Vol. 16: Philinidae, Gastropteridae, Aglajidae, Aplysiidae, Oxynoeidae, Runcinidae, Umbraculidae, Pleurobranchidae. pp vii, 1-262, pls 1-74. Philadelphia, published by the Conchological Section, Academy of Natural Sciences. [pp. 1-48, pls. 1-16, Aug. 20, 1895; pp. 49-112, pls. 17-31, Nov. 26, 1895; pp. 113-160, pls. 32-43, Mar. 13, 1896; pp. 161-262, pls. 44-74, Sept. 23, 1896; pp. i-vii, Sept. 23, 1896].",
+  "link": "http://www.biodiversitylibrary.org/item/41491",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=8762",
+  "species": [
+   {
+    "name": "Tomoberthella martensi",
+    "aphia": 1720806,
+    "page": "211, pl. 48 figs 34-35",
+    "original_name": "Gymnotoplax martensi Pilsbry, 1896"
+   }
+  ]
+ },
+ {
+  "source_id": 140947,
+  "slug": "od-pola-2008-140947",
+  "title": "Description of the first two tropical Indo-Pacific species of Dendronotus (Gastropoda: Nudibranchia) with new data of the poorly known species Dendronotus gracilis Baba, 1949. Zootaxa, 1960: 45-66",
+  "source": "Pola M. & Stout C.C. (2008)",
+  "citation": "Pola M. & Stout C.C. (2008). Description of the first two tropical Indo-Pacific species of Dendronotus (Gastropoda: Nudibranchia) with new data of the poorly known species Dendronotus gracilis Baba, 1949. Zootaxa, 1960: 45-66",
+  "link": "https://doi.org/10.11646/zootaxa.1960.1.2",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=140947",
+  "species": [
+   {
+    "name": "Cabangus regius",
+    "aphia": 1457499,
+    "page": "46-54, figs 1A–C, 2, 3, 4, 5",
+    "original_name": "Dendronotus regius Pola & Stout, 2008"
+   }
+  ]
+ },
+ {
+  "source_id": 191767,
+  "slug": "od-pola-2014-191767",
+  "title": "Going further on an intricate and challenging group of nudibranchs: description of five novel species and a more complete molecular phylogeny of the subfamily Nembrothinae (Polyceridae)",
+  "source": "Pola M., Padula V., Gosliner T.M. & Cervera J.L. (2014)",
+  "citation": "Pola M., Padula V., Gosliner T.M. & Cervera J.L. (2014). Going further on an intricate and challenging group of nudibranchs: description of five novel species and a more complete molecular phylogeny of the subfamily Nembrothinae (Polyceridae). Cladistics. 30(6): 607-634.",
+  "link": "https://doi.org/10.1111/cla.12097",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=191767",
+  "species": [
+   {
+    "name": "Tambja kava",
+    "aphia": 816920,
+    "page": "15",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 167460,
+  "slug": "od-pruvot-fol-1930-167460",
+  "title": "Diagnoses provisoires (incomplètes) des espèces nouvelles et liste provisoire des mollusques nudibranches recueillis par Mme A. Pruvot-Fol en Nouvelle Cadédonie (Ile de Pins)",
+  "source": "Pruvot-Fol, A. (1930)",
+  "citation": "Pruvot-Fol, A. (1930). Diagnoses provisoires (incomplètes) des espèces nouvelles et liste provisoire des mollusques nudibranches recueillis par Mme A. Pruvot-Fol en Nouvelle Cadédonie (Ile de Pins). Bulletin du Muséum National d'Histoire Naturelle. ser. 2, 2: 229-231.",
+  "link": "https://biodiversitylibrary.org/page/52082519",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=167460",
+  "species": [
+   {
+    "name": "Goniobranchus kuniei",
+    "aphia": 597339,
+    "page": "229",
+    "original_name": "Chromodoris kuniei Pruvot-Fol, 1930"
+   }
+  ]
+ },
+ {
+  "source_id": 221032,
+  "slug": "od-pruvot-fol-1933-221032",
+  "title": "Mission Robert Ph",
+  "source": "Pruvot-Fol, A. (1933)",
+  "citation": "Pruvot-Fol, A. (1933). Mission Robert Ph. Dollfus en Egypte. Opisthobranchiata. Memoires presentés à l'Institut d'Egypte. 21: 89-159, pls 1-4.",
+  "link": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=221032",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=221032",
+  "species": [
+   {
+    "name": "Goniodoridella savignyi",
+    "aphia": 533842,
+    "page": "117, pl. 2, figs 23-26",
+    "original_name": "Goniodoris (Goniodoridella) savignyi Pruvot-Fol, 1933"
+   }
+  ]
+ },
+ {
+  "source_id": 435813,
+  "slug": "od-pruvot-fol-1957-435813",
+  "title": "Révision de la famille des Phyllidiidae",
+  "source": "Pruvot-Fol, A. (1957)",
+  "citation": "Pruvot-Fol, A. (1957). Révision de la famille des Phyllidiidae. IIe Partie. Journal de Conchyliologie. 97(3): 104–135, pl. 1.",
+  "link": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=435813",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=435813",
+  "species": [
+   {
+    "name": "Phyllidia picta",
+    "aphia": 536615,
+    "page": "110",
+    "original_name": null
+   },
+   {
+    "name": "Phyllidiopsis krempfi",
+    "aphia": 536716,
+    "page": "120",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 40326,
+  "slug": "od-quoy-1832-40326",
+  "title": "Voyage de la corvette l'Astrolabe: exécuté par ordre du roi, pendant les années 1826-1827-1828-1829, sous le commandement de M. J. Dumont d'Urville",
+  "source": "Quoy, J. R. C.; Gaimard, J. P. (1832)",
+  "citation": "Quoy, J. R. C.; Gaimard, J. P. (1832-1835). Voyage de la corvette l'Astrolabe: exécuté par ordre du roi, pendant les années 1826-1827-1828-1829, sous le commandement de M. J. Dumont d'Urville. Zoologie. 1: i-l, 1-264; 2(1): 1-321 [1832]; 2(2): 321-686 [1833]; 3(1): 1-366 [1834]; 3(2): 367-954 [1835]; 4 [1833]; Atlas (Mollusques): pls 1-93 [1833] ...etc. In: Dumont d'Urville, J.; 1834, Voyage de Découvertes de l'Astrolabe. Paris, J. Tastu, Éditeur-Imprimeur.",
+  "link": "https://doi.org/10.5962/bhl.title.2132",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=40326",
+  "species": [
+   {
+    "name": "Chelidonura hirundinina",
+    "aphia": 420528,
+    "page": "367",
+    "original_name": "Bulla hirundinina Quoy & Gaimard, 1833"
+   },
+   {
+    "name": "Chromodoris magnifica",
+    "aphia": 558230,
+    "page": "2: 270",
+    "original_name": "Doris magnifica Quoy & Gaimard, 1832"
+   },
+   {
+    "name": "Goniobranchus reticulatus",
+    "aphia": 597341,
+    "page": "272, pl. 20:9-11",
+    "original_name": "Doris reticulata Quoy & Gaimard, 1832"
+   },
+   {
+    "name": "Stylocheilus striatus",
+    "aphia": 224662,
+    "page": "315–316, pl. 24 figs 9–11",
+    "original_name": "Aplysia striata Quoy & Gaimard, 1832"
+   }
+  ]
+ },
+ {
+  "source_id": 41719,
+  "slug": "od-rang-1828-41719",
+  "title": "Histoire naturelle des Aplysiens",
+  "source": "Rang, S. (1828)",
+  "citation": "Rang, S. (1828). Histoire naturelle des Aplysiens. Paris: Firmin Didot. 83 pp. 24 pls.",
+  "link": "https://www.biodiversitylibrary.org/page/14983674",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=41719",
+  "species": [
+   {
+    "name": "Aplysia dactylomela",
+    "aphia": 138753,
+    "page": null,
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 140398,
+  "slug": "od-ref-nd-140398",
+  "title": "Burghardt I., Schrödl M. & Wägele H. 2008. Three new solar powered species of the genus Phyllodesmium Ehrenberg, 1831 (Mollusca: Nudibranchia: Aeolidoidea) from the tropical Indopacific with analysis of their photosynthetic activity and notes on biology",
+  "source": "",
+  "citation": "Burghardt I., Schrödl M. & Wägele H. 2008. Three new solar powered species of the genus Phyllodesmium Ehrenberg, 1831 (Mollusca: Nudibranchia: Aeolidoidea) from the tropical Indopacific with analysis of their photosynthetic activity and notes on biology. Journal of Molluscan Studies, 74(3): 277-292",
+  "link": "https://doi.org/10.1093/mollus/eyn016",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=140398",
+  "species": [
+   {
+    "name": "Phyllodesmium koehleri",
+    "aphia": 456998,
+    "page": null,
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 140551,
+  "slug": "od-ref-nd-140551",
+  "title": "Fahrner A. & Beck L.A. 2000. Identification key to the Indo-Pacific species of the nudibranch family Phyllidiidae Rafinesque, 1814, including the description of two new species",
+  "source": "",
+  "citation": "Fahrner A. & Beck L.A. 2000. Identification key to the Indo-Pacific species of the nudibranch family Phyllidiidae Rafinesque, 1814, including the description of two new species. Archiv für Molluskenkunde, 128(1-2): 189-211",
+  "link": "https://doi.org/10.1127/arch.moll/128/2000/189",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=140551",
+  "species": [
+   {
+    "name": "Phyllidiella hageni",
+    "aphia": 457331,
+    "page": null,
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 140552,
+  "slug": "od-ref-nd-140552",
+  "title": "Fahrner A. & Schrödl M. 2000. Description of Phyllidia schupporum, a new nudibranch species from the northern Red Sea (Gastropoda, Nudibranchia, Phyllidiidae)",
+  "source": "",
+  "citation": "Fahrner A. & Schrödl M. 2000. Description of Phyllidia schupporum, a new nudibranch species from the northern Red Sea (Gastropoda, Nudibranchia, Phyllidiidae). Spixiana, 23(1): 55-60",
+  "link": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=140552",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=140552",
+  "species": [
+   {
+    "name": "Phyllidia schupporum",
+    "aphia": 457332,
+    "page": null,
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 162994,
+  "slug": "od-ref-nd-162994",
+  "title": "Yonow, N. 1996. Systematic Revision of the Family Phyllidiidae in the Indian Ocean Province: Part 1 (Opisthobranchia: Nudibranchia: Doridoidea)",
+  "source": "",
+  "citation": "Yonow, N. 1996. Systematic Revision of the Family Phyllidiidae in the Indian Ocean Province: Part 1 (Opisthobranchia: Nudibranchia: Doridoidea). Journal of Conchology 35: 483-516.",
+  "link": "https://doi.org/10.5962/p.408000",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=162994",
+  "species": [
+   {
+    "name": "Phyllidia alyta",
+    "aphia": 599550,
+    "page": null,
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 40302,
+  "slug": "od-ref-nd-40302",
+  "title": "Portmann A. & Sandmeier (1960 [giugno])",
+  "source": "",
+  "citation": "Portmann A. & Sandmeier (1960 [giugno]). Zur kenntnis von Diaphorodoris (Gastropoda, Nudibranchia) und ihrer mediterranean Formen. Verhandelungen der Naturforschenden Gesellschaft in Basel 71: 174-183",
+  "link": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=40302",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=40302",
+  "species": [
+   {
+    "name": "Diaphorodoris papillata",
+    "aphia": 140631,
+    "page": null,
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 110799,
+  "slug": "od-risbec-1928-110799",
+  "title": "Contribution à l'étude des nudibranches néo-calédoniens",
+  "source": "Risbec, J. (1928)",
+  "citation": "Risbec, J. (1928). Contribution à l'étude des nudibranches néo-calédoniens. Faune des Colonies Françaises. 2: 1-328 [incl. figs 1-98, pls 1-12, maps].",
+  "link": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=110799",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=110799",
+  "species": [
+   {
+    "name": "Cadlinella ornatissima",
+    "aphia": 558431,
+    "page": "163",
+    "original_name": "Cadlina ornatissima Risbec, 1928"
+   },
+   {
+    "name": "Goniobranchus geometricus",
+    "aphia": 597336,
+    "page": "148",
+    "original_name": "Chromodoris geometrica Risbec, 1928"
+   },
+   {
+    "name": "Hypselodoris decorata",
+    "aphia": 565422,
+    "page": "152",
+    "original_name": "Chromodoris decorata Risbec, 1928"
+   },
+   {
+    "name": "Thuridilla gracilis",
+    "aphia": 494494,
+    "page": "278, textfig. 93, pl. 10 fig. 5",
+    "original_name": "Elysia gracilis Risbec, 1928"
+   }
+  ]
+ },
+ {
+  "source_id": 168830,
+  "slug": "od-risbec-1937-168830",
+  "title": "Note préliminaire au sujet de nudibranches néo-calédoniens",
+  "source": "Risbec, J. (1937)",
+  "citation": "Risbec, J. (1937). Note préliminaire au sujet de nudibranches néo-calédoniens. Bulletin du Muséum National d'Histoire Naturelle. ser. 2, 9: 159-164.",
+  "link": "https://biodiversitylibrary.org/page/52444183",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=168830",
+  "species": [
+   {
+    "name": "Melibe engeli",
+    "aphia": 593362,
+    "page": "160",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 336277,
+  "slug": "od-risbec-1956-336277",
+  "title": "Nudibranches du Viet-Nam",
+  "source": "Risbec, J. (1956)",
+  "citation": "Risbec, J. (1956). Nudibranches du Viet-Nam. Archives du Muséum National d'Histoire Naturelle. ser. 7, 4: 1-34, pls 1-22.",
+  "link": "https://www.biodiversitylibrary.org/page/59781721",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=336277",
+  "species": [
+   {
+    "name": "Goniobranchus coi",
+    "aphia": 597329,
+    "page": "9, pl. 22 figs 58-59",
+    "original_name": "Glossodoris coi Risbec, 1956"
+   }
+  ]
+ },
+ {
+  "source_id": 40346,
+  "slug": "od-risso-1818-40346",
+  "title": "Mémoire sur quelques Gastropodes nouveaux, Nudibranches et Tectibranches observés dans la mer de Nice",
+  "source": "Risso, A. (1818)",
+  "citation": "Risso, A. (1818). Mémoire sur quelques Gastropodes nouveaux, Nudibranches et Tectibranches observés dans la mer de Nice. Journal de Physique, de Chimie, d'Histoire Naturelle et des Arts. 87: 368-377.",
+  "link": "http://biodiversitylibrary.org/page/6173832",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=40346",
+  "species": [
+   {
+    "name": "Elysia timida",
+    "aphia": 139684,
+    "page": "376",
+    "original_name": "Notarchus timidus Risso, 1818"
+   }
+  ]
+ },
+ {
+  "source_id": 490285,
+  "slug": "od-rudman-1970-490285",
+  "title": "Chelidonura inornata Baba and C. electra sp.nov. from the Solomon Islands (Opisthobranchia, Aglajidae)",
+  "source": "Rudman, W.B. (1970)",
+  "citation": "Rudman, W.B. (1970). Chelidonura inornata Baba and C. electra sp.nov. from the Solomon Islands (Opisthobranchia, Aglajidae). Journal of the Malacological Society of Australia. 2: 7-12.",
+  "link": "https://doi.org/10.1080/00852988.1970.10673835",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=490285",
+  "species": [
+   {
+    "name": "Chelidonura electra",
+    "aphia": 213150,
+    "page": null,
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 5964,
+  "slug": "od-rudman-1977-5964",
+  "title": "Chromodorid opisthobranch Mollusca from East Africa and the tropical West Pacific",
+  "source": "Rudman, W. B. (1977)",
+  "citation": "Rudman, W. B. (1977). Chromodorid opisthobranch Mollusca from East Africa and the tropical West Pacific. Zoological Journal of the Linnean Society. 61: 351-397.",
+  "link": "https://doi.org/10.1111/j.1096-3642.1977.tb01033.x",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=5964",
+  "species": [
+   {
+    "name": "Hypselodoris emma",
+    "aphia": 209596,
+    "page": "362",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 516329,
+  "slug": "od-rudman-1978-516329",
+  "title": "A new species and genus of the Aglajidae and the evolution of the philinacean opisthobranch molluscs",
+  "source": "Rudman, W. B. (1978)",
+  "citation": "Rudman, W. B. (1978). A new species and genus of the Aglajidae and the evolution of the philinacean opisthobranch molluscs. Zoological Journal of the Linnean Society. 62(1): 89-107.",
+  "link": "https://doi.org/10.1111/j.1096-3642.1978.tb00524.x",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=516329",
+  "species": [
+   {
+    "name": "Odontoglaja guamensis",
+    "aphia": 559047,
+    "page": null,
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 5975,
+  "slug": "od-rudman-1978-5975",
+  "title": "The dorid opisthobranch genera Halgerda Bergh and Sclerodoris Eliot from the Indo-West Pacific",
+  "source": "Rudman, W. B. (1978)",
+  "citation": "Rudman, W. B. (1978). The dorid opisthobranch genera Halgerda Bergh and Sclerodoris Eliot from the Indo-West Pacific. Zoological Journal of the Linnean Society. 62: 59-88.",
+  "link": "https://doi.org/10.1111/j.1096-3642.1978.tb00523.x",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=5975",
+  "species": [
+   {
+    "name": "Halgerda carlsoni",
+    "aphia": 599500,
+    "page": null,
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 147461,
+  "slug": "od-rudman-1981-147461",
+  "title": "Further studies on the anatomy and ecology of opisthobranch molluscs feeding on the scleractinian coral Porites",
+  "source": "Rudman, W. B. (1981)",
+  "citation": "Rudman, W. B. (1981). Further studies on the anatomy and ecology of opisthobranch molluscs feeding on the scleractinian coral Porites. Zoological Journal of the Linnean Society. 71: 373-412.",
+  "link": "https://doi.org/10.1111/j.1096-3642.1981.tb01136.x",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=147461",
+  "species": [
+   {
+    "name": "Phestilla minor",
+    "aphia": 536541,
+    "page": null,
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 479835,
+  "slug": "od-rudman-1981-479835",
+  "title": "The anatomy and biology of alcyonarian-feeding aeolid opisthobranch molluscs and their development of symbiosis with zooxanthellae",
+  "source": "Rudman, W. B. (1981)",
+  "citation": "Rudman, W. B. (1981). The anatomy and biology of alcyonarian-feeding aeolid opisthobranch molluscs and their development of symbiosis with zooxanthellae. Zoological Journal of the Linnean Society. 72(3):219-262.",
+  "link": "https://doi.org/10.1111/j.1096-3642.1981.tb01571.x",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=479835",
+  "species": [
+   {
+    "name": "Phyllodesmium crypticum",
+    "aphia": 548878,
+    "page": null,
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 149005,
+  "slug": "od-rudman-1982-149005",
+  "title": "The Chromodorididae (Opisthobranchia: Mollusca) of the Indo-West Pacific: Chromodoris quadricolor, C. lineolata and Hypselodoris nigrolineata colour groups",
+  "source": "Rudman, W. B. (1982)",
+  "citation": "Rudman, W. B. (1982). The Chromodorididae (Opisthobranchia: Mollusca) of the Indo-West Pacific: Chromodoris quadricolor, C. lineolata and Hypselodoris nigrolineata colour groups. Zoological Journal of the Linnean Society. 76: 183-241.",
+  "link": "https://doi.org/10.1111/j.1096-3642.1982.tb02182.x",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=149005",
+  "species": [
+   {
+    "name": "Chromodoris colemani",
+    "aphia": 558301,
+    "page": "231",
+    "original_name": null
+   },
+   {
+    "name": "Chromodoris lochi",
+    "aphia": 558198,
+    "page": "186",
+    "original_name": null
+   },
+   {
+    "name": "Chromodoris strigata",
+    "aphia": 558300,
+    "page": "229",
+    "original_name": null
+   },
+   {
+    "name": "Chromodoris willani",
+    "aphia": 558217,
+    "page": "193",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 149042,
+  "slug": "od-rudman-1984-149042",
+  "title": "The Chromodorididae (Opisthobranchia: Mollusca) of the Indo-West Pacific: a review of the genera",
+  "source": "Rudman, W. B. (1984)",
+  "citation": "Rudman, W. B. (1984). The Chromodorididae (Opisthobranchia: Mollusca) of the Indo-West Pacific: a review of the genera. Zoological Journal of the Linnean Society. 81(2): 115-273.",
+  "link": "https://doi.org/10.1111/j.1096-3642.1984.tb01174.x",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=149042",
+  "species": [
+   {
+    "name": "Ardeadoris egretta",
+    "aphia": 558430,
+    "page": "163",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 149584,
+  "slug": "od-rudman-1986-149584",
+  "title": "The Chromodorididae (Opisthobranchia: Mollusca) of the Indo-West Pacific: the genus Glossodoris Ehrenberg (= Casella, H. & A. Adams)",
+  "source": "Rudman, W. B. (1986)",
+  "citation": "Rudman, W. B. (1986). The Chromodorididae (Opisthobranchia: Mollusca) of the Indo-West Pacific: the genus Glossodoris Ehrenberg (= Casella, H. & A. Adams). Zoological Journal of the Linnean Society. 86: 101-184.",
+  "link": "https://doi.org/10.1111/j.1096-3642.1986.tb01810.x",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=149584",
+  "species": [
+   {
+    "name": "Ardeadoris cruenta",
+    "aphia": 597321,
+    "page": "167",
+    "original_name": "Glossodoris cruenta Rudman, 1986"
+   }
+  ]
+ },
+ {
+  "source_id": 150183,
+  "slug": "od-rudman-1986-150183",
+  "title": "The Chromodorididae (Opisthobranchia: Mollusca) of the Indo-West Pacific: Noumea flava color group",
+  "source": "Rudman, W. B. (1986)",
+  "citation": "Rudman, W. B. (1986). The Chromodorididae (Opisthobranchia: Mollusca) of the Indo-West Pacific: Noumea flava color group. Zoological Journal of the Linnean Society. 88: 307-404.",
+  "link": "https://doi.org/10.1111/j.1096-3642.1986.tb02254.x",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=150183",
+  "species": [
+   {
+    "name": "Diversidoris crocea",
+    "aphia": 597311,
+    "page": "382",
+    "original_name": "Noumea crocea Rudman, 1986"
+   }
+  ]
+ },
+ {
+  "source_id": 6214,
+  "slug": "od-rudman-1987-6214",
+  "title": "The Chromodorididae (Opisthobranchia: Mollusca) of the Indo-West Pacific: Chromodoris epicuria, C. aureopurpurea, C. annulata, C. coi and Risbecia tryoni colour groups",
+  "source": "Rudman, W. B. (1987)",
+  "citation": "Rudman, W. B. (1987). The Chromodorididae (Opisthobranchia: Mollusca) of the Indo-West Pacific: Chromodoris epicuria, C. aureopurpurea, C. annulata, C. coi and Risbecia tryoni colour groups. Zoological Journal of the Linnean Society. 90(3): 305-407.",
+  "link": "https://doi.org/10.1111/j.1096-3642.1987.tb01357.x",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=6214",
+  "species": [
+   {
+    "name": "Goniobranchus geminus",
+    "aphia": 597335,
+    "page": "384",
+    "original_name": "Chromodoris geminus Rudman, 1987"
+   }
+  ]
+ },
+ {
+  "source_id": 150341,
+  "slug": "od-rudman-1990-150341",
+  "title": "The Chromodorididae (Opisthobranchia: Mollusca) of the Indo-West Pacific: further species of Glossodoris, Thorunna and the Chromodoris aureomarginata colour group",
+  "source": "Rudman, W. B. (1990)",
+  "citation": "Rudman, W. B. (1990). The Chromodorididae (Opisthobranchia: Mollusca) of the Indo-West Pacific: further species of Glossodoris, Thorunna and the Chromodoris aureomarginata colour group. Zoological Journal of the Linnean Society. 100: 263-326.",
+  "link": "https://doi.org/10.1111/j.1096-3642.1990.tb01864.x",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=150341",
+  "species": [
+   {
+    "name": "Goniobranchus albonares",
+    "aphia": 597346,
+    "page": "307",
+    "original_name": "Chromodoris albonares Rudman, 1990"
+   }
+  ]
+ },
+ {
+  "source_id": 163719,
+  "slug": "od-rudman-1991-163719",
+  "title": "Further studies on the taxonomy and biology of the octocoral-feeding genus Phyllodesmium Ehrenberg, 1831 (Nudibranchia: Aeolidoidea)",
+  "source": "Rudman, W. B. (1991)",
+  "citation": "Rudman, W. B. (1991). Further studies on the taxonomy and biology of the octocoral-feeding genus Phyllodesmium Ehrenberg, 1831 (Nudibranchia: Aeolidoidea). Journal of Molluscan Studies. 57: 167-203.",
+  "link": "https://doi.org/10.1093/mollus/57.2.167",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=163719",
+  "species": [
+   {
+    "name": "Phyllodesmium colemani",
+    "aphia": 548883,
+    "page": "187",
+    "original_name": null
+   },
+   {
+    "name": "Phyllodesmium magnum",
+    "aphia": 548880,
+    "page": "190",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 40364,
+  "slug": "od-ruppell-1828-40364",
+  "title": "Mollusca",
+  "source": "Rüppell, E. & Leuckart, F. S. (1828)",
+  "citation": "Rüppell, E. & Leuckart, F. S. (1828-1830). Mollusca. In: Atlas zu der Reise im nordlichen Afrika von Eduard Rüppell. Neue wirbellose Thiere des Rothen Meeres. Frankfurt, H. L. Brönner. pp. 15-22, pls 4-6 [1828]; pp. 23-47, pls 7-12 [1830].",
+  "link": "https://www.biodiversitylibrary.org/page/37140891",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=40364",
+  "species": [
+   {
+    "name": "Aplysia argus",
+    "aphia": 730434,
+    "page": "23, Plate 7, Figure 1",
+    "original_name": null
+   },
+   {
+    "name": "Chromodoris quadricolor",
+    "aphia": 139143,
+    "page": "31; pl. 9 fig. 2",
+    "original_name": "Doris quadricolor Rüppell & Leuckart, 1830"
+   },
+   {
+    "name": "Goniobranchus obsoletus",
+    "aphia": 597365,
+    "page": "31-32, Plate 9, Figure 3",
+    "original_name": "Doris obsoleta Rüppell & Leuckart, 1830"
+   },
+   {
+    "name": "Hexabranchus sanguineus",
+    "aphia": 220381,
+    "page": "28-29, Plate 8, Figure 1",
+    "original_name": "Doris sanguinea Rüppell & Leuckart, 1830"
+   },
+   {
+    "name": "Hypselodoris infucata",
+    "aphia": 139151,
+    "page": "34, Plate 10, Figure 3",
+    "original_name": "Doris infucata Rüppell & Leuckart, 1830"
+   },
+   {
+    "name": "Hypselodoris pulchella",
+    "aphia": 597870,
+    "page": "32-33, Plate 9, Figure 5",
+    "original_name": "Doris pulchella Rüppell & Leuckart, 1830"
+   },
+   {
+    "name": "Pleurobranchus forskalii",
+    "aphia": 140819,
+    "page": "18-20; pl. 5 fig. 2",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 175700,
+  "slug": "od-schweigger-1820-175700",
+  "title": "Handbuch der Naturgeschichte der skelettlosen ungegliederten Thiere",
+  "source": "Schweigger, A. F. (1820)",
+  "citation": "Schweigger, A. F. (1820). Handbuch der Naturgeschichte der skelettlosen ungegliederten Thiere. Leipzig, Im Verlag der Dyk'schen Buchhandlung. 1-776.",
+  "link": "https://doi.org/10.5962/bhl.title.59209",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=175700",
+  "species": [
+   {
+    "name": "Notarchus indicus",
+    "aphia": 139594,
+    "page": null,
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 197928,
+  "slug": "od-shipman-2015-197928",
+  "title": "Molecular and morphological systematics of Doto Oken, 1851 (sic) (Gastropoda: Heterobranchia), with descriptions of five new species and a new genus",
+  "source": "Shipman C. & Gosliner T. (2015)",
+  "citation": "Shipman C. & Gosliner T. (2015). Molecular and morphological systematics of Doto Oken, 1851 (sic) (Gastropoda: Heterobranchia), with descriptions of five new species and a new genus. Zootaxa. 3973(1): 57-101.",
+  "link": "https://doi.org/10.11646/zootaxa.3973.1.2",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=197928",
+  "species": [
+   {
+    "name": "Kabeiro phasmida",
+    "aphia": 850136,
+    "page": "91, figs 11A, 12A, 14C-D",
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 40479,
+  "slug": "od-stimpson-1855-40479",
+  "title": "Descriptions of some of the new marine Invertebrata from the Chinese and Japanese seas",
+  "source": "Stimpson, W. (1855)",
+  "citation": "Stimpson, W. (1855). Descriptions of some of the new marine Invertebrata from the Chinese and Japanese seas. Proceedings of the Academy of Natural Sciences, Philadelphia. 7(10): 375–384.",
+  "link": "https://biodiversitylibrary.org/page/26299600",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=40479",
+  "species": [
+   {
+    "name": "Dendrodoris nigra",
+    "aphia": 139519,
+    "page": "380",
+    "original_name": "Doris nigra W. Stimpson, 1855"
+   }
+  ]
+ },
+ {
+  "source_id": 129556,
+  "slug": "od-valles-2006-129556",
+  "title": "Shedding light onto the genera (Mollusca: Nudibranchia) Kaloplocamus and Plocamopherus with description of new species belonging to these unique bioluminescent dorids",
+  "source": "Vallès Y.; Gosliner T.M. (2006)",
+  "citation": "Vallès Y.; Gosliner T.M. (2006). Shedding light onto the genera (Mollusca: Nudibranchia) Kaloplocamus and Plocamopherus with description of new species belonging to these unique bioluminescent dorids. The Veliger. 48(3): 178-205.",
+  "link": "https://www.biodiversitylibrary.org/page/42489898",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=129556",
+  "species": [
+   {
+    "name": "Plocamopherus maculapodium",
+    "aphia": 390179,
+    "page": null,
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 434930,
+  "slug": "od-van-1824-434930",
+  "title": "Uittreksel uit eenen brief van Dr J. C. van Hasselt, aan Prof van Swinderen",
+  "source": "van Hasselt, J. C. (1824)",
+  "citation": "van Hasselt, J. C. (1824). Uittreksel uit eenen brief van Dr J. C. van Hasselt, aan Prof van Swinderen. Algemeene Konst- en Letter-Bode. 1824: [2] 20–24, [3] 34–39, [4] 54–55.",
+  "link": "https://babel.hathitrust.org/cgi/pt?id=mdp.39015065334867&view=1up&seq=20&skin=2021",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=434930",
+  "species": [
+   {
+    "name": "Plakobranchus ocellatus",
+    "aphia": 451657,
+    "page": null,
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 40612,
+  "slug": "od-vicente-1975-40612",
+  "title": "Une nouvelle espèce de gastéropodes nudibranches en Méditerranée Facelina gabinierei n. sp",
+  "source": "Vicente, N. (1975)",
+  "citation": "Vicente, N. (1975). Une nouvelle espèce de gastéropodes nudibranches en Méditerranée Facelina gabinierei n. sp. Travaux scientifiques du Parc national de Port-Cros. 1: 67-74.",
+  "link": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=40612",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=40612",
+  "species": [
+   {
+    "name": "Flabellina gabinierei",
+    "aphia": 1044183,
+    "page": null,
+    "original_name": "Facelina gabinierei Vicente, 1975"
+   }
+  ]
+ },
+ {
+  "source_id": 40661,
+  "slug": "od-yonow-1986-40661",
+  "title": "Red Sea Phyllidiidae (Mollusca, Nudibranchia) with descriptions of new species",
+  "source": "Yonow N. (1986)",
+  "citation": "Yonow N. (1986). Red Sea Phyllidiidae (Mollusca, Nudibranchia) with descriptions of new species. Journal of Natural History 20: 1401-1428",
+  "link": "https://doi.org/10.1080/00222938600770941",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=40661",
+  "species": [
+   {
+    "name": "Phyllidia multifaria",
+    "aphia": 536618,
+    "page": null,
+    "original_name": null
+   },
+   {
+    "name": "Phyllidia undula",
+    "aphia": 1458826,
+    "page": null,
+    "original_name": null
+   }
+  ]
+ },
+ {
+  "source_id": 386736,
+  "slug": "od-yonow-1988-386736",
+  "title": "Red Sea Opisthobranchia 1: The Family Phyllidiidae (Mollusca, Nudibranchia)",
+  "source": "Yonow, N. (1988)",
+  "citation": "Yonow, N. (1988). Red Sea Opisthobranchia 1: The Family Phyllidiidae (Mollusca, Nudibranchia). Fauna of Saudi Arabia. 9:138-151.",
+  "link": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=386736",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=386736",
+  "species": [
+   {
+    "name": "Phyllidiopsis sinaiensis",
+    "aphia": 536718,
+    "page": null,
+    "original_name": "Phyllidia sinaiensis Yonow, 1988"
+   }
+  ]
+ },
+ {
+  "source_id": 141136,
+  "slug": "od-yonow-2001-141136",
+  "title": "Results of the Rumphius Biohistorical Expedition to Ambon (1990)",
+  "source": "Yonow, N. (2001)",
+  "citation": "Yonow, N. (2001). Results of the Rumphius Biohistorical Expedition to Ambon (1990). Part 11. Doridacea of the families Chromodorididae and Hexabranchidae (Mollusca, Gastropoda, Opisthobranchia, Nudibranchia), including additional Moluccan material. Zoologische Mededelingen. 75: 1-50.",
+  "link": "https://repository.naturalis.nl/pub/217432",
+  "worms": "https://www.marinespecies.org/aphia.php?p=sourcedetails&id=141136",
+  "species": [
+   {
+    "name": "Hypselodoris apolegma",
+    "aphia": 560044,
+    "page": "40, figs 11-12, pl. 5, figs 4, 5",
+    "original_name": "Risbecia apolegma Yonow, 2001"
+   }
+  ]
+ }
+]

@@ -955,6 +955,13 @@ function buildCollectionCard(c, index) {
 // Scientific names are shown with the genus and the species epithet in italics and everything
 // else (cf./aff., "sp. 7", the variant letter, the author) in roman -- the same rule as
 // observations/names.py (name_html), which renders the server-side pages.
+// What follows a species' name on its card: the author of a described species, or for an undescribed "sp." species
+// the publication that numbered it, "(Source: ...)" -- the same rule as Species.author_text (models.py).
+function authorText(sp) {
+    if (sp.source && /^sp\./.test((sp.epithet || '').trim())) return `(${language === 'en' ? 'Source' : 'מקור'}: ${sp.source})`;
+    return sp.author || '';
+}
+
 function setLatinName(el, text) {
     el.textContent = '';
     const tokens = String(text || '').split(/\s+/).filter(Boolean);
@@ -1037,10 +1044,11 @@ function buildSpeciesCard(sp, index, group = null, member = false) {
     info.className = 'card-info';
     const h3 = document.createElement('h3');
     setLatinName(h3, sp.title);
-    if (sp.author) {
+    const authorLine = authorText(sp);
+    if (authorLine) {
         const author = document.createElement('span');
         author.className = 'card-author';
-        author.textContent = sp.author;
+        author.textContent = authorLine;
         h3.append(' ', author);
     }
     const sub = document.createElement('span');

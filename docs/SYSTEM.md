@@ -199,7 +199,16 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
 ### 5.2 Catalogue and taxonomy
 
 - **`Species`** (5,382 rows: a full checklist; only about 270 appear in the gallery)
-  - `genus` + `species` + `author` are authoritative. `scientific_name` is derived as exactly
+  - `genus` + `species` + `author` are authoritative.
+  - `name_source` (migrations `0109`–`0110`): for an undescribed "sp." species, the publication that numbered it
+    (e.g. "NSSI-2 Gosliner, Valdés & Behrens, 2018", "NSSI-3 … 2026", "Martín-Hervás et al., 2021"). Shown where a
+    described species shows its author, as "(Source: …)" / "(מקור: …)" (`Species.author_text`, the `author_text`
+    filter, catalog.js `source`, app.js `authorText` -- keep in step). The owner's own marks (sp. A, or a number he
+    gave) take the site observation that defines them: "SeaSlugs.org.il observation: <photographer>, <region>, <year>"
+    (`Species.site_source`, the earliest published observation; migration `0111` for the letter marks, species admin
+    action "מקור השם מהתצפית הראשונה באתר" for any). A bare "Genus sp." in the gallery is not left unmarked: migration
+    `0113` gave each such card a letter (its variant letter, else the next free one) in place -- the card keeps its URL.
+    On the species page the source links to its bibliography entry (`Species.source_article`, the `author_html` filter). `scientific_name` is derived as exactly
     "Genus species" (migration 0038).
   - Text taxonomy columns: `order`, `family`, `superfamily`.
   - `name_he`, `name_en`.
@@ -294,6 +303,20 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
   - `slug`, he/en titles, subtitles, bylines and editorial notes, `link`.
   - `pdf_he`, `pdf_en` (≤20 MB) and auto previews `thumb_he`, `thumb_en`.
   - `published_on`, `show_on_home`.
+  - **Bibliography** (migrations `0112`–`0113`): `kind` -- `guide` (identification guides), `description` (papers in
+    which species were described or numbered: the bibliography for a species' original description), `general`;
+    `citation` (the full reference, as shown) and `short_ref` (the short form species cite it by: an undescribed
+    species whose `name_source` equals it links to the entry). `/articles/` lists the three kinds in sections, each
+    entry with its reference, link and the species it is the source of. An entry may be a **reference only** (a book,
+    a paper not kept on the site): no PDF, no sections, but a reference or a link. The two editions of Gosliner, Valdés
+    & Behrens are such entries (`nssi-2-…`, `nssi-3-…`). The fields travel with the article transfer.
+  - **Original descriptions** (migration `0114`, `observations/data/original_descriptions.json`): the publication in
+    which each described gallery species was described (WoRMS "original description" sources, read 2026-11-20; for a
+    species moved to another genus, its original combination), one reference-only entry per publication
+    (`od-<author>-<year>-<WoRMS source id>`), picked by its species. The JSON also keeps each species' page and
+    original name -- the starting point for checking an identification against the original description. 214 of 221
+    species; missing: Dendrodoris tuberculosa, Phyllidiella nigra, P. zeylanica, Sagaminopteron psychedelicum,
+    Samla bicolor, S. riwo, Verconia varians.
   - It is either a PDF article or an article **written on the site**, made of `ArticleBlock` sections
     (heading, subheading, paragraph, figure → Sample, table, list, notice) plus `ArticleReference`
     entries. A table block is one row per line with cells separated by `|`, or a table copied from Excel and pasted as
@@ -1047,6 +1070,8 @@ Catalogue of test modules (test count) and what each guards:
 | `test_book_links` | 5 | Book page links: PDF page per edition, superuser and files only, edition from the nearest mark, page language first, text escaped, PDF view superusers only |
 | `test_discussion_topics` | 12 | Topics for discussion: superuser page, filters / search / order, quick priority and state, add / edit / delete, required topic; `discussions` transfer (export, round trip, newer copy wins, strict format); the `book_edition` issue kind; the editions-comparison migration (rows once, missing species skipped, corrected species linked, empty catalogue gets nothing) |
 | `test_sp_identification_texts` | 3 | Migration 0107: writes only empty identification fields, cites the edition (both editions for a renamed species), reversible; every text bilingual and sourced |
+| `test_bibliography` | 5 | Articles as a bibliography: sections by kind, references, reference-only entries (admin), cited species, the species page's source link, article transfer of the new fields; migration 0113 (bare sp. marks, guides, 2nd-edition sources); migration 0114 (original descriptions) |
+| `test_sp_name_source` | 7 | Source of an undescribed sp. species' name shown instead of an author (species page, catalog, app.js), species transfer, migration 0110; the site's own marks (site_source, migration 0111, admin action) |
 | `test_identification_transfer` | 5 | Genus identification files between environments: manifest, comparison, download, receive (new / same / replace only when confirmed / unknown genus / bad files), page section and the image manager's link |
 | `test_thuridilla_source_migration` | 1 | Migration 0108: the Thuridilla article's author line accents |
 | `test_identification_issues` | 16 | Identification issues: species follow the observations, fixed date, duplicate needs a second one, SET_NULL; superuser page, filters / search / order, quick priority and state, add / edit / delete, form errors, prefill; `identissues` transfer (export, round trip, newer copy wins, missing references skipped, strict format); the findings migration |

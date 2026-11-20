@@ -218,7 +218,7 @@ def species_page(request, slug):
     articles = list(area.species.articles.all())
     for s in samples:
         s.show_name = s.taxon_label != species.scientific_name
-        s.name_main, s.name_author, s.name_stage = s.taxon_parts()
+        s.name_main, s.name_author, s.name_stage = s.taxon_parts(lang)
         s.note = note_html(s, lang, articles, binomials)
     # The main observation is the area's defining sample (the one behind the hero photo/
     # video); the observations grid below lists only the other ones.

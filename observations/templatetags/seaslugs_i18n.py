@@ -101,6 +101,18 @@ TRANSLATIONS = {
     'פורסם באתר:': 'Added to the site:',
     'מופיע בעמודים:': 'Shown on:',
     'קישור למקור ↗': 'Original source ↗',
+    'סוגי המאמרים': 'Kinds of articles',
+    'מגדירים': 'Identification guides',
+    'תיאור והגדרת מינים': 'Species descriptions',
+    'מאמרים מדעיים': 'Scientific papers',
+    'ספרי זיהוי ומגדירים. מינים שטרם תוארו ומסומנים sp. עם מספר נקראים לפי המספר שבמגדיר — המקור מצוין ליד שם המין.':
+        'Identification books and guides. Undescribed species marked "sp." with a number are named by their number in a guide -- the source is given next to the species name.',
+    'מאמרים שבהם תוארו המינים או הוגדרו ומוספרו — ביבליוגרפיה למציאת ההגדרה המקורית של מין ולדיון בזיהוי.':
+        'Papers in which species were described, or defined and numbered -- a bibliography for finding a species\' original description and discussing identifications.',
+    'מאמרים מדעיים בנושאים כלליים: ביולוגיה, אבולוציה, ביוגאוגרפיה ועוד.': 'Scientific papers on general subjects: biology, evolution, biogeography and more.',
+    'מצוטט באתר כ:': 'Cited on the site as:',
+    'אינו שמור באתר': 'Not stored on the site',
+    'מקור השם של:': 'Source of the name of:',
     'PDF (באנגלית)': 'PDF (in English)',
     'PDF (בעברית)': 'PDF (in Hebrew)',
     'באנגלית': 'in English',
@@ -591,3 +603,25 @@ def photo_credit(context, sample, area=None):
             request._viewer_species_keys = keys
     key = species_key(area.species_id, area.undetermined_variant) if area is not None else None
     return credit(sample, user, keys, context.get('lang') or 'he', key)
+
+
+@register.filter
+def author_text(species, lang):
+    """The author of a species -- or, for an undescribed "sp." species, "(Source: <publication>)" (Species.author_text)."""
+    return species.author_text(lang) if species is not None else ''
+
+
+@register.filter
+def author_html(species, lang):
+    """author_text, with the source of an undescribed species' name linked to its entry in the articles library (and
+    its full reference as the link's tooltip) when the library has it (Species.source_article)."""
+    from django.utils.html import format_html
+    if species is None:
+        return ''
+    text = species.author_text(lang)
+    article = species.source_article() if text else None
+    if article is None:
+        return text
+    label = species.SOURCE_LABEL.get(lang, 'Source')
+    return format_html('({}: <a class="name-source" href="{}" title="{}">{}</a>)', label, article.list_url(lang),
+                       article.citation.strip() or article.title(lang), species.name_source.strip())

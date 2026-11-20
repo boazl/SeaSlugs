@@ -48,7 +48,7 @@ class GalleryScriptTests(SimpleTestCase):
         root = Path(__file__).resolve().parent.parent / 'dist'
         js, css = (root / 'app.js').read_text(encoding='utf-8'), (root / 'styles.css').read_text(encoding='utf-8')
         self.assertIn("author.className = 'card-author'", js)
-        self.assertIn('if (sp.author)', js)
+        self.assertIn('if (authorLine)', js)   # the author, or for an undescribed sp. its source (authorText)
         self.assertIn('function photographerSpeciesCount(', js)
         self.assertIn('function photographerCollectionCount(', js)
         self.assertIn("'מינים'", js)

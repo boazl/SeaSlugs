@@ -34,9 +34,12 @@ def article_links(articles, lang, binomials=None):
         links.append({
             'slug': article.slug, 'title': italicize_names(article.title(lang), binomials), 'source': article.source,
             'link': article.link, 'pdf_url': article.pdf_url(lang), 'other_language': other_language,
-            'written': written, 'url': article.url(lang),
+            # a bibliography entry only (no PDF, no sections) leads to its entry in the library, with its full reference
+            'written': written, 'url': article.url(lang) or with_lang(reverse('article-list'), lang) + f'#{article.slug}',
             'thumb_url': reverse('observation-photo', args=[figure.pk]) if figure else article.thumb_url(lang),
             'list_url': with_lang(reverse('article-list'), lang) + f'#{article.slug}',
+            'kind': article.kind, 'citation': article.citation.strip(), 'short_ref': article.short_ref.strip(),
+            'reference_only': not written and not pdf_lang,
         })
     return links
 
@@ -78,6 +81,12 @@ def article_list(request):
     lang = get_lang(request)
     binomials = known_binomials()
     articles = list(Article.objects.prefetch_related('species', 'orders', 'families', 'genera', 'trips'))
+    # the undescribed "sp." species whose name cites each entry (Species.name_source == Article.short_ref)
+    from .models import Species
+    cited_by = {}
+    for species in (Species.objects.exclude(name_source='').filter(species__startswith='sp.', areas__isnull=False)
+                    .distinct().order_by('scientific_name')):
+        cited_by.setdefault(species.name_source.strip(), []).append(species)
     rows = []
     for article, link in zip(articles, article_links(articles, lang, binomials)):
         places = []
@@ -91,9 +100,15 @@ def article_list(request):
             places.append({'url': with_lang(reverse('order-page', args=[order.pk]), lang), 'name': str(order), 'place': ''})
         for trip in article.trips.all():
             places.append({'url': with_lang(reverse('dive-trips'), lang) + f'#trip-{trip.pk}', 'name': trip.title, 'place': '', 'trip': True})
-        rows.append({**link, 'published_on': article.published_on, 'places': places, 'pk': article.pk})
+        rows.append({**link, 'published_on': article.published_on, 'places': places, 'pk': article.pk,
+                     'cited_by': [{'name': s.scientific_name, 'url': next((x['url'] for x in _area_links(s, lang)), '')}
+                                  for s in (cited_by.get(article.short_ref.strip(), []) if article.short_ref.strip() else [])]})
     user = request.user
-    return render(request, 'observations/articles.html', {'articles': rows,
+    # The library in three sections (Article.kind): identification guides, the papers in which the species were
+    # described or numbered (the bibliography for finding a species' original description), general scientific papers.
+    sections = [{'kind': kind, 'anchor': f'kind-{kind}', 'articles': [r for r in rows if r['kind'] == kind]}
+                for kind in (Article.Kind.GUIDE, Article.Kind.DESCRIPTION, Article.Kind.GENERAL)]
+    return render(request, 'observations/articles.html', {'articles': rows, 'sections': [s for s in sections if s['articles']],
         # managers (staff with the article permissions) get an add button and an edit button per article
         'can_add_article': user.is_staff and user.has_perm('observations.add_article'),
         'can_edit_article': user.is_staff and user.has_perm('observations.change_article')})
