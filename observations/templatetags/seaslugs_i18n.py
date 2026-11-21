@@ -66,6 +66,7 @@ TRANSLATIONS = {
     'כוכבים': 'stars',
     'לחיצה נוספת על אותו כוכב מבטלת את הדירוג': 'Click the same star again to clear your rating',
     'צפייה בסרטון': 'Watch the video',
+    'צפייה בתמונה': 'View the photo',
     'הגדלת התמונה': 'Enlarge photo',
     'סגירה': 'Close',
     'תצפיות נוספות': 'More observations',

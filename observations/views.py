@@ -228,6 +228,10 @@ def species_page(request, slug):
         from .local_videos import annotate
         annotate(samples)
     other_samples = [s for s in samples if s is not main_sample]
+    # An editor (a manager, or the observation's owner) opens an extra observation's card at its edit page; the photo /
+    # video then opens from a separate link. Everyone else keeps the card opening the photo or video on the page.
+    for other in other_samples:
+        other.edit_url = sample_edit_url(request, [other])
     # The observations forum (forum.py): an "add a comment" button per observation and, when there are any, a link to
     # the comments this visitor can read.
     from .forum import forum_counts, forum_url, new_comment_url
