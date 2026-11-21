@@ -198,5 +198,10 @@
     "old_slug": "goniobranchus-geminus-djibouti-red-sea-gulf-of-aqaba",
     "current_slug": "goniobranchus-geminus-djibouti-red-sea-bab-el-mandeb-strait-gulf-of-aden",
     "sample_transfer_id": "205cceeb3c3e4fb3874b6ed3a1446fdb"
+  },
+  {
+    "old_slug": "phyllidia-multifaria-thailand-indo-pacific-gulf-of-thailand",
+    "current_slug": "phyllidia-elegans-thailand-indo-pacific-gulf-of-thailand",
+    "sample_transfer_id": "92312e13-7d87-44de-8a34-76c822259a42"
   }
 ]

@@ -32,10 +32,14 @@ class MappingValidationTests(SimpleTestCase):
         # (2026-11-02) Goniobranchus geminus' "Djibouti · Gulf of Eilat" page: its trip moved to Bab el-Mandeb
         # (migration 0085 removed the stale area, see test_stale_species_areas)
         geminus = 'goniobranchus-geminus-djibouti-red-sea-gulf-of-aqaba'
-        self.assertEqual(len(set(HISTORICAL_SPECIES_REDIRECTS) - {MERGED, moved, geminus}), 37)
+        # (2026-11-21) identification issue #4: the Thailand observation of "Phyllidia multifaria" (a Red Sea endemic) is
+        # Phyllidia elegans
+        elegans = 'phyllidia-multifaria-thailand-indo-pacific-gulf-of-thailand'
+        self.assertEqual(HISTORICAL_SPECIES_REDIRECTS[elegans][0], 'phyllidia-elegans-thailand-indo-pacific-gulf-of-thailand')
+        self.assertEqual(len(set(HISTORICAL_SPECIES_REDIRECTS) - {MERGED, moved, geminus, elegans}), 37)
         self.assertEqual(set(HISTORICAL_SPECIES_REDIRECTS) & {MERGED}, {MERGED})
         self.assertEqual(HISTORICAL_SPECIES_REDIRECTS[moved][0], 'hexabranchus-sanguineus-sinai-red-sea-gulf-of-aqaba')
-        self.assertEqual(len(HISTORICAL_SPECIES_REDIRECTS), 40)
+        self.assertEqual(len(HISTORICAL_SPECIES_REDIRECTS), 41)
         self.assertEqual(HISTORICAL_SPECIES_REDIRECTS[OLD][0], CURRENT)
         for stem in UNRESOLVED:
             self.assertNotIn(stem + '-phillipines-indo-pacific', HISTORICAL_SPECIES_REDIRECTS)

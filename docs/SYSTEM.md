@@ -886,6 +886,9 @@ never serves `MEDIA_ROOT` directly.** Every file goes through a view that checks
     `_Fill species reference links.command`.
   - `test_email`.
   - `setup_community`: groups and geography seed; repeatable.
+  - `apply_issue_reviews`: writes the reviews of identification issues kept in
+    `observations/data/issue_reviews.json` (recommendation / decision only into empty fields; a state only while under
+    review). Dry run by default, `--apply` backs up first.
 - **Imports** (local only; most were one-off migrations from the owner's Excel workbook)
   - `import_species_catalog`, `import_species_science`, `import_gallery_species`.
   - `import_gallery_samples`, `import_dive_trips`, `import_missing_no_video_samples`.

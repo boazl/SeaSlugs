@@ -293,3 +293,28 @@ class IssueWorkflowTests(IssueFixture):
         item = issue_plan(document)[0]
         self.assertEqual(item['action'], 'update')
         self.assertEqual(item['object'].decision, 'kept here')
+
+
+class ApplyIssueReviewsTests(IssueFixture):
+    """apply_issue_reviews writes the reviews kept in observations/data/issue_reviews.json: a recommendation / decision
+    only into an empty field, a state only on an issue still under review; dry run unless --apply."""
+
+    def test_writes_only_empty_fields_and_review_states(self):
+        from io import StringIO
+        from unittest.mock import patch
+        from django.core.management import call_command
+        from .management.commands import apply_issue_reviews as command
+        fresh = Issue.objects.create(kind='range', species=self.maculosa)
+        edited = Issue.objects.create(kind='range', species=self.aurora, recommendation='mine', status='decided')
+        reviews = [{'transfer_id': str(fresh.transfer_id), 'recommendation': 'R', 'decision': 'D', 'status': 'checking'},
+                   {'transfer_id': str(edited.transfer_id), 'recommendation': 'R2', 'status': 'checking'}]
+        with patch.object(command, 'DATA') as data, patch('observations.table_transfer.create_backup'):
+            data.read_text.return_value = json.dumps(reviews)
+            call_command('apply_issue_reviews', stdout=StringIO())
+            fresh.refresh_from_db()
+            self.assertEqual(fresh.recommendation, '')
+            call_command('apply_issue_reviews', '--apply', stdout=StringIO())
+        fresh.refresh_from_db(); edited.refresh_from_db()
+        self.assertEqual((fresh.recommendation, fresh.decision, fresh.status), ('R', 'D', 'checking'))
+        self.assertEqual((edited.recommendation, edited.status), ('mine', 'decided'))
+        self.assertTrue(json.loads(command.DATA.read_text(encoding='utf-8')))     # the real file is valid JSON
