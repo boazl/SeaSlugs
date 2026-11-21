@@ -27,7 +27,8 @@ from django.utils import timezone
 from .models import IdentificationIssue, Sample, Species
 
 Issue = IdentificationIssue
-STATE_FILTERS = [('active', 'פתוחות ובבדיקה'), ('all', 'הכול')] + list(Issue.Status.choices)
+STATE_FILTERS = [('active', 'לא טופלו (לבחינה ולתיקון)'), ('review', 'לבחינה (פתוחות ובבדיקה)'), ('tofix', 'לתיקון (הוחלט)'), ('all', 'הכול')] + list(Issue.Status.choices)
+ACTIVE = [Issue.Status.OPEN, Issue.Status.CHECKING, Issue.Status.DECIDED]
 SORT_CHOICES = [('priority', 'לפי עדיפות'), ('new', 'החדשות קודם'), ('old', 'הישנות קודם'), ('species', 'לפי שם המין')]
 # Which kind uses which extra field: the form shows them all, and marks the ones that belong to the chosen kind.
 KIND_FIELDS = {
@@ -86,10 +87,12 @@ class IssueForm(forms.ModelForm):
         model = Issue
         fields = ['kind', 'priority', 'status', 'opened_on', 'fixed_on', 'reporter', 'observation', 'species',
                   'second_observation', 'second_species', 'native_range', 'corrected_species', 'corrected_name',
-                  'research_link', 'notes']
+                  'research_link', 'notes', 'recommendation', 'decision'] + list(Issue.ACTION_FIELDS)
         widgets = {'opened_on': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
                    'fixed_on': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
                    'notes': forms.Textarea(attrs={'rows': 6, 'cols': 80}),
+                   'recommendation': forms.Textarea(attrs={'rows': 8, 'cols': 80}),
+                   'decision': forms.Textarea(attrs={'rows': 4, 'cols': 80}),
                    'native_range': forms.TextInput(attrs={'size': 60}),
                    'corrected_name': forms.TextInput(attrs={'size': 40, 'dir': 'ltr'}),
                    'research_link': forms.URLInput(attrs={'size': 60, 'dir': 'ltr'}),
@@ -123,7 +126,11 @@ def issue_rows(state='active', kind='', priority='', q='', sort='priority'):
                                           'second_observation__trip__region__sea', 'second_observation__trip__country',
                                           'second_observation__species', 'species', 'second_species', 'corrected_species')
     if state == 'active':
+        issues = issues.filter(status__in=ACTIVE)
+    elif state == 'review':
         issues = issues.filter(status__in=[Issue.Status.OPEN, Issue.Status.CHECKING])
+    elif state == 'tofix':
+        issues = issues.filter(status=Issue.Status.DECIDED)
     elif state != 'all':
         issues = issues.filter(status=state)
     if kind:
@@ -133,7 +140,7 @@ def issue_rows(state='active', kind='', priority='', q='', sort='priority'):
     if q:
         match = (Q(species__scientific_name__icontains=q) | Q(second_species__scientific_name__icontains=q)
                  | Q(corrected_species__scientific_name__icontains=q) | Q(corrected_name__icontains=q)
-                 | Q(notes__icontains=q) | Q(native_range__icontains=q) | Q(reporter__icontains=q)
+                 | Q(notes__icontains=q) | Q(recommendation__icontains=q) | Q(decision__icontains=q) | Q(native_range__icontains=q) | Q(reporter__icontains=q)
                  | Q(observation__species__scientific_name__icontains=q))
         if q.isdigit():
             match |= Q(observation_id=int(q)) | Q(second_observation_id=int(q)) | Q(pk=int(q))
@@ -189,6 +196,9 @@ def identification_issues(request):
         if request.POST.get('priority') in {str(v) for v in Issue.Priority.values} and int(request.POST['priority']) != issue.priority:
             issue.priority = int(request.POST['priority']); changed.append('priority')
         if request.POST.get('status') in Issue.Status.values and request.POST['status'] != issue.status:
+            if request.POST['status'] == Issue.Status.FIXED and issue.actions_pending:
+                messages.error(request, f'רשומה {issue.pk}: לפני סימון "טופלה" יש לסמן כבוצעו: ' + ', '.join(issue.actions_pending))
+                return redirect(_back(request))
             issue.status = request.POST['status']; changed.append('status')
         if changed:
             issue.updated_at = timezone.now()
@@ -204,7 +214,7 @@ def identification_issues(request):
         issue.second_page_url = page_urls.get(issue.second_observation_id)
         issue.species_page_url = page_urls.get(getattr(issue.species_sample, 'pk', None))
     totals = {row['status']: row['n'] for row in Issue.objects.values('status').annotate(n=Count('id'))}
-    active = Issue.objects.filter(status__in=[Issue.Status.OPEN, Issue.Status.CHECKING])
+    active = Issue.objects.filter(status__in=ACTIVE)
     by_kind = {row['kind']: row['n'] for row in active.values('kind').annotate(n=Count('id'))}
     return render(request, 'observations/identification_issues.html', {
         'issues': issues, **filters, 'query': request.GET.urlencode(),

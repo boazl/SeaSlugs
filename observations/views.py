@@ -295,7 +295,7 @@ def species_page(request, slug):
         species_label, common_name, taxon_label(family_obj), taxon_label(order_obj), len(samples), place, lang,
         migrant=species.is_migrant and seo_text.is_mediterranean(area), migrant_year=species.first_observed_year))
     return render(request, 'observations/species_page.html', {
-        'article_links': article_links(articles, lang, binomials),
+        'article_links': article_links(articles, lang, binomials, species=area.species),
         'note': note_html(area, lang, articles, binomials),
         'can_copy_image': is_manager(request.user),
         'meta_title': meta_title, 'meta_description': meta_description, 'place_label': place,

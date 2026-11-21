@@ -18,10 +18,13 @@ from .models import IdentificationIssue, Sample, Species
 
 ISSUE_FIELDS = ['transfer_id', 'kind', 'status', 'priority', 'opened_on', 'fixed_on', 'observation', 'species',
                 'second_observation', 'second_species', 'corrected_species', 'corrected_name', 'native_range',
-                'research_link', 'reporter', 'notes', 'created_at', 'updated_at']
+                'research_link', 'reporter', 'notes', 'created_at', 'updated_at', 'recommendation', 'decision',
+                'action_video', 'action_photo', 'action_observation', 'action_delete', 'action_catalog']
 OBSERVATION_FIELDS = ('observation', 'second_observation')
 SPECIES_FIELDS = ('species', 'second_species', 'corrected_species')
 TEXT_FIELDS = ('kind', 'status', 'corrected_name', 'native_range', 'research_link', 'reporter', 'notes')
+# the review and the work (added later): a row from an older file lacks them and the destination keeps its own
+WORK_FIELDS = ('recommendation', 'decision', 'action_video', 'action_photo', 'action_observation', 'action_delete', 'action_catalog')
 # the fields compared and shown in the preview (everything but the key and the bookkeeping times)
 COMPARED = [f for f in ISSUE_FIELDS if f not in ('transfer_id', 'created_at', 'updated_at')]
 
@@ -31,7 +34,7 @@ def issue_row(obj, fields=ISSUE_FIELDS):
               'opened_on': obj.opened_on.isoformat() if obj.opened_on else None,
               'fixed_on': obj.fixed_on.isoformat() if obj.fixed_on else None,
               'corrected_name': obj.corrected_name, 'native_range': obj.native_range, 'research_link': obj.research_link,
-              'reporter': obj.reporter, 'notes': obj.notes,
+              'reporter': obj.reporter, 'notes': obj.notes, **{f: getattr(obj, f) for f in WORK_FIELDS},
               'created_at': obj.created_at.isoformat() if obj.created_at else None,
               'updated_at': obj.updated_at.isoformat() if obj.updated_at else None}
     for f in OBSERVATION_FIELDS:
@@ -65,7 +68,7 @@ def _day(value, number, field, required):
 def issue_plan(document):
     result, seen = [], set()
     for number, incoming in enumerate(document['rows'], 1):
-        if not isinstance(incoming, dict) or set(incoming) != set(ISSUE_FIELDS):
+        if not isinstance(incoming, dict) or not (set(ISSUE_FIELDS) - set(WORK_FIELDS) <= set(incoming) <= set(ISSUE_FIELDS)):
             raise ValidationError(f'שדות לא תואמים בשורה {number}; יש לעדכן את הקוד בשתי הסביבות.')
         for field in TEXT_FIELDS:
             if not isinstance(incoming[field], str):
@@ -97,6 +100,11 @@ def issue_plan(document):
             result.append({'action': 'skipped', 'label': label, 'reason': missing})
             continue
         values = {f: incoming[f] for f in TEXT_FIELDS}
+        for f in WORK_FIELDS:
+            if f in incoming:
+                if not isinstance(incoming[f], str):
+                    raise ValidationError(f'ערך לא תקין בשורה {number} ({f}).')
+                values[f] = incoming[f]
         values.update(refs, priority=incoming['priority'],
                       opened_on=_day(incoming['opened_on'], number, 'opened_on', True),
                       fixed_on=_day(incoming['fixed_on'], number, 'fixed_on', False),

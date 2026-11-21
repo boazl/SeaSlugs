@@ -18,7 +18,7 @@ from django.core.files.base import ContentFile
 from django.db import transaction
 from django.utils import timezone
 
-from .models import Article, ArticleBlock, ArticleReference, DiveTrip, Sample, Species, TaxonFamily, TaxonGenus, TaxonOrder
+from .models import Article, ArticleBlock, ArticleReference, DiveTrip, Sample, Species, SpeciesPublicationName, TaxonFamily, TaxonGenus, TaxonOrder
 
 TEXT_FIELDS = ('subtitle_he', 'subtitle_en', 'byline_he', 'byline_en', 'editorial_he', 'editorial_en')
 BLOCK_FIELDS = ('position', 'kind', 'title_he', 'title_en', 'text_he', 'text_en')
@@ -76,6 +76,9 @@ def article_entry(article):
         'kind': article.kind, 'citation': article.citation, 'short_ref': article.short_ref,
         'files': {lang: _file_details(getattr(article, 'pdf_' + lang)) for lang in LANGS},
         'pages': _pages(article),
+        # the names under which species appear in it (SpeciesPublicationName; added later: a list from before it
+        # lacks them, and the destination keeps its own)
+        'species_names': sorted([n.species.scientific_name, n.name, n.pages] for n in article.species_names.all()),
         # An article written on the site: its texts, sections (a figure's observation by its fixed transfer id,
         # the same in both environments) and references.
         'content': {
@@ -88,7 +91,8 @@ def article_entry(article):
 
 
 def _articles():
-    return Article.objects.prefetch_related('species', 'genera', 'families', 'orders', 'trips', 'references').order_by('slug')
+    return Article.objects.prefetch_related('species', 'genera', 'families', 'orders', 'trips', 'references',
+                                            'species_names__species').order_by('slug')
 
 
 def _valid_content(content):
@@ -141,6 +145,10 @@ def _valid_entry(entry):
             return False
     if not _valid_content(entry.get('content')):
         return False
+    names = entry.get('species_names', [])
+    if not (isinstance(names, list) and all(isinstance(x, list) and len(x) == 3 and all(isinstance(y, str) for y in x)
+                                            and x[0] and x[1] for x in names)):
+        return False
     pages = entry['pages']
     if set(pages) != set(PAGE_LABELS):
         return False
@@ -185,6 +193,8 @@ def compare_manifest(manifest):
             continue
         details = [DETAIL_LABELS[f] for f in DETAIL_FIELDS if here[f] != there[f]]
         details += [BIBLIOGRAPHY_LABELS[f] for f in BIBLIOGRAPHY_FIELDS if f in there and here[f] != there[f]]
+        if 'species_names' in there and here['species_names'] != there['species_names']:
+            details.append('שמות המינים בפרסום')
         if there.get('content') is not None and here['content'] != there['content']:
             details.append('תוכן המאמר (קטעים, כותרת משנה, קרדיט, מקורות)')
         pdfs = []
@@ -334,5 +344,17 @@ def receive(uploads, replace=False):
                 getattr(article, key).set(values)
             if missing:
                 notes.append(f'{slug}: עמודים שלא נמצאו כאן ולכן לא קושרו — ' + ', '.join(missing))
+            if 'species_names' in entry:
+                article.species_names.all().delete()
+                absent = []
+                for species_name, name, pages in entry['species_names']:
+                    species = Species.objects.filter(scientific_name=species_name).first()
+                    if species is None:
+                        absent.append(species_name)
+                        continue
+                    SpeciesPublicationName.objects.create(species=species, article=article, name=name, pages=pages)
+                    article.species.add(species)
+                if absent:
+                    notes.append(f'{slug}: שמות בפרסום של מינים שאינם כאן ולכן לא נשמרו — ' + ', '.join(absent))
             done.append(('נוסף' if created else 'עודכן', str(article)))
     return done, notes

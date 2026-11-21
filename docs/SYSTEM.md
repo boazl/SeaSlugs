@@ -317,6 +317,19 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
     original name -- the starting point for checking an identification against the original description. 214 of 221
     species; missing: Dendrodoris tuberculosa, Phyllidiella nigra, P. zeylanica, Sagaminopteron psychedelicum,
     Samla bicolor, S. riwo, Verconia varians.
+  - **Guides linked to their species by their sources** (migrations `0116` (emptied) / `0117`, `guide_citations.py`):
+    like the original descriptions, a publication is picked by a species through the species' sources only -- its
+    `name_source` (every gallery "sp. N" was named by the **2nd edition**: the photo labels say 2018; `0117` moved back
+    the 14 that `0110` had given NSSI-3) and the names it has in publications (`SpeciesPublicationName`: species,
+    article, the name used there, pages; admin inline on the species form). The 3rd edition is linked only to the 33
+    species it has a name for (`0117`, from the 3rd-edition accounts of `0107`; 14 same name, 19 renamed), and the
+    link says so: "מופיע בו בשם <name>, עמ׳ N" / "מופיע בו באותו שם" on the species page, "(בשם … / באותו שם)" in the
+    library. A citation in a species' texts does not link. Saving a species in the admin adds the links; links are
+    never removed automatically. In the library a species whose name the guide is the source of is listed once (under
+    "מקור השם של:"). The names travel with the article transfer (`species_names`).
+  - Migration `0118`: the open `book_edition` issues carry the source of the 3rd-edition name in `corrected_name`
+    ("Aegires sp. 13 (NSSI-3 Gosliner, Valdés & Behrens, 2026)"); a change of number only (same genus) is low
+    priority, a move to another genus keeps its priority. Species with the same name in both editions have no issue.
   - It is either a PDF article or an article **written on the site**, made of `ArticleBlock` sections
     (heading, subheading, paragraph, figure → Sample, table, list, notice) plus `ArticleReference`
     entries. A table block is one row per line with cells separated by `|`, or a table copied from Excel and pasted as
@@ -1093,6 +1106,7 @@ Catalogue of test modules (test count) and what each guards:
 | `test_species_add`, `test_species_observation_counts` | 7+7 | Adding species; counters wording |
 | `test_assign_genus_defining_samples`, `test_import_genus_texts`, `test_signup_email`, `test_sitemap`, `test_genus_placeholder_migration` | 6 each | as named |
 | `test_genus_identification_bilingual` | 5 | he/en identification files, preview page, fallback, image as own preview |
+| `test_guide_citations` | 6 | Guides linked by the species' sources only (name source, names in publications -- not texts); "appears in it as" on the species page and in the library; admin save; article transfer of the names; migration 0117 (NSSI-3 sources back to NSSI-2, 3rd-edition names, text links removed); migration 0118 (book-edition issues: source, low priority for a number change) |
 | `test_account_transfer`, `test_releases`, `test_card_media_marks` | 5 each | as named |
 | `test_gallery_order_media_source`, `test_gallery_others_source`, `test_taxon_card_frames`, `test_listing_filter_layout`, `test_species_list_check_migration` | 4 each | gallery card media, "Others" cards, rank frames, listing CSS, catalogue fix |
 | `test_listing_genus_filter`, `test_manager_auto_publish`, `test_sample_changelist_form`, `test_taxon_samples_stay_published`, `test_trip_sea_removal`, `test_library_image_repair`, `test_coryphellina_merge_migration`, `test_worms_suborders_migration` | 3 each | as named |

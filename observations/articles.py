@@ -20,11 +20,14 @@ def with_lang(url, lang):
     return f'{url}?lang=en' if lang == 'en' and url else url
 
 
-def article_links(articles, lang, binomials=None):
+def article_links(articles, lang, binomials=None, species=None):
     """What a page shows for each of its articles, in the page's language: the title (scientific names in
-    italics), the source, the PDF address and whether that PDF is in the other language."""
+    italics), the source, the PDF address and whether that PDF is in the other language. On a species page
+    (`species`), the name under which the species appears in a publication that has one (SpeciesPublicationName)."""
     if binomials is None:
         binomials = known_binomials()
+    from .guide_citations import publication_names
+    names = publication_names(species, lang) if species is not None else {}
     links = []
     for article in articles:
         written = article.is_written
@@ -40,6 +43,7 @@ def article_links(articles, lang, binomials=None):
             'list_url': with_lang(reverse('article-list'), lang) + f'#{article.slug}',
             'kind': article.kind, 'citation': article.citation.strip(), 'short_ref': article.short_ref.strip(),
             'reference_only': not written and not pdf_lang,
+            'as_name': names.get(article.pk),
         })
     return links
 
@@ -80,7 +84,8 @@ def article_list(request):
     """Every article in the library, newest first, with its PDF and the pages that show it."""
     lang = get_lang(request)
     binomials = known_binomials()
-    articles = list(Article.objects.prefetch_related('species', 'orders', 'families', 'genera', 'trips'))
+    articles = list(Article.objects.prefetch_related('species__publication_names', 'orders', 'families', 'genera', 'trips'))
+    from .guide_citations import publication_names
     # the undescribed "sp." species whose name cites each entry (Species.name_source == Article.short_ref)
     from .models import Species
     cited_by = {}
@@ -90,8 +95,12 @@ def article_list(request):
     rows = []
     for article, link in zip(articles, article_links(articles, lang, binomials)):
         places = []
+        # a species whose name the entry is the source of is listed once, under "מקור השם של:"
+        named = {s.pk for s in cited_by.get(article.short_ref.strip(), [])} if article.short_ref.strip() else set()
         for species in article.species.all():
-            places += _area_links(species, lang)
+            if species.pk not in named:
+                as_name = publication_names(species, lang).get(article.pk)
+                places += [{**p, 'as_name': as_name} for p in _area_links(species, lang)]
         for genus in article.genera.all():
             places.append({'url': with_lang(reverse('genus-page', args=[genus.name]), lang), 'name': genus.name, 'place': ''})
         for family in article.families.all():

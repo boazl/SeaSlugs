@@ -12,7 +12,7 @@ from django.utils.safestring import mark_safe
 from django.urls import reverse
 from .forms import SampleForm, SampleChangelistForm, taxonomy_for_form, species_name_options
 from .reference_links import link_kind
-from .models import Article, ArticleBlock, ArticleReference, Country, Sea, Region, Site, Species, Profile, Sample, DiveTrip, SiteImage, SpeciesArea, TaxonOrder, TaxonFamily, TaxonGenus, SampleKind, IdentificationQualifier, LifeStage
+from .models import Article, ArticleBlock, ArticleReference, SpeciesPublicationName, Country, Sea, Region, Site, Species, Profile, Sample, DiveTrip, SiteImage, SpeciesArea, TaxonOrder, TaxonFamily, TaxonGenus, SampleKind, IdentificationQualifier, LifeStage
 
 for model in [Country,Sea,Site,Profile,SiteImage,SampleKind]: admin.site.register(model)
 
@@ -139,12 +139,27 @@ class SpeciesAreaNoteInline(admin.TabularInline):
         return format_html('<a href="{}" target="_blank" rel="noopener">{}</a>', reverse('species-page', args=[obj.slug]), label)
 
 
+class SpeciesPublicationNameInline(admin.TabularInline):
+    """The name under which the species appears in a publication of the library (e.g. its 3rd-edition name in
+    Gosliner, Valdés & Behrens) and the pages; saving links the publication to the species (guide_citations.py)."""
+    model = SpeciesPublicationName
+    extra = 0
+    autocomplete_fields = ['article']
+    fields = ['article', 'name', 'pages']
+
+
 @admin.register(Species)
 class SpeciesAdmin(SaveAndViewMixin, admin.ModelAdmin):
     form = SpeciesAdminForm
     autocomplete_fields = ['articles']
-    inlines = [SpeciesAreaNoteInline]
+    inlines = [SpeciesAreaNoteInline, SpeciesPublicationNameInline]
     readonly_fields = ['scientific_name', 'full_name_display']
+    def save_related(self, request, form, formsets, change):
+        # after the form has set the picked articles: add the publications the species' sources point to -- its
+        # name source and the publications that have a name for it (guide_citations.py)
+        super().save_related(request, form, formsets, change)
+        from .guide_citations import link_species
+        link_species(form.instance)
     def site_pages(self, obj):
         # one per public gallery page of this species (a species observed in several areas has a page for each)
         return species_site_pages(obj)

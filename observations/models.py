@@ -1681,6 +1681,23 @@ class ArticleReference(models.Model):
     def __str__(self): return self.text[:60]
 
 
+class SpeciesPublicationName(models.Model):
+    """The name under which a species appears in a publication of the library (an edition of an identification guide,
+    a paper), with its pages -- e.g. the site's Marionia sp. 6 (named by the 2nd edition of Gosliner, Valdés &
+    Behrens) appears in the 3rd edition as Marioniopsis sp. 11, pp. 282-283. The publication is then linked to the
+    species (Species.articles, guide_citations.py) and its link shows the name: "Appears in it as ...".
+    Travels with the article transfer."""
+    species = models.ForeignKey('Species', on_delete=models.CASCADE, related_name='publication_names', verbose_name='מין')
+    article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name='species_names', verbose_name='פרסום')
+    name = models.CharField('השם בפרסום', max_length=200)
+    pages = models.CharField('עמודים', max_length=40, blank=True)
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['species', 'article'], name='unique_species_publication_name')]
+        ordering = ['article__slug']
+        verbose_name = 'שם המין בפרסום'; verbose_name_plural = 'שם המין בפרסומים (למשל במהדורה השלישית)'
+    def __str__(self): return f'{self.species} = {self.name} ({self.article})'
+
+
 def _delete_article_files(sender, instance, **kwargs):
     """A deleted article (in the admin or from the article-files page) takes its PDFs and previews with it,
     unless another article still points at the same file."""
@@ -1857,7 +1874,8 @@ class IdentificationIssue(models.Model):
     class Status(models.TextChoices):
         OPEN = 'open', 'פתוחה'
         CHECKING = 'checking', 'בבדיקה'
-        FIXED = 'fixed', 'תוקנה'
+        DECIDED = 'decided', 'הוחלט — ממתין לתיקון'
+        FIXED = 'fixed', 'טופלה'
         REJECTED = 'rejected', 'נדחתה (אינה שגיאה)'
     class Priority(models.IntegerChoices):
         HIGH = 1, 'גבוהה'
@@ -1882,6 +1900,30 @@ class IdentificationIssue(models.Model):
     research_link = models.URLField('קישור למחקר', max_length=500, blank=True)
     reporter = models.CharField('מקור הפנייה', max_length=200, blank=True, help_text='מי דיווח או איך התגלתה התקלה.')
     notes = models.TextField('הערות', blank=True)
+    # The work on an issue (identification_issues.py): first it is reviewed against the most authoritative sources and
+    # other observations -- Claude's recommendation, then the owner's decision and the work it needs (state "decided");
+    # then, by priority, the media and the observations are fixed, the site updated, each action marked done, and the
+    # issue is closed as handled ("fixed").
+    recommendation = models.TextField('המלצה (לאחר בחינה)', blank=True,
+        help_text='בחינת הזיהוי מול המקורות המוסמכים, תצפיות אחרות וספרים — והמלצה לתיקון.')
+    decision = models.TextField('החלטה', blank=True, help_text='מה הוחלט לעשות, אחרי הבחינה.')
+    class Action(models.TextChoices):
+        NONE = '', '—'
+        NEEDED = 'needed', 'נדרש'
+        DONE = 'done', 'בוצע'
+    action_video = models.CharField('עריכת סרטון YouTube', max_length=6, choices=Action.choices, blank=True, default='')
+    action_photo = models.CharField('עריכת התמונה (כיתוב)', max_length=6, choices=Action.choices, blank=True, default='')
+    action_observation = models.CharField('עדכון התצפית באתר (מין / פרטים)', max_length=6, choices=Action.choices, blank=True, default='')
+    action_delete = models.CharField('מחיקת תצפית', max_length=6, choices=Action.choices, blank=True, default='')
+    action_catalog = models.CharField('תיקון בקטלוג (שם, מחבר, טקסטים)', max_length=6, choices=Action.choices, blank=True, default='')
+    ACTION_FIELDS = ('action_video', 'action_photo', 'action_observation', 'action_delete', 'action_catalog')
+    @property
+    def actions(self):
+        """[(label, state)] of the work this issue needs, in order."""
+        return [(self._meta.get_field(f).verbose_name, getattr(self, f)) for f in self.ACTION_FIELDS if getattr(self, f)]
+    @property
+    def actions_pending(self):
+        return [label for label, state in self.actions if state == self.Action.NEEDED]
     created_at = models.DateTimeField('נוצרה', default=timezone.now)
     updated_at = models.DateTimeField('עודכנה', default=timezone.now)
     # The same in both environments: the table transfer's key (identification_issue_transfer.py).
@@ -1895,7 +1937,7 @@ class IdentificationIssue(models.Model):
         return f'{self.get_kind_display()} · {name}' if name else self.get_kind_display()
     @property
     def is_active(self):
-        return self.status in (self.Status.OPEN, self.Status.CHECKING)
+        return self.status in (self.Status.OPEN, self.Status.CHECKING, self.Status.DECIDED)
     def clean(self):
         errors = {}
         if self.kind == self.Kind.DUPLICATE and not (self.second_observation_id or self.second_species_id):
@@ -1904,6 +1946,8 @@ class IdentificationIssue(models.Model):
             errors['second_observation'] = 'התצפית השנייה זהה לתצפית הראשונה.'
         if self.fixed_on and self.opened_on and self.fixed_on < self.opened_on:
             errors['fixed_on'] = 'תאריך התיקון מוקדם מתאריך הפתיחה.'
+        if self.status == self.Status.FIXED and self.actions_pending:
+            errors['status'] = 'לפני סימון "טופלה" יש לסמן כבוצעו: ' + ', '.join(self.actions_pending) + '.'
         if errors:
             raise ValidationError(errors)
     def save(self, *args, **kwargs):

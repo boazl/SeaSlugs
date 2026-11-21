@@ -344,8 +344,9 @@ class SpeciesFormNoteTests(ArticleFixture):
                     data[name] = 'on'
             else:
                 data[name] = value
+        for inline in response.context['inline_admin_formsets']:          # every inline's management form
+            data.update({f'{inline.formset.prefix}-{k}': v for k, v in inline.formset.management_form.initial.items()})
         formset = response.context['inline_admin_formsets'][0].formset
-        data.update({f'{formset.prefix}-{k}': v for k, v in formset.management_form.initial.items()})
         for i, area_form in enumerate(formset.forms):
             data[f'{formset.prefix}-{i}-id'] = area_form.instance.pk
             data[f'{formset.prefix}-{i}-species'] = self.ocellata.pk

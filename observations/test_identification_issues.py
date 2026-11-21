@@ -254,3 +254,42 @@ class IdentificationFindingsMigrationTests(IssueFixture):
         self.assertEqual((issue.kind, issue.priority, issue.observation, issue.second_observation, issue.second_species),
                          ('duplicate', 1, self.first, self.second, self.aurora))
         self.assertIn('Mexichromis aurora', issue.notes)
+
+
+class IssueWorkflowTests(IssueFixture):
+    """The work on an issue: review (open / checking) -> a recommendation and a decision with the work it needs (video,
+    photo, observation, deletion, catalogue -- each "needed" then "done"; state "decided", listed under "to fix") ->
+    handled ("fixed"), which is refused while any of its work is still pending. Older transfer files without these
+    fields are still read."""
+
+    def test_states_filters_and_closing(self):
+        review = Issue.objects.create(kind='range', species=self.maculosa)
+        tofix = Issue.objects.create(kind='duplicate', observation=self.first, second_observation=self.second, status='decided',
+                                     recommendation='Same photo', decision='Keep M. aurora', action_photo='needed', action_delete='needed')
+        self.assertEqual(issue_rows(), [tofix, review])
+        self.assertEqual(issue_rows(state='review'), [review])
+        self.assertEqual(issue_rows(state='tofix'), [tofix])
+        self.assertEqual(issue_rows(q='keep m. aurora'), [tofix])
+        self.client.post(reverse('identification-issues'), {'issue': tofix.pk, 'status': 'fixed'})
+        tofix.refresh_from_db()
+        self.assertEqual(tofix.status, 'decided')
+        with self.assertRaises(ValidationError):
+            Issue(kind='other', notes='x', status='fixed', action_video='needed').full_clean()
+        Issue.objects.filter(pk=tofix.pk).update(action_photo='done', action_delete='done')
+        self.client.post(reverse('identification-issues'), {'issue': tofix.pk, 'status': 'fixed'})
+        tofix.refresh_from_db()
+        self.assertEqual((tofix.status, tofix.fixed_on), ('fixed', timezone.localdate()))
+        page = self.client.get(reverse('identification-issues') + '?state=all').content.decode()
+        self.assertIn('✓ עריכת התמונה (כיתוב)', page)
+
+    def test_older_transfer_rows_without_the_work_fields(self):
+        issue = Issue.objects.create(kind='range', species=self.maculosa, decision='kept here')
+        document = export_table('identissues')
+        row = document['rows'][0]
+        for f in ('recommendation', 'decision', 'action_video', 'action_photo', 'action_observation', 'action_delete', 'action_catalog'):
+            del row[f]
+        row['notes'] = 'changed'
+        row['updated_at'] = (issue.updated_at + timedelta(minutes=1)).isoformat()
+        item = issue_plan(document)[0]
+        self.assertEqual(item['action'], 'update')
+        self.assertEqual(item['object'].decision, 'kept here')
