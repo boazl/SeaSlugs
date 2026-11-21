@@ -101,6 +101,7 @@ TRANSLATIONS = {
     'פורסם באתר:': 'Added to the site:',
     'מופיע בעמודים:': 'Shown on:',
     'קישור למקור ↗': 'Original source ↗',
+    'אזורים': 'areas',
     'סוגי המאמרים': 'Kinds of articles',
     'מגדירים': 'Identification guides',
     'תיאור והגדרת מינים': 'Species descriptions',

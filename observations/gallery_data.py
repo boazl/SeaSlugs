@@ -81,6 +81,46 @@ def annotate_same_species(areas, lang, totals=None):
     return areas
 
 
+MED_AREA_CODE = 'med'
+
+
+def group_area_cards(areas, lang):
+    """The cards of a genus / family / order page, one per species like the gallery (app.js groupSpeciesByArea): the
+    cards of one species (same catalog species and variant letter; never an unmarked "sp.") from several areas become
+    one card -- its Mediterranean card when it has one, else the one with the most observations -- carrying an "N areas"
+    button that opens the others, right after it. Returns the cards in order; on each: group_key (None for a card on
+    its own), group_size and group_tip on the shown card, group_member (True for the cards that open)."""
+    by_key = {}
+    for area in areas:
+        area.group_key, area.group_size, area.group_tip, area.group_member = None, 0, '', False
+        if not is_unmarked_sp(area):
+            by_key.setdefault((area.species_id, area.undetermined_variant), []).append(area)
+    out, placed = [], set()
+    for area in areas:
+        key = None if is_unmarked_sp(area) else (area.species_id, area.undetermined_variant)
+        members = by_key.get(key) if key else None
+        if not members or len(members) < 2:
+            out.append(area)
+            continue
+        if key in placed:
+            continue
+        placed.add(key)
+        med = [a for a in members if getattr(a.sea, 'url_code', '') == MED_AREA_CODE]
+        pool = med or members
+        rep = max(pool, key=lambda a: (getattr(a, 'observation_count', 0), -pool.index(a)))
+        tag = f'g{key[0]}-{key[1] or "x"}'
+        observations = sum(getattr(a, 'observation_count', 0) for a in members)
+        tip = other_areas_tip(len(members), observations, lang) + (
+            ' -- click to show every area' if lang == 'en' else ' -- לחיצה מציגה את כל האזורים')
+        rep.group_key, rep.group_size, rep.group_tip = tag, len(members), tip
+        out.append(rep)
+        for other in members:
+            if other is not rep:
+                other.group_key, other.group_member, other.group_size, other.group_tip = tag, True, 0, ''
+                out.append(other)
+    return out
+
+
 def area_is_live(area):
     """An area is shown (card, link, page) only when its defining sample is publicly showable AND it still has
     observations of its own -- an area left behind when its trip moved to another country/sea is not."""

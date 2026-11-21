@@ -1,0 +1,11 @@
+{# The "N areas" button of a species card (gallery_data.group_area_cards): opens / closes the species' cards from its other areas, right after it -- as in the gallery (app.js toggleAreaGroup). #}<script>
+document.addEventListener('click', function(e){
+    var button = e.target.closest && e.target.closest('.area-group-toggle[data-group]');
+    if (!button) return;
+    var open = button.getAttribute('aria-expanded') !== 'true';
+    document.querySelectorAll('.card.area-member[data-group="' + button.dataset.group + '"]').forEach(function(card){ card.hidden = !open; });
+    button.setAttribute('aria-expanded', String(open));
+    button.textContent = button.textContent.replace(/[▾▴]$/, open ? '▴' : '▾');
+    button.closest('.card').classList.toggle('open', open);
+});
+</script>

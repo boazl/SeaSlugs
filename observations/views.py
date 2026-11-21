@@ -379,6 +379,11 @@ def genus_page(request, name):
     lang = get_lang(request)
     annotate_same_species(areas, lang)   # yellow count on a species also observed in other areas
     focus = genus_page_focus(request, areas)
+    from .gallery_data import group_area_cards
+    if focus:   # one card per species, with an "N areas" button (gallery_data.group_area_cards)
+        focus['areas'], focus['others'] = group_area_cards(focus['areas'], lang), group_area_cards(focus['others'], lang)
+    else:
+        areas = group_area_cards(areas, lang)
 
     def taxon_label(obj):
         if not obj:
@@ -545,6 +550,8 @@ def _taxon_page(request, rank, obj, areas, children, parent, parent_url, trail=(
     if is_manager(request.user):
         from .local_videos import annotate_areas
         annotate_areas(areas)   # the manager's red ▶ on a card whose video has no local copy
+    from .gallery_data import group_area_cards
+    areas = group_area_cards(areas, lang)   # one card per species, with an "N areas" button
     sub = getattr(obj, 'sub_order', '') or getattr(obj, 'sub_family', '')
     below_order = rank == 'order' and bool(obj.sub_order or obj.superfamily)     # a sub-order or a superfamily row
     return render(request, 'observations/taxon_page.html', {

@@ -219,12 +219,15 @@ class SpeciesCardsYellowCountOnPagesTests(TestCase):
 
     def test_genus_page(self):
         html = self.client.get('/genus/Caloria/').content.decode()
-        self.assertIn('<span class="count-badge other-areas" aria-hidden="true" title="המין נצפה ב-2 אזורים, 3 תצפיות בסך הכול">2</span>', html)
+        # one card per species (test_taxon_page_area_groups): the shown card carries the "2 areas" button with the same
+        # tooltip instead of a count; the card it opens keeps its yellow count
+        self.assertIn('title="המין נצפה ב-2 אזורים, 3 תצפיות בסך הכול -- לחיצה מציגה את כל האזורים">2 אזורים ▾</button>', html)
         self.assertIn('<span class="count-badge other-areas" aria-hidden="true" title="המין נצפה ב-2 אזורים, 3 תצפיות בסך הכול">1</span>', html)
-        self.assertEqual(html.count('count-badge'), 2)          # militaris: one observation, one area -- no badge
+        self.assertEqual(html.count('count-badge'), 1)          # militaris: one observation, one area -- no badge
         self.assertNotIn('A genus card clicked', html)
         html = self.client.get('/genus/Caloria/?lang=en').content.decode()
         self.assertIn('title="This species was observed in 2 areas, 3 observations in total"', html)
+        self.assertIn('2 areas ▾</button>', html)
 
     def test_trip_page(self):
         main = Sample(owner=self.manager, trip=self.trip_il, kind=Sample.Kind.COLLECTION, title='Haifa', video_url='https://youtu.be/99999999999')
