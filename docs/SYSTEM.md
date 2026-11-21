@@ -330,6 +330,21 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
   - Migration `0118`: the open `book_edition` issues carry the source of the 3rd-edition name in `corrected_name`
     ("Aegires sp. 13 (NSSI-3 Gosliner, Valdés & Behrens, 2026)"); a change of number only (same genus) is low
     priority, a move to another genus keeps its priority. Species with the same name in both editions have no issue.
+  - Migration `0122` (owner's decision on the genus moves, issues #19, 26-28, 33): a species that the 3rd edition moves
+    to another genus takes its 3rd-edition name **in place** (as in `0113`: same species row, observations with the
+    same transfer ids and their genus updated, the card keeps its slug, so no redirect): Dermatobranchus sp. 6 → Armina
+    sp. 10, Haminoea sp. 5 → Liloa sp. 9, Marionia sp. 6 / sp. 24 → Marioniopsis sp. 11 / sp. 22, Tritonia sp. 4 →
+    Marioniopsis sp. 6. Name source NSSI-3; the texts give the 2nd edition's name; sources cite the new genus in WoRMS
+    and the 3rd edition; the genera's defining samples are repaired (`0071`'s rule); the issues become "decided" with
+    the catalogue done and the photo label (and video) to fix. A number change in the same genus keeps the 2nd-edition
+    number.
+  - Migration `0123` (issues #34-36): a 2nd-edition number since described takes the WoRMS accepted name -- Thecacera
+    sp. 8 → Thecacera pikachu (renamed in place), Goniodoridella sp. 8 → Murphydoris cobbi, Eubranchus sp. 26 →
+    Longibranchus putnami (the catalogue row "Eubranchus putnami" takes the accepted combination; genus Longibranchus
+    added to Eubranchidae). When the name has a row, the observations and the card move to it (same rows, transfer ids
+    and slug) with the numbered row's texts, guide names and guides; migration `0124` then deletes the empty numbered rows
+    (owner's approval; only while nothing points at them; their issues point at the described species). Author set, no name
+    source, texts for a described species, sources: WoRMS, original description, both editions.
   - **The book at the species' page** (`book_links.species_book_url`, `/admin/book/<edition>/<lang>/find/?name=`): for
     the owner on the Mac (a superuser, the PDFs in `BOOK_PDF_DIR`), a species' link to an edition (the entry's
     `short_ref` code NSSI-2 / NSSI-3) opens the page viewer at the species' page in that edition -- its known pages
@@ -1098,6 +1113,8 @@ Catalogue of test modules (test count) and what each guards:
 | `test_sp_identification_texts` | 3 | Migration 0107: writes only empty identification fields, cites the edition (both editions for a renamed species), reversible; every text bilingual and sourced |
 | `test_taxon_page_area_groups` | 2 | Genus / family / order pages: one card per species with an "N areas" button, Mediterranean card first; single-area species and bare sp. stay ordinary |
 | `test_bibliography` | 5 | Articles as a bibliography: sections by kind, references, reference-only entries (admin), cited species, the species page's source link, article transfer of the new fields; migration 0113 (bare sp. marks, guides, 2nd-edition sources); migration 0114 (original descriptions) |
+| `test_book_edition_genus_moves` | 4 | Migration 0122: a species moved to another genus by the 3rd edition renamed in place (texts, sources, name source, observations' genus, same slug and transfer id), the old genus's defining sample repaired, the issue decided with its actions; runs once; skipped when the new name exists |
+| `test_described_book_species` | 3 | Migration 0123: a described 2nd-edition number takes the accepted name -- renamed in place, or observations / card / texts / guide names moved to the existing row (same slug and transfer ids), new genus added, defining samples repaired, issue decided; runs once; migration 0124 deletes the empty numbered row (repointing its issues) only while unused |
 | `test_sp_name_source` | 7 | Source of an undescribed sp. species' name shown instead of an author (species page, catalog, app.js), species transfer, migration 0110; the site's own marks (site_source, migration 0111, admin action) |
 | `test_identification_transfer` | 5 | Genus identification files between environments: manifest, comparison, download, receive (new / same / replace only when confirmed / unknown genus / bad files), page section and the image manager's link |
 | `test_thuridilla_source_migration` | 1 | Migration 0108: the Thuridilla article's author line accents |
