@@ -12,8 +12,8 @@ class BookLinksTests(TestCase):
     """Citations of Gosliner et al. with a page number get links to the owner's PDF of that edition (both languages,
     the page's language first) at the right PDF page -- only for a superuser and only when the PDFs are on this computer
     (settings.BOOK_PDF_DIR). The edition is the nearest edition mark before the page; a page without one gets no link.
-    A link opens a page viewer (the page as an image, previous / next, the other language, the whole PDF) in one named
-    tab; the viewer, the page image and the PDF are for superusers only. Everyone else sees the plain text."""
+    A link opens a page viewer (the page as an image, previous / next, the other language, the whole PDF) in a named
+    tab of its own edition (seaslugs-book-2 / -3, so the two can be compared side by side); the viewer, the page image and the PDF are for superusers only. Everyone else sees the plain text."""
 
     def setUp(self):
         self.folder = tempfile.TemporaryDirectory()
@@ -39,6 +39,8 @@ class BookLinksTests(TestCase):
             self.assertLess(html.index('/2/he/'), html.index('/2/en/'))   # the page's language first
             self.assertIn('&lt;b&gt;', html)                               # the text itself stays escaped
             self.assertIn('<br>', html)
+            self.assertIn(f'href="{reverse("book-page", args=["2", "he", 280])}" target="seaslugs-book-2"', html)
+            self.assertIn(f'href="{reverse("book-page", args=["3", "he", 162])}" target="seaslugs-book-3"', html)
             self.assertNotIn('book-link', linked_citations(text, self.staff, 'he'))
             self.assertNotIn('book-link', linked_citations(text, AnonymousUser(), 'he'))
             self.assertNotIn('book-link', linked_citations('Size 7 mm (עמ\' 12)', self.boss, 'he'))  # no edition mark

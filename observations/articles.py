@@ -20,14 +20,16 @@ def with_lang(url, lang):
     return f'{url}?lang=en' if lang == 'en' and url else url
 
 
-def article_links(articles, lang, binomials=None, species=None):
+def article_links(articles, lang, binomials=None, species=None, user=None):
     """What a page shows for each of its articles, in the page's language: the title (scientific names in
     italics), the source, the PDF address and whether that PDF is in the other language. On a species page
-    (`species`), the name under which the species appears in a publication that has one (SpeciesPublicationName)."""
+    (`species`), the name under which the species appears in a publication that has one (SpeciesPublicationName), and
+    for the owner on the Mac (`user`, book_links.py) an edition of Gosliner, Valdés & Behrens opens at the species' page."""
     if binomials is None:
         binomials = known_binomials()
     from .guide_citations import publication_names
     names = publication_names(species, lang) if species is not None else {}
+    from .book_links import article_edition, book_target, species_book_url
     links = []
     for article in articles:
         written = article.is_written
@@ -44,6 +46,9 @@ def article_links(articles, lang, binomials=None, species=None):
             'kind': article.kind, 'citation': article.citation.strip(), 'short_ref': article.short_ref.strip(),
             'reference_only': not written and not pdf_lang,
             'as_name': names.get(article.pk),
+            'book_url': species_book_url(article, (names.get(article.pk) or {}).get('name') or species.scientific_name,
+                                         (names.get(article.pk) or {}).get('raw_pages', ''), lang, user) if species is not None else '',
+            'book_target': book_target(article_edition(article)),
         })
     return links
 
@@ -86,6 +91,7 @@ def article_list(request):
     binomials = known_binomials()
     articles = list(Article.objects.prefetch_related('species__publication_names', 'orders', 'families', 'genera', 'trips'))
     from .guide_citations import publication_names
+    from .book_links import article_edition, book_target, species_book_url
     # the undescribed "sp." species whose name cites each entry (Species.name_source == Article.short_ref)
     from .models import Species
     cited_by = {}
@@ -100,7 +106,10 @@ def article_list(request):
         for species in article.species.all():
             if species.pk not in named:
                 as_name = publication_names(species, lang).get(article.pk)
-                places += [{**p, 'as_name': as_name} for p in _area_links(species, lang)]
+                book_url = species_book_url(article, (as_name or {}).get('name') or species.scientific_name,
+                                            (as_name or {}).get('raw_pages', ''), lang, request.user)
+                places += [{**p, 'as_name': as_name, 'book_url': book_url, 'book_target': book_target(article_edition(article))}
+                           for p in _area_links(species, lang)]
         for genus in article.genera.all():
             places.append({'url': with_lang(reverse('genus-page', args=[genus.name]), lang), 'name': genus.name, 'place': ''})
         for family in article.families.all():

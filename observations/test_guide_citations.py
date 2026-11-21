@@ -1,4 +1,4 @@
-"""Guides and other publications linked to species by their sources (guide_citations.py, migrations 0117 / 0118)."""
+"""Guides and other publications linked to species by their sources (guide_citations.py, migrations 0117-0119), and the book links."""
 import json
 from importlib import import_module
 from pathlib import Path
@@ -143,3 +143,103 @@ class EditionIssuesMigrationTests(Fixture):
         self.assertEqual(rows[closed.pk], ('Tenellia sp. 15', 1))
         self.assertEqual(rows[missing.pk], ('', 2))
         self.assertEqual(rows[worms.pk], ('Thecacera pikachu Pola et al., 2026', 1))
+
+
+class BookLinkTests(Fixture):
+    """For the owner on the Mac (a superuser, the book's PDFs in BOOK_PDF_DIR) a species' link to an edition of
+    Gosliner, Valdés & Behrens opens the book's page viewer at the species' page -- its known pages in that edition,
+    else the first page that names it (/admin/book/<edition>/<lang>/find/?name=, the whole PDF when none does); in the
+    page's language, else the other. Each edition opens in its own named tab (seaslugs-book-2 / -3), so the two can be
+    compared side by side. Anyone else, the live site (no PDFs) and other publications keep the library link.
+    Migration 0119 records the known 2nd-edition pages."""
+
+    def setUp(self):
+        super().setUp()
+        import shutil, tempfile
+        from django.test import override_settings
+        from .book_links import FILES
+        folder = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, folder, True)
+        for (edition, lang), file_name in FILES.items():
+            if lang == 'en':
+                Path(folder, file_name).write_bytes(b'%PDF-1.4')
+        override = override_settings(BOOK_PDF_DIR=folder)
+        override.enable()
+        self.addCleanup(override.disable)
+        self.g2, self.g3 = guides()
+        self.sp = self.species('Marionia sp. 6', name_source=NSSI2)
+        SpeciesPublicationName.objects.create(species=self.sp, article=self.g3, name='Marioniopsis sp. 11', pages='282-283')
+        link_species(self.sp)
+        self.observe(self.sp)
+        self.url = f'/species/{self.sp.areas.get().slug}/?lang=he'
+
+    def test_the_owner_gets_the_page_others_the_library(self):
+        page = self.client.get(self.url).content.decode()
+        self.assertNotIn('/admin/book/', page)
+        self.client.force_login(self.owner)
+        page = self.client.get(self.url).content.decode()
+        # 3rd edition: book page 282 -> PDF page 282 // 2 + 2, in English (no Hebrew PDF here)
+        self.assertIn('href="/admin/book/3/en/143/" target="seaslugs-book-3" class="article-book"', page)
+        # 2nd edition, page not known: the first page that names the species
+        self.assertIn('href="/admin/book/2/en/find/?name=Marionia+sp.+6" target="seaslugs-book-2"', page)
+        library = self.client.get('/articles/?lang=he').content.decode()
+        self.assertIn('href="/admin/book/3/en/143/" target="seaslugs-book-3">בספר</a>', library)
+
+    def test_find_opens_the_first_page_naming_the_species(self):
+        from . import book_links
+        self.client.force_login(self.owner)
+        book_links._found_pages.clear()
+        with patch('observations.book_links.find_page', return_value=88) as found:
+            for _ in range(2):
+                response = self.client.get('/admin/book/2/en/find/', {'name': 'Marionia sp. 6'})
+                self.assertRedirects(response, '/admin/book/2/en/88/', fetch_redirect_response=False)
+        self.assertEqual(found.call_count, 1)                          # found once
+        with patch('observations.book_links.find_page', return_value=None):
+            response = self.client.get('/admin/book/2/en/find/', {'name': 'Nowhere sp. 1'})
+        self.assertRedirects(response, '/admin/book/2/en/', fetch_redirect_response=False)
+        self.client.logout()
+        self.assertNotEqual(self.client.get('/admin/book/2/en/find/', {'name': 'Marionia sp. 6'}).status_code, 200)
+
+    def test_name_pattern(self):
+        from .book_links import find_page
+        class Page:
+            def __init__(self, text): self.text = text
+            def get_textpage(self): return self
+            def get_text_range(self): return self.text
+        class Doc(list):
+            def close(self): pass
+        with patch('pypdfium2.PdfDocument', return_value=Doc([Page('Tenellia sp. 180'), Page('x Tenellia\nsp. 18 y')])):
+            self.assertEqual(find_page('x.pdf', 'Tenellia sp. 18'), 2)
+
+    def test_migration_records_second_edition_pages(self):
+        other = self.species('Tenellia sp. 17', name_source=NSSI2)
+        import_module('observations.migrations.0119_second_edition_pages').forward(apps, None)
+        self.assertEqual(list(self.sp.publication_names.filter(article=self.g2).values_list('name', 'pages')),
+                         [('Marionia sp. 6', '262')])
+        self.assertEqual(list(other.publication_names.filter(article=self.g2).values_list('pages', flat=True)), ['288'])
+
+
+class MissingInThirdEditionTaskTests(Fixture):
+    """Migration 0120: one task row in the identification-issues worklist lists the species named by the 2nd edition
+    that have no 3rd-edition name yet (with the 2nd-edition page where known, * for a species with its own open row) and
+    how to record what is found; written once, and not at all when there is no such species."""
+
+    def test_migration(self):
+        from .models import IdentificationIssue as Issue
+        migration = import_module('observations.migrations.0120_missing_in_third_edition_task')
+        migration.forward(apps, None)
+        self.assertFalse(Issue.objects.exists())                       # no such species: no row
+        g2, g3 = guides()
+        found = self.species('Marionia sp. 6', name_source=NSSI2)
+        SpeciesPublicationName.objects.create(species=found, article=g3, name='Marioniopsis sp. 11', pages='282-283')
+        missing = self.species('Atagema sp. 13', name_source=NSSI2)
+        SpeciesPublicationName.objects.create(species=missing, article=g2, name='Atagema sp. 13', pages='117')
+        Issue.objects.create(kind='book_edition', species=missing)
+        self.species('Coryphellina sp. 1', name_source=NSSI2)
+        for _ in range(2):
+            migration.forward(apps, None)
+        task = Issue.objects.get(kind='other')
+        self.assertEqual((task.priority, task.status, task.species), (2, 'open', None))
+        self.assertIn("- Atagema sp. 13 (מהדורה 2, עמ' 117) *\n- Coryphellina sp. 1\n", task.notes)
+        self.assertNotIn('Marionia', task.notes)
+        self.assertIn('את 2 המינים', task.notes)

@@ -46,6 +46,6 @@ def publication_names(species, lang):
         pages = entry.pages.strip()
         if pages:
             pages = f'עמ׳ {pages}' if lang == 'he' else f"{'pp.' if '-' in pages else 'p.'} {pages}"
-        found[entry.article_id] = {'name': entry.name.strip(), 'pages': pages,
+        found[entry.article_id] = {'name': entry.name.strip(), 'pages': pages, 'raw_pages': entry.pages.strip(),
                                    'same': entry.name.strip() == species.scientific_name.strip()}
     return found

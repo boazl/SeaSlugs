@@ -12,19 +12,21 @@ the books are never served to anyone but the owner.
   two-page spreads after the cover and the title page (book page // 2 + 2).
 - A link opens /admin/book/<edition>/<lang>/<pdf page>/, a page viewer that shows that PDF page as an image (rendered
   with pypdfium2), with previous / next, the other language and the whole PDF -- a PDF reader such as the Adobe
-  Acrobat extension ignores "#page=N", so the page is never left to the reader. All the links open in one named tab
-  ("seaslugs-book"), so clicking another citation reuses it.
+  Acrobat extension ignores "#page=N", so the page is never left to the reader. Each edition opens in its own named
+  tab ("seaslugs-book-2" / "seaslugs-book-3", book_target): another citation of the same edition reuses its tab, and
+  the two editions can be compared side by side.
 - /admin/book/<edition>/<lang>/ serves the whole PDF. Everything is for superusers only.
 """
 import io
 import re
 from pathlib import Path
+from urllib.parse import urlencode
 
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.exceptions import PermissionDenied
 from django.http import FileResponse, Http404, HttpResponse
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
@@ -75,7 +77,7 @@ def linked_citations(text, user, lang='he'):
         for file_lang, label in sorted([('he', 'עב'), ('en', 'EN')], key=lambda x: x[0] != lang):
             if edition and book_file(edition, file_lang):
                 url = reverse('book-page', args=[edition, file_lang, pdf_page(edition, m.group(1))])
-                links.append(f'<a class="book-link" href="{url}" target="seaslugs-book" '
+                links.append(f'<a class="book-link" href="{url}" target="{book_target(edition)}" '
                              f'title="{"מהדורה" if lang == "he" else "Edition"} {edition}">{label}</a>')
         out.append(escape(text[last:m.end()]))
         if links:
@@ -83,6 +85,67 @@ def linked_citations(text, user, lang='he'):
         last = m.end()
     out.append(escape(text[last:]))
     return mark_safe(''.join(out).replace('\r\n', '\n').replace('\n', '<br>'))
+
+
+# The library's entries for the editions (Article.short_ref starts with the code): a species' link to one of them opens
+# the book at the species' page (species_book_url).
+EDITION_BY_CODE = {'NSSI-2': '2', 'NSSI-3': '3'}
+_found_pages = {}          # (edition, lang, name) -> PDF page, found once per process (book_find)
+
+
+def book_target(edition):
+    """The named browser tab an edition opens in -- one per edition, so the two can be read side by side."""
+    return f'seaslugs-book-{edition}'
+
+
+def article_edition(article):
+    """'2' / '3' when the library entry is an edition of the book, else None."""
+    return EDITION_BY_CODE.get((getattr(article, 'short_ref', '') or '').strip().split(' ')[0])
+
+
+def species_book_url(article, name, pages, lang, user):
+    """For a superuser on the Mac: where the species' link to an edition of the book opens it -- the page viewer at
+    the species' page (its known pages in that edition, SpeciesPublicationName), else at the first page that names
+    it (book_find); in the page's language, else the other. '' for anyone else, another publication or no PDF here."""
+    edition = article_edition(article)
+    if not (edition and user and getattr(user, 'is_superuser', False)):
+        return ''
+    for file_lang in (lang, 'en' if lang == 'he' else 'he'):
+        if book_file(edition, file_lang):
+            m = re.match(r'\s*(\d{1,3})', pages or '')
+            if m:
+                return reverse('book-page', args=[edition, file_lang, pdf_page(edition, m.group(1))])
+            return reverse('book-find', args=[edition, file_lang]) + '?' + urlencode({'name': name})
+    return ''
+
+
+def find_page(path, name):
+    """The first PDF page whose text names the species ("Tenellia sp. 18", not "... sp. 180"), else None."""
+    import pypdfium2 as pdfium
+    pattern = re.compile(r'\s+'.join(re.escape(w) for w in name.split()) + r'(?![\w.]*\d)')
+    document = pdfium.PdfDocument(str(path))
+    try:
+        for index in range(len(document)):
+            text = document[index].get_textpage().get_text_range()
+            if pattern.search(text):
+                return index + 1
+    finally:
+        document.close()
+    return None
+
+
+@staff_member_required
+def book_find(request, edition, lang):
+    """Opens the book at the first page that names the species (?name=), or the whole PDF when none does."""
+    path = _checked(request, edition, lang)
+    name = ' '.join((request.GET.get('name') or '').split())[:200]
+    if not name:
+        raise Http404
+    key = (edition, lang, name)
+    if key not in _found_pages:
+        _found_pages[key] = find_page(path, name)
+    page = _found_pages[key]
+    return redirect(reverse('book-page', args=[edition, lang, page]) if page else reverse('book-pdf', args=[edition, lang]))
 
 
 @staff_member_required

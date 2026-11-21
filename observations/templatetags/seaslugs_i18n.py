@@ -117,6 +117,7 @@ TRANSLATIONS = {
     'מופיע בו בשם': 'Appears in it as',
     'באותו שם': 'same name',
     'בשם': 'as',
+    'בספר': 'in the book',
     'PDF (באנגלית)': 'PDF (in English)',
     'PDF (בעברית)': 'PDF (in Hebrew)',
     'באנגלית': 'in English',
