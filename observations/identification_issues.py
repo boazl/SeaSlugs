@@ -2,7 +2,7 @@
 and disputes about the species identification of observations (IdentificationIssue).
 
 - The list: filters by state (by default the active ones: open + being checked), kind and priority, and a free search
-  (species names, notes, corrected name, range, reporter, observation number). Sorted by priority, then newest first
+  (species names, notes, corrected name, range, reporter, observation number). Sorted by priority, then by number
   (or newest / oldest / by species); closed issues always come after the active ones.
   Each row shows the observation(s) with their photo and a link to their page on the site and to their edit form; an
   issue about a species alone shows that species' gallery observation.
@@ -29,7 +29,7 @@ from .models import IdentificationIssue, Sample, Species
 Issue = IdentificationIssue
 STATE_FILTERS = [('active', 'לא טופלו (לבחינה ולתיקון)'), ('review', 'לבחינה (פתוחות ובבדיקה)'), ('tofix', 'לתיקון (הוחלט)'), ('all', 'הכול')] + list(Issue.Status.choices)
 ACTIVE = [Issue.Status.OPEN, Issue.Status.CHECKING, Issue.Status.DECIDED]
-SORT_CHOICES = [('priority', 'לפי עדיפות'), ('new', 'החדשות קודם'), ('old', 'הישנות קודם'), ('species', 'לפי שם המין')]
+SORT_CHOICES = [('priority', 'לפי עדיפות ומספר'), ('new', 'החדשות קודם'), ('old', 'הישנות קודם'), ('species', 'לפי שם המין')]
 # Which kind uses which extra field: the form shows them all, and marks the ones that belong to the chosen kind.
 KIND_FIELDS = {
     Issue.Kind.DUPLICATE: ('second_observation', 'second_species'),
@@ -145,7 +145,7 @@ def issue_rows(state='active', kind='', priority='', q='', sort='priority'):
         if q.isdigit():
             match |= Q(observation_id=int(q)) | Q(second_observation_id=int(q)) | Q(pk=int(q))
         issues = issues.filter(match)
-    order = {'priority': ['priority', '-opened_on', '-pk'], 'new': ['-opened_on', '-pk'], 'old': ['opened_on', 'pk'],
+    order = {'priority': ['priority', 'pk'], 'new': ['-opened_on', '-pk'], 'old': ['opened_on', 'pk'],
              'species': ['species__scientific_name', 'priority', '-pk']}[sort]
     # closed issues (fixed / rejected) after the active ones, whatever the order
     return sorted(issues.order_by(*order), key=lambda issue: not issue.is_active)
@@ -197,8 +197,16 @@ def identification_issues(request):
             issue.priority = int(request.POST['priority']); changed.append('priority')
         if request.POST.get('status') in Issue.Status.values and request.POST['status'] != issue.status:
             if request.POST['status'] == Issue.Status.FIXED and issue.actions_pending:
-                messages.error(request, f'רשומה {issue.pk}: לפני סימון "טופלה" יש לסמן כבוצעו: ' + ', '.join(issue.actions_pending))
-                return redirect(_back(request))
+                # Closing from the list (confirmed in the page: "mark the remaining work done?") marks it done;
+                # without that confirmation the issue stays as it was.
+                if request.POST.get('complete_actions') != 'yes':
+                    messages.error(request, f'רשומה {issue.pk}: לא סומנה כטופלה — נותרו פעולות: ' + ', '.join(issue.actions_pending))
+                    return redirect(_back(request))
+                done = issue.actions_pending
+                for field in Issue.ACTION_FIELDS:
+                    if getattr(issue, field) == Issue.Action.NEEDED:
+                        setattr(issue, field, Issue.Action.DONE)
+                messages.info(request, f'רשומה {issue.pk}: סומנו כבוצעו: ' + ', '.join(done))
             issue.status = request.POST['status']; changed.append('status')
         if changed:
             issue.updated_at = timezone.now()

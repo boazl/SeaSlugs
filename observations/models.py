@@ -1930,7 +1930,7 @@ class IdentificationIssue(models.Model):
     transfer_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     class Meta:
         db_table = 'identification_issues'
-        ordering = ['priority', '-opened_on', '-pk']
+        ordering = ['priority', 'pk']
         verbose_name = 'בעיית זיהוי'; verbose_name_plural = 'בעיות זיהוי'
     def __str__(self):
         name = self.species.scientific_name if self.species_id else (self.observation.taxon_name if self.observation_id else '')

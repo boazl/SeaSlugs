@@ -266,13 +266,18 @@ class IssueWorkflowTests(IssueFixture):
         review = Issue.objects.create(kind='range', species=self.maculosa)
         tofix = Issue.objects.create(kind='duplicate', observation=self.first, second_observation=self.second, status='decided',
                                      recommendation='Same photo', decision='Keep M. aurora', action_photo='needed', action_delete='needed')
-        self.assertEqual(issue_rows(), [tofix, review])
+        self.assertEqual(issue_rows(), [review, tofix])      # by priority, then by number
         self.assertEqual(issue_rows(state='review'), [review])
         self.assertEqual(issue_rows(state='tofix'), [tofix])
         self.assertEqual(issue_rows(q='keep m. aurora'), [tofix])
         self.client.post(reverse('identification-issues'), {'issue': tofix.pk, 'status': 'fixed'})
         tofix.refresh_from_db()
         self.assertEqual(tofix.status, 'decided')
+        # closing from the list after confirming in the page marks the remaining work done
+        other = Issue.objects.create(kind='other', notes='x', status='decided', action_video='needed', action_catalog='done')
+        self.client.post(reverse('identification-issues'), {'issue': other.pk, 'status': 'fixed', 'complete_actions': 'yes'})
+        other.refresh_from_db()
+        self.assertEqual((other.status, other.action_video, other.action_catalog), ('fixed', 'done', 'done'))
         with self.assertRaises(ValidationError):
             Issue(kind='other', notes='x', status='fixed', action_video='needed').full_clean()
         Issue.objects.filter(pk=tofix.pk).update(action_photo='done', action_delete='done')
