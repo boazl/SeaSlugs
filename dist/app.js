@@ -959,7 +959,7 @@ function buildCollectionCard(c, index) {
 // the publication that numbered it, "Source: Authors, Year" (no parentheses: they belong to an authority) -- catalog.js sends it without the library's edition
 // code (Species.source_display) -- the same rule as Species.author_text (models.py).
 function authorText(sp) {
-    if (sp.source && /^sp\./.test((sp.epithet || '').trim())) return `${language === 'en' ? 'Source' : 'מקור'}: ${sp.source}`;
+    if (sp.source && /^sp\./.test((sp.epithet || '').trim())) return `Source: ${sp.source}`;   // in both languages, as on the photo labels
     return sp.author || '';
 }
 

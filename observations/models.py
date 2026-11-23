@@ -319,7 +319,8 @@ class Species(models.Model):
         if genus and epithet or not name:
             name = f'{genus} {epithet}'.strip()
         self.genus, self.species, self.scientific_name = genus, epithet, name
-    SOURCE_LABEL = {'he': 'מקור', 'en': 'Source'}
+    # "Source:" in both languages, as on the photo labels (the owner's rule): it belongs with the Latin name line.
+    SOURCE_LABEL = {'he': 'Source', 'en': 'Source'}
     @property
     def is_undescribed(self):
         """An undescribed species: its epithet is "sp." (with or without a number or letter)."""

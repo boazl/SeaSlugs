@@ -522,10 +522,14 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
        "Source:" is the publication the identification relies on, not part of the name.
      - Type: the name in Arial Italic 28 pt; author / authority in Arial Regular, same size; the source line in Arial
        Regular 16 pt; white with a soft black shadow. (Older labels: Helvetica Neue faux italic, fully slanted.)
-     - The site follows the same rule: a species' name source is shown as "Source: Authors, Year" / "מקור: …" -- no
-       parentheses (they belong to a taxonomic authority) and, on the species page, on its own line under the name --
+     - The site follows the same rule: a species' name source is shown as "Source: Authors, Year" -- "Source:" in Hebrew
+       too, as on the labels; no parentheses (they belong to a taxonomic authority); on the species page on its own line
+       under the name --
        without the library's edition code (`Species.source_display`; `name_source` keeps the code, the library entry's
        `short_ref`, and the link still opens that entry).
+   - Scientific names on the site (species and taxon pages, cards, trips, news) are set in Helvetica Neue (then
+     Helvetica, Arial) with normal letter spacing -- the name in italics, author / authority / source upright. The
+     site-wide h1 rule tightens letters (-1.5px), which made the species title look cramped; name headings reset it.
    - **Parentheses of the authority (ICZN):** none while the species stays in the genus it was described in; in
      parentheses once it stands in another genus -- they mark a change of genus, never doubt. `Species.original_genus`
      records the original genus (migration `0131`, from WoRMS's "original combination" and
