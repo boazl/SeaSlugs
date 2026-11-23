@@ -224,7 +224,7 @@ def gallery_file(request, filename='index.html'):
                 'variant': area.undetermined_variant,
                 'author': (area.species.author or '').strip(),
                 # an undescribed "sp." species: the publication that numbered it, shown as "(Source: ...)" (app.js authorText)
-                'source': (area.species.name_source or '').strip() if area.species.is_undescribed else '',
+                'source': area.species.source_display if area.species.is_undescribed else '',
                 # Species.is_migrant, straight through -- drives the "migrant species" area
                 # filter button in app.js (a species-level flag, not species+area-specific,
                 # so it's the same for every area entry of the same species).

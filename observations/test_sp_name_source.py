@@ -15,7 +15,7 @@ APP_JS = Path(settings.BASE_DIR) / 'dist' / 'app.js'
 
 class SpNameSourceTests(TestCase):
     """An undescribed "sp." species has no author: where a described species shows its author, it shows the publication
-    that numbered it -- Species.name_source -- as "(Source: NSSI-2 Gosliner, Valdés & Behrens, 2018)" ("(מקור: ...)" on
+    that numbered it -- Species.name_source -- as "(Source: Gosliner, Valdés & Behrens, 2018)" -- without the library's edition code ("(מקור: ...)" on
     Hebrew pages): on the species page (title and observations), the genus / taxon cards and the gallery cards (catalog.js
     `source`, app.js authorText). A described species keeps its author; a "sp." without a source shows nothing; a source
     on a described species is ignored. The field travels with the species table; migration 0110 fills it for the gallery's
@@ -48,12 +48,14 @@ class SpNameSourceTests(TestCase):
     def test_species_page_and_catalog(self):
         sp, area = self.gallery('Tenellia sp. 65', source='NSSI-3 Gosliner, Valdés & Behrens, 2026')
         page = self.client.get(f'/species/{area.slug}/?lang=en').content.decode()
-        self.assertIn('<span class="species-author">(Source: NSSI-3 Gosliner, Valdés &amp; Behrens, 2026)</span>', page)
+        # shown as "Authors, Year", without the library's edition code (the owner's uniform rule for sources)
+        self.assertIn('<span class="species-author">(Source: Gosliner, Valdés &amp; Behrens, 2026)</span>', page)
         page = self.client.get(f'/species/{area.slug}/?lang=he').content.decode()
-        self.assertIn('(מקור: NSSI-3 Gosliner, Valdés &amp; Behrens, 2026)', page)
+        self.assertIn('(מקור: Gosliner, Valdés &amp; Behrens, 2026)', page)
         body = self.client.get('/catalog.js').content.decode()
         catalog = json.loads(body.split('=', 1)[1].strip().removesuffix(';'))
-        self.assertIn('"source": "NSSI-3 Gosliner, Valdés & Behrens, 2026"', json.dumps(catalog, ensure_ascii=False))
+        self.assertIn('"source": "Gosliner, Valdés & Behrens, 2026"', json.dumps(catalog, ensure_ascii=False))
+        self.assertEqual(sp.source_display, 'Gosliner, Valdés & Behrens, 2026')
         script = APP_JS.read_text()
         self.assertIn('function authorText(sp)', script)
         self.assertIn('const authorLine = authorText(sp);', script)

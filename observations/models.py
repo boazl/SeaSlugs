@@ -319,11 +319,17 @@ class Species(models.Model):
     def is_undescribed(self):
         """An undescribed species: its epithet is "sp." (with or without a number or letter)."""
         return bool(re.match(r'^sp\.', (self.species or '').strip()))
+    @property
+    def source_display(self):
+        """The name source as shown to visitors: the publication as "Authors, Year", without the library's edition code
+        ("NSSI-3 Gosliner, Valdés & Behrens, 2026" -> "Gosliner, Valdés & Behrens, 2026") -- the owner's uniform rule for
+        sources, as on the photo labels. name_source itself keeps the code: it is the library entry's short_ref."""
+        return re.sub(r'^[A-Z]+-\d+\s+', '', (self.name_source or '').strip())
     def author_text(self, lang='he'):
         """What follows the name: the author and year of a described species; for an undescribed "sp." species the
-        source of its number, "(Source: NSSI-2 Gosliner, Valdés & Behrens, 2018)"; '' when there is neither.
-        dist/app.js authorText follows the same rule -- keep the two in step."""
-        source = (self.name_source or '').strip()
+        source of its number, "(Source: Gosliner, Valdés & Behrens, 2018)" (source_display); '' when there is neither.
+        dist/app.js authorText follows the same rule (catalog.js sends source_display) -- keep the two in step."""
+        source = self.source_display
         if self.is_undescribed and source:
             return f'({self.SOURCE_LABEL.get(lang, "Source")}: {source})'
         return (self.author or '').strip()

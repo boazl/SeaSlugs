@@ -345,6 +345,27 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
     and slug) with the numbered row's texts, guide names and guides; migration `0124` then deletes the empty numbered rows
     (owner's approval; only while nothing points at them; their issues point at the described species). Author set, no name
     source, texts for a described species, sources: WoRMS, original description, both editions.
+  - Migration `0125` (issue #37): the Romblon observation of Aegires sp. 7 (2nd ed.) keeps its species with "cf." and a
+    note (white tubercles where the book's are orange); the species gets its 3rd-edition name Aegires sp. 12 (pp. 28-29;
+    the 3rd edition's own "Aegires sp. 7" is another animal), identification texts from both editions and the 3rd
+    edition in its sources.
+  - Migration `0126` (issues #38, #39; Martín-Hervás et al. 2021, the paper that numbers Thuridilla sp. 1-10): its
+    numbers are not the book's. The book's "Thuridilla sp. 7" row becomes the paper's Thuridilla sp. 7, source the paper; the Solomon
+    Islands observation filed as T. ratna moves to it with its card; both, and the Romblon Thuridilla sp. 4, get
+    cf. and a note; sp. 2 / sp. 4 / sp. 7 get identification texts from the paper and cite it by its real
+    title. Photo labels of numbered species carry a "Source: ..." line, never an author (the label rule in §6).
+  - Migration `0127` (owner's rule, correcting `0126`): "(2021)" never appears in a name -- the paper's species are
+    plain "Thuridilla sp. 4" / "Thuridilla sp. 7" with "(Source: Martín-Hervás et al., 2021)"; texts drop it for the
+    site's paper species and say "of the paper" for other paper numbers. Observation #195 (deleted, no media) moves
+    from the sourceless "Thuridilla sp. 4" to T. gracilis, and the emptied row is deleted.
+  - Migration `0128` (owner's decision): the two Thuridilla sp. 7 observations (#241, #471) drop cf.; the Solomon note
+    keeps why it is not T. ratna.
+  - Migration `0129` (owner's decision, issue #38): observation #234 (Romblon) is Thuridilla gracilis, not the paper's
+    sp. 4: it moves there without cf., joins T. gracilis's Philippines card, and its emptied card is deleted with a 301
+    (historical_species_redirects.json); the paper's Thuridilla sp. 4 stays in the catalogue without observations.
+  - Migration `0130` (owner's decisions): "Aegires sp. 7" (2nd ed.) takes its 3rd-edition name Aegires sp. 12 with the
+    3rd edition as source (same row and slug; the Romblon observation keeps cf.); observation #234 is Thuridilla cf.
+    gracilis.
   - **The book at the species' page** (`book_links.species_book_url`, `/admin/book/<edition>/<lang>/find/?name=`): for
     the owner on the Mac (a superuser, the PDFs in `BOOK_PDF_DIR`), a species' link to an edition (the entry's
     `short_ref` code NSSI-2 / NSSI-3) opens the page viewer at the species' page in that edition -- its known pages
@@ -489,8 +510,21 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
    - Every fully named species must have an author; `sp.` rows are exempt.
    - Merge duplicate species into the accepted WoRMS name.
    - When checking a species list against the catalogue, fix the catalogue, not the list.
-   - The name labels burned into photos (Photoshop, Helvetica Neue faux italic, label fully slanted)
-     are a deliberate design and must **not** be flagged.
+   - The name labels burned into photos (Photoshop) are a deliberate design and must **not** be flagged. The owner's
+     uniform rule (2026-11-22), for new and corrected labels:
+     - A described species: one line, the name and its taxonomic authority -- "Thuridilla gracilis (Risbec, 1928)";
+       with an uncertain identification "Thuridilla cf. gracilis (Risbec, 1928)". No source line (the source used to
+       identify the animal may go on the species page instead).
+     - An undescribed species with a number from a publication: the name -- "Aegires sp. 12", or "Aegires cf. sp. 12" --
+       and a second line "Source: Authors, Year" (the number depends on the publication), without the "NSSI-2/3" code
+       and without parentheses: "Source: Gosliner, Valdés & Behrens, 2026", "Source: Martín-Hervás et al., 2021".
+     - The authority in parentheses means the species was first described in another genus; it is part of the name.
+       "Source:" is the publication the identification relies on, not part of the name.
+     - Type: the name in Arial Italic 28 pt; author / authority in Arial Regular, same size; the source line in Arial
+       Regular 16 pt; white with a soft black shadow. (Older labels: Helvetica Neue faux italic, fully slanted.)
+     - The site follows the same rule: a species' name source is shown as "(Source: Authors, Year)" / "(מקור: …)"
+       without the library's edition code (`Species.source_display`; `name_source` keeps the code, the library entry's
+       `short_ref`, and the link still opens that entry).
 9. **Language** (§7.3)
    - Each page shows exactly one language.
    - The choice persists across pages.
@@ -1115,6 +1149,8 @@ Catalogue of test modules (test count) and what each guards:
 | `test_bibliography` | 5 | Articles as a bibliography: sections by kind, references, reference-only entries (admin), cited species, the species page's source link, article transfer of the new fields; migration 0113 (bare sp. marks, guides, 2nd-edition sources); migration 0114 (original descriptions) |
 | `test_book_edition_genus_moves` | 4 | Migration 0122: a species moved to another genus by the 3rd edition renamed in place (texts, sources, name source, observations' genus, same slug and transfer id), the old genus's defining sample repaired, the issue decided with its actions; runs once; skipped when the new name exists |
 | `test_described_book_species` | 3 | Migration 0123: a described 2nd-edition number takes the accepted name -- renamed in place, or observations / card / texts / guide names moved to the existing row (same slug and transfer ids), new genus added, defining samples repaired, issue decided; runs once; migration 0124 deletes the empty numbered row (repointing its issues) only while unused |
+| `test_aegires_sp7_cf` | 3 | Migration 0125: cf. and a note on the observation, the 3rd-edition name and pages, texts and sources on the species, the issue decided; existing values kept; runs once; migration 0130: renamed Aegires sp. 12 (NSSI-3 source, cf. kept), #234 cf. gracilis |
+| `test_thuridilla_2021_numbers` | 4 | Migration 0126: book sp. 7 → Thuridilla sp. 7 (2021) with the paper as source, the T. ratna observation and card moved to it (same slug), cf. and notes, paper texts only where empty, real citation, issues decided; runs once; migration 0127: plain numbers (no "(2021)"), texts adjusted, #195 to T. gracilis and the emptied row deleted; migration 0128: the sp. 7 observations without cf. (notes the owner changed kept); migration 0129: #234 to T. gracilis, its emptied card deleted |
 | `test_species_extra_observation_link` | 2 | Species page: an extra observation's card opens its edit page for a manager or its owner (photo / video in the lightbox from separate links); other visitors keep the lightbox |
 | `test_sp_name_source` | 7 | Source of an undescribed sp. species' name shown instead of an author (species page, catalog, app.js), species transfer, migration 0110; the site's own marks (site_source, migration 0111, admin action) |
 | `test_identification_transfer` | 5 | Genus identification files between environments: manifest, comparison, download, receive (new / same / replace only when confirmed / unknown genus / bad files), page section and the image manager's link |

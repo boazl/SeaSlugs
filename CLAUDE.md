@@ -81,8 +81,10 @@ node -e "new Function(require('fs').readFileSync('dist/app.js','utf8'))"   # app
   edition (2018) or other publications. "sp. N" numbers changed between the editions -- never carry one across unchecked.
   A species may keep its 2nd-edition "sp. N" name (neither numbering is better), but every text and source must say
   which edition it follows. When checking a
-  list, fix the catalogue, not the list. The labels burned into photos are deliberately fully slanted;
-  don't flag them.
+  list, fix the catalogue, not the list. Don't flag the labels burned into photos. Label rule (§6): a described species
+  is one line, name + authority ("Thuridilla cf. gracilis (Risbec, 1928)"), no source; an undescribed numbered one
+  adds "Source: Authors, Year" without NSSI code or parentheses ("Aegires cf. sp. 12" / "Source: Gosliner, Valdés &
+  Behrens, 2026").
 - **Taxonomy:** WoRMS ranks only:
   orders → sub-orders + Others → superfamilies + Others → families + Others → genera → species.
   All ranks behave alike: a defining photo, a page, a card and navigation buttons.

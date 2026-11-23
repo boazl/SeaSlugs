@@ -631,4 +631,4 @@ def author_html(species, lang):
         return text
     label = species.SOURCE_LABEL.get(lang, 'Source')
     return format_html('({}: <a class="name-source" href="{}" title="{}">{}</a>)', label, article.list_url(lang),
-                       article.citation.strip() or article.title(lang), species.name_source.strip())
+                       article.citation.strip() or article.title(lang), species.source_display)

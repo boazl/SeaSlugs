@@ -36,10 +36,14 @@ class MappingValidationTests(SimpleTestCase):
         # Phyllidia elegans
         elegans = 'phyllidia-multifaria-thailand-indo-pacific-gulf-of-thailand'
         self.assertEqual(HISTORICAL_SPECIES_REDIRECTS[elegans][0], 'phyllidia-elegans-thailand-indo-pacific-gulf-of-thailand')
-        self.assertEqual(len(set(HISTORICAL_SPECIES_REDIRECTS) - {MERGED, moved, geminus, elegans}), 37)
+        # (2026-11-22) identification issue #38: the Romblon observation filed as the paper's Thuridilla sp. 4 is
+        # Thuridilla gracilis (migration 0129 removed its card)
+        gracilis = 'thuridilla-sp-4-2021-phillipines-indo-pacific-south-china-sea'
+        self.assertEqual(HISTORICAL_SPECIES_REDIRECTS[gracilis][0], 'thuridilla-gracilis-phillipines-indo-pacific-south-china-sea')
+        self.assertEqual(len(set(HISTORICAL_SPECIES_REDIRECTS) - {MERGED, moved, geminus, elegans, gracilis}), 37)
         self.assertEqual(set(HISTORICAL_SPECIES_REDIRECTS) & {MERGED}, {MERGED})
         self.assertEqual(HISTORICAL_SPECIES_REDIRECTS[moved][0], 'hexabranchus-sanguineus-sinai-red-sea-gulf-of-aqaba')
-        self.assertEqual(len(HISTORICAL_SPECIES_REDIRECTS), 41)
+        self.assertEqual(len(HISTORICAL_SPECIES_REDIRECTS), 42)
         self.assertEqual(HISTORICAL_SPECIES_REDIRECTS[OLD][0], CURRENT)
         for stem in UNRESOLVED:
             self.assertNotIn(stem + '-phillipines-indo-pacific', HISTORICAL_SPECIES_REDIRECTS)
