@@ -96,7 +96,10 @@ def build_rows(trip, folder, posted=None):
     by_pk = {s.pk: s for s in samples + deleted}
     found = []                                  # in priority order: live holder, live match, deleted holder, deleted match
     for group in (samples, deleted):
-        holders = {s.local_video_file: s for s in group if s.local_video_file} if same_folder(trip, folder) else {}
+        # A holder only of a file still in the folder: an observation whose recorded file is gone (renamed after the
+        # species was renamed, e.g. "Aegires sp. 7.mov" -> "Aegires cf. sp. 12.mov") is matched by name again.
+        holders = ({s.local_video_file: s for s in group if s.local_video_file and s.local_video_file in names}
+                   if same_folder(trip, folder) else {})
         matches = {}
         for sample, name in match_trip([s for s in group if s not in holders.values()], folder)[0]: matches.setdefault(name, sample)
         found += [holders, matches]

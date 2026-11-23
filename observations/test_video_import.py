@@ -161,3 +161,11 @@ class VideoImportTests(TestCase):
         gone = Sample(owner=self.admin, trip=self.trip, species=self.annae, video_url='https://youtu.be/fffffffffff'); gone.save_reviewed()
         gone.soft_delete(self.admin)
         self.assertEqual(self.rows()['Chromodoris annae.mov']['sample'], str(self.existing.pk))
+
+    def test_renamed_file_matches_the_observation_again(self):
+        # The observation recorded a file that is no longer in the folder (its species was renamed and the video exported
+        # again under the new name): it is matched by name to the new file -- not offered as "a new observation", which
+        # its YouTube link would refuse.
+        self.trip.local_video_folder = str(self.folder); self.trip.save()
+        Sample.objects.filter(pk=self.existing.pk).update(local_video_file='Chromodoris sp. 7.mov', video_url='https://youtu.be/AAAAAAAAAAA')
+        self.assertEqual(self.rows()['Chromodoris annae.mov']['sample'], str(self.existing.pk))

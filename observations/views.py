@@ -1804,6 +1804,10 @@ def photo(request,pk):
     item=get_object_or_404(Sample,pk=pk)
     if not (is_manager(request.user) or (not item.deleted_at and (item.status=='published' or item.owner_id==getattr(request.user,'id',None)))): raise Http404
     if not item.image: raise Http404
-    response=FileResponse(item.image.open('rb'),content_type='image/jpeg')
+    # A photo whose file is not in this environment's storage (not transferred yet, /admin/images/) is "not found",
+    # not a server error.
+    try: handle=item.image.open('rb')
+    except OSError: raise Http404
+    response=FileResponse(handle,content_type='image/jpeg')
     response['Cache-Control']='private, no-store'
     return response

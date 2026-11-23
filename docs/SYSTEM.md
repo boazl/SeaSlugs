@@ -363,6 +363,9 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
   - Migration `0129` (owner's decision, issue #38): observation #234 (Romblon) is Thuridilla gracilis, not the paper's
     sp. 4: it moves there without cf., joins T. gracilis's Philippines card, and its emptied card is deleted with a 301
     (historical_species_redirects.json); the paper's Thuridilla sp. 4 stays in the catalogue without observations.
+  - Migration `0132` (issues #40, #89): Tritonia sp. 3 (2nd ed., p. 257) is Marioniopsis sp. 23 (3rd ed., p. 284), renamed
+    in place; the site then has no Tritonia species, and the genus observation #336 (genera-tritonia.jpg) is deleted
+    (soft), so Tritonia leaves the gallery (its genus row and catalogue species stay).
   - Migration `0130` (owner's decisions): "Aegires sp. 7" (2nd ed.) takes its 3rd-edition name Aegires sp. 12 with the
     3rd edition as source (same row and slug; the Romblon observation keeps cf.); observation #234 is Thuridilla cf.
     gracilis.
@@ -1165,6 +1168,8 @@ Catalogue of test modules (test count) and what each guards:
 | `test_species_extra_observation_link` | 2 | Species page: an extra observation's card opens its edit page for a manager or its owner (photo / video in the lightbox from separate links); other visitors keep the lightbox |
 | `test_sp_name_source` | 7 | Source of an undescribed sp. species' name shown instead of an author (species page, catalog, app.js), species transfer, migration 0110; the site's own marks (site_source, migration 0111, admin action) |
 | `test_original_genus` | 3 | Species.original_genus and the ICZN parentheses rule (author_parentheses_ok); migration 0131 fills only empty values and gives three authors WoRMS's parentheses; check_author_parentheses lists the disagreements |
+| `test_tritonia_sp3` | 1 | Migration 0132: Tritonia sp. 3 → Marioniopsis sp. 23 in place (texts, publication name, observation genus, slug), the Tritonia genus observation deleted, issues #40 decided and #89 fixed; runs once |
+| `test_photo_missing_file` | 1 | An observation's photo whose file is not in this environment's storage answers 404, not a server error |
 | `test_identification_transfer` | 5 | Genus identification files between environments: manifest, comparison, download, receive (new / same / replace only when confirmed / unknown genus / bad files), page section and the image manager's link |
 | `test_thuridilla_source_migration` | 1 | Migration 0108: the Thuridilla article's author line accents |
 | `test_identification_issues` | 16 | Identification issues: species follow the observations, fixed date, duplicate needs a second one, SET_NULL; superuser page, filters / search / order, quick priority and state, add / edit / delete, form errors, prefill; `identissues` transfer (export, round trip, newer copy wins, missing references skipped, strict format); the findings migration |
@@ -1192,7 +1197,7 @@ Catalogue of test modules (test count) and what each guards:
 | `test_listing_genus_filter`, `test_manager_auto_publish`, `test_sample_changelist_form`, `test_taxon_samples_stay_published`, `test_trip_sea_removal`, `test_library_image_repair`, `test_coryphellina_merge_migration`, `test_worms_suborders_migration` | 3 each | as named |
 | `test_superfamilies_into_orders_migration`, `test_names_and_fossils_migration`, `test_sample_status_filter` | 2 each | as named |
 | `test_trip_picker_tools` | 3 | The import tools pick the trip like the observation form (filters, labels, add-trip link, no library trips) |
-| `test_video_import` | 12 | Video import: matching and guesses, required YouTube link, save/create/copy to Drive, all-or-nothing, duplicates |
+| `test_video_import` | 13 | Video import: matching and guesses, required YouTube link, save/create/copy to Drive, all-or-nothing, duplicates; an observation whose recorded file is gone from the folder (renamed species) is matched by name again |
 | `test_backup_retention` | 4 | Automatic backups pruned: 7 days, at least the newest 5, hand-made ones kept; releases page summary |
 | `test_drive_video_ids` | 6 | Drive id rescan: same/update/clear/waiting/missing, page and command save, nothing without the Drive folder |
 | `test_video_check` | 12 | YouTube video check: status mapping, scan lists only problems, remove link / delete / update rules |
