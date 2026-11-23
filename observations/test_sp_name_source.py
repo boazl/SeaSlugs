@@ -15,7 +15,8 @@ APP_JS = Path(settings.BASE_DIR) / 'dist' / 'app.js'
 
 class SpNameSourceTests(TestCase):
     """An undescribed "sp." species has no author: where a described species shows its author, it shows the publication
-    that numbered it -- Species.name_source -- as "(Source: Gosliner, Valdés & Behrens, 2018)" -- without the library's edition code ("(מקור: ...)" on
+    that numbered it -- Species.name_source -- as "Source: Gosliner, Valdés & Behrens, 2018" -- without the library's edition code and without parentheses, on its
+    own line on the species page, as on the photo labels ("מקור: ..." on
     Hebrew pages): on the species page (title and observations), the genus / taxon cards and the gallery cards (catalog.js
     `source`, app.js authorText). A described species keeps its author; a "sp." without a source shows nothing; a source
     on a described species is ignored. The field travels with the species table; migration 0110 fills it for the gallery's
@@ -38,8 +39,8 @@ class SpNameSourceTests(TestCase):
 
     def test_author_text(self):
         sp, _ = self.gallery('Thuridilla sp. 2', source='Martín-Hervás et al., 2021')
-        self.assertEqual(sp.author_text('en'), '(Source: Martín-Hervás et al., 2021)')
-        self.assertEqual(sp.author_text('he'), '(מקור: Martín-Hervás et al., 2021)')
+        self.assertEqual(sp.author_text('en'), 'Source: Martín-Hervás et al., 2021')
+        self.assertEqual(sp.author_text('he'), 'מקור: Martín-Hervás et al., 2021')
         described, _ = self.gallery('Thuridilla gracilis', author='(Risbec, 1928)', source='ignored')
         self.assertEqual(described.author_text('en'), '(Risbec, 1928)')
         bare, _ = self.gallery('Tenellia sp. A')
@@ -49,9 +50,9 @@ class SpNameSourceTests(TestCase):
         sp, area = self.gallery('Tenellia sp. 65', source='NSSI-3 Gosliner, Valdés & Behrens, 2026')
         page = self.client.get(f'/species/{area.slug}/?lang=en').content.decode()
         # shown as "Authors, Year", without the library's edition code (the owner's uniform rule for sources)
-        self.assertIn('<span class="species-author">(Source: Gosliner, Valdés &amp; Behrens, 2026)</span>', page)
+        self.assertIn('<span class="species-author species-source">Source: Gosliner, Valdés &amp; Behrens, 2026</span>', page)
         page = self.client.get(f'/species/{area.slug}/?lang=he').content.decode()
-        self.assertIn('(מקור: Gosliner, Valdés &amp; Behrens, 2026)', page)
+        self.assertIn('>מקור: Gosliner, Valdés &amp; Behrens, 2026<', page)
         body = self.client.get('/catalog.js').content.decode()
         catalog = json.loads(body.split('=', 1)[1].strip().removesuffix(';'))
         self.assertIn('"source": "Gosliner, Valdés & Behrens, 2026"', json.dumps(catalog, ensure_ascii=False))

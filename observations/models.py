@@ -235,11 +235,16 @@ class Species(models.Model):
     author = models.TextField('Author — מחבר ושנת תיאור', blank=True)
     # An undescribed species marked "sp." with a number (or a number and a year) has no author: its name is the number a
     # book or paper gave it. This is that publication, e.g. "NSSI-2 Gosliner, Valdés & Behrens, 2018" or
-    # "Martín-Hervás et al., 2021"; the site shows "(Source: ...)" where a described species shows its author
+    # "Martín-Hervás et al., 2021"; the site shows "Source: ..." where a described species shows its author
     # (Species.author_text, app.js authorText).
     name_source = models.CharField('מקור השם (sp. עם מספר)', max_length=200, blank=True,
         help_text='למין שטרם תואר ומסומן sp. עם מספר: הספר או המאמר שבו מופיע המספר, למשל "NSSI-2 Gosliner, Valdés & Behrens, 2018" '
                   'או "Martín-Hervás et al., 2021". מוצג במקום המחבר: (Source: …). ריק — לא מוצג דבר.')
+    # The genus the species was first described in (ICZN: the authority is in parentheses exactly when the species now
+    # stands in another genus) -- recorded so the parentheses can be checked rather than copied (author_parentheses_ok,
+    # manage.py check_author_parentheses). Filled from WoRMS's "original combination" (migration 0131).
+    original_genus = models.CharField('סוג מקורי (Original genus)', max_length=150, blank=True,
+        help_text='הסוג שבו תואר המין לראשונה. לפי ICZN: מחבר בסוגריים רק אם המין עבר מאז לסוג אחר.')
     order = models.TextField('Order — סדרה', blank=True)
     family = models.TextField('Family — משפחה', blank=True)
     superfamily = models.TextField('Superfamily — על־משפחה', blank=True)
@@ -327,12 +332,21 @@ class Species(models.Model):
         return re.sub(r'^[A-Z]+-\d+\s+', '', (self.name_source or '').strip())
     def author_text(self, lang='he'):
         """What follows the name: the author and year of a described species; for an undescribed "sp." species the
-        source of its number, "(Source: Gosliner, Valdés & Behrens, 2018)" (source_display); '' when there is neither.
+        source of its number, "Source: Gosliner, Valdés & Behrens, 2018" (source_display) -- without parentheses, which
+        belong to a taxonomic authority only, as on the photo labels; '' when there is neither.
         dist/app.js authorText follows the same rule (catalog.js sends source_display) -- keep the two in step."""
         source = self.source_display
         if self.is_undescribed and source:
-            return f'({self.SOURCE_LABEL.get(lang, "Source")}: {source})'
+            return f'{self.SOURCE_LABEL.get(lang, "Source")}: {source}'
         return (self.author or '').strip()
+    def author_parentheses_ok(self):
+        """ICZN: the authority is in parentheses exactly when the species stands in another genus than the one it was
+        described in. True / False against original_genus; None when that, or the author, is not known."""
+        author, original = (self.author or '').strip(), (self.original_genus or '').strip()
+        if not author or not original or self.is_undescribed:
+            return None
+        current = (self.accepted_genus or self.genus or '').strip()
+        return author.startswith('(') == (original != current)
     def source_article(self):
         """The library entry (Article) the source of an undescribed species' name refers to -- the one whose short
         reference (Article.short_ref) is exactly that source; None for a site observation or an unknown source."""

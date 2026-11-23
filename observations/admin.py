@@ -199,7 +199,7 @@ class SpeciesAdmin(SaveAndViewMixin, admin.ModelAdmin):
             self.message_user(request, 'דולגו (לא sp. מסומן, כבר יש מקור, או אין תצפית מפורסמת): ' + ', '.join(skipped), level='warning')
     list_filter = ['order','family','genus','is_migrant']
     fieldsets = [
-        ('זיהוי מדעי', {'fields':['phylogenetic_order','genus','species','author','name_source','scientific_name','full_name_display','formatted_author','reference_author','full_species_name_with_order']}),
+        ('זיהוי מדעי', {'fields':['phylogenetic_order','genus','species','author','original_genus','name_source','scientific_name','full_name_display','formatted_author','reference_author','full_species_name_with_order']}),
         ('סיווג טקסונומי', {'fields':['order','superfamily','family','accepted_genus','accepted_species']}),
         ('שמות ותפוצה', {'fields':['name_he','name_en','common_name','transliteration','language','distribution']}),
         ('תוכן לעמוד המין', {'fields':['description_he','description_en','identification_he','identification_en','similar_species_he','similar_species_en','size_from','size_to','size_max','link','reference_link','articles']}),

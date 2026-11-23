@@ -956,10 +956,10 @@ function buildCollectionCard(c, index) {
 // else (cf./aff., "sp. 7", the variant letter, the author) in roman -- the same rule as
 // observations/names.py (name_html), which renders the server-side pages.
 // What follows a species' name on its card: the author of a described species, or for an undescribed "sp." species
-// the publication that numbered it, "(Source: Authors, Year)" -- catalog.js sends it without the library's edition
+// the publication that numbered it, "Source: Authors, Year" (no parentheses: they belong to an authority) -- catalog.js sends it without the library's edition
 // code (Species.source_display) -- the same rule as Species.author_text (models.py).
 function authorText(sp) {
-    if (sp.source && /^sp\./.test((sp.epithet || '').trim())) return `(${language === 'en' ? 'Source' : 'מקור'}: ${sp.source})`;
+    if (sp.source && /^sp\./.test((sp.epithet || '').trim())) return `${language === 'en' ? 'Source' : 'מקור'}: ${sp.source}`;
     return sp.author || '';
 }
 

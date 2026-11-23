@@ -56,7 +56,7 @@ class PublicationNameTests(Fixture):
             self.observe(sp)
         page = self.client.get(f'/species/{renamed.areas.get().slug}/?lang=en').content.decode()
         self.assertIn('Appears in it as <bdi dir="ltr"><i>Marioniopsis</i> sp. 11</bdi>, <bdi>pp. 282-283</bdi>', page)
-        self.assertIn('(Source: <a class="name-source" href="/articles/?lang=en#nssi-2"', page)
+        self.assertIn('Source: <a class="name-source" href="/articles/?lang=en#nssi-2"', page)
         page = self.client.get(f'/species/{same.areas.get().slug}/?lang=he').content.decode()
         self.assertIn('מופיע בו באותו שם, <bdi>עמ׳ 328-329</bdi>', page)
         library = self.client.get('/articles/?lang=en').content.decode()

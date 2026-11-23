@@ -59,7 +59,7 @@ class BibliographyTests(Fixture):
         self.assertIn('<i>Tenellia</i> sp. 17', page)
         area = SpeciesArea.objects.get(species=sp)
         page = self.client.get(f'/species/{area.slug}/?lang=en').content.decode()
-        self.assertIn('(Source: <a class="name-source" href="/articles/?lang=en#nssi-2"', page)
+        self.assertIn('Source: <a class="name-source" href="/articles/?lang=en#nssi-2"', page)
 
     def test_admin_accepts_a_reference_only_entry(self):
         self.client.force_login(self.owner)

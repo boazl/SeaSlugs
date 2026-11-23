@@ -522,9 +522,16 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
        "Source:" is the publication the identification relies on, not part of the name.
      - Type: the name in Arial Italic 28 pt; author / authority in Arial Regular, same size; the source line in Arial
        Regular 16 pt; white with a soft black shadow. (Older labels: Helvetica Neue faux italic, fully slanted.)
-     - The site follows the same rule: a species' name source is shown as "(Source: Authors, Year)" / "(מקור: …)"
+     - The site follows the same rule: a species' name source is shown as "Source: Authors, Year" / "מקור: …" -- no
+       parentheses (they belong to a taxonomic authority) and, on the species page, on its own line under the name --
        without the library's edition code (`Species.source_display`; `name_source` keeps the code, the library entry's
        `short_ref`, and the link still opens that entry).
+   - **Parentheses of the authority (ICZN):** none while the species stays in the genus it was described in; in
+     parentheses once it stands in another genus -- they mark a change of genus, never doubt. `Species.original_genus`
+     records the original genus (migration `0131`, from WoRMS's "original combination" and
+     `original_descriptions.json`: `observations/data/original_genera.json`), `Species.author_parentheses_ok()` checks
+     the parentheses against it, and `python manage.py check_author_parentheses` lists the disagreements and the
+     gallery species without an original genus. `original_genus` travels with the species table transfer.
 9. **Language** (§7.3)
    - Each page shows exactly one language.
    - The choice persists across pages.
@@ -1153,6 +1160,7 @@ Catalogue of test modules (test count) and what each guards:
 | `test_thuridilla_2021_numbers` | 4 | Migration 0126: book sp. 7 → Thuridilla sp. 7 (2021) with the paper as source, the T. ratna observation and card moved to it (same slug), cf. and notes, paper texts only where empty, real citation, issues decided; runs once; migration 0127: plain numbers (no "(2021)"), texts adjusted, #195 to T. gracilis and the emptied row deleted; migration 0128: the sp. 7 observations without cf. (notes the owner changed kept); migration 0129: #234 to T. gracilis, its emptied card deleted |
 | `test_species_extra_observation_link` | 2 | Species page: an extra observation's card opens its edit page for a manager or its owner (photo / video in the lightbox from separate links); other visitors keep the lightbox |
 | `test_sp_name_source` | 7 | Source of an undescribed sp. species' name shown instead of an author (species page, catalog, app.js), species transfer, migration 0110; the site's own marks (site_source, migration 0111, admin action) |
+| `test_original_genus` | 3 | Species.original_genus and the ICZN parentheses rule (author_parentheses_ok); migration 0131 fills only empty values and gives three authors WoRMS's parentheses; check_author_parentheses lists the disagreements |
 | `test_identification_transfer` | 5 | Genus identification files between environments: manifest, comparison, download, receive (new / same / replace only when confirmed / unknown genus / bad files), page section and the image manager's link |
 | `test_thuridilla_source_migration` | 1 | Migration 0108: the Thuridilla article's author line accents |
 | `test_identification_issues` | 16 | Identification issues: species follow the observations, fixed date, duplicate needs a second one, SET_NULL; superuser page, filters / search / order, quick priority and state, add / edit / delete, form errors, prefill; `identissues` transfer (export, round trip, newer copy wins, missing references skipped, strict format); the findings migration |

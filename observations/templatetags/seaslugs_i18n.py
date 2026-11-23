@@ -614,7 +614,7 @@ def photo_credit(context, sample, area=None):
 
 @register.filter
 def author_text(species, lang):
-    """The author of a species -- or, for an undescribed "sp." species, "(Source: <publication>)" (Species.author_text)."""
+    """The author of a species -- or, for an undescribed "sp." species, "Source: <publication>" (Species.author_text)."""
     return species.author_text(lang) if species is not None else ''
 
 
@@ -630,5 +630,5 @@ def author_html(species, lang):
     if article is None:
         return text
     label = species.SOURCE_LABEL.get(lang, 'Source')
-    return format_html('({}: <a class="name-source" href="{}" title="{}">{}</a>)', label, article.list_url(lang),
+    return format_html('{}: <a class="name-source" href="{}" title="{}">{}</a>', label, article.list_url(lang),
                        article.citation.strip() or article.title(lang), species.source_display)
