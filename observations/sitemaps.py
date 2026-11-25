@@ -11,13 +11,17 @@ from .models import Sample, SpeciesArea, TaxonGenus
 
 
 class StaticViewSitemap(Sitemap):
-    """The pages every visitor starts from: the gallery, the news & activity page and the observations forum."""
+    """The pages every visitor starts from: the gallery, the news & activity page, the observations forum, the open
+    plannings and, while the option is on, the support page."""
     protocol = 'https'
     changefreq = 'daily'
     priority = 0.8
 
     def items(self):
-        return ['gallery', 'news', 'forum', 'planning-list']
+        from .support import is_enabled
+        # The support page only while the option is on (support.is_enabled, the rule under which it answers 200).
+        # Its thank-you page is never listed (noindex).
+        return ['gallery', 'news', 'forum', 'planning-list'] + (['support'] if is_enabled() else [])
 
     def location(self, item):
         return reverse(item)

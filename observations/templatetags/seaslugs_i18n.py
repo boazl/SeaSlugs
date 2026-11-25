@@ -452,6 +452,30 @@ TRANSLATIONS = {
     'לתצפית באתר': 'Open the observation on the site',
     'לדיון המלא': 'Whole discussion',
     'להרשמה': 'Sign up',
+    # The support page and its thank-you page (support.py, support.html, support_thank_you.html).
+    'תמיכה בפרויקט': 'Support the Project',
+    'תמיכה בפרויקט חקר חשופיות הים | SeaSlugs': 'Support Sea Slug Research | SeaSlugs',
+    'תמיכה וולונטרית בפרויקט SeaSlugs, מיזם עצמאי לתיעוד ולחקר חשופיות הים וחינניות הים ולחקר הים התיכון של ישראל: מינים חדשים, הגירה וטרופיזציה.': "Voluntary support for SeaSlugs, an independent project documenting and studying sea slugs and nudibranchs along Israel's Mediterranean coast: new species, migration and tropicalization.",
+    'תמיכה בפרויקט SeaSlugs': 'Support the SeaSlugs Project',
+    'פרויקט SeaSlugs הוא מיזם עצמאי לתיעוד ולחקר חשופיות וחינניות הים, המגוון הביולוגי הימי והשינויים המתרחשים בים התיכון.': 'SeaSlugs is an independent project dedicated to documenting and studying sea slugs, marine biodiversity, and environmental changes in the Mediterranean Sea.',
+    'מטרתו המרכזית של הפרויקט היא להרחיב את הידע על חשופיות הים בחופי הים התיכון של ישראל, לתעד הופעת מינים חדשים, לעקוב אחר תהליכי הטרופיזציה ולעודד שיתוף פעולה עם צוללים וצלמים תת־ימיים.': "The project's primary objective is to expand our knowledge of sea slugs along Israel's Mediterranean coast, document newly arriving species, monitor tropicalization, and encourage collaboration with divers and underwater photographers.",
+    'האתר פתוח לכלל הציבור ללא תשלום.': 'The website is freely accessible to everyone.',
+    'אם אתם מוצאים עניין או ערך בפרויקט ומעוניינים לסייע בהמשך פעילותו, תוכלו לעשות זאת באמצעות תמיכה כספית וולונטרית.': 'If you find the project interesting or valuable and would like to help sustain its activities, you are welcome to make a voluntary financial contribution.',
+    'התמיכה שלכם תסייע ב:': 'Your support will help:',
+    'תחזוקת האתר, האחסון ומאגר המידע.': 'Maintain the website, hosting, and database.',
+    'הרחבת מאגר התצלומים והתצפיות.': 'Expand the collection of photographs and observations.',
+    'תיעוד וחקר המגוון הביולוגי הימי.': 'Document and study marine biodiversity.',
+    'מעקב אחר שינויים בתפוצת המינים בים התיכון.': 'Monitor changes in species distribution in the Mediterranean Sea.',
+    'פיתוח כלים לשיתוף תצפיות וידע עם קהילת הצוללים והצלמים.': 'Develop tools for sharing observations and knowledge with the diving and underwater photography communities.',
+    'תמיכה בפרויקט באמצעות PayPal': 'Support the Project via PayPal',
+    'ניתן לבחור את סכום התמיכה באופן חופשי. התשלום מתבצע באמצעות מערכת התשלומים המאובטחת של PayPal.': 'You may choose your own contribution amount. Payments are processed securely through PayPal.',
+    'התמיכה היא וולונטרית ואינה מקנה תמורה, שירות או זכויות מיוחדות. התמיכה אינה מזכה בהטבת מס לפי סעיף 46 לפקודת מס הכנסה.': 'Contributions are entirely voluntary and do not provide goods, services, or special privileges in return. Contributions are not eligible for Israeli tax deductions under Section 46.',
+    'צילום': 'Photo',
+    'תודה על תמיכתך | SeaSlugs': 'Thank you for your support | SeaSlugs',
+    'תודה על תמיכתך בפרויקט SeaSlugs!': 'Thank you for supporting the SeaSlugs Project!',
+    'תמיכתך מסייעת לנו להמשיך לתעד ולחקור את חשופיות הים, להרחיב את הידע על המגוון הביולוגי הימי ולעקוב אחר השינויים המתרחשים בים התיכון.': 'Your contribution helps us continue documenting and studying sea slugs, expanding our knowledge of marine biodiversity, and monitoring environmental changes in the Mediterranean Sea.',
+    'אנו מעריכים את תמיכתך ואת השותפות שלך בהמשך פעילות הפרויקט.': 'We appreciate your support and your contribution to the future of this project.',
+    'חזרה לאתר': 'Return to SeaSlugs',
 }
 
 
@@ -546,6 +570,7 @@ NAV_ICONS = {
     'articles': '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/>',
     'news': '<path d="M4 4h13v16H6a2 2 0 0 1-2-2z"/><path d="M17 8h3v10a2 2 0 0 1-2 2"/><path d="M8 8h5M8 12h5M8 16h5"/>',
     'forum': '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h5"/>',
+    'support': '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z"/>',
     'signup': '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/>',
 }
 

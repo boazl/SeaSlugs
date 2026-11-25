@@ -84,6 +84,14 @@ SITE_ID = 1
 # Google gives you as this environment variable on Render; blank = no tag on the pages.
 GOOGLE_SITE_VERIFICATION = os.environ.get("GOOGLE_SITE_VERIFICATION", "").strip()
 
+# Voluntary financial support (observations/support.py): the payment happens on PayPal's own page.
+# SUPPORT_ENABLED switches the menu/footer link, /support/ and its sitemap entry. Unset = off in
+# production (until the owner turns it on with SUPPORT_ENABLED=true on Render), on locally for testing.
+_support_enabled = os.environ.get("SUPPORT_ENABLED", "").strip().lower()
+SUPPORT_ENABLED = (_support_enabled in ("1", "true", "yes", "on")) if _support_enabled else not PRODUCTION
+# The PayPal payment link (payer picks the amount, ILS). Must be an https paypal.com address.
+PAYPAL_SUPPORT_URL = os.environ.get("PAYPAL_SUPPORT_URL", "https://www.paypal.com/ncp/payment/ZPWK3CE7KPCU2").strip()
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
@@ -113,6 +121,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'observations.context_processors.maintenance_status',
                 'observations.context_processors.language',
+                'observations.support.context',
             ],
         },
     },

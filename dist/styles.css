@@ -240,3 +240,5 @@ body:has(.controls-panel) .collection-selection:empty{margin:0}
 .area-group-toggle:hover{background:#ffe27a}
 .card.area-group.open .image-wrap{outline:2px solid #ffd23f;outline-offset:3px}
 .card.area-member .image-wrap{outline:1px dashed #ffd23f99;outline-offset:3px}
+
+footer .footer-support{color:var(--accent);text-decoration:none;white-space:nowrap}footer .footer-support:hover,footer .footer-support:focus-visible{text-decoration:underline}

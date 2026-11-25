@@ -1,4 +1,4 @@
-{% load seo %}<!doctype html>
+{% load seo seaslugs_i18n %}<!doctype html>
 <html lang="{{ lang }}" dir="{% if lang == 'en' %}ltr{% else %}rtl{% endif %}">
 
 <head>
@@ -155,7 +155,8 @@ gtag('config', 'G-CPGTC09P2P');</script>
     <footer><span class="brand-name" dir="ltr">SeaSlugs.</span>
         <p>צילום: בועז ליבס · הסרטונים מוצגים דרך YouTube</p><span class="footer-tagline">חינניות ים, מקרוב.</span>
         <p class="footer-invite" data-home-section="footer_invite" data-lang="{{ lang }}">{{ sections.footer_invite|safe }}</p>
-    </footer>
+{% if support_link %}        <a class="footer-support" href="{{ support_link|with_lang:lang }}" data-support-link data-he="תמיכה בפרויקט" data-en="Support the Project">{{ "תמיכה בפרויקט"|t:lang }}</a>
+{% endif %}    </footer>
     <dialog id="player" aria-labelledby="playerTitle">
         <div class="player-head">
             <div>

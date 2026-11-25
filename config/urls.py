@@ -23,6 +23,7 @@ from observations.forum import forum, forum_new, forum_delete, forum_trip
 from observations.article_edit import article_edit
 from observations.planned_trips import planning_list, planning_page
 from observations.trip_page import trip_page
+from observations.support import support_page, support_thank_you
 from observations.views import site_image, species_page, genus_page, genus_identification, genus_identification_preview, order_page, family_page, divetrip_locations
 from observations.articles import article_list, article_page, article_pdf, article_thumb, species_article, genus_article, family_article, order_article
 from observations.db_replace import db_replace, db_replace_download
@@ -66,6 +67,8 @@ urlpatterns = [
     path('analytics/exclude/', analytics_exclude, name='analytics-exclude'),
     path('analytics/include/', analytics_include, name='analytics-include'),
     path('site-image/<slug:key>.jpg', site_image, name='site-image'),
+    path('support/', support_page, name='support'),
+    path('support/thank-you/', support_thank_you, name='support-thank-you'),
     path('news/', news, name='news'),
     path('news/slideshow/', news_slideshow, name='news-slideshow'),
     path('planning/', planning_list, name='planning-list'),

@@ -1,0 +1,58 @@
+{% extends 'observations/base.html' %}{% load seaslugs_i18n seo %}{% block title %}{{ "תמיכה בפרויקט חקר חשופיות הים | SeaSlugs"|t:lang }}{% endblock %}{% block share_meta %}<meta name="description" content="{{ "תמיכה וולונטרית בפרויקט SeaSlugs, מיזם עצמאי לתיעוד ולחקר חשופיות הים וחינניות הים ולחקר הים התיכון של ישראל: מינים חדשים, הגירה וטרופיזציה."|t:lang }}">
+{% if photo %}{% share_meta "תמיכה בפרויקט SeaSlugs"|t:lang "" "תמיכה וולונטרית בפרויקט SeaSlugs, מיזם עצמאי לתיעוד ולחקר חשופיות הים וחינניות הים ולחקר הים התיכון של ישראל: מינים חדשים, הגירה וטרופיזציה."|t:lang photo.url %}{% else %}{% share_meta "תמיכה בפרויקט SeaSlugs"|t:lang "" "תמיכה וולונטרית בפרויקט SeaSlugs, מיזם עצמאי לתיעוד ולחקר חשופיות הים וחינניות הים ולחקר הים התיכון של ישראל: מינים חדשים, הגירה וטרופיזציה."|t:lang %}{% endif %}{% endblock %}{% block site_hero %}{% endblock %}{% block content %}<style>
+.support{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:40px;align-items:start;margin:8px 0 56px}
+.support h1{font-size:32px;line-height:1.25;margin:8px 0 18px}
+.support p{margin:0 0 14px}
+.support .lead{font-size:18px;color:#e4f3f4}
+.support .free{color:#b8ccd0}
+.support h2{font-size:19px;color:#64dfce;margin:26px 0 8px}
+.support ul{margin:0 0 8px;padding-inline-start:22px}
+.support li{margin:4px 0}
+.support-action{margin:30px 0 0;padding:22px 24px;border:1px solid #36515a;border-radius:10px}
+.support-button{display:inline-flex;align-items:center;gap:9px;background:#61dfcc;color:#08232a;padding:11px 22px;border-radius:7px;text-decoration:none;font-weight:600;font-size:17px}
+.support-button:hover,.support-button:focus-visible{background:#8ae9da}
+.support-button .nav-icon{width:19px;height:19px}
+.support-note{font-size:14px;color:#b8ccd0;margin:14px 0 0!important;line-height:1.6}
+.support-photo{margin:0;position:sticky;top:20px}
+.support-photo img{display:block;width:100%;height:auto;max-height:520px;object-fit:cover;border-radius:10px;border:1px solid #36515a}
+.support-photo figcaption{font-size:14px;color:#b8ccd0;margin-top:8px;line-height:1.5}
+.support-photo figcaption a{color:#64dfce;text-decoration:none}
+@media(max-width:850px){.support{grid-template-columns:1fr;gap:24px}.support-photo{position:static;order:-1}.support-photo img{max-height:340px}.support h1{font-size:27px}}
+</style>
+<div class="support">
+<section class="support-text" aria-labelledby="support-title">
+<h1 id="support-title">{{ "תמיכה בפרויקט SeaSlugs"|t:lang }}</h1>
+<p class="lead">{{ "פרויקט SeaSlugs הוא מיזם עצמאי לתיעוד ולחקר חשופיות וחינניות הים, המגוון הביולוגי הימי והשינויים המתרחשים בים התיכון."|t:lang }}</p>
+<p>{{ "מטרתו המרכזית של הפרויקט היא להרחיב את הידע על חשופיות הים בחופי הים התיכון של ישראל, לתעד הופעת מינים חדשים, לעקוב אחר תהליכי הטרופיזציה ולעודד שיתוף פעולה עם צוללים וצלמים תת־ימיים."|t:lang }}</p>
+<p class="free">{{ "האתר פתוח לכלל הציבור ללא תשלום."|t:lang }}</p>
+<p>{{ "אם אתם מוצאים עניין או ערך בפרויקט ומעוניינים לסייע בהמשך פעילותו, תוכלו לעשות זאת באמצעות תמיכה כספית וולונטרית."|t:lang }}</p>
+<h2>{{ "התמיכה שלכם תסייע ב:"|t:lang }}</h2>
+<ul>
+<li>{{ "תחזוקת האתר, האחסון ומאגר המידע."|t:lang }}</li>
+<li>{{ "הרחבת מאגר התצלומים והתצפיות."|t:lang }}</li>
+<li>{{ "תיעוד וחקר המגוון הביולוגי הימי."|t:lang }}</li>
+<li>{{ "מעקב אחר שינויים בתפוצת המינים בים התיכון."|t:lang }}</li>
+<li>{{ "פיתוח כלים לשיתוף תצפיות וידע עם קהילת הצוללים והצלמים."|t:lang }}</li>
+</ul>
+<div class="support-action">
+<a class="support-button" id="support-paypal" href="{{ paypal_url }}" rel="noopener">{% nav_icon 'support' %}<span>{{ "תמיכה בפרויקט באמצעות PayPal"|t:lang }}</span></a>
+<p class="support-note">{{ "ניתן לבחור את סכום התמיכה באופן חופשי. התשלום מתבצע באמצעות מערכת התשלומים המאובטחת של PayPal."|t:lang }}</p>
+<p class="support-note">{{ "התמיכה היא וולונטרית ואינה מקנה תמורה, שירות או זכויות מיוחדות. התמיכה אינה מזכה בהטבת מס לפי סעיף 46 לפקודת מס הכנסה."|t:lang }}</p>
+</div>
+</section>
+{% if photo %}<figure class="support-photo"><img src="{{ photo.url }}" alt="{{ photo.alt }}" loading="lazy"><figcaption><a href="{{ photo.species_url|with_lang:lang }}" dir="ltr">{{ photo.name }}</a>{% if photo.photographer %} · {{ "צילום"|t:lang }}: <bdi>{{ photo.photographer }}</bdi>{% endif %}</figcaption></figure>{% endif %}
+</div>
+<script>
+// GA4 (the site's own tag from base.html, absent under /admin/ and with the owner's opt-out cookie): how many open
+// this page and how many go on to PayPal. No personal data, no amount, never a purchase event (support.py).
+(function () {
+    var params = {language: '{{ lang|escapejs }}', payment_provider: 'paypal'};
+    if (typeof gtag === 'function') gtag('event', 'support_page_view', params);
+    var button = document.getElementById('support-paypal');
+    if (button) button.addEventListener('click', function () {
+        if (typeof gtag === 'function') gtag('event', 'support_paypal_click', {
+            language: params.language, payment_provider: 'paypal', currency: 'ILS', transport_type: 'beacon'});
+    });
+})();
+</script>
+{% endblock %}

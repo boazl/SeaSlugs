@@ -576,6 +576,7 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
 | `/observations/trips/#planning` | The dive trips page's "תכנון מסעות צלילה" section (§7.6) |
 | `/planning/`, `/planning/<trip code>/` | The open plannings; one planning's page (§7.6) |
 | `/forum/trip/<trip code>/` | One dive trip's discussion to send to people, without the forum's picker; a summary trip's page holds its series (§7.5) |
+| `/support/`, `/support/thank-you/` | Voluntary financial support (§7.7): the support page (404 while `SUPPORT_ENABLED` is off) and PayPal's auto-return thank-you page (always reachable, noindex) |
 | `/news/` | News & activity (§7.4): public activity feed, posts, planned trips, progress chart; management data for staff |
 | `/forum/` (`?kind=…`, `?obs=<pk>`), `/forum/new/`, `/forum/<pk>/delete/` | Observations forum (§7.5) |
 
@@ -851,6 +852,24 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
   trip in the admin); same owner, the trip's title. The series stays open until its last trip ends; the planning
   section shows the trips' plannings inside the series card (full width) with the trip's articles (e.g. a schedule);
   the forum links the series and its trips' discussions and shows the trip's articles.
+
+### 7.7 Voluntary financial support (`support.py`, `support.html`, `support_thank_you.html`, `test_support.py`)
+
+- **Payment happens on PayPal only:** the button links to the PayPal payment link in `PAYPAL_SUPPORT_URL` (payer picks
+  the amount, ILS). No API, SDK or webhooks; no amount field on the site; no table, nothing about supporters is stored.
+  A URL that is not `https://` on a PayPal host counts as no link.
+- **Switch:** `SUPPORT_ENABLED` (env). Unset = off in production, on locally. Off (or no valid link): `/support/` is
+  404, no menu / footer link, no sitemap entry. The link is in the shared main menu (`account_menu.html`, context
+  `support_link` from `support.context`) and the gallery footer (`dist/index.html`, `[data-support-link]` swapped by
+  `app.js`), never under `/admin/`.
+- **Thank-you page** `/support/thank-you/` = PayPal's auto-return URL: always reachable, `noindex, follow` (meta and
+  `X-Robots-Tag`), never in the sitemap, no amount / transaction id / "verified" -- reaching it proves nothing. Its
+  language comes from the `seaslugs_lang` cookie set when the visitor opened `/support/?lang=…`.
+- **Picture:** the defining photo of a published Mediterranean gallery observation (nudibranch first, Israel first,
+  best rated, then oldest), linked to its species page with the photographer's credit; none if there is no such photo.
+- **GA4** (the existing tag only): `support_page_view`, `support_paypal_click` (with `currency: ILS`),
+  `support_thank_you_view`; params `language`, `payment_provider`. Never `purchase` or a value.
+- The site is not a registered charity and support gives no tax benefit (Section 46): the page says so.
 
 ## 8. Storage of media and documents
 

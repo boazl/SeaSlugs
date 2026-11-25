@@ -2231,8 +2231,9 @@ function setLanguage(value) {
     document.querySelectorAll('.account-menu [data-he][data-en]').forEach(element => {
         element.textContent = en ? element.dataset.en : element.dataset.he;
     });
-    // The observations forum's "add a comment" button (index.html, [data-forum-link]): its label and its link's language.
-    document.querySelectorAll('[data-forum-link]').forEach(link => {
+    // The observations forum's "add a comment" button (index.html, [data-forum-link]) and the footer's "support the
+    // project" link ([data-support-link], support.py): their label and their link's language.
+    document.querySelectorAll('[data-forum-link], [data-support-link]').forEach(link => {
         link.textContent = en ? link.dataset.en : link.dataset.he;
         const url = new URL(link.getAttribute('href'), window.location.origin);
         if (en) url.searchParams.set('lang', 'en'); else url.searchParams.delete('lang');

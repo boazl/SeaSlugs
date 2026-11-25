@@ -1,0 +1,19 @@
+{% extends 'observations/base.html' %}{% load seaslugs_i18n %}{% block title %}{{ "תודה על תמיכתך | SeaSlugs"|t:lang }}{% endblock %}{% block share_meta %}<meta name="robots" content="noindex, follow">
+{% endblock %}{% block site_hero %}{% endblock %}{% block content %}<style>
+.support-thanks{max-width:720px;margin:24px auto 64px;padding:30px 32px;border:1px solid #36515a;border-radius:10px}
+.support-thanks h1{font-size:30px;line-height:1.3;margin:0 0 18px}
+.support-thanks p{margin:0 0 14px}
+.support-thanks .button{display:inline-block;margin-top:14px;text-decoration:none;font-weight:600}
+@media(max-width:560px){.support-thanks{padding:22px 18px}.support-thanks h1{font-size:25px}}
+</style>
+<section class="support-thanks" aria-labelledby="thanks-title">
+<h1 id="thanks-title">{{ "תודה על תמיכתך בפרויקט SeaSlugs!"|t:lang }}</h1>
+<p>{{ "תמיכתך מסייעת לנו להמשיך לתעד ולחקור את חשופיות הים, להרחיב את הידע על המגוון הביולוגי הימי ולעקוב אחר השינויים המתרחשים בים התיכון."|t:lang }}</p>
+<p>{{ "אנו מעריכים את תמיכתך ואת השותפות שלך בהמשך פעילות הפרויקט."|t:lang }}</p>
+<a class="button" href="{{ '/'|with_lang:lang }}">{{ "חזרה לאתר"|t:lang }}</a>
+</section>
+<script>
+// GA4: a visit to PayPal's return page -- counted as a visit only, never as a purchase (support.py).
+if (typeof gtag === 'function') gtag('event', 'support_thank_you_view', {language: '{{ lang|escapejs }}', payment_provider: 'paypal'});
+</script>
+{% endblock %}
