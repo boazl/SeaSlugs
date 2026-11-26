@@ -366,6 +366,12 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
   - Migration `0129` (owner's decision, issue #38): observation #234 (Romblon) is Thuridilla gracilis, not the paper's
     sp. 4: it moves there without cf., joins T. gracilis's Philippines card, and its emptied card is deleted with a 301
     (historical_species_redirects.json); the paper's Thuridilla sp. 4 stays in the catalogue without observations.
+  - Migration `0135` (issue #10): the Romblon Goniodoridella savignyi (#66) is marked cf. with a note on the species complex
+    (Paz-Sedano et al. 2023).
+  - Migration `0134` (issue #9): the Anilao "Hypselodoris carnea" (#240) is H. skyleri, joining its Philippines card;
+    the emptied H. carnea card is deleted with a 301 (historical_species_redirects.json).
+  - Migration `0133` (issues #7, #8): the Papua New Guinea observation filed as Phyllidia rueppelii (Red Sea only) is
+    Phyllidia picta (moved in place with its card, same slug); the P. alyta one (Indian Ocean only) is marked cf.
   - Migration `0132` (issues #40, #89): Tritonia sp. 3 (2nd ed., p. 257) is Marioniopsis sp. 23 (3rd ed., p. 284), renamed
     in place; the site then has no Tritonia species, and the genus observation #336 (genera-tritonia.jpg) is deleted
     (soft), so Tritonia leaves the gallery (its genus row and catalogue species stay).
@@ -1229,6 +1235,8 @@ Catalogue of test modules (test count) and what each guards:
 | `test_sp_name_source` | 7 | Source of an undescribed sp. species' name shown instead of an author (species page, catalog, app.js), species transfer, migration 0110; the site's own marks (site_source, migration 0111, admin action) |
 | `test_original_genus` | 3 | Species.original_genus and the ICZN parentheses rule (author_parentheses_ok); migration 0131 fills only empty values and gives three authors WoRMS's parentheses; check_author_parentheses lists the disagreements |
 | `test_tritonia_sp3` | 1 | Migration 0132: Tritonia sp. 3 → Marioniopsis sp. 23 in place (texts, publication name, observation genus, slug), the Tritonia genus observation deleted, issues #40 decided and #89 fixed; runs once |
+| `test_phyllidia_png_reviews` | 1 | Migration 0133: P. rueppelii observation and card to P. picta (same slug), P. alyta observation cf. with a note, issues #7/#8 decided; runs once |
+| `test_hypselodoris_skyleri` | 2 | Migration 0134: the H. carnea observation to H. skyleri's card, the emptied card deleted, issue #9 decided; runs once; migration 0135: the Goniodoridella savignyi observation cf. with a note |
 | `test_photo_missing_file` | 1 | An observation's photo whose file is not in this environment's storage answers 404, not a server error |
 | `test_identification_transfer` | 5 | Genus identification files between environments: manifest, comparison, download, receive (new / same / replace only when confirmed / unknown genus / bad files), page section and the image manager's link |
 | `test_thuridilla_source_migration` | 1 | Migration 0108: the Thuridilla article's author line accents |

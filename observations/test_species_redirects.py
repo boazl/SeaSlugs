@@ -40,10 +40,13 @@ class MappingValidationTests(SimpleTestCase):
         # Thuridilla gracilis (migration 0129 removed its card)
         gracilis = 'thuridilla-sp-4-2021-phillipines-indo-pacific-south-china-sea'
         self.assertEqual(HISTORICAL_SPECIES_REDIRECTS[gracilis][0], 'thuridilla-gracilis-phillipines-indo-pacific-south-china-sea')
-        self.assertEqual(len(set(HISTORICAL_SPECIES_REDIRECTS) - {MERGED, moved, geminus, elegans, gracilis}), 37)
+        # (2026-11-24) identification issue #9: the Anilao "Hypselodoris carnea" is H. skyleri (migration 0134)
+        skyleri = 'hypselodoris-carnea-phillipines-indo-pacific-south-china-sea'
+        self.assertEqual(HISTORICAL_SPECIES_REDIRECTS[skyleri][0], 'hypselodoris-skyleri-phillipines-indo-pacific-south-china-sea')
+        self.assertEqual(len(set(HISTORICAL_SPECIES_REDIRECTS) - {MERGED, moved, geminus, elegans, gracilis, skyleri}), 37)
         self.assertEqual(set(HISTORICAL_SPECIES_REDIRECTS) & {MERGED}, {MERGED})
         self.assertEqual(HISTORICAL_SPECIES_REDIRECTS[moved][0], 'hexabranchus-sanguineus-sinai-red-sea-gulf-of-aqaba')
-        self.assertEqual(len(HISTORICAL_SPECIES_REDIRECTS), 42)
+        self.assertEqual(len(HISTORICAL_SPECIES_REDIRECTS), 43)
         self.assertEqual(HISTORICAL_SPECIES_REDIRECTS[OLD][0], CURRENT)
         for stem in UNRESOLVED:
             self.assertNotIn(stem + '-phillipines-indo-pacific', HISTORICAL_SPECIES_REDIRECTS)
