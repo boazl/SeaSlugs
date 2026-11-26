@@ -418,6 +418,9 @@ def compare_manifest(manifest):
             if kept==pairs: break
             pairs=kept
         for row in rows: row['renamable']=row['here'] in pairs
+        # this environment's own pictures of those observations (not the ones a rename settles): downloaded here and
+        # uploaded there with "replace", they become the observation's image there too
+        result['different_image_names']=sorted({row['here'] for row in rows if row['here'] and not row['renamable']})
         result['align_pairs']=sorted(pairs.items())
         result['align_token']=signing.dumps(pairs,salt=ALIGN_SALT) if pairs else ''
     return result

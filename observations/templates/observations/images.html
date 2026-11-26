@@ -21,7 +21,8 @@
 {% else %}<p>לכל הקבצים המשותפים אותו תוכן בשתי הסביבות.</p>{% endif %}
 <h3>תצפיות שקיימות בשתי הסביבות עם תמונה שונה ({{comparison.different_image|length}})</h3>
 {% if not comparison.assignments_checked %}<p class="helptext">הקובץ יוצא בגרסה קודמת של האתר ואינו כולל את שיוך התמונות לתצפיות. יש לייצא אותו מחדש בסביבה השנייה אחרי עדכון הקוד שם.</p>
-{% elif comparison.different_image %}<p class="helptext">התמונה עצמה קיימת, אבל התצפית משתמשת בה רק באחת הסביבות (או בתמונה אחרת). העברת טבלת התצפיות אינה מעבירה את שיוך התמונה — יש לבחור את התמונה בעריכת התצפית בסביבה שבה היא חסרה.</p><ul>{% for row in comparison.different_image %}<li><a href="{% url 'observation-edit' row.sample.pk %}">{{row.sample}}</a> ({{row.sample.get_kind_display}}) — כאן: <span dir="ltr">{{row.here|default:"ללא תמונה"}}</span> · בסביבה השנייה: <span dir="ltr">{{row.there|default:"ללא תמונה"}}</span>{% if row.renamable %} <strong>— אותה תמונה בשם אחר</strong>{% elif row.same_picture %} — אותה תמונה, אבל השם תפוס כאן{% endif %}</li>{% endfor %}</ul>
+{% elif comparison.different_image %}<p class="helptext">התמונה עצמה קיימת, אבל התצפית משתמשת בה רק באחת הסביבות (או בתמונה אחרת). העברת טבלת התצפיות אינה מעבירה את שיוך התמונה. כדי שהתמונה של הסביבה הזו תוצג גם בשנייה: לסמן אותה כאן, להוריד, ולהעלות בסביבה השנייה ב"העברת תמונות לסביבה זו" עם אישור החלפת תמונות קיימות — התמונה מחליפה את התמונה של אותה תצפית שם (אפשר גם לבחור אותה בעריכת התצפית בסביבה שבה היא חסרה).</p><ul>{% for row in comparison.different_image %}<li><a href="{% url 'observation-edit' row.sample.pk %}">{{row.sample}}</a> ({{row.sample.get_kind_display}}) — כאן: <span dir="ltr">{{row.here|default:"ללא תמונה"}}</span> · בסביבה השנייה: <span dir="ltr">{{row.there|default:"ללא תמונה"}}</span>{% if row.renamable %} <strong>— אותה תמונה בשם אחר</strong>{% elif row.same_picture %} — אותה תמונה, אבל השם תפוס כאן{% endif %}</li>{% endfor %}</ul>
+{% if comparison.different_image_names %}<p><button type="button" id="select-different-image" data-label-on="הצגת כל התמונות" data-label-off="סימון התמונות של הסביבה הזו בגלריה למטה, לקראת הורדה">סימון התמונות של הסביבה הזו בגלריה למטה, לקראת הורדה</button></p>{{ comparison.different_image_names|json_script:"different-image-names" }}{% endif %}
 {% if comparison.align_token %}<form method="post">{% csrf_token %}<input type="hidden" name="action" value="align_names"><input type="hidden" name="pairs" value="{{ comparison.align_token }}">
 <p class="helptext">אותן תמונות שמורות בשתי הסביבות בשמות שונים. שינוי השם כאן לשם שבסביבה השנייה מעדכן את הקובץ ואת כל התצפיות שמציגות אותו:</p><ul>{% for old, new in comparison.align_pairs %}<li dir="ltr">{{ old }} → {{ new }}</li>{% endfor %}</ul>
 <p><button type="submit">שינוי שמות {{ comparison.align_pairs|length }} הקבצים לשמות שבסביבה השנייה</button></p></form>{% endif %}
@@ -79,6 +80,8 @@ const onlyHereNames=document.querySelector('#only-here-names');
 const onlyHere=onlyHereNames?new Set(JSON.parse(onlyHereNames.textContent)):new Set();
 const differentNames=document.querySelector('#different-content-names');
 const differentContent=differentNames?new Set(JSON.parse(differentNames.textContent)):new Set();
+const differentImageNames=document.querySelector('#different-image-names');
+const differentImage=differentImageNames?new Set(JSON.parse(differentImageNames.textContent)):new Set();
 // Filter modes, each with its toolbar button: while one is on, only its cards are shown (and
 // all of them selected); pressing the same button again shows every card. A card that gets
 // hidden is also unchecked, so nothing out of sight is ever downloaded or deleted by mistake.
@@ -88,6 +91,7 @@ const modes={
   mismatch:{button:document.querySelector('#select-mismatch'),match:card=>card.dataset.mismatch==='1',noSelect:true},
   onlyHere:{button:document.querySelector('#select-only-here'),match:card=>onlyHere.has(checkOf(card).dataset.name)},
   differentContent:{button:document.querySelector('#select-different-content'),match:card=>differentContent.has(checkOf(card).dataset.name)},
+  differentImage:{button:document.querySelector('#select-different-image'),match:card=>differentImage.has(checkOf(card).dataset.name)},
 };
 let mode=null;
 function applyFilter(){
@@ -107,7 +111,7 @@ function applyFilter(){
 }
 function toggleMode(key){
   const turningOn=mode!==key;
-  if(turningOn&&(key==='onlyHere'||key==='differentContent'))search.value='';
+  if(turningOn&&(key==='onlyHere'||key==='differentContent'||key==='differentImage'))search.value='';
   mode=turningOn?key:null;applyFilter();
   if(!modes[key].noSelect)visibleChecks().forEach(c=>c.checked=turningOn);
   if(turningOn)document.querySelector('#gallery-toolbar').scrollIntoView({behavior:'smooth'});

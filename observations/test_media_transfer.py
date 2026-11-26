@@ -214,6 +214,30 @@ class MediaTransferTests(TestCase):
         self.assertIn('תצפיות שקיימות בשתי הסביבות עם תמונה שונה (1)',content)
         self.assertIn(f'/observations/{family.pk}/edit/',content);self.assertIn('ללא תמונה',content)
 
+    def test_an_observation_shown_with_another_file_there_offers_this_environments_file_for_download(self):
+        """An observation present in both environments with a different file name (a re-captioned photo saved
+        under its new name, e.g. c-hypselodoris-skyleri.jpg here and c-hypselodoris-carnea.jpg there) lists this
+        environment's file in different_image_names, and the page renders a button that marks it in the gallery
+        for download -- uploaded there with "replace", it becomes that observation's image."""
+        import json
+        from .image_manager import build_manifest,compare_manifest
+        other=build_manifest();name=self.sample.image.name
+        other['assignments'][str(self.sample.transfer_id)]='observations/other-name.jpg'
+        other['images']=sorted(set(other['images'])|{'observations/other-name.jpg'})
+        result=compare_manifest(other)
+        self.assertEqual([r['here'] for r in result['different_image']],[name])
+        self.assertEqual(result['different_image_names'],[name])
+        self.client.force_login(self.sample.owner)
+        upload=SimpleUploadedFile('manifest.json',json.dumps(other).encode(),content_type='application/json')
+        content=self.client.post('/admin/images/',{'action':'compare_manifest','manifest':upload}).content.decode()
+        self.assertIn('id="select-different-image"',content)
+        names=json.loads(content.split('id="different-image-names" type="application/json">',1)[1].split('</script>',1)[0])
+        self.assertEqual(names,[name])
+        self.assertIn('אישור החלפת תמונות קיימות',content)
+        # nothing to offer when the observation has no image here
+        other['assignments'][str(self.sample.transfer_id)]=name
+        self.assertEqual(compare_manifest(other)['different_image_names'],[])
+
     def test_compare_manifest_reports_a_same_named_file_with_different_content(self):
         from .image_manager import build_manifest,compare_manifest
         other=build_manifest();name=self.sample.image.name
