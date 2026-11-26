@@ -354,8 +354,9 @@ class GenusPageTests(TestCase):
                video_url='https://youtu.be/66666666666').save_reviewed()
         html = self.client.get(f'/species/{self.area.slug}/').content.decode()
         self.assertLess(html.index('<img src', html.index('class="grid"')), html.index('class="sample-name"'))
-        self.assertIn('<h3 class="sample-name" dir="ltr"><i>Chromodoris</i> cf. <i>annae</i> '
-                      '<span class="sample-author">Bergh, 1877</span> juv.</h3>', html)
+        # the life stage follows the name, before the author -- as on the photo label
+        self.assertIn('<h3 class="sample-name" dir="ltr"><i>Chromodoris</i> cf. <i>annae</i> juv. '
+                      '<span class="sample-author">Bergh, 1877</span></h3>', html)
 
     def test_genus_page_cards_show_the_species_name_in_italics(self):
         self.species.species = 'annae'; self.species.save()

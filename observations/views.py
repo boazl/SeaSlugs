@@ -228,6 +228,14 @@ def species_page(request, slug):
         from .local_videos import annotate
         annotate(samples)
     other_samples = [s for s in samples if s is not main_sample]
+    # The page heading names the main observation as identified: with its cf./aff. and life stage ("Phyllidia cf. alyta
+    # juv."), as on its photo label; an extra observation shows its own heading only when it differs from the main one.
+    title_name, title_stage = species_label, ''
+    if main_sample.kind == Sample.Kind.SPECIES and main_sample.species_id == species.pk:
+        title_name = f'{main_sample.name_main} {area.undetermined_variant}'.strip()
+        title_stage = main_sample.name_stage
+    for other in other_samples:
+        other.show_name = other.taxon_label != main_sample.taxon_label
     # An editor (a manager, or the observation's owner) opens an extra observation's card at its edit page; the photo /
     # video then opens from a separate link. Everyone else keeps the card opening the photo or video on the page.
     for other in other_samples:
@@ -304,6 +312,7 @@ def species_page(request, slug):
         'can_copy_image': is_manager(request.user),
         'meta_title': meta_title, 'meta_description': meta_description, 'place_label': place,
         'area': area, 'species': species, 'species_label': species_label, 'samples': samples,
+        'title_name': title_name, 'title_stage': title_stage,
         'main_sample': main_sample, 'other_samples': other_samples, 'other_areas': other_areas,
         'info': info, 'size_short': size_short, 'depth_short': depth_short, 'sources': sources,
         'image_url': image_url, 'video_id': video_id, 'thumbnail': thumbnail,

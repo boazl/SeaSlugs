@@ -216,7 +216,8 @@ def gallery_file(request, filename='index.html'):
                 # the photographer has told them apart with an undetermined_variant letter
                 # (see Sample.undetermined_variant / SpeciesArea.undetermined_variant) --
                 # the card title carries that letter too, so the two cards aren't identical.
-                'title': f'{area.species.scientific_name} {area.undetermined_variant}'.strip(),
+                # ... and the defining observation's cf./aff. and life stage, as on its photo label (SpeciesArea.display_name)
+                'title': area.display_name,
                 'name_he': area.species.name_he, 'name_en': area.species.name_en,
                 'epithet': area.species.species,
                 # the area's undetermined_variant letter: with the species it decides which cards are one species

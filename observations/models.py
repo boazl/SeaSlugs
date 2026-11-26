@@ -1488,6 +1488,16 @@ class SpeciesArea(models.Model):
     def __str__(self):
         label = f'{self.species} {self.undetermined_variant}'.strip()
         return f'{label} · {self.country} · {self.sea}'
+    @property
+    def display_name(self):
+        """The card's name as its defining observation is identified: with its cf./aff. and life stage ("Phyllidia cf.
+        alyta juv."), as on the photo label, and the undetermined-variant letter -- the gallery (catalog.js title),
+        genus / family / order pages and the species page heading."""
+        sp, d = self.species, self.defining_sample
+        q = d.identification_qualifier if d is not None and d.species_id == self.species_id else ''
+        base = f'{sp.genus} {q} {sp.species}' if q and sp.genus and sp.species else sp.scientific_name
+        stage = d.life_stage if d is not None and d.species_id == self.species_id else ''
+        return ' '.join(x for x in (base, self.undetermined_variant, stage) if x)
     def _generate_slug(self):
         country_part = self.country.name_en or self.country.name
         sea_part = self.sea.name_en or self.sea.name

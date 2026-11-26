@@ -542,6 +542,10 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
    - Scientific names on the site (species and taxon pages, cards, trips, news) are set in Helvetica Neue (then
      Helvetica, Arial) with normal letter spacing -- the name in italics, author / authority / source upright. The
      site-wide h1 rule tightens letters (-1.5px), which made the species title look cramped; name headings reset it.
+   - **Names as identified:** a card and the species page heading name the defining observation as identified -- its
+     cf./aff. and life stage, as on the photo label ("Phyllidia cf. alyta juv. Yonow, 1996"; `SpeciesArea.display_name`,
+     catalog.js `title`); the life stage follows the name, before the author. An extra observation on the species page
+     shows its own heading only when it differs from the main one.
    - **Parentheses of the authority (ICZN):** none while the species stays in the genus it was described in; in
      parentheses once it stands in another genus -- they mark a change of genus, never doubt. `Species.original_genus`
      records the original genus (migration `0131`, from WoRMS's "original combination" and
@@ -1239,6 +1243,7 @@ Catalogue of test modules (test count) and what each guards:
 | `test_tritonia_sp3` | 1 | Migration 0132: Tritonia sp. 3 → Marioniopsis sp. 23 in place (texts, publication name, observation genus, slug), the Tritonia genus observation deleted, issues #40 decided and #89 fixed; runs once |
 | `test_phyllidia_png_reviews` | 1 | Migration 0133: P. rueppelii observation and card to P. picta (same slug), P. alyta observation cf. with a note, issues #7/#8 decided; runs once |
 | `test_hypselodoris_skyleri` | 2 | Migration 0134: the H. carnea observation to H. skyleri's card, the emptied card deleted, issue #9 decided; runs once; migration 0135: the Goniodoridella savignyi observation cf. with a note |
+| `test_species_title_qualifier` | 3 | The species page heading, gallery card title and genus card show the main observation's cf. and life stage (before the author); an extra observation's own heading when it differs; migration 0136 records #502's juv. |
 | `test_photo_missing_file` | 1 | An observation's photo whose file is not in this environment's storage answers 404, not a server error |
 | `test_identification_transfer` | 5 | Genus identification files between environments: manifest, comparison, download, receive (new / same / replace only when confirmed / unknown genus / bad files), page section and the image manager's link |
 | `test_thuridilla_source_migration` | 1 | Migration 0108: the Thuridilla article's author line accents |

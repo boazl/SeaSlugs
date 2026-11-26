@@ -63,7 +63,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
                 {% endwith %}
             </div>
             <div class="species-summary">
-                <h1 dir="ltr">{{ species_label|name_html }}{% with author=species|author_html:lang %}{% if author %} <span class="species-author{% if species.is_undescribed %} species-source{% endif %}">{{ author }}</span>{% endif %}{% endwith %}</h1>
+                <h1 dir="ltr">{{ title_name|name_html }}{% if title_stage %} {{ title_stage }}{% endif %}{% with author=species|author_html:lang %}{% if author %} <span class="species-author{% if species.is_undescribed %} species-source{% endif %}">{{ author }}</span>{% endif %}{% endwith %}</h1>
                 {% if common_name %}<p class="species-common">{{ common_name }}</p>{% endif %}
                 <p class="species-area">{{ area.country|loc:lang }} · {{ area.sea|loc:lang }}</p>
                 <div class="species-badges">
@@ -150,7 +150,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
                 {% photo_credit s area as credit %}<article class="card" id="obs-{{ s.pk }}">
                     {% if s.edit_url %}<a class="video-button observation-edit-link" href="{{ s.edit_url }}" title="{{ "עריכת תצפית"|t:lang }}">{% else %}<a class="video-button lightbox-link" data-sample="{{ s.pk }}" href="{% if s.video_url %}{{ s.video_url }}{% else %}{% url 'observation-photo' s.pk %}{% endif %}"{% if s.video_url %} data-video="1"{% endif %}>{% endif %}
                         <span class="image-wrap{% if credit.frame %} {{ credit.frame }}{% endif %}"><img src="{% if s.image %}{% url 'observation-photo' s.pk %}{% else %}{{ s.thumbnail }}{% endif %}" alt="" width="640" height="360" loading="lazy">{% if s.image and s.video_url %}<span class="play play-both{% if s.local_video_missing %} no-local{% endif %}" aria-hidden="true"><b>▶</b><i>⤢</i></span>{% elif s.video_url %}<span class="play{% if s.local_video_missing %} no-local{% endif %}" aria-hidden="true">▶</span>{% else %}<span class="play" aria-hidden="true">⤢</span>{% endif %}</span>
-                        {% if s.show_name %}<h3 class="sample-name" dir="ltr">{{ s.name_main|name_html }}{% if s.name_author %} <span class="sample-author">{{ s.name_author }}</span>{% endif %}{% if s.name_stage %} {{ s.name_stage }}{% endif %}</h3>{% endif %}
+                        {% if s.show_name %}<h3 class="sample-name" dir="ltr">{{ s.name_main|name_html }}{% if s.name_stage %} {{ s.name_stage }}{% endif %}{% if s.name_author %} <span class="sample-author">{{ s.name_author }}</span>{% endif %}</h3>{% endif %}
                         <span class="card-info">
                             <span class="card-meta"><span>{% if s.site %}{{ s.site|loc:lang }}{% endif %}{% if s.trip.region and s.trip.region_id != main_sample.trip.region_id %}{% if s.site %} · {% endif %}{{ s.trip.region|loc:lang }}{% endif %}{% if s.trip.year %}{% if s.site or s.trip.region and s.trip.region_id != main_sample.trip.region_id %} · {% endif %}{% if s.day and s.trip.month %}{{ s.day }}/{{ s.trip.month }}/{{ s.trip.year }}{% else %}{{ s.trip.year }}{% endif %}{% endif %}</span></span>
                             {% if credit.name %}<span class="photographer">{{ "צילום:"|t:lang }} {{ credit.name }}</span>{% endif %}
