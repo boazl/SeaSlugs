@@ -461,4 +461,7 @@ def news(request):
     }
     if context['manager']:
         context.update(manager_data(lang))
+    # Voluntary financial support: the owner (superuser) only, while receiving is on (contributions/views.py).
+    from contributions.views import news_section
+    context['support'] = news_section(request)
     return render(request, 'observations/news.html', context)

@@ -4,7 +4,7 @@
 <a class="nav-item" href="{{ '/'|with_lang:lang }}" title="{{ 'דף הבית'|t:lang }}" data-title-he="דף הבית" data-title-en="Home page">{% nav_icon 'gallery' %}{% nav_label 'גלריה' lang %}</a>
 <a class="nav-item" href="{% url 'dive-trips' as menu_url %}{{ menu_url|with_lang:lang }}">{% nav_icon 'trips' %}{% nav_label 'מסעות צלילה' lang %}</a>
 <a class="nav-item" href="{% url 'article-list' as menu_url %}{{ menu_url|with_lang:lang }}">{% nav_icon 'articles' %}{% nav_label 'מאמרים' lang %}</a>
-<a class="nav-item" href="{% url 'news' as menu_url %}{{ menu_url|with_lang:lang }}">{% nav_icon 'news' %}{% nav_label 'חדשות ופעילות' lang %}</a>
+<a class="nav-item" href="{% url 'news' as menu_url %}{{ menu_url|with_lang:lang }}">{% nav_icon 'news' %}{% nav_label 'חדשות ופעילות' lang %}{% if support_unseen %} <span class="nav-count" title="{{ 'תמיכות חדשות'|t:lang }}" style="display:inline-block;min-width:18px;padding:0 6px;border-radius:999px;background:#ffcf5c;color:#08232a;font-size:12px;font-weight:700;line-height:18px;text-align:center">{{ support_unseen }}</span>{% endif %}</a>
 <a class="nav-item" href="{% url 'forum' as menu_url %}{{ menu_url|with_lang:lang }}">{% nav_icon 'forum' %}{% nav_label 'פורום' lang %}</a>
 {% if support_link %}<a class="nav-item" href="{{ support_link|with_lang:lang }}">{% nav_icon 'support' %}{% nav_label 'תמיכה בפרויקט' lang %}</a>{% endif %}
 {% if user.is_authenticated %}

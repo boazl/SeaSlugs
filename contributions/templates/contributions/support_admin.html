@@ -1,0 +1,60 @@
+{% extends 'observations/base.html' %}{% block title %}SeaSlugs · תמיכות כספיות{% endblock %}{% block site_hero %}{% endblock %}
+{% block content %}<style>
+.sp-filters{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:end;margin:0 0 22px;padding:16px;border:1px solid #36515a;border-radius:10px}
+.sp-filters label{display:flex;flex-direction:column;gap:5px;font-size:15px}.sp-filters input,.sp-filters select{min-width:0;height:44px}
+.sp-filters .check{flex-direction:row;align-items:center;gap:8px}
+.sp-table{width:100%;border-collapse:collapse;font-size:14px;margin:8px 0 28px}.sp-table th,.sp-table td{padding:7px 8px;border-bottom:1px solid #22404a;text-align:start;vertical-align:top}
+.sp-table td.num,.sp-table th.num{text-align:end;white-space:nowrap;direction:ltr}.sp-wrap{overflow-x:auto}
+.sp-table tr.new td{background:#ffcf5c14}.sp-table .txn{font-family:ui-monospace,Menlo,monospace;font-size:13px;direction:ltr}
+.sp-table form{margin:0}.sp-table button,.sp-actions button{padding:5px 12px;font-size:13px}
+.sp-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;margin:0 0 24px}.sp-tile{border:1px solid #36515a;border-radius:10px;padding:12px 14px}.sp-tile b{display:block;font-size:24px;color:#64dfce;direction:ltr;text-align:start}.sp-tile span{font-size:13px;color:#b8ccd0}
+.sp-actions{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;margin:0 0 18px}.sp-actions form{margin:0}
+.sp-status{display:inline-block;padding:1px 9px;border-radius:999px;font-size:12px;border:1px solid #61dfcc66;background:#61dfcc1a;white-space:nowrap}
+.sp-status.refunded,.sp-status.reversed,.sp-status.denied{border-color:#ff8a6b88;background:#ff8a6b1a}.sp-status.partially_refunded,.sp-status.pending{border-color:#ffcf5c88;background:#ffcf5c1a}
+details summary{cursor:pointer;color:#64dfce}.na{color:#8aa}
+</style>
+<a href="{% url 'admin:index' %}">חזרה לניהול האתר</a>
+<h1>תמיכות כספיות</h1>
+<p class="helptext">תמיכות שהתקבלו בקישור התשלום של PayPal ואומתו מול PayPal (IPN וממשק ה-API). הסכומים, העמלות והנטו הם כפי שדיווח PayPal; נתון שלא התקבל מסומן "לא זמין". החזרים ופעולות כספיות נעשים בחשבון PayPal עצמו, והדף אינו מפיק קבלות או מסמכי מס. הנתונים נשמרים בקובץ מסד נפרד (support.sqlite3) ואינם עוברים בהעברת טבלאות.</p>
+{% if not enabled %}<p class="notice">קליטת התשלומים האוטומטית כבויה (PAYPAL_WEBHOOK_ENABLED).</p>{% endif %}
+{% if not mail_configured %}<p class="notice">לא הוגדרה כתובת להתראות (SUPPORT_NOTIFICATION_EMAIL): הודעות דוא"ל ממתינות ויישלחו כשתוגדר.</p>{% endif %}
+<div class="sp-actions">
+<form method="post">{% csrf_token %}<input type="hidden" name="action" value="seen_all"><input type="hidden" name="next" value="{{ request.get_full_path }}"><button>סימון כל התמיכות כנצפו</button></form>
+{% if pending_mail %}<form method="post">{% csrf_token %}<input type="hidden" name="action" value="retry"><input type="hidden" name="next" value="{{ request.get_full_path }}"><button>שליחת {{ pending_mail }} הודעות דוא"ל שממתינות</button></form>{% endif %}
+<a href="?{% if query %}{{ query }}&amp;{% endif %}format=csv">ייצוא CSV</a>
+</div>
+<form method="get" class="sp-filters">
+<label>מתאריך <input type="date" name="from" value="{{ chosen.from|date:'Y-m-d' }}"></label>
+<label>עד תאריך <input type="date" name="to" value="{{ chosen.to|date:'Y-m-d' }}"></label>
+<label>סטטוס <select name="status"><option value="">הכול</option>{% for value, label in statuses %}<option value="{{ value }}"{% if value == chosen.status %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+<label>מיון <select name="sort"><option value="-date"{% if chosen.sort == '-date' %} selected{% endif %}>תאריך, מהחדש</option><option value="date"{% if chosen.sort == 'date' %} selected{% endif %}>תאריך, מהישן</option><option value="-amount"{% if chosen.sort == '-amount' %} selected{% endif %}>סכום, מהגבוה</option><option value="amount"{% if chosen.sort == 'amount' %} selected{% endif %}>סכום, מהנמוך</option></select></label>
+<label class="check"><input type="checkbox" name="new" value="1"{% if chosen.new %} checked{% endif %}> חדשות בלבד</label>
+<button>הצגה</button> <a href="{% url 'support-admin' %}">ניקוי</a>
+</form>
+{% for currency, t in totals.items %}<div class="sp-tiles">
+<div class="sp-tile"><b>{{ t.count }}</b><span>תמיכות שהושלמו · {{ currency }}</span></div>
+<div class="sp-tile"><b>{{ t.gross|floatformat:2 }}</b><span>ברוטו · {{ currency }}</span></div>
+<div class="sp-tile"><b>{{ t.fees|floatformat:2 }}</b><span>עמלות PayPal · {{ currency }}</span></div>
+<div class="sp-tile"><b>{{ t.refunds|floatformat:2 }}</b><span>הוחזר · {{ currency }}</span></div>
+{% if t.reversed %}<div class="sp-tile"><b>{{ t.reversed|floatformat:2 }}</b><span>בוטל / עוכב · {{ currency }}</span></div>{% endif %}
+<div class="sp-tile"><b>{{ t.net|floatformat:2 }}</b><span>נטו אחרי עמלות והחזרים · {{ currency }}{% if t.missing %} ({{ t.missing }} ללא נתוני עמלה){% endif %}</span></div>
+</div>{% empty %}<p>אין תמיכות להצגה.</p>{% endfor %}
+{% if rows %}<div class="sp-wrap"><table class="sp-table"><thead><tr><th>תאריך</th><th>מזהה עסקה</th><th>סטטוס</th><th class="num">ברוטו</th><th class="num">עמלה</th><th class="num">נטו</th><th class="num">הוחזר</th><th class="num">נטו אחרי החזרים</th><th>הודעת התומך</th><th>נצפתה</th></tr></thead><tbody>
+{% for c in rows %}<tr{% if not c.seen %} class="new"{% endif %}><td>{% if c.paid_at %}{{ c.paid_at|date:"d/m/Y H:i" }}{% else %}<span class="na">לא זמין</span>{% endif %}</td>
+<td class="txn">{{ c.transaction_id }}{% if c.dispute_case_id %}<br>{{ c.dispute_case_id }}{% endif %}</td>
+<td><span class="sp-status {{ c.status }}">{{ c.get_status_display }}</span></td>
+<td class="num">{% if c.gross_amount is not None %}{{ c.gross_amount }} {{ c.currency }}{% else %}<span class="na">לא זמין</span>{% endif %}</td>
+<td class="num">{% if c.fee_amount is not None %}{{ c.fee_amount }}{% else %}<span class="na">לא זמין</span>{% endif %}</td>
+<td class="num">{% if c.net_amount is not None %}{{ c.net_amount }}{% else %}<span class="na">לא זמין</span>{% endif %}</td>
+<td class="num">{% if c.refunded_amount %}{{ c.refunded_amount }}{% else %}—{% endif %}{% if c.reversed_amount %}<br>עוכב {{ c.reversed_amount }}{% endif %}</td>
+<td class="num">{% if c.net_after_refunds is not None %}{{ c.net_after_refunds }}{% else %}<span class="na">לא זמין</span>{% endif %}</td>
+<td>{% if c.message %}<details><summary>{{ c.message|truncatechars:30 }}</summary><bdi>{{ c.message }}</bdi></details>{% else %}—{% endif %}</td>
+<td>{% if c.seen %}כן{% else %}<form method="post">{% csrf_token %}<input type="hidden" name="action" value="seen"><input type="hidden" name="pk" value="{{ c.pk }}"><input type="hidden" name="next" value="{{ request.get_full_path }}"><button>סימון כנצפתה</button></form>{% endif %}</td></tr>{% endfor %}
+</tbody></table></div>{% endif %}
+{% if monthly %}<h2>סיכום חודשי</h2><div class="sp-wrap"><table class="sp-table"><thead><tr><th>חודש</th><th>מטבע</th><th class="num">תמיכות</th><th class="num">ברוטו</th><th class="num">עמלות</th><th class="num">הוחזר</th><th class="num">נטו</th></tr></thead><tbody>
+{% for label, per in monthly %}{% for currency, t in per.items %}<tr><td>{{ label }}</td><td>{{ currency }}</td><td class="num">{{ t.count }}</td><td class="num">{{ t.gross|floatformat:2 }}</td><td class="num">{{ t.fees|floatformat:2 }}</td><td class="num">{{ t.refunds|floatformat:2 }}</td><td class="num">{{ t.net|floatformat:2 }}</td></tr>{% endfor %}{% endfor %}
+</tbody></table></div>
+<h2>סיכום שנתי</h2><div class="sp-wrap"><table class="sp-table"><thead><tr><th>שנה</th><th>מטבע</th><th class="num">תמיכות</th><th class="num">ברוטו</th><th class="num">עמלות</th><th class="num">הוחזר</th><th class="num">נטו</th></tr></thead><tbody>
+{% for label, per in yearly %}{% for currency, t in per.items %}<tr><td>{{ label }}</td><td>{{ currency }}</td><td class="num">{{ t.count }}</td><td class="num">{{ t.gross|floatformat:2 }}</td><td class="num">{{ t.fees|floatformat:2 }}</td><td class="num">{{ t.refunds|floatformat:2 }}</td><td class="num">{{ t.net|floatformat:2 }}</td></tr>{% endfor %}{% endfor %}
+</tbody></table></div>{% endif %}
+{% endblock %}

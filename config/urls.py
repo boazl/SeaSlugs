@@ -24,6 +24,7 @@ from observations.article_edit import article_edit
 from observations.planned_trips import planning_list, planning_page
 from observations.trip_page import trip_page
 from observations.support import support_page, support_thank_you
+from contributions.views import paypal_ipn, support_admin
 from observations.views import site_image, species_page, genus_page, genus_identification, genus_identification_preview, order_page, family_page, divetrip_locations
 from observations.articles import article_list, article_page, article_pdf, article_thumb, species_article, genus_article, family_article, order_article
 from observations.db_replace import db_replace, db_replace_download
@@ -34,6 +35,7 @@ urlpatterns = [
     path('admin/images/',image_manager,name='image-manager'),
     path('admin/images/file/',image_file,name='image-file'),
     path('admin/releases/', releases, name='releases'),
+    path('admin/support/', support_admin, name='support-admin'),
     path('admin/article-files/', article_files, name='article-files'),
     path('admin/article-files/open/', article_file_open, name='article-file-open'),
     path('admin/article-files/delete/', article_file_delete, name='article-file-delete'),
@@ -67,6 +69,7 @@ urlpatterns = [
     path('analytics/exclude/', analytics_exclude, name='analytics-exclude'),
     path('analytics/include/', analytics_include, name='analytics-include'),
     path('site-image/<slug:key>.jpg', site_image, name='site-image'),
+    path('webhooks/paypal/', paypal_ipn, name='paypal-ipn'),
     path('support/', support_page, name='support'),
     path('support/thank-you/', support_thank_you, name='support-thank-you'),
     path('news/', news, name='news'),

@@ -1,0 +1,15 @@
+{% load seaslugs_i18n %}<section class="manager support-news" id="support"><h2>{{ "תמיכה כספית בפרויקט (לבעל האתר בלבד)"|t:lang }}</h2>
+<div class="tiles">
+<div class="tile"><b>{{ support.unseen }}</b><span>{{ "תמיכות חדשות שטרם נצפו"|t:lang }}</span></div>
+<div class="tile"><b>{{ support.count }}</b><span>{{ "מספר התמיכות הכולל"|t:lang }}</span></div>
+{% for currency, t in support.totals.items %}<div class="tile"><b dir="ltr">{{ t.gross|floatformat:2 }}</b><span>{{ "סך התמיכות"|t:lang }} · {{ currency }}</span></div>
+<div class="tile"><b dir="ltr">{{ t.fees|floatformat:2 }}</b><span>{{ "עמלות PayPal"|t:lang }} · {{ currency }}</span></div>
+<div class="tile"><b dir="ltr">{{ t.net|floatformat:2 }}</b><span>{{ "נטו אחרי עמלות והחזרים"|t:lang }} · {{ currency }}</span></div>{% endfor %}
+{% for currency, t in support.month_totals.items %}<div class="tile"><b dir="ltr">{{ t.gross|floatformat:2 }}</b><span>{{ "החודש"|t:lang }} · {{ currency }}</span></div>{% endfor %}
+<div class="tile"><b dir="ltr" style="font-size:20px">{% if support.last_paid_at %}{{ support.last_paid_at|date:"d/m/Y" }}{% else %}—{% endif %}</b><span>{{ "התמיכה האחרונה"|t:lang }}</span></div>
+</div>
+{% if support.recent %}<h3>{{ "התמיכות האחרונות"|t:lang }}</h3><div class="table-wrap"><table class="data-table"><thead><tr><th>{{ "תאריך"|t:lang }}</th><th class="num">{{ "סכום"|t:lang }}</th><th>{{ "הודעת התומך"|t:lang }}</th><th></th></tr></thead><tbody>
+{% for c in support.recent %}<tr><td>{% if c.paid_at %}{{ c.paid_at|date:"d/m/Y H:i" }}{% endif %}{% if not c.seen %} <span class="badge">{{ "חדשה"|t:lang }}</span>{% endif %}</td><td class="num" dir="ltr">{{ c.gross_amount }} {{ c.currency }}</td><td><bdi>{{ c.message|default:"—" }}</bdi></td><td>{% if not c.seen %}<form method="post" action="{% url 'support-admin' %}">{% csrf_token %}<input type="hidden" name="action" value="seen"><input type="hidden" name="pk" value="{{ c.pk }}"><input type="hidden" name="next" value="{{ request.get_full_path }}#support"><button style="padding:4px 12px;font-size:13px">{{ "סימון כנצפתה"|t:lang }}</button></form>{% endif %}</td></tr>{% endfor %}
+</tbody></table></div>{% endif %}
+<div class="actions">{% if support.unseen %}<form method="post" action="{% url 'support-admin' %}" style="display:inline">{% csrf_token %}<input type="hidden" name="action" value="seen_all"><input type="hidden" name="next" value="{{ request.get_full_path }}#support"><button style="padding:6px 14px;font-size:14px">{{ "סימון כל התמיכות כנצפו"|t:lang }}</button></form> {% endif %}<a href="{% url 'support-admin' %}">{{ "לדף ניהול התמיכות המלא"|t:lang }}</a></div>
+</section>

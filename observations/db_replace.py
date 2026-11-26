@@ -65,6 +65,10 @@ def migration_mismatch(path):
             conn.close()
     except sqlite3.Error:
         return 'לא נמצאה בקובץ טבלת django_migrations תקינה.'
+    # The contributions app lives in its own database (support.sqlite3, contributions/router.py): its migrations
+    # say nothing about whether this file fits the code, and a replacement never touches its data.
+    expected = {m for m in expected if m[0] != 'contributions'}
+    actual = {m for m in actual if m[0] != 'contributions'}
     if actual != expected:
         return (f'גרסת מסד הנתונים אינה תואמת לקוד הנוכחי '
                 f'(חסרות {len(expected - actual)} מיגרציות, {len(actual - expected)} עודפות). '

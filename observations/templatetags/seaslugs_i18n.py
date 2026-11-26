@@ -476,6 +476,24 @@ TRANSLATIONS = {
     'תמיכתך מסייעת לנו להמשיך לתעד ולחקור את חשופיות הים, להרחיב את הידע על המגוון הביולוגי הימי ולעקוב אחר השינויים המתרחשים בים התיכון.': 'Your contribution helps us continue documenting and studying sea slugs, expanding our knowledge of marine biodiversity, and monitoring environmental changes in the Mediterranean Sea.',
     'אנו מעריכים את תמיכתך ואת השותפות שלך בהמשך פעילות הפרויקט.': 'We appreciate your support and your contribution to the future of this project.',
     'חזרה לאתר': 'Return to SeaSlugs',
+    # The owner's support section on the news page, the menu count and the admin link (contributions app).
+    'תמיכה כספית בפרויקט (לבעל האתר בלבד)': 'Financial support for the project (site owner only)',
+    'תמיכות חדשות שטרם נצפו': 'New contributions not yet seen',
+    'מספר התמיכות הכולל': 'Total contributions',
+    'סך התמיכות': 'Total contributions received',
+    'עמלות PayPal': 'PayPal fees',
+    'נטו אחרי עמלות והחזרים': 'Net after fees and refunds',
+    'החודש': 'This month',
+    'התמיכה האחרונה': 'Latest contribution',
+    'התמיכות האחרונות': 'Latest contributions',
+    'סכום': 'Amount',
+    'הודעת התומך': "Supporter's message",
+    'חדשה': 'New',
+    'סימון כנצפתה': 'Mark as seen',
+    'סימון כל התמיכות כנצפו': 'Mark all as seen',
+    'לדף ניהול התמיכות המלא': 'Full contributions page',
+    'תמיכות כספיות': 'Contributions',
+    'תמיכות חדשות': 'New contributions',
 }
 
 

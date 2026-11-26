@@ -64,6 +64,7 @@ MEDIA_URL = "/media/"
 
 INSTALLED_APPS = [
     'observations',
+    'contributions',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -91,6 +92,18 @@ _support_enabled = os.environ.get("SUPPORT_ENABLED", "").strip().lower()
 SUPPORT_ENABLED = (_support_enabled in ("1", "true", "yes", "on")) if _support_enabled else not PRODUCTION
 # The PayPal payment link (payer picks the amount, ILS). Must be an https paypal.com address.
 PAYPAL_SUPPORT_URL = os.environ.get("PAYPAL_SUPPORT_URL", "https://www.paypal.com/ncp/payment/ZPWK3CE7KPCU2").strip()
+# Receiving the payments automatically (contributions app): PayPal's IPN at /webhooks/paypal/, each notification
+# verified with PayPal and the transaction read back through the REST API. Separate from SUPPORT_ENABLED (the public
+# page). Unset = off in production, on locally -- and off in the test run unless a test turns it on.
+_ipn_enabled = os.environ.get("PAYPAL_WEBHOOK_ENABLED", "").strip().lower()
+PAYPAL_WEBHOOK_ENABLED = ((_ipn_enabled in ("1", "true", "yes", "on")) if _ipn_enabled
+                          else (not PRODUCTION and not (len(sys.argv) > 1 and sys.argv[1] == "test")))
+PAYPAL_ENV = os.environ.get("PAYPAL_ENV", "live" if PRODUCTION else "sandbox").strip().lower()   # live | sandbox
+PAYPAL_CLIENT_ID = os.environ.get("PAYPAL_CLIENT_ID", "").strip()
+PAYPAL_CLIENT_SECRET = os.environ.get("PAYPAL_CLIENT_SECRET", "").strip()
+PAYPAL_RECEIVER_ID = os.environ.get("PAYPAL_RECEIVER_ID", "").strip()          # the SeaSlugs account's merchant ID
+PAYPAL_SUPPORT_ITEM_ID = os.environ.get("PAYPAL_SUPPORT_ITEM_ID", "").strip()  # blank = the payment link's own id
+SUPPORT_NOTIFICATION_EMAIL = os.environ.get("SUPPORT_NOTIFICATION_EMAIL", "").strip()
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -122,6 +135,7 @@ TEMPLATES = [
                 'observations.context_processors.maintenance_status',
                 'observations.context_processors.language',
                 'observations.support.context',
+                'contributions.views.context',
             ],
         },
     },
@@ -138,8 +152,16 @@ DATABASES = {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': DATA_DIR / 'db.sqlite3',
         'OPTIONS': {'timeout': 20},
-    }
+    },
+    # Voluntary financial support (contributions app) in its own file, so replacing or restoring db.sqlite3 never
+    # touches it (contributions/router.py). Backed up and migrated by start.sh together with the main database.
+    'support': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': DATA_DIR / 'support.sqlite3',
+        'OPTIONS': {'timeout': 20},
+    },
 }
+DATABASE_ROUTERS = ['contributions.router.SupportRouter']
 
 
 # Password validation

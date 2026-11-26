@@ -9,6 +9,25 @@ from django.shortcuts import render
 from .table_transfer import create_backup, backups_summary, TABLES
 
 
+def backup_support_database():
+    """A verified copy of the separate support (financial) database next to the other backups, or None if there is
+    none yet (contributions app; never part of table transfers or a database replacement)."""
+    import sqlite3
+    from django.utils import timezone
+    from .table_transfer import backups_dir
+    source = Path(settings.DATABASES['support']['NAME'])
+    if not source.exists():
+        return None
+    root = backups_dir(); root.mkdir(parents=True, exist_ok=True)
+    target = root / f'support-{timezone.now():%Y%m%d-%H%M%S}.sqlite3'
+    with sqlite3.connect(str(source)) as src, sqlite3.connect(str(target)) as dst:
+        src.backup(dst)
+        if dst.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
+            raise RuntimeError('support database backup failed its integrity check')
+    target.chmod(0o600)
+    return target
+
+
 @staff_member_required
 def releases(request):
     if not request.user.is_superuser: raise PermissionDenied
@@ -17,6 +36,9 @@ def releases(request):
         archive = tempfile.TemporaryFile()
         with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as bundle:
             bundle.write(backup, 'db.sqlite3')
+            support_backup = backup_support_database()
+            if support_backup:
+                bundle.write(support_backup, 'support.sqlite3')
             root = Path(settings.MEDIA_ROOT)
             if root.exists():
                 for file in root.rglob('*'):

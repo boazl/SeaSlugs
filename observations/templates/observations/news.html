@@ -62,6 +62,7 @@
 </svg>
 <div class="legend"><span><i class="box" style="background:#398781"></i>{{ "תצפיות שפורסמו"|t:lang }} ({{ chart.obs_total }})</span><span><i class="box" style="background:#d7c163"></i>{{ "מינים"|t:lang }} ({{ chart.species_total }})</span><span><i style="background:#ff8a6b"></i>{{ "סרטונים"|t:lang }} ({{ chart.video_total }})</span><span class="legend-note">{{ "סך מצטבר בסוף כל יום"|t:lang }}</span></div>{% elif sea_id %}<h2 id="progress">{{ "התקדמות האתר מאז עלייתו לאוויר"|t:lang }}{% if chart_sea %} · {{ chart_sea }}{% endif %}</h2><p>{{ "אין עדיין תצפיות שפורסמו באזור זה."|t:lang }}</p>{% endif %}
 
+{% if support %}{% include 'observations/_support_news.html' %}{% endif %}
 {% if manager %}<section class="manager"><h2>{{ "נתוני ניהול (למנהלים בלבד)"|t:lang }}</h2>
 <p><small>{{ "הביקורים והכניסות של בעל האתר אינם נספרים, וגם לא דפדפן שבו הופעלה החרגת הסטטיסטיקה."|t:lang }}</small></p>
 <div class="tiles">

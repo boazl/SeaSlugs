@@ -69,6 +69,9 @@ moves only through the admin transfer tools (§10).
   - `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS`
   - `DEFAULT_FROM_EMAIL`
   - `NEW_USER_NOTIFICATION_EMAIL` (recipient of the new-sign-up notice)
+  - Support (§7.7): `SUPPORT_ENABLED`, `PAYPAL_SUPPORT_URL`, `PAYPAL_WEBHOOK_ENABLED`, `PAYPAL_ENV`,
+    `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_RECEIVER_ID`, `PAYPAL_SUPPORT_ITEM_ID` (optional),
+    `SUPPORT_NOTIFICATION_EMAIL`
 - **Never** put secrets in the repository. `.secret_key`, `.env`, `*.sqlite3`, `media/`, `backups/`,
   `staticfiles/`, `*.docx` and Google Docs exports are in `.gitignore`. A Google Docs HTML export once
   leaked API keys into git and triggered a GitHub secret-scanning alert.
@@ -576,6 +579,8 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
 | `/observations/trips/#planning` | The dive trips page's "תכנון מסעות צלילה" section (§7.6) |
 | `/planning/`, `/planning/<trip code>/` | The open plannings; one planning's page (§7.6) |
 | `/forum/trip/<trip code>/` | One dive trip's discussion to send to people, without the forum's picker; a summary trip's page holds its series (§7.5) |
+| `/webhooks/paypal/` | PayPal IPN listener for support payments (§7.7, POST only, CSRF-exempt, verified with PayPal; 503 while `PAYPAL_WEBHOOK_ENABLED` is off) |
+| `/admin/support/` | The owner's support page (superuser): all contributions, filters, sorting, monthly / yearly totals, CSV (§7.7) |
 | `/support/`, `/support/thank-you/` | Voluntary financial support (§7.7): the support page (404 while `SUPPORT_ENABLED` is off) and PayPal's auto-return thank-you page (always reachable, noindex) |
 | `/news/` | News & activity (§7.4): public activity feed, posts, planned trips, progress chart; management data for staff |
 | `/forum/` (`?kind=…`, `?obs=<pk>`), `/forum/new/`, `/forum/<pk>/delete/` | Observations forum (§7.5) |
@@ -870,6 +875,42 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
 - **GA4** (the existing tag only): `support_page_view`, `support_paypal_click` (with `currency: ILS`),
   `support_thank_you_view`; params `language`, `payment_provider`. Never `purchase` or a value.
 - The site is not a registered charity and support gives no tax benefit (Section 46): the page says so.
+
+**Receiving payments automatically** (app `contributions`, `test_support_payments.py`; Sandbox findings 2026-11-25/26):
+
+- The payment link sends **IPN only**: PayPal creates no REST webhook events for Payment Links & Buttons. PayPal's
+  IPN settings (account settings, Notifications, Instant payment notifications) point at
+  `https://seaslugs.org.il/webhooks/paypal/`.
+- **Switch:** `PAYPAL_WEBHOOK_ENABLED` (env, separate from `SUPPORT_ENABLED`). Unset = off in production, on locally,
+  off in the test run. Off: the listener answers 503 (PayPal keeps retrying for days), no news section, no menu count.
+- **Per message** (`contributions/views.paypal_ipn`, `processing.process`): the raw body goes back to PayPal
+  (`cmd=_notify-validate`, `paypal.verify_ipn`); only `VERIFIED` continues (else 400). Then `receiver_id` must be
+  `PAYPAL_RECEIVER_ID` and `test_ipn` must match `PAYPAL_ENV`; the capture is read through the REST API
+  (`PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET`): payee = the receiver, and its order's item id = the payment link's id
+  (`PAYPAL_SUPPORT_ITEM_ID`, default: the last part of `PAYPAL_SUPPORT_URL`). A genuine message that is not ours is
+  acknowledged (200) and recorded as ignored; PayPal unreachable = 502, a missing setting = 503, nothing saved.
+- **Duplicates:** `SupportEvent.event_key` = txn_type | payment_status | txn_id | case_id (unique). `ipn_track_id` is
+  not unique (a dispute's two messages share it). A repeated message changes nothing and sends no second e-mail.
+- **Order:** a refund / reversal / dispute arriving first creates the contribution from the API.
+- **Money** (Decimal, never estimated; missing = "not available"): gross, fee and net from the API's
+  `seller_receivable_breakdown`. Refunds: `payment_status=Refunded`, negative `mc_gross`, `parent_txn_id`; PayPal
+  returns part of the fee (`mc_fee`). Net after refunds = net − (refunded − fee returned) − reversed. A dispute sends
+  `Reversed` (amount on hold) and `new_case` (case id); `Canceled_Reversal` lifts the hold.
+- **Message:** the cart option "Leave a message" (`option_selection1_1`), decoded with the IPN's `charset`
+  (windows-1255 for Hebrew); also in the order (`item_option_selections`).
+- **E-mail** (existing SMTP, to `SUPPORT_NOTIFICATION_EMAIL`): a completed payment ("SeaSlugs – התקבלה תמיכה כספית
+  חדשה"), a refund, a reversal. Sent after saving; `notified_at` only on success; a pending e-mail is retried after the
+  next IPN, from `/admin/support/` and by `python manage.py support_retry_notifications` (not again within 5 minutes).
+- **Owner only** (superuser, checked on the server): the news page section `_support_news.html` (unseen count,
+  totals per currency, this month, latest date, latest five with messages, "seen" buttons), a count on the menu's news
+  item, the admin link, and `/admin/support/` (CSV with a UTF-8 BOM). Opening a page never marks anything seen.
+- **Storage:** its own SQLite file `<DATA_DIR>/support.sqlite3` (`DATABASES['support']`, `contributions/router.py`).
+  Never in table transfers; a full database replacement does not touch it (`db_replace.migration_mismatch` ignores
+  the app's migrations); `start.sh` backs it up (`support-before-deploy-*`) and runs `migrate --database support`;
+  the releases page's backup ZIP includes it. Locally run `python manage.py migrate --database support` once.
+- Nothing personal is stored (no name, e-mail, address, card) and nothing personal or secret is logged. GA4 gets no
+  amounts or transaction data. No refunds, receipts or tax documents from the site.
+
 
 ## 8. Storage of media and documents
 
