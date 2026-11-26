@@ -3,7 +3,7 @@ the edit screen (HomeText rows) replaces its default; clearing the text restores
 
 SECTION_LABELS = {
     'hero': 'פתיחת הדף (כותרת ופסקת פתיחה)',
-    'what': 'מה הן חינניות ים?',
+    'what': 'מי הן חינניות הים?',
     'project': 'המיזם',
     'contribute': 'איך תורמים תצפית?',
     'collection_note': 'שורת האוסף (מעל הגלריה)',
@@ -20,7 +20,7 @@ DEFAULTS = {
 A home for sea slug enthusiasts: an international collection of photos and videos, and a community documenting the sea slugs of the Israeli Mediterranean. Photographed a sea slug? Add an observation.""",
     },
     'what': {
-        'he': """## מה הן חינניות ים?
+        'he': """## מי הן חינניות הים?
 חינניות ים (Sea slugs) הן חלזונות ים שאין להם קונכייה חיצונית, או שיש להן קונכייה מצומצמת מאוד. רבות מהן קטנות, צבעוניות ובעלות דוגמאות מרשימות. הקבוצה המוכרת ביותר היא החשופיות (Nudibranchs), אך חינניות ים כוללות גם קבוצות נוספות, כמו ארנבות ים.
 
 באתר אפשר לדפדף במינים לפי סדרה, משפחה וסוג, לצפות בסרטונים ובתמונות, ולראות היכן כל מין תועד.""",

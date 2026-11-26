@@ -25,7 +25,7 @@ class SupportPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         html = response.content.decode()
         self.assertIn('<html lang="he" dir="rtl">', html)
-        self.assertIn('<h1 id="support-title">תמיכה בפרויקט SeaSlugs</h1>', html)
+        self.assertIn('<h1 id="support-title">תמיכה בפרויקט חינניות הים</h1>', html)
         self.assertIn('<title>תמיכה בפרויקט חקר חשופיות הים | SeaSlugs</title>', html)
         self.assertIn('האתר פתוח לכלל הציבור ללא תשלום.', html)
         self.assertIn('תמיכה בפרויקט באמצעות PayPal', html)
@@ -156,7 +156,7 @@ class ThankYouPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         html = response.content.decode()
         self.assertIn('<html lang="he" dir="rtl">', html)
-        self.assertIn('תודה על תמיכתך בפרויקט SeaSlugs!', html)
+        self.assertIn('תודה על תמיכתך בפרויקט חינניות הים!', html)
         self.assertIn('<a class="button" href="/">חזרה לאתר</a>', html)
 
     def test_english(self):
@@ -277,3 +277,20 @@ class SupportPrivacyTests(TestCase):
         self.assertNotIn('models.Model', source)
         migrations = [p.name for p in (settings.BASE_DIR / 'observations' / 'migrations').glob('*.py')]
         self.assertFalse([m for m in migrations if 'support' in m or 'donat' in m or 'payment' in m])
+
+
+class ProjectHebrewNameTests(TestCase):
+    """The project's Hebrew name is "חינניות הים": the site header's brand on every page type (base.html, the
+    gallery, species, genus, taxon and trip templates) and the Hebrew support / thank-you texts. The umbrella term
+    "חינניות ים" (sea slugs) in running text is unchanged."""
+
+    def test_header_brand_everywhere(self):
+        templates = settings.BASE_DIR / 'observations' / 'templates' / 'observations'
+        for path in [templates / n for n in ('species_page.html', 'genus_page.html', 'taxon_page.html', 'trip_page.html')] + \
+                [settings.BASE_DIR / 'dist' / 'index.html']:
+            self.assertRegex(path.read_text(), r'class="brand-he">חינניות\s+הים</span>', path.name)
+        self.assertIn('<span class="brand-he">חינניות הים</span>', self.client.get('/news/').content.decode())
+        self.assertIn('<span class="brand-he">Sea slugs</span>', self.client.get('/news/?lang=en').content.decode())
+
+    def test_thank_you_names_the_project(self):
+        self.assertIn('תודה על תמיכתך בפרויקט חינניות הים!', self.client.get('/support/thank-you/').content.decode())

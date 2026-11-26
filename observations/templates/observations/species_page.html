@@ -29,7 +29,7 @@ gtag('config', 'G-CPGTC09P2P');</script>
 <body>
     <header class="masthead"><a class="brand" href="{{ '/'|with_lang:lang }}" aria-label="SeaSlugs — דף הבית"><span class="brand-name"
                 dir="ltr">SeaSlugs<span class="brand-dot">.</span></span><span class="brand-he">חינניות
-                ים</span></a>{% include 'observations/account_menu.html' %}<a class="language-switch" href="{{ lang_toggle_url }}">{% if lang == 'en' %}עברית{% else %}English{% endif %}</a></header>
+                הים</span></a>{% include 'observations/account_menu.html' %}<a class="language-switch" href="{{ lang_toggle_url }}">{% if lang == 'en' %}עברית{% else %}English{% endif %}</a></header>
     <main class="species-page">
         {% for message in messages %}<p class="notice{% if message.extra_tags %} {{ message.extra_tags }}{% endif %}">{{ message|t:lang }}</p>{% endfor %}
         <nav class="breadcrumb" aria-label="מיקום בטקסונומיה">

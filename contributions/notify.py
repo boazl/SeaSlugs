@@ -86,7 +86,7 @@ def _send(obj, subject, lines):
 def notify_contribution(c):
     if c.payment_status != SupportContribution.PaymentStatus.COMPLETED:
         return False
-    return _send(c, SUBJECT_NEW, ['התקבלה תמיכה כספית חדשה בפרויקט SeaSlugs, מאומתת מול PayPal.', ''] +
+    return _send(c, SUBJECT_NEW, ['התקבלה תמיכה כספית חדשה בפרויקט חינניות הים, מאומתת מול PayPal.', ''] +
                  contribution_lines(c) + footer())
 
 

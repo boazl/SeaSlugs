@@ -1,5 +1,5 @@
-{% extends 'observations/base.html' %}{% load seaslugs_i18n seo %}{% block title %}{{ "תמיכה בפרויקט חקר חשופיות הים | SeaSlugs"|t:lang }}{% endblock %}{% block share_meta %}<meta name="description" content="{{ "תמיכה וולונטרית בפרויקט SeaSlugs, מיזם עצמאי לתיעוד ולחקר חשופיות הים וחינניות הים ולחקר הים התיכון של ישראל: מינים חדשים, הגירה וטרופיזציה."|t:lang }}">
-{% if photo %}{% share_meta "תמיכה בפרויקט SeaSlugs"|t:lang "" "תמיכה וולונטרית בפרויקט SeaSlugs, מיזם עצמאי לתיעוד ולחקר חשופיות הים וחינניות הים ולחקר הים התיכון של ישראל: מינים חדשים, הגירה וטרופיזציה."|t:lang photo.url %}{% else %}{% share_meta "תמיכה בפרויקט SeaSlugs"|t:lang "" "תמיכה וולונטרית בפרויקט SeaSlugs, מיזם עצמאי לתיעוד ולחקר חשופיות הים וחינניות הים ולחקר הים התיכון של ישראל: מינים חדשים, הגירה וטרופיזציה."|t:lang %}{% endif %}{% endblock %}{% block site_hero %}{% endblock %}{% block content %}<style>
+{% extends 'observations/base.html' %}{% load seaslugs_i18n seo %}{% block title %}{{ "תמיכה בפרויקט חקר חשופיות הים | SeaSlugs"|t:lang }}{% endblock %}{% block share_meta %}<meta name="description" content="{{ "תמיכה וולונטרית בפרויקט חינניות הים (SeaSlugs), מיזם עצמאי לתיעוד ולחקר חשופיות הים וחינניות הים ולחקר הים התיכון של ישראל: מינים חדשים, הגירה וטרופיזציה."|t:lang }}">
+{% if photo %}{% share_meta "תמיכה בפרויקט חינניות הים"|t:lang "" "תמיכה וולונטרית בפרויקט חינניות הים (SeaSlugs), מיזם עצמאי לתיעוד ולחקר חשופיות הים וחינניות הים ולחקר הים התיכון של ישראל: מינים חדשים, הגירה וטרופיזציה."|t:lang photo.url %}{% else %}{% share_meta "תמיכה בפרויקט חינניות הים"|t:lang "" "תמיכה וולונטרית בפרויקט חינניות הים (SeaSlugs), מיזם עצמאי לתיעוד ולחקר חשופיות הים וחינניות הים ולחקר הים התיכון של ישראל: מינים חדשים, הגירה וטרופיזציה."|t:lang %}{% endif %}{% endblock %}{% block site_hero %}{% endblock %}{% block content %}<style>
 .support{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:40px;align-items:start;margin:8px 0 56px}
 .support h1{font-size:32px;line-height:1.25;margin:8px 0 18px}
 .support p{margin:0 0 14px}
@@ -21,8 +21,8 @@
 </style>
 <div class="support">
 <section class="support-text" aria-labelledby="support-title">
-<h1 id="support-title">{{ "תמיכה בפרויקט SeaSlugs"|t:lang }}</h1>
-<p class="lead">{{ "פרויקט SeaSlugs הוא מיזם עצמאי לתיעוד ולחקר חשופיות וחינניות הים, המגוון הביולוגי הימי והשינויים המתרחשים בים התיכון."|t:lang }}</p>
+<h1 id="support-title">{{ "תמיכה בפרויקט חינניות הים"|t:lang }}</h1>
+<p class="lead">{{ "פרויקט חינניות הים הוא מיזם עצמאי לתיעוד ולחקר חשופיות וחינניות הים, המגוון הביולוגי הימי והשינויים המתרחשים בים התיכון."|t:lang }}</p>
 <p>{{ "מטרתו המרכזית של הפרויקט היא להרחיב את הידע על חשופיות הים בחופי הים התיכון של ישראל, לתעד הופעת מינים חדשים, לעקוב אחר תהליכי הטרופיזציה ולעודד שיתוף פעולה עם צוללים וצלמים תת־ימיים."|t:lang }}</p>
 <p class="free">{{ "האתר פתוח לכלל הציבור ללא תשלום."|t:lang }}</p>
 <p>{{ "אם אתם מוצאים עניין או ערך בפרויקט ומעוניינים לסייע בהמשך פעילותו, תוכלו לעשות זאת באמצעות תמיכה כספית וולונטרית."|t:lang }}</p>

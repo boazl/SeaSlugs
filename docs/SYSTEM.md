@@ -728,6 +728,8 @@ Counts are from the local DB on 2026-10-30. Table names are Django's defaults un
 - **Gallery strings:** `app.js` has its own lookup and swaps both languages without a reload.
 - The header (`dist/site-header.css`, `account_menu.html`) is identical on all pages: brand, credit
   line, icon menu, language button and opening panel.
+  The brand's Hebrew name is the project's name, "חינניות הים" (English "Sea slugs"); in running text the
+  umbrella term stays "חינניות ים".
 
 ### 7.4 News & activity page and the activity log (`activity.py`, `news.py`, migrations `0086`–`0087`)
 

@@ -26,7 +26,7 @@ class HomeContentTests(SeoFixture):
 
     def test_hebrew_home_has_the_content_without_javascript(self):
         html = self.page('/')
-        for text in ('חינניות ים: מידע, תמונות ומיזם מחקר בים התיכון', 'מה הן חינניות ים?',
+        for text in ('חינניות ים: מידע, תמונות ומיזם מחקר בים התיכון', 'מי הן חינניות הים?',
                      'המיזם: חינניות ים בים התיכון של ישראל', 'איך תורמים תצפית?', 'הוסיפו תצפית',
                      'בעיקר מהפיליפינים'):
             self.assertIn(text, html)
@@ -119,7 +119,7 @@ class HomeContentTests(SeoFixture):
         self.assertEqual(set(data), {'he', 'en'})
         self.assertEqual(set(data['he']), set(data['en']))
         self.assertIn('What are sea slugs?', data['en']['what'])
-        self.assertIn('מה הן חינניות ים?', data['he']['what'])
+        self.assertIn('מי הן חינניות הים?', data['he']['what'])
 
     def test_the_gallery_hooks_the_script_needs_are_still_there(self):
         html = self.page('/')
@@ -209,7 +209,7 @@ class HomeTextEditTests(SeoFixture):
         for key in ('hero', 'what', 'project', 'contribute', 'collection_note', 'footer_invite', 'meta_title', 'meta_description'):
             for lang in ('he', 'en'):
                 self.assertIn(f'name="{key}__{lang}"', html)
-        self.assertIn('מה הן חינניות ים?', html)
+        self.assertIn('מי הן חינניות הים?', html)
         self.assertIn('[[הוספת תצפית]]', html)
 
     def test_an_edited_text_replaces_the_default_in_that_language_only(self):
@@ -220,7 +220,7 @@ class HomeTextEditTests(SeoFixture):
         he = self.page('/')
         self.assertIn('<h2>כותרת חדשה</h2>', he)
         self.assertIn('<p>פסקה חדשה עם <strong>הדגשה</strong>.</p>', he)
-        self.assertNotIn('מה הן חינניות ים?', he.split('<body>')[1].split('<script')[0])
+        self.assertNotIn('מי הן חינניות הים?', he.split('<body>')[1].split('<script')[0])
         self.assertIn('What are sea slugs?', self.page('/?lang=en'))
         import json, re
         data = json.loads(re.search(r'id="home-content" type="application/json">(.*?)</script>', he, re.S).group(1))
@@ -233,7 +233,7 @@ class HomeTextEditTests(SeoFixture):
         self.assertEqual(HomeText.objects.filter(key='what').count(), 1)
         self.post(what__he='')
         self.assertEqual(HomeText.objects.count(), 0)
-        self.assertIn('מה הן חינניות ים?', self.page('/'))
+        self.assertIn('מי הן חינניות הים?', self.page('/'))
 
     def test_saving_the_untouched_form_stores_nothing(self):
         from .models import HomeText
@@ -263,7 +263,7 @@ class BeforeMigrationTests(SeoFixture):
         with mock.patch('observations.models.HomeText.objects') as manager:
             manager.all.side_effect = OperationalError('no such table')
             manager.filter.side_effect = OperationalError('no such table')
-            self.assertIn('מה הן חינניות ים?', self.page('/'))
+            self.assertIn('מי הן חינניות הים?', self.page('/'))
 
 
 class LanguageLinksTests(SeoFixture):
